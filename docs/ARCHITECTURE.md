@@ -1,5 +1,11 @@
 # Unity — Architecture & Tech Stack
 
+> **MVP scope note:** Unity's MVP covers peer-to-peer rentals, buying & selling,
+> and affiliate marketing only. Loans, credit building, credit scoring, credit
+> bureau reporting, and NCR registration are explicitly out of scope and must
+> not be built or planned for. Risk assessment is handled by the Risk Engine
+> (`RISK_ENGINE.md`), not a credit score.
+
 ## Recommended Stack
 
 ### Frontend
@@ -84,15 +90,27 @@ unity/
 ### listings
 - id, merchant_id (→ profiles)
 - title, description, category, condition
-- daily_rate, weekly_rate
+- listing_type: 'rental' | 'sale'
+- daily_rate, weekly_rate (rental only) / sale_price, quantity_available (sale only)
 - deposit_required (bool), deposit_amount
 - min_rental_days
 - shipping_payer: 'renter' | 'merchant' | 'split' | 'negotiate'
-- min_unity_score, requires_credit_score, min_credit_score
+- min_unity_score
+- risk_tier: 'low' | 'medium' | 'high' — assigned automatically by the Risk Engine, not user-settable. See `RISK_ENGINE.md`.
 - accepts_affiliates (bool), affiliate_commission_rate
 - status: 'draft' | 'active' | 'paused' | 'rented'
 - ownership_verified (bool)
 - created_at
+
+### orders (one-time purchases — parallel to `bookings`)
+- id, listing_id (→ listings), buyer_id (→ profiles), seller_id (→ profiles)
+- quantity, unit_price, shipping_fee, total_amount
+- status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'disputed' | 'cancelled'
+- payfast_payment_id
+- affiliate_id, affiliate_commission_amount
+- created_at
+
+See `BUYING_SELLING.md` for the full design and rationale.
 
 ### bookings
 - id, listing_id (→ listings), renter_id (→ profiles), merchant_id (→ profiles)

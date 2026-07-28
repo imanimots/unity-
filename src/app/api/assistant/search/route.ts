@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { z } from 'zod'
+import { checkRateLimit, getClientKey } from '@/lib/rate-limit'
+
+const bodySchema = z.object({
+  query: z.string().min(1).max(500),
+})
+
+// Escape ILIKE wildcard characters so user input can't broaden its own
+// pattern match (e.g. a query of "%" would otherwise match every row).
+function escapeIlike(value: string): string {
+  return value.replace(/[%_]/g, (c) => `\\${c}`)
+}
 
 async function generateEmbedding(text: string): Promise<number[] | null> {
   const apiKey = process.env.VOYAGE_API_KEY
@@ -30,15 +42,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ results: [] })
   }
 
-  let body: { query?: string }
+  const rate = checkRateLimit(`search:${getClientKey(request)}`, 30, 60_000)
+  if (!rate.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
+  let json: unknown
   try {
-    body = await request.json()
+    json = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   }
 
-  const { query } = body
-  if (!query) return NextResponse.json({ error: 'query is required' }, { status: 400 })
+  const parsed = bodySchema.safeParse(json)
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid fields', issues: parsed.error.issues }, { status: 400 })
+  }
+  const { query } = parsed.data
 
   const admin = createClient(url, serviceKey)
 
@@ -68,7 +88,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Last resort: ILIKE on any keyword
-  const keyword = query.split(/\s+/).slice(0, 2).join('%')
+  const keyword = query.split(/\s+/).slice(0, 2).map(escapeIlike).join('%')
   const { data: likeData } = await admin
     .from('knowledge_base')
     .select('content')

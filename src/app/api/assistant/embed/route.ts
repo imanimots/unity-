@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { z } from 'zod'
 import { KNOWLEDGE_BASE_ENTRIES } from '@/lib/assistant/seed-data'
+import { requireAdmin } from '@/lib/supabase/require-admin'
+import { checkRateLimit, getClientKey } from '@/lib/rate-limit'
+
+const bodySchema = z.object({
+  text: z.string().min(1).max(20_000).optional(),
+  category: z.string().max(64).optional(),
+  title: z.string().max(200).optional(),
+  seed: z.boolean().optional(),
+})
 
 // Embeddings require a vector embedding model.
 // Anthropic recommends Voyage AI (https://www.voyageai.com) — set VOYAGE_API_KEY.
@@ -34,12 +44,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 })
   }
 
-  let body: { text?: string; category?: string; title?: string; seed?: boolean }
+  const rate = checkRateLimit(`embed:${getClientKey(request)}`, 10, 60_000)
+  if (!rate.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
+  // Writes the knowledge base that drives the AI assistant's answers —
+  // admin-only, not a public endpoint.
+  const adminAuth = await requireAdmin()
+  if (!adminAuth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  let json: unknown
   try {
-    body = await request.json()
+    json = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   }
+
+  const parsed = bodySchema.safeParse(json)
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid fields', issues: parsed.error.issues }, { status: 400 })
+  }
+  const body = parsed.data
 
   const admin = createClient(url, serviceKey)
 

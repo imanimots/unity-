@@ -167,8 +167,7 @@ create table listings (
   insurance_amount numeric(10,2),
   shipping_payer text check (shipping_payer in ('renter', 'merchant', 'split', 'negotiate')) default 'renter',
   min_unity_score numeric(3,2) default 0,
-  requires_credit_score boolean default false,
-  min_credit_score int,
+  risk_tier text check (risk_tier in ('low', 'medium', 'high')) not null default 'low', -- assigned automatically, see docs/RISK_ENGINE.md
   accepts_affiliates boolean default false,
   affiliate_commission_rate numeric(5,2) default 0,
   status text check (status in ('draft', 'pending', 'active', 'paused', 'rented')) default 'draft',

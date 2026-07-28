@@ -1,5 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { z } from 'zod'
+import { checkRateLimit, getClientKey } from '@/lib/rate-limit'
+
+const bodySchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'assistant', 'system']),
+        content: z.string().max(4_000),
+      })
+    )
+    .max(20)
+    .optional(),
+  pageUrl: z.string().max(500).optional(),
+  knowledgeContext: z.string().max(8_000).optional(),
+})
 
 const BASE_SYSTEM_PROMPT = `You are the Unity Assistant — the AI helper for Unity, South Africa's peer-to-peer rental marketplace.
 
@@ -95,18 +111,24 @@ function getMockResponse(userMessage: string): string {
 export async function POST(request: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY
 
-  let body: {
-    messages?: { role: string; content: string }[]
-    pageUrl?: string
-    knowledgeContext?: string
+  const rate = checkRateLimit(`chat:${getClientKey(request)}`, 20, 60_000)
+  if (!rate.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
+
+  let json: unknown
   try {
-    body = await request.json()
+    json = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   }
 
-  const { messages = [], pageUrl, knowledgeContext } = body
+  const parsed = bodySchema.safeParse(json)
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid fields', issues: parsed.error.issues }, { status: 400 })
+  }
+
+  const { messages = [], pageUrl, knowledgeContext } = parsed.data
   const systemPrompt = buildSystemPrompt(pageUrl, knowledgeContext)
   const encoder = new TextEncoder()
 

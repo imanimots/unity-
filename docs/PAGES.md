@@ -104,7 +104,6 @@
 ### `/onboarding` — Post-KYC Onboarding Quiz
 - Q1: What do you rent most? (sets recommendation engine)
 - Q2: Preferred rental length? (pre-fills filters)
-- Q3: Enable credit building? (opt-in)
 
 ---
 

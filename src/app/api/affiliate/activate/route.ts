@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
+import { getRequestProfile } from '@/lib/supabase/require-admin'
+import { checkRateLimit, getClientKey } from '@/lib/rate-limit'
 
 function generateAffiliateCode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -9,28 +9,21 @@ function generateAffiliateCode(): string {
   return `AFC-${code}`
 }
 
-export async function POST(_request: NextRequest) {
+export async function POST(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!url || !anonKey || !serviceKey) {
+  if (!url || !serviceKey) {
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 })
   }
 
-  const cookieStore = await cookies()
+  const rate = checkRateLimit(`activate:${getClientKey(request)}`, 5, 60_000)
+  if (!rate.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
 
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll() { return cookieStore.getAll() },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-      },
-    },
-  })
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const requester = await getRequestProfile()
+  if (!requester) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createClient(url, serviceKey)
   const affiliateCode = generateAffiliateCode()
@@ -38,7 +31,7 @@ export async function POST(_request: NextRequest) {
   const { data, error } = await admin
     .from('profiles')
     .update({ is_affiliate: true, affiliate_code: affiliateCode })
-    .eq('id', user.id)
+    .eq('id', requester.userId)
     .select('affiliate_code')
     .single()
 

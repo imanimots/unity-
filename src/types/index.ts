@@ -6,6 +6,13 @@ export type ShippingPayer = 'renter' | 'merchant' | 'split' | 'negotiate'
 export type ItemCondition = 'new' | 'like_new' | 'good' | 'fair'
 export type MediaType = 'photo' | 'video' | 'ownership_proof'
 
+/**
+ * Automatically assigned by the Risk Engine (server-side trigger) — never
+ * set or overridden by merchants, renters, or the client. See
+ * docs/RISK_ENGINE.md.
+ */
+export type RiskTier = 'low' | 'medium' | 'high'
+
 export interface Profile {
   id: string
   full_name: string | null
@@ -44,8 +51,7 @@ export interface Listing {
   insurance_amount: number | null
   shipping_payer: ShippingPayer
   min_unity_score: number
-  requires_credit_score: boolean
-  min_credit_score: number | null
+  risk_tier: RiskTier
   accepts_affiliates: boolean
   affiliate_commission_rate: number
   status: ListingStatus

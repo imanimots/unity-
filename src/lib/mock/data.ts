@@ -1,4 +1,5 @@
 import type { Profile, Listing, ListingMedia, Booking, Review } from '@/types'
+import { calculateRiskTier } from '@/lib/risk/engine'
 
 export const MOCK_PROFILES: Profile[] = [
   {
@@ -141,7 +142,7 @@ export const MOCK_MEDIA: Record<string, ListingMedia[]> = {
   ],
 }
 
-export const MOCK_LISTINGS: Listing[] = [
+const RAW_LISTINGS: Omit<Listing, 'risk_tier'>[] = [
   {
     id: 'listing-1',
     merchant_id: 'user-2',
@@ -158,8 +159,6 @@ export const MOCK_LISTINGS: Listing[] = [
     insurance_amount: null,
     shipping_payer: 'renter',
     min_unity_score: 3.5,
-    requires_credit_score: false,
-    min_credit_score: null,
     accepts_affiliates: true,
     affiliate_commission_rate: 10,
     status: 'active',
@@ -184,8 +183,6 @@ export const MOCK_LISTINGS: Listing[] = [
     insurance_amount: null,
     shipping_payer: 'renter',
     min_unity_score: 0,
-    requires_credit_score: false,
-    min_credit_score: null,
     accepts_affiliates: false,
     affiliate_commission_rate: 0,
     status: 'active',
@@ -210,8 +207,6 @@ export const MOCK_LISTINGS: Listing[] = [
     insurance_amount: 50,
     shipping_payer: 'merchant',
     min_unity_score: 4.0,
-    requires_credit_score: false,
-    min_credit_score: null,
     accepts_affiliates: true,
     affiliate_commission_rate: 8,
     status: 'active',
@@ -236,8 +231,6 @@ export const MOCK_LISTINGS: Listing[] = [
     insurance_amount: null,
     shipping_payer: 'renter',
     min_unity_score: 0,
-    requires_credit_score: false,
-    min_credit_score: null,
     accepts_affiliates: false,
     affiliate_commission_rate: 0,
     status: 'active',
@@ -262,8 +255,6 @@ export const MOCK_LISTINGS: Listing[] = [
     insurance_amount: 100,
     shipping_payer: 'renter',
     min_unity_score: 4.5,
-    requires_credit_score: false,
-    min_credit_score: null,
     accepts_affiliates: true,
     affiliate_commission_rate: 12,
     status: 'active',
@@ -288,8 +279,6 @@ export const MOCK_LISTINGS: Listing[] = [
     insurance_amount: null,
     shipping_payer: 'renter',
     min_unity_score: 0,
-    requires_credit_score: false,
-    min_credit_score: null,
     accepts_affiliates: false,
     affiliate_commission_rate: 0,
     status: 'active',
@@ -314,8 +303,6 @@ export const MOCK_LISTINGS: Listing[] = [
     insurance_amount: null,
     shipping_payer: 'split',
     min_unity_score: 3.0,
-    requires_credit_score: false,
-    min_credit_score: null,
     accepts_affiliates: true,
     affiliate_commission_rate: 7,
     status: 'active',
@@ -340,8 +327,6 @@ export const MOCK_LISTINGS: Listing[] = [
     insurance_amount: null,
     shipping_payer: 'renter',
     min_unity_score: 3.5,
-    requires_credit_score: false,
-    min_credit_score: null,
     accepts_affiliates: false,
     affiliate_commission_rate: 0,
     status: 'active',
@@ -366,8 +351,6 @@ export const MOCK_LISTINGS: Listing[] = [
     insurance_amount: null,
     shipping_payer: 'merchant',
     min_unity_score: 0,
-    requires_credit_score: false,
-    min_credit_score: null,
     accepts_affiliates: true,
     affiliate_commission_rate: 15,
     status: 'active',
@@ -392,8 +375,6 @@ export const MOCK_LISTINGS: Listing[] = [
     insurance_amount: 30,
     shipping_payer: 'renter',
     min_unity_score: 3.5,
-    requires_credit_score: false,
-    min_credit_score: null,
     accepts_affiliates: false,
     affiliate_commission_rate: 0,
     status: 'active',
@@ -418,8 +399,6 @@ export const MOCK_LISTINGS: Listing[] = [
     insurance_amount: null,
     shipping_payer: 'merchant',
     min_unity_score: 0,
-    requires_credit_score: false,
-    min_credit_score: null,
     accepts_affiliates: true,
     affiliate_commission_rate: 10,
     status: 'active',
@@ -444,8 +423,6 @@ export const MOCK_LISTINGS: Listing[] = [
     insurance_amount: 80,
     shipping_payer: 'renter',
     min_unity_score: 4.0,
-    requires_credit_score: false,
-    min_credit_score: null,
     accepts_affiliates: false,
     affiliate_commission_rate: 0,
     status: 'active',
@@ -471,8 +448,6 @@ export const MOCK_LISTINGS: Listing[] = [
     insurance_amount: 60,
     shipping_payer: 'renter',
     min_unity_score: 3.5,
-    requires_credit_score: false,
-    min_credit_score: null,
     accepts_affiliates: true,
     affiliate_commission_rate: 8,
     status: 'active',
@@ -497,8 +472,6 @@ export const MOCK_LISTINGS: Listing[] = [
     insurance_amount: null,
     shipping_payer: 'renter',
     min_unity_score: 0,
-    requires_credit_score: false,
-    min_credit_score: null,
     accepts_affiliates: false,
     affiliate_commission_rate: 0,
     status: 'active',
@@ -523,8 +496,6 @@ export const MOCK_LISTINGS: Listing[] = [
     insurance_amount: null,
     shipping_payer: 'renter',
     min_unity_score: 0,
-    requires_credit_score: false,
-    min_credit_score: null,
     accepts_affiliates: false,
     affiliate_commission_rate: 0,
     status: 'paused',
@@ -549,8 +520,6 @@ export const MOCK_LISTINGS: Listing[] = [
     insurance_amount: null,
     shipping_payer: 'renter',
     min_unity_score: 3.0,
-    requires_credit_score: false,
-    min_credit_score: null,
     accepts_affiliates: false,
     affiliate_commission_rate: 0,
     status: 'draft',
@@ -560,6 +529,19 @@ export const MOCK_LISTINGS: Listing[] = [
     media: MOCK_MEDIA['listing-16'],
   },
 ]
+
+// risk_tier is never hand-authored — it's derived the same way the DB
+// trigger derives it (see docs/RISK_ENGINE.md), so mock data exercises the
+// same rules real listings will.
+export const MOCK_LISTINGS: Listing[] = RAW_LISTINGS.map((listing) => ({
+  ...listing,
+  risk_tier: calculateRiskTier({
+    category: listing.category,
+    dailyRate: listing.daily_rate,
+    merchantKycStatus: listing.merchant?.kyc_status ?? 'none',
+    merchantUnityScore: listing.merchant?.unity_score ?? 0,
+  }),
+}))
 
 export const MOCK_REVIEWS: (Review & { reviewer: Profile })[] = [
   {

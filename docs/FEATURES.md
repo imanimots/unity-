@@ -3,6 +3,13 @@
 ## MVP Scope (Launch)
 Focus on these features first. Everything marked [POST-MVP] comes later.
 
+The MVP covers **peer-to-peer rentals, buying & selling, and affiliate
+marketing only.** Loans, credit building, credit scoring, credit bureau
+reporting, and NCR registration workflows must not be built or planned for.
+Risk is assessed automatically by the Risk Engine (`RISK_ENGINE.md`), not a
+credit score — see that doc for the LOW/MEDIUM/HIGH rules. Buying & selling
+architecture is documented in `BUYING_SELLING.md`.
+
 ---
 
 ## 1. Authentication & Onboarding
@@ -17,8 +24,8 @@ Focus on these features first. Everything marked [POST-MVP] comes later.
   - Liveness check / biometrics
   - AML/PEP screening
 - [ ] Accept Terms & Conditions + Privacy Policy
-- [ ] POPIA consent for data sharing (credit building opt-in)
-- [ ] Onboarding quiz (3 questions): most-rented category, preferred rental length, credit-building opt-in
+- [ ] POPIA consent for data sharing
+- [ ] Onboarding quiz (2 questions): most-rented category, preferred rental length
 
 ---
 
@@ -36,8 +43,8 @@ Focus on these features first. Everything marked [POST-MVP] comes later.
   - Minimum rental days (e.g., 1–30)
   - Shipping payer: Renter / Merchant / Split / Negotiate
   - Minimum Unity Score required
-  - Credit score required: Yes/No + threshold
-- [ ] Listing verification (auto + manual for high-value items)
+  - Risk tier: assigned automatically by the Risk Engine (LOW/MEDIUM/HIGH) — not merchant-configurable, see `RISK_ENGINE.md`
+- [ ] Listing verification (auto + manual review for HIGH risk tier)
 - [ ] Optional: Pro photography add-on [POST-MVP]
 
 ### Browse & Search (Renter)
@@ -65,7 +72,7 @@ Focus on these features first. Everything marked [POST-MVP] comes later.
 ## 3. Booking Flow
 
 - [ ] Date picker (respects min rental days + availability calendar)
-- [ ] Eligibility check (Unity Score, credit score vs merchant requirements)
+- [ ] Eligibility check (Unity Score vs merchant requirements; risk tier requirements — deposit/insurance/manual review — enforced per `RISK_ENGINE.md`)
 - [ ] Booking request sent to merchant
 - [ ] Merchant approve/decline (with optional filtered chat for clarification)
 - [ ] On approval: payment checkout
@@ -107,7 +114,6 @@ Focus on these features first. Everything marked [POST-MVP] comes later.
 - [ ] Booking history
 - [ ] Wishlist
 - [ ] Unity Score display + breakdown
-- [ ] Credit building progress [POST-MVP]
 - [ ] Notifications centre
 
 ### Merchant Dashboard
@@ -178,12 +184,24 @@ Focus on these features first. Everything marked [POST-MVP] comes later.
 
 ---
 
+## 12. Buying & Selling (MVP)
+
+Core MVP scope alongside rentals. Full schema design in `BUYING_SELLING.md`.
+
+- [ ] Merchant creates a sale listing (same wizard as rentals, `listing_type: 'sale'`): title, description, category, condition, photos, proof of ownership, sale price, quantity
+- [ ] Risk tier assigned automatically (see `RISK_ENGINE.md`) using sale price instead of daily rate
+- [ ] Renter/buyer purchases via checkout: item price + shipping fee, payment via PayFast
+- [ ] Funds held in escrow until delivery is confirmed by the buyer
+- [ ] Reviews, disputes, and filtered chat work the same way as rentals (shared infrastructure, see `orders` table)
+- [ ] Affiliate promotion works on sale listings the same way as rental listings
+
+---
+
 ## POST-MVP Features
 
-- Credit builder (bureau reporting)
 - Rent-to-buy option
 - Property rentals
 - Zero-interest loans
 - Unity as insurance provider
 - Raffles / giveaways
-- Buy & sell marketplace
+- Credit building / credit scoring / credit bureau reporting / NCR registration — explicitly excluded, not just deferred; see MVP scope note at top of this file

@@ -11,7 +11,12 @@ This file is the master instruction set for Claude Code when working on the Unit
 
 Unity is a peer-to-peer rental marketplace launching in South Africa (JHB, Cape Town, Durban).
 Users can rent out items they own, or rent from others instead of buying.
-Long-term: buying/selling, credit building, insurance, zero-interest loans.
+MVP scope: peer-to-peer rentals, buying & selling, and affiliate marketing.
+Explicitly out of scope — do not build or plan: loans, collateral-backed
+lending, credit building, credit scoring, credit bureau reporting, or NCR
+registration workflows. Risk is assessed by the Risk Engine, not a credit
+score — see `docs/RISK_ENGINE.md`. Buying & selling design is in
+`docs/BUYING_SELLING.md`.
 
 ---
 

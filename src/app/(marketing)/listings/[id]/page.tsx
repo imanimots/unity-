@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ShieldCheck, Star, MapPin, ArrowLeft, ArrowRight, CheckCircle, UserCheck } from 'lucide-react'
 import { getListing, getSimilarListings, getListingReviews, getAverageRating } from '@/lib/data/listings'
+import { getRiskRequirements, RISK_TIER_LABELS } from '@/lib/risk/engine'
 import { ImageGallery } from '@/components/listings/image-gallery'
 import { BookingCard } from '@/components/listings/booking-card'
 import { ListingCard } from '@/components/listings/listing-card'
@@ -53,7 +54,9 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
   const city = CITY_BY_MERCHANT[listing.merchant_id] ?? 'South Africa'
   const categoryLabel = CATEGORIES.find((c) => c.id === listing.category)?.label ?? listing.category
   const categoryIcon = CATEGORIES.find((c) => c.id === listing.category)?.icon ?? '📦'
-  const hasRequirements = listing.min_unity_score > 0 || listing.deposit_required || listing.requires_credit_score
+  const riskRequirements = getRiskRequirements(listing.risk_tier)
+  const hasRequirements =
+    listing.min_unity_score > 0 || listing.deposit_required || riskRequirements.ownershipVerificationRequired
 
   return (
     <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen">
@@ -133,6 +136,17 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                   Renter Requirements
                 </h2>
                 <div className="rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-5 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+                        {RISK_TIER_LABELS[listing.risk_tier]} item
+                      </p>
+                      <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-0.5">
+                        Assigned automatically by Unity based on item value, category, and merchant standing.
+                      </p>
+                    </div>
+                  </div>
                   {listing.min_unity_score > 0 && (
                     <div className="flex items-start gap-3">
                       <Star size={16} className="text-amber-500 fill-amber-500 shrink-0 mt-0.5" />
@@ -159,15 +173,29 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                       </div>
                     </div>
                   )}
-                  {listing.requires_credit_score && (
+                  {riskRequirements.ownershipVerificationRequired && (
                     <div className="flex items-start gap-3">
                       <UserCheck size={16} className="text-amber-500 shrink-0 mt-0.5" />
                       <div>
                         <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
-                          Identity verification required
+                          Ownership verification required
                         </p>
                         <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-0.5">
-                          You must have completed KYC verification to rent this item.
+                          This item&apos;s risk tier requires Unity to verify the merchant&apos;s proof of ownership
+                          before it can be rented.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {riskRequirements.insuranceRequired && (
+                    <div className="flex items-start gap-3">
+                      <ShieldCheck size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+                          Insurance required
+                        </p>
+                        <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-0.5">
+                          High risk items must carry insurance cover for the rental period.
                         </p>
                       </div>
                     </div>

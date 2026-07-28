@@ -9,6 +9,7 @@ import {
   Calendar, CreditCard, Star, Info, UserCheck,
 } from 'lucide-react'
 import type { Listing } from '@/types'
+import { getRiskRequirements, RISK_TIER_LABELS } from '@/lib/risk/engine'
 import Image from 'next/image'
 
 type Step = 'dates' | 'review' | 'payment' | 'confirmed'
@@ -118,29 +119,6 @@ function ScoreGate({ listingId, required, actual }: { listingId: string; require
   )
 }
 
-function CreditGate({ listingId }: { listingId: string }) {
-  return (
-    <div className="max-w-md mx-auto px-4 py-20 text-center">
-      <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-6">
-        <UserCheck size={32} className="text-amber-500" />
-      </div>
-      <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] mb-3">
-        Identity Verification Required
-      </h1>
-      <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-8">
-        This merchant requires renters to have a verified identity before booking. Complete KYC verification — it
-        takes less than 2 minutes.
-      </p>
-      <Link
-        href={`/verify?redirectTo=/listings/${listingId}/book`}
-        className="inline-flex items-center gap-2 px-6 py-3.5 bg-[#8B1A1A] text-white font-semibold rounded-xl text-sm hover:bg-[#7A1616] transition-colors"
-      >
-        <UserCheck size={15} /> Verify my identity
-      </Link>
-    </div>
-  )
-}
-
 // ─── Main booking flow ────────────────────────────────────────────────────────
 
 export function BookingFlow({ listing }: { listing: Listing }) {
@@ -205,15 +183,14 @@ export function BookingFlow({ listing }: { listing: Listing }) {
     setStep('confirmed')
   }
 
+  const riskRequirements = getRiskRequirements(listing.risk_tier)
+
   // Eligibility checks — evaluated after state is initialized
-  if (!kycApproved && !listing.requires_credit_score) {
+  if (!kycApproved) {
     return <KycGate listingId={listing.id} />
   }
   if (listing.min_unity_score > 0 && renterScore < listing.min_unity_score) {
     return <ScoreGate listingId={listing.id} required={listing.min_unity_score} actual={renterScore} />
-  }
-  if (listing.requires_credit_score && !kycApproved) {
-    return <CreditGate listingId={listing.id} />
   }
 
   const ListingSummary = () => (
@@ -427,6 +404,17 @@ export function BookingFlow({ listing }: { listing: Listing }) {
               </span>
             </div>
           </div>
+
+          {(riskRequirements.ownershipVerificationRequired || riskRequirements.insuranceRequired) && (
+            <div className="flex items-start gap-2 mb-5 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl px-4 py-3">
+              <UserCheck size={14} className="shrink-0 mt-0.5" />
+              <span>
+                {RISK_TIER_LABELS[listing.risk_tier]} item — this listing has been ownership-verified
+                {riskRequirements.insuranceRequired ? ' and carries mandatory insurance' : ''} per Unity&apos;s Risk
+                Engine.
+              </span>
+            </div>
+          )}
 
           <p className="section-label mb-3">Price breakdown</p>
           <PriceBreakdown />

@@ -12,7 +12,7 @@ export const KNOWLEDGE_BASE_ENTRIES = [
   {
     title: 'How to list an item as a merchant',
     category: 'platform',
-    content: `To list an item on Unity: Go to your Merchant Dashboard and click "List an Item". You'll go through 7 steps: (1) Basics — title, description, category, condition; (2) Photos — minimum 3 photos required; (3) Ownership — upload proof of ownership (receipt, serial number, or video); (4) Pricing — set daily rate, weekly rate, and minimum rental days; (5) Renter Requirements — optional minimum Unity Score, deposit, and credit check; (6) Affiliates — choose whether to accept affiliate referrals and set commission rate; (7) Review and publish.`,
+    content: `To list an item on Unity: Go to your Merchant Dashboard and click "List an Item". You'll go through 7 steps: (1) Basics — title, description, category, condition; (2) Photos — minimum 3 photos required; (3) Ownership — upload proof of ownership (receipt, serial number, or video); (4) Pricing — set daily rate, weekly rate, and minimum rental days; (5) Renter Requirements — optional minimum Unity Score and deposit, plus your listing's automatically assigned risk tier; (6) Affiliates — choose whether to accept affiliate referrals and set commission rate; (7) Review and publish.`,
   },
   {
     title: 'KYC verification process',
@@ -82,7 +82,7 @@ export const KNOWLEDGE_BASE_ENTRIES = [
   {
     title: 'Renter requirements on listings',
     category: 'listing',
-    content: `Some premium listings have renter requirements set by the merchant: (1) Minimum Unity Score — e.g. "3.5+ required" means your Unity Score must be at least 3.5 to book. (2) Credit check required — means your KYC status must be 'approved' and you must have a verified ID. (3) Deposit — not a gate but an upfront amount held in escrow. These requirements are shown in the "Renter Requirements" section on the listing page. If you don't meet them, you'll see a specific gate explaining why you can't book yet.`,
+    content: `Some listings have renter requirements: (1) Minimum Unity Score — e.g. "3.5+ required" means your Unity Score must be at least 3.5 to book. (2) Deposit — not a gate but an upfront amount held in escrow. Every listing is also assigned a risk tier (Low, Medium, or High) automatically by Unity's Risk Engine, based on the item's value, category, and the merchant's standing — merchants cannot set or change this themselves. Higher tiers carry mandatory ownership verification, inspection video, deposit, and (for High Risk) insurance and manual review before the listing can go live. These requirements are shown in the "Renter Requirements" section on the listing page. If you don't meet them, you'll see a specific gate explaining why you can't book yet.`,
   },
   {
     title: 'Merchant payout schedule',

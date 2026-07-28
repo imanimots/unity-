@@ -33,13 +33,26 @@ export async function updateSession(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
-  const protectedPaths = ['/dashboard']
+  const protectedPaths = ['/dashboard', '/admin']
 
   if (protectedPaths.some((p) => pathname.startsWith(p)) && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.searchParams.set('redirectTo', pathname)
     return NextResponse.redirect(url)
+  }
+
+  // First line of defense for /admin: reject non-admins before the route
+  // even renders. This is not the only check — src/app/admin/layout.tsx
+  // re-verifies server-side, since middleware role checks can be skipped in
+  // edge runtimes or misconfigured matchers and must not be the sole gate.
+  if (pathname.startsWith('/admin') && user) {
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (profile?.role !== 'admin') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse

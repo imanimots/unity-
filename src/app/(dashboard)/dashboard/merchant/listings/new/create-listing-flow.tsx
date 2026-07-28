@@ -11,6 +11,8 @@ import {
   FileText, AlertCircle, ShieldCheck, Info, Star, UserCheck,
 } from 'lucide-react'
 import { CATEGORIES, type ItemCondition, type ShippingPayer } from '@/types'
+import { calculateRiskTier, getRiskRequirements, RISK_TIER_LABELS } from '@/lib/risk/engine'
+import { useAuth } from '@/hooks/use-auth'
 
 // ─── Step definitions ────────────────────────────────────────────────────────
 
@@ -44,10 +46,9 @@ const pricingSchema = z.object({
 })
 
 const requirementsSchema = z.object({
-  min_unity_score:       z.number().min(0).max(5),
-  deposit_required:      z.boolean(),
-  deposit_amount:        z.number().optional(),
-  requires_credit_score: z.boolean(),
+  min_unity_score:  z.number().min(0).max(5),
+  deposit_required: z.boolean(),
+  deposit_amount:   z.number().optional(),
 })
 
 const affiliatesSchema = z.object({
@@ -424,13 +425,29 @@ function PricingStep({ onNext, onBack, defaults }: { onNext: (d: PricingData) =>
 
 // ─── Step: Renter Requirements ────────────────────────────────────────────────
 
-function RequirementsStep({ onNext, onBack, defaults }: { onNext: (d: RequirementsData) => void; onBack: () => void; defaults?: Partial<RequirementsData> }) {
+function RequirementsStep({
+  onNext, onBack, defaults, category, dailyRate,
+}: {
+  onNext: (d: RequirementsData) => void
+  onBack: () => void
+  defaults?: Partial<RequirementsData>
+  category?: string
+  dailyRate?: number
+}) {
+  const { profile } = useAuth()
   const { register, handleSubmit, watch, setValue } = useForm<RequirementsData>({
     resolver: zodResolver(requirementsSchema),
-    defaultValues: { min_unity_score: 0, deposit_required: false, requires_credit_score: false, ...defaults },
+    defaultValues: { min_unity_score: 0, deposit_required: false, ...defaults },
   })
   const depositRequired = watch('deposit_required')
-  const requiresCreditScore = watch('requires_credit_score')
+
+  const riskTier = calculateRiskTier({
+    category: category ?? '',
+    dailyRate: dailyRate ?? 0,
+    merchantKycStatus: profile?.kyc_status ?? 'none',
+    merchantUnityScore: profile?.unity_score ?? 0,
+  })
+  const riskRequirements = getRiskRequirements(riskTier)
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-5">
@@ -482,23 +499,31 @@ function RequirementsStep({ onNext, onBack, defaults }: { onNext: (d: Requiremen
         )}
       </div>
 
-      {/* Credit check */}
+      {/* Risk tier — automatic, not merchant-configurable */}
       <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-start gap-3">
-            <UserCheck size={16} className="text-[#9B8B85] shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Require identity verification</p>
-              <p className="text-xs text-[#9B8B85] mt-0.5">Renter must have completed KYC verification</p>
-            </div>
+        <div className="flex items-start gap-3">
+          <UserCheck size={16} className="text-[#9B8B85] shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+              Risk tier: {RISK_TIER_LABELS[riskTier]}
+            </p>
+            <p className="text-xs text-[#9B8B85] mt-0.5">
+              Assigned automatically by Unity&apos;s Risk Engine from category, price, and your merchant standing —
+              this can&apos;t be changed manually.
+            </p>
+            <ul className="mt-3 space-y-1 text-xs text-[#6B5B55] dark:text-[#9B8B85]">
+              {riskRequirements.ownershipVerificationRequired && <li>• Ownership verification required</li>}
+              {riskRequirements.inspectionVideoRequired && <li>• Inspection video required</li>}
+              {riskRequirements.depositRequired && <li>• Deposit mandatory before publishing</li>}
+              {!riskRequirements.depositRequired && riskRequirements.depositRecommended && (
+                <li>• Deposit recommended</li>
+              )}
+              {riskRequirements.insuranceRequired && <li>• Insurance mandatory before publishing</li>}
+              {riskRequirements.manualReviewRequired && <li>• Requires manual review by Unity before going live</li>}
+              {riskTier === 'low' && <li>• No deposit or ownership verification required</li>}
+            </ul>
           </div>
-          <Toggle checked={requiresCreditScore} onChange={(v) => setValue('requires_credit_score', v)} />
         </div>
-        {requiresCreditScore && (
-          <p className="mt-3 text-xs text-[#6B5B55] dark:text-[#9B8B85] bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg px-3 py-2">
-            Renters without a verified identity will see a prompt to complete verification before booking.
-          </p>
-        )}
       </div>
 
       <div className="flex gap-3 pt-2">
@@ -590,6 +615,14 @@ function ReviewStep({
   photoCount: number
   ownershipFileName: string
 }) {
+  const { profile } = useAuth()
+  const riskTier = calculateRiskTier({
+    category: basics?.category ?? '',
+    dailyRate: pricing?.daily_rate ?? 0,
+    merchantKycStatus: profile?.kyc_status ?? 'none',
+    merchantUnityScore: profile?.unity_score ?? 0,
+  })
+
   const rows: [string, string][] = [
     ['Title',        basics?.title ?? '—'],
     ['Category',     CATEGORIES.find((c) => c.id === basics?.category)?.label ?? '—'],
@@ -601,7 +634,7 @@ function ReviewStep({
     ['Shipping',     pricing?.shipping_payer ? { renter: 'Renter pays', merchant: 'Free (merchant)', split: 'Split 50/50', negotiate: 'Negotiate' }[pricing.shipping_payer] : '—'],
     ['Min Unity Score', requirements?.min_unity_score ? `${requirements.min_unity_score}+` : 'No minimum'],
     ['Deposit',      requirements?.deposit_required ? `R${requirements.deposit_amount ?? 0}` : 'None'],
-    ['ID check',     requirements?.requires_credit_score ? 'KYC verification required' : 'Not required'],
+    ['Risk tier',    RISK_TIER_LABELS[riskTier]],
     ['Affiliates',   affiliates?.accepts_affiliates ? `Yes — ${affiliates.affiliate_commission_rate ?? 0}% commission` : 'No'],
     ['Photos',       `${photoCount} uploaded`],
     ['Ownership',    ownershipFileName || '—'],
@@ -728,7 +761,13 @@ export function CreateListingFlow() {
         <PricingStep onNext={(d) => { setPricing(d); goNext() }} onBack={goBack} defaults={pricing} />
       )}
       {currentStep.id === 'requirements' && (
-        <RequirementsStep onNext={(d) => { setRequirements(d); goNext() }} onBack={goBack} defaults={requirements} />
+        <RequirementsStep
+          onNext={(d) => { setRequirements(d); goNext() }}
+          onBack={goBack}
+          defaults={requirements}
+          category={basics?.category}
+          dailyRate={pricing?.daily_rate}
+        />
       )}
       {currentStep.id === 'affiliates' && (
         <AffiliatesStep onNext={(d) => { setAffiliates(d); goNext() }} onBack={goBack} defaults={affiliates} />
