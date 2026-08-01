@@ -1,17 +1,64 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { Plus, Eye, Pencil, PauseCircle, PlayCircle, MoreHorizontal, Package, ArrowLeft } from 'lucide-react'
+import { Plus, Eye, Pencil, PauseCircle, PlayCircle, MoreHorizontal, Package, ArrowLeft, AlertTriangle } from 'lucide-react'
 import { IS_MOCK_MODE, MOCK_MY_LISTINGS } from '@/lib/mock/data'
-import type { Listing, ListingStatus } from '@/types'
+import { getServerUser } from '@/lib/data/profiles'
+import { getListingsByMerchant } from '@/lib/data/listings'
+import type { Listing } from '@/types'
 
 export const metadata = { title: 'My Listings — Unity' }
 
-const STATUS_CONFIG: Record<ListingStatus, { label: string; classes: string }> = {
-  active:  { label: 'Active',  classes: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-  paused:  { label: 'Paused',  classes: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
-  draft:   { label: 'Draft',   classes: 'bg-[#F2EDE8] text-[#6B5B55] dark:bg-[#2A1A1A] dark:text-[#9B8B85]' },
-  pending: { label: 'Pending', classes: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
-  rented:  { label: 'Rented',  classes: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
+const STATUS_CONFIG: Record<string, { label: string; classes: string }> = {
+  active:    { label: 'Active',    classes: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+  paused:    { label: 'Paused',    classes: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+  draft:     { label: 'Draft',     classes: 'bg-[#F2EDE8] text-[#6B5B55] dark:bg-[#2A1A1A] dark:text-[#9B8B85]' },
+  pending:   { label: 'Pending',   classes: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+  rented:    { label: 'Rented',    classes: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
+  suspended: { label: 'Suspended', classes: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+}
+
+interface ModerationSummary {
+  listing_id: string
+  moderation_status: string
+  rejection_reason: string | null
+  moderated_at: string | null
+}
+interface OwnershipSummary {
+  listing_id: string
+  status: string
+  merchant_feedback: string | null
+  reviewed_at: string | null
+}
+
+/**
+ * Merchant-safe status label -- combines listings.status (lifecycle) with
+ * moderation_status (review verdict) and ownership verification, read
+ * only from the merchant-safe views (listing_moderation_merchant_view /
+ * listing_ownership_verification_merchant_view), which never expose
+ * internal admin notes. See docs/ADMIN_MODERATION.md.
+ */
+function deriveMerchantStatus(
+  listing: Listing,
+  moderation: ModerationSummary | undefined,
+  ownership: OwnershipSummary | undefined
+): { label: string; classes: string; feedback: string | null; canEditResubmit: boolean } {
+  if (listing.status === 'draft' && moderation?.moderation_status === 'requires_review') {
+    return { label: 'Changes Required', classes: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', feedback: moderation.rejection_reason, canEditResubmit: true }
+  }
+  if (listing.status === 'draft' && moderation?.moderation_status === 'rejected') {
+    return { label: 'Rejected — Edit & Resubmit', classes: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', feedback: moderation.rejection_reason, canEditResubmit: true }
+  }
+  if (listing.status === 'pending' && moderation?.moderation_status === 'pending') {
+    return { label: 'Submitted — Awaiting Review', classes: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', feedback: null, canEditResubmit: false }
+  }
+  if (listing.status === 'pending' && moderation?.moderation_status === 'approved' && ownership && ownership.status !== 'verified' && ownership.status !== 'not_required') {
+    return { label: 'Approved — Ownership Under Review', classes: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', feedback: ownership.merchant_feedback, canEditResubmit: false }
+  }
+  if (listing.status === 'pending' && moderation?.moderation_status === 'approved') {
+    return { label: 'Approved — Pending Activation', classes: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', feedback: null, canEditResubmit: false }
+  }
+  const sc = STATUS_CONFIG[listing.status] ?? STATUS_CONFIG.draft
+  return { label: sc.label, classes: sc.classes, feedback: null, canEditResubmit: false }
 }
 
 function getMockViewCount(id: string) {
@@ -26,12 +73,33 @@ function getMockBookingCount(id: string) {
 
 async function getMyListings(): Promise<Listing[]> {
   if (IS_MOCK_MODE) return MOCK_MY_LISTINGS
-  // TODO: fetch from Supabase filtered by auth user
-  return []
+  const { profile } = await getServerUser()
+  if (!profile) return []
+  return getListingsByMerchant(profile.id)
+}
+
+/**
+ * Reads the merchant-safe views only (RLS-scoped to auth.uid(), never the
+ * admin-only base tables) -- session-scoped client, no service role
+ * needed here since these views already exist for exactly this purpose.
+ */
+async function getModerationSummaries(listingIds: string[]): Promise<{ moderation: ModerationSummary[]; ownership: OwnershipSummary[] }> {
+  if (IS_MOCK_MODE || listingIds.length === 0) return { moderation: [], ownership: [] }
+  const { createClient } = await import('@/lib/supabase/server')
+  const supabase = await createClient()
+  if (!supabase) return { moderation: [], ownership: [] }
+
+  const [{ data: moderation }, { data: ownership }] = await Promise.all([
+    supabase.from('listing_moderation_merchant_view').select('*').in('listing_id', listingIds),
+    supabase.from('listing_ownership_verification_merchant_view').select('*').in('listing_id', listingIds),
+  ])
+
+  return { moderation: moderation ?? [], ownership: ownership ?? [] }
 }
 
 export default async function MyListingsPage() {
   const listings = await getMyListings()
+  const { moderation, ownership } = await getModerationSummaries(listings.map((l) => l.id))
 
   const active = listings.filter((l) => l.status === 'active').length
   const paused = listings.filter((l) => l.status === 'paused').length
@@ -100,7 +168,9 @@ export default async function MyListingsPage() {
             const cover = listing.media?.[0]?.url
             const views = getMockViewCount(listing.id)
             const bookings = getMockBookingCount(listing.id)
-            const sc = STATUS_CONFIG[listing.status]
+            const modSummary = moderation.find((m) => m.listing_id === listing.id)
+            const ownSummary = ownership.find((o) => o.listing_id === listing.id)
+            const derived = deriveMerchantStatus(listing, modSummary, ownSummary)
 
             return (
               <div key={listing.id} className="flex items-center gap-4 px-5 py-4 border-b border-[#F2EDE8] dark:border-[#2A1A1A] last:border-b-0 hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors group">
@@ -117,8 +187,8 @@ export default async function MyListingsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] text-sm truncate">{listing.title}</span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${sc.classes}`}>
-                      {sc.label}
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${derived.classes}`}>
+                      {derived.label}
                     </span>
                   </div>
                   <div className="text-xs text-[#9B8B85] flex items-center gap-3">
@@ -128,6 +198,12 @@ export default async function MyListingsPage() {
                     <span className="text-[#F2EDE8] dark:text-[#2A1A1A]">·</span>
                     <span>{bookings} booking{bookings !== 1 ? 's' : ''}</span>
                   </div>
+                  {derived.feedback && (
+                    <div className="mt-1.5 flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+                      <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                      <span>{derived.feedback}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Actions */}
@@ -139,13 +215,23 @@ export default async function MyListingsPage() {
                   >
                     <Eye size={16} />
                   </Link>
-                  <Link
-                    href={`/dashboard/merchant/listings/${listing.id}/edit`}
-                    className="p-2 rounded-lg hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors"
-                    title="Edit listing"
-                  >
-                    <Pencil size={16} />
-                  </Link>
+                  {listing.status === 'draft' || derived.canEditResubmit ? (
+                    <Link
+                      href={`/dashboard/merchant/listings/new?edit=${listing.id}`}
+                      className="p-2 rounded-lg hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors"
+                      title={derived.canEditResubmit ? 'Edit and resubmit' : 'Continue editing draft'}
+                    >
+                      <Pencil size={16} />
+                    </Link>
+                  ) : (
+                    <button
+                      disabled
+                      className="p-2 rounded-lg text-[#F2EDE8] dark:text-[#2A1A1A] cursor-not-allowed"
+                      title="Editing a submitted listing isn't available yet"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                  )}
                   {listing.status === 'active' ? (
                     <button
                       className="p-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 text-[#9B8B85] hover:text-amber-600 dark:hover:text-amber-400 transition-colors"

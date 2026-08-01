@@ -10,9 +10,14 @@ import {
   ChevronLeft, ChevronRight, Check, Upload, X, ImagePlus,
   FileText, AlertCircle, ShieldCheck, Info, Star, UserCheck,
 } from 'lucide-react'
-import { CATEGORIES, type ItemCondition, type ShippingPayer } from '@/types'
+import { CATEGORIES, type ItemCondition, type ShippingPayer, type Listing, type ListingMedia } from '@/types'
 import { calculateRiskTier, getRiskRequirements, RISK_TIER_LABELS } from '@/lib/risk/engine'
 import { useAuth } from '@/hooks/use-auth'
+import { validatePhotoFile, validateOwnershipProofFile, uploadListingPhoto, uploadOwnershipProof, removeUploadedFiles } from '@/lib/listings/storage'
+import { DECLARATION_CATALOGUE } from '@/lib/listings/declarations'
+import { CATEGORY_FIELD_SETS, getRequiredCategoryFieldKeys, type CategoryFieldDef } from '@/lib/listings/category-fields'
+import type { ListingDraft } from '@/lib/data/listings'
+import type { BlockedDateRange } from '@/lib/listings/validation'
 
 // ─── Step definitions ────────────────────────────────────────────────────────
 
@@ -35,21 +40,56 @@ const basicsSchema = z.object({
   category:    z.string().min(1, 'Please select a category'),
   condition:   z.enum(['new', 'like_new', 'good', 'fair'] as const, { error: 'Please select a condition' }),
   description: z.string().min(50, 'Description must be at least 50 characters'),
+  replacement_value: z.number({ error: 'Required' }).positive('Enter the item\'s replacement value'),
+  quantity_available: z.number().int().min(1).max(100),
+  province: z.string().min(1, 'Please enter a province'),
+  city: z.string().min(1, 'Please enter a city'),
+  category_metadata: z.record(z.string(), z.string()).optional(),
+  private_category_metadata: z.record(z.string(), z.string()).optional(),
 })
 
 const pricingSchema = z.object({
   daily_rate:       z.number({ error: 'Required' }).min(10, 'Minimum rate is R10/day'),
   weekly_rate:      z.number().optional(),
   min_rental_days:  z.number().min(1).max(30),
+  max_rental_days:  z.number().min(1).max(365).optional(),
   shipping_payer:   z.enum(['renter', 'merchant', 'split', 'negotiate'] as const),
   insurance_amount: z.number().optional(),
-})
+  available_from:   z.string().min(1, 'Please choose an availability start date'),
+  min_booking_notice_days: z.number().min(0).max(90).optional(),
+  max_advance_booking_days: z.number().min(0).max(365).optional(),
+}).refine(
+  (d) => !d.max_rental_days || d.max_rental_days >= d.min_rental_days,
+  { message: 'Maximum rental duration cannot be less than the minimum', path: ['max_rental_days'] }
+)
 
 const requirementsSchema = z.object({
   min_unity_score:  z.number().min(0).max(5),
   deposit_required: z.boolean(),
   deposit_amount:   z.number().optional(),
-})
+  verified_identity_required: z.boolean(),
+  kyc_approved_required: z.boolean(),
+  min_age: z.number().min(0).max(120).optional(),
+  driving_licence_required: z.boolean(),
+  licence_class: z.string().optional(),
+  additional_requirements: z.string().max(2000).optional(),
+  permitted_use: z.string().max(2000).optional(),
+  prohibited_use: z.string().max(2000).optional(),
+  geographic_restriction: z.string().max(500).optional(),
+  commercial_use_allowed: z.boolean(),
+  sub_rental_allowed: z.boolean(),
+  cleaning_requirements: z.string().max(2000).optional(),
+  return_condition_requirements: z.string().max(2000).optional(),
+  merchant_custom_rules: z.string().max(2000).optional(),
+  existing_damage_description: z.string().max(2000).optional(),
+  inspection_required_before_handover: z.boolean(),
+  inspection_required_on_return: z.boolean(),
+  missing_accessory_consequence: z.string().max(1000).optional(),
+  lost_item_consequence: z.string().max(1000).optional(),
+}).refine(
+  (d) => !d.driving_licence_required || !!d.licence_class,
+  { message: 'Licence class is required when a driving licence is required', path: ['licence_class'] }
+)
 
 const affiliatesSchema = z.object({
   accepts_affiliates:        z.boolean(),
@@ -97,17 +137,89 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   )
 }
 
+// ─── Category-specific fields (vehicles/tech/tools only — see
+// src/lib/listings/category-fields.ts) ─────────────────────────────────────
+
+function CategoryFieldInput({ field, register, prefix }: {
+  field: CategoryFieldDef
+  register: ReturnType<typeof useForm<BasicsData>>['register']
+  prefix: 'category_metadata' | 'private_category_metadata'
+}) {
+  const name = `${prefix}.${field.key}` as `category_metadata.${string}` | `private_category_metadata.${string}`
+  return (
+    <div>
+      <Label required={field.required}>{field.label}</Label>
+      {field.type === 'select' ? (
+        <select {...register(name)} className={inputCls()}>
+          <option value="">Select…</option>
+          {field.options?.map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+      ) : (
+        <input {...register(name)} className={inputCls()} />
+      )}
+    </div>
+  )
+}
+
+function CategoryFieldsSection({ category, register }: {
+  category: string
+  register: ReturnType<typeof useForm<BasicsData>>['register']
+}) {
+  const set = CATEGORY_FIELD_SETS[category as keyof typeof CATEGORY_FIELD_SETS]
+  if (!set) return null
+
+  return (
+    <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-4">
+      <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">
+        {CATEGORIES.find((c) => c.id === category)?.label} details
+      </p>
+      {set.public.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {set.public.map((f) => <CategoryFieldInput key={f.key} field={f} register={register} prefix="category_metadata" />)}
+        </div>
+      )}
+      {set.private.length > 0 && (
+        <>
+          <div className="flex items-center gap-2 text-xs text-[#9B8B85] pt-1">
+            <ShieldCheck size={12} /> Kept private — never shown on the public listing
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {set.private.map((f) => <CategoryFieldInput key={f.key} field={f} register={register} prefix="private_category_metadata" />)}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── Step: Basics ─────────────────────────────────────────────────────────────
 
 function BasicsStep({ onNext, defaults }: { onNext: (d: BasicsData) => void; defaults?: Partial<BasicsData> }) {
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<BasicsData>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<BasicsData>({
     resolver: zodResolver(basicsSchema),
-    defaultValues: defaults,
+    defaultValues: { quantity_available: 1, ...defaults },
   })
   const description = watch('description') ?? ''
+  const category = watch('category')
+  const [categoryError, setCategoryError] = useState('')
+
+  const handleValid = (d: BasicsData) => {
+    const missing = getRequiredCategoryFieldKeys(category).filter((key) => {
+      const set = CATEGORY_FIELD_SETS[category as keyof typeof CATEGORY_FIELD_SETS]
+      const isPrivate = set?.private.some((f) => f.key === key)
+      const value = isPrivate ? d.private_category_metadata?.[key] : d.category_metadata?.[key]
+      return !value?.trim()
+    })
+    if (missing.length > 0) {
+      setCategoryError(`Please fill in all ${CATEGORIES.find((c) => c.id === category)?.label ?? 'category'} details.`)
+      return
+    }
+    setCategoryError('')
+    onNext(d)
+  }
 
   return (
-    <form onSubmit={handleSubmit(onNext)} className="space-y-5">
+    <form onSubmit={handleSubmit(handleValid)} className="space-y-5">
       <div>
         <Label required>Item title</Label>
         <input {...register('title')} placeholder="e.g. DJI Mavic 3 Pro Drone + ND Filters" className={inputCls(!!errors.title)} />
@@ -116,7 +228,17 @@ function BasicsStep({ onNext, defaults }: { onNext: (d: BasicsData) => void; def
 
       <div>
         <Label required>Category</Label>
-        <select {...register('category')} className={inputCls(!!errors.category)}>
+        <select {...register('category')} className={inputCls(!!errors.category)} onChange={(e) => {
+          // Switching category invalidates any previously entered
+          // category-specific values (they belong to the old category's
+          // field set) — clear both metadata objects rather than letting
+          // stale values silently persist. The server independently
+          // strips anything not on the new category's allowlist regardless
+          // (see save_listing_draft's sanitize_category_metadata call).
+          setValue('category', e.target.value)
+          setValue('category_metadata', {})
+          setValue('private_category_metadata', {})
+        }}>
           <option value="">Select a category…</option>
           {CATEGORIES.map((c) => (
             <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
@@ -124,6 +246,9 @@ function BasicsStep({ onNext, defaults }: { onNext: (d: BasicsData) => void; def
         </select>
         <FieldError message={errors.category?.message} />
       </div>
+
+      {category && <CategoryFieldsSection category={category} register={register} />}
+      {categoryError && <p className="flex items-center gap-1 text-xs text-[#E03D2F]"><AlertCircle size={11} />{categoryError}</p>}
 
       <div>
         <Label required>Condition</Label>
@@ -159,6 +284,32 @@ function BasicsStep({ onNext, defaults }: { onNext: (d: BasicsData) => void; def
         </div>
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <Label required>Replacement value (R)</Label>
+          <input type="number" min={1} {...register('replacement_value', { valueAsNumber: true })} className={inputCls(!!errors.replacement_value)} />
+          <FieldError message={errors.replacement_value?.message} />
+        </div>
+        <div>
+          <Label required>Quantity available</Label>
+          <input type="number" min={1} max={100} {...register('quantity_available', { valueAsNumber: true })} className={inputCls(!!errors.quantity_available)} />
+          <FieldError message={errors.quantity_available?.message} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <Label required>Province</Label>
+          <input {...register('province')} placeholder="e.g. Gauteng" className={inputCls(!!errors.province)} />
+          <FieldError message={errors.province?.message} />
+        </div>
+        <div>
+          <Label required>City / town</Label>
+          <input {...register('city')} placeholder="e.g. Johannesburg" className={inputCls(!!errors.city)} />
+          <FieldError message={errors.city?.message} />
+        </div>
+      </div>
+
       <button type="submit" className="w-full py-3 bg-[#8B1A1A] text-white font-semibold rounded-xl hover:bg-[#7A1616] transition-colors flex items-center justify-center gap-2">
         Continue <ChevronRight size={16} />
       </button>
@@ -169,12 +320,19 @@ function BasicsStep({ onNext, defaults }: { onNext: (d: BasicsData) => void; def
 // ─── Step: Photos ─────────────────────────────────────────────────────────────
 
 function PhotosStep({
-  onNext, onBack, photos, setPhotos,
+  onNext, onBack, photos, setPhotos, existingPhotos, onRemoveExisting, onReorderExisting,
+  hasDeclaredDefects, hasDamagePhoto, setHasDamagePhoto,
 }: {
   onNext: () => void
   onBack: () => void
   photos: File[]
   setPhotos: (f: File[]) => void
+  existingPhotos: ListingMedia[]
+  onRemoveExisting: (id: string) => void
+  onReorderExisting: (next: ListingMedia[]) => void
+  hasDeclaredDefects: boolean
+  hasDamagePhoto: boolean
+  setHasDamagePhoto: (v: boolean) => void
 }) {
   const [previews, setPreviews] = useState<string[]>(() => photos.map((f) => URL.createObjectURL(f)))
   const inputRef = useRef<HTMLInputElement>(null)
@@ -182,11 +340,16 @@ function PhotosStep({
 
   const addFiles = useCallback((files: FileList | null) => {
     if (!files) return
-    const valid = Array.from(files).filter((f) => f.type.startsWith('image/'))
+    const rejected: string[] = []
+    const valid = Array.from(files).filter((f) => {
+      const err = validatePhotoFile(f)
+      if (err) { rejected.push(`${f.name}: ${err}`); return false }
+      return true
+    })
     const newPreviews = valid.map((f) => URL.createObjectURL(f))
     setPhotos([...photos, ...valid])
     setPreviews((p) => [...p, ...newPreviews])
-    setError('')
+    setError(rejected.length ? rejected.join(' ') : '')
   }, [photos, setPhotos])
 
   const remove = (i: number) => {
@@ -195,8 +358,31 @@ function PhotosStep({
     setPreviews((p) => p.filter((_, idx) => idx !== i))
   }
 
+  const moveExisting = (i: number, dir: -1 | 1) => {
+    const next = [...existingPhotos]
+    const j = i + dir
+    if (j < 0 || j >= next.length) return
+    ;[next[i], next[j]] = [next[j], next[i]]
+    onReorderExisting(next)
+  }
+
+  const makePrimary = (i: number) => {
+    if (i === 0) return
+    const next = [...existingPhotos]
+    const [item] = next.splice(i, 1)
+    next.unshift(item)
+    onReorderExisting(next)
+  }
+
+  const totalCount = existingPhotos.length + photos.length
+  const primaryIsExisting = existingPhotos.length > 0
+
   const handleNext = () => {
-    if (photos.length < 3) { setError('Please upload at least 3 photos'); return }
+    if (totalCount < 3) { setError('Please upload at least 3 photos'); return }
+    if (hasDeclaredDefects && !hasDamagePhoto) {
+      setError('A damage close-up photo is required since defects were declared in the previous step')
+      return
+    }
     onNext()
   }
 
@@ -204,7 +390,7 @@ function PhotosStep({
     <div className="space-y-5">
       <div>
         <Label required>Item photos (minimum 3)</Label>
-        <p className="text-xs text-[#9B8B85] mb-3">Upload clear photos from different angles. The first photo will be the cover image.</p>
+        <p className="text-xs text-[#9B8B85] mb-3">Upload clear photos from different angles. The first photo is the cover image — use the star button to change it.</p>
 
         <div
           className="border-2 border-dashed border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-8 text-center cursor-pointer hover:border-[#8B1A1A] dark:hover:border-[#8B1A1A] transition-colors"
@@ -228,13 +414,42 @@ function PhotosStep({
         {error && <p className="flex items-center gap-1 text-xs text-[#E03D2F] mt-2"><AlertCircle size={11} />{error}</p>}
       </div>
 
-      {previews.length > 0 && (
+      {(existingPhotos.length > 0 || previews.length > 0) && (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+          {existingPhotos.map((m, i) => (
+            <div key={m.id} className="relative aspect-square rounded-xl overflow-hidden bg-[#FAF8F5] dark:bg-[#1A1010] group">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={m.url} alt={`Existing photo ${i + 1}`} className="w-full h-full object-cover" />
+              {i === 0 && (
+                <span className="absolute bottom-1 left-1 text-[10px] font-bold bg-[#1A0A0A]/80 text-white px-1.5 py-0.5 rounded-full">Cover</span>
+              )}
+              <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {i > 0 && (
+                  <button onClick={() => makePrimary(i)} title="Make primary" className="w-6 h-6 rounded-full bg-[#1A0A0A]/70 text-white flex items-center justify-center hover:bg-amber-500">
+                    <Star size={11} />
+                  </button>
+                )}
+                {i > 0 && (
+                  <button onClick={() => moveExisting(i, -1)} title="Move earlier" className="w-6 h-6 rounded-full bg-[#1A0A0A]/70 text-white flex items-center justify-center hover:bg-[#8B1A1A]">
+                    <ChevronLeft size={11} />
+                  </button>
+                )}
+                {i < existingPhotos.length - 1 && (
+                  <button onClick={() => moveExisting(i, 1)} title="Move later" className="w-6 h-6 rounded-full bg-[#1A0A0A]/70 text-white flex items-center justify-center hover:bg-[#8B1A1A]">
+                    <ChevronRight size={11} />
+                  </button>
+                )}
+                <button onClick={() => onRemoveExisting(m.id)} title="Remove" className="w-6 h-6 rounded-full bg-[#1A0A0A]/70 text-white flex items-center justify-center hover:bg-[#E03D2F]">
+                  <X size={11} />
+                </button>
+              </div>
+            </div>
+          ))}
           {previews.map((src, i) => (
             <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-[#FAF8F5] dark:bg-[#1A1010] group">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
-              {i === 0 && (
+              <img src={src} alt={`New photo ${i + 1}`} className="w-full h-full object-cover" />
+              {!primaryIsExisting && i === 0 && (
                 <span className="absolute bottom-1 left-1 text-[10px] font-bold bg-[#1A0A0A]/80 text-white px-1.5 py-0.5 rounded-full">Cover</span>
               )}
               <button
@@ -255,6 +470,20 @@ function PhotosStep({
         </div>
       )}
 
+      {hasDeclaredDefects && (
+        <label className="flex items-start gap-3 p-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={hasDamagePhoto}
+            onChange={(e) => setHasDamagePhoto(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span className="text-xs text-amber-700 dark:text-amber-300">
+            One of the photos above clearly shows the damage/defects described earlier — required since defects were declared.
+          </span>
+        </label>
+      )}
+
       <div className="flex gap-3 pt-2">
         <button onClick={onBack} className="flex-1 py-3 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] font-semibold rounded-xl hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors flex items-center justify-center gap-2">
           <ChevronLeft size={16} /> Back
@@ -270,18 +499,25 @@ function PhotosStep({
 // ─── Step: Ownership proof ────────────────────────────────────────────────────
 
 function OwnershipStep({
-  onNext, onBack, ownershipFile, setOwnershipFile,
+  onNext, onBack, ownershipFile, setOwnershipFile, hasExistingOwnershipProof,
+  conditionConfirmed, setConditionConfirmed, knownDefects, setKnownDefects,
 }: {
   onNext: () => void
   onBack: () => void
   ownershipFile: File | null
   setOwnershipFile: (f: File | null) => void
+  hasExistingOwnershipProof: boolean
+  conditionConfirmed: boolean
+  setConditionConfirmed: (v: boolean) => void
+  knownDefects: string
+  setKnownDefects: (v: string) => void
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState('')
 
   const handleNext = () => {
-    if (!ownershipFile) { setError('Please upload proof of ownership'); return }
+    if (!ownershipFile && !hasExistingOwnershipProof) { setError('Please upload proof of ownership'); return }
+    if (!conditionConfirmed) { setError('Please confirm the condition and defects described are accurate'); return }
     onNext()
   }
 
@@ -311,6 +547,30 @@ function OwnershipStep({
               <X size={14} />
             </button>
           </div>
+        ) : hasExistingOwnershipProof ? (
+          <div className="flex items-center gap-3 p-4 border border-[#F2EDE8] dark:border-[#2A1A1A] bg-[#FAF8F5] dark:bg-[#1A1010] rounded-xl">
+            <FileText size={20} className="text-[#9B8B85] shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">Existing proof on file</p>
+              <p className="text-xs text-[#9B8B85]">Click below to replace it</p>
+            </div>
+            <button onClick={() => inputRef.current?.click()} className="text-xs font-semibold uppercase tracking-[0.08em] text-[#8B1A1A] hover:underline">
+              Replace
+            </button>
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*,application/pdf,video/mp4"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (!f) return
+                const err = validateOwnershipProofFile(f)
+                if (err) { setError(err); return }
+                setOwnershipFile(f); setError('')
+              }}
+            />
+          </div>
         ) : (
           <div
             className="border-2 border-dashed border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-8 text-center cursor-pointer hover:border-[#8B1A1A] dark:hover:border-[#8B1A1A] transition-colors"
@@ -326,13 +586,40 @@ function OwnershipStep({
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0]
-                if (f) { setOwnershipFile(f); setError('') }
+                if (!f) return
+                const err = validateOwnershipProofFile(f)
+                if (err) { setError(err); return }
+                setOwnershipFile(f); setError('')
               }}
             />
           </div>
         )}
         {error && <p className="flex items-center gap-1 text-xs text-[#E03D2F] mt-2"><AlertCircle size={11} />{error}</p>}
       </div>
+
+      <div>
+        <Label>Known defects or damage <span className="text-[#9B8B85] font-normal text-xs">(leave blank if none)</span></Label>
+        <textarea
+          value={knownDefects}
+          onChange={(e) => setKnownDefects(e.target.value)}
+          rows={3}
+          placeholder="Describe any existing damage, wear, or missing parts a renter should know about…"
+          className={inputCls()}
+        />
+        <p className="text-xs text-[#9B8B85] mt-1">Unity does not allow hiding known defects — disclosed items still rent, undisclosed ones risk disputes.</p>
+      </div>
+
+      <label className="flex items-start gap-3 p-4 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] cursor-pointer">
+        <input
+          type="checkbox"
+          checked={conditionConfirmed}
+          onChange={(e) => setConditionConfirmed(e.target.checked)}
+          className="mt-0.5"
+        />
+        <span className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+          I confirm that the condition and defects described are accurate.
+        </span>
+      </label>
 
       <div className="flex gap-3 pt-2">
         <button onClick={onBack} className="flex-1 py-3 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] font-semibold rounded-xl hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors flex items-center justify-center gap-2">
@@ -348,7 +635,59 @@ function OwnershipStep({
 
 // ─── Step: Pricing ────────────────────────────────────────────────────────────
 
-function PricingStep({ onNext, onBack, defaults }: { onNext: (d: PricingData) => void; onBack: () => void; defaults?: Partial<PricingData> }) {
+function BlockedDatesWidget({ ranges, setRanges }: { ranges: BlockedDateRange[]; setRanges: (r: BlockedDateRange[]) => void }) {
+  const [start, setStart] = useState('')
+  const [end, setEnd] = useState('')
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState('')
+
+  const add = () => {
+    if (!start || !end) { setError('Choose both a start and end date'); return }
+    if (start > end) { setError('Start date must be before the end date'); return }
+    const overlaps = ranges.some((r) => start <= r.end_date && r.start_date <= end)
+    if (overlaps) { setError('This range overlaps an existing blocked range'); return }
+    setRanges([...ranges, { start_date: start, end_date: end, reason: reason || undefined }])
+    setStart(''); setEnd(''); setReason(''); setError('')
+  }
+
+  return (
+    <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-3">
+      <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Blocked dates</p>
+      <p className="text-xs text-[#9B8B85]">Dates this item is unavailable to book (maintenance, personal use, etc.).</p>
+      {ranges.length > 0 && (
+        <div className="space-y-1.5">
+          {ranges.map((r, i) => (
+            <div key={`${r.start_date}-${r.end_date}`} className="flex items-center justify-between text-xs bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg px-3 py-2">
+              <span>{r.start_date} → {r.end_date}{r.reason ? ` · ${r.reason}` : ''}</span>
+              <button type="button" onClick={() => setRanges(ranges.filter((_, idx) => idx !== i))} className="text-[#9B8B85] hover:text-[#E03D2F]">
+                <X size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className={inputCls()} />
+        <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className={inputCls()} />
+        <input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (optional)" className={`${inputCls()} col-span-2 sm:col-span-1`} />
+      </div>
+      {error && <p className="flex items-center gap-1 text-xs text-[#E03D2F]"><AlertCircle size={11} />{error}</p>}
+      <button type="button" onClick={add} className="text-xs font-semibold uppercase tracking-[0.08em] text-[#8B1A1A] hover:underline">
+        + Add blocked range
+      </button>
+    </div>
+  )
+}
+
+function PricingStep({
+  onNext, onBack, defaults, blockedRanges, setBlockedRanges,
+}: {
+  onNext: (d: PricingData) => void
+  onBack: () => void
+  defaults?: Partial<PricingData>
+  blockedRanges: BlockedDateRange[]
+  setBlockedRanges: (r: BlockedDateRange[]) => void
+}) {
   const { register, handleSubmit, formState: { errors } } = useForm<PricingData>({
     resolver: zodResolver(pricingSchema),
     defaultValues: { min_rental_days: 1, shipping_payer: 'renter', ...defaults },
@@ -411,6 +750,34 @@ function PricingStep({ onNext, onBack, defaults }: { onNext: (d: PricingData) =>
         </div>
       </div>
 
+      <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-4">
+        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Availability</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label required>Available from</Label>
+            <input type="date" {...register('available_from')} className={inputCls(!!errors.available_from)} />
+            <FieldError message={errors.available_from?.message} />
+          </div>
+          <div>
+            <Label>Maximum rental (days) <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+            <input type="number" min={1} max={365} {...register('max_rental_days', { valueAsNumber: true })} className={inputCls(!!errors.max_rental_days)} />
+            <FieldError message={errors.max_rental_days?.message} />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label>Minimum booking notice (days) <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+            <input type="number" min={0} max={90} {...register('min_booking_notice_days', { valueAsNumber: true })} className={inputCls()} />
+          </div>
+          <div>
+            <Label>Maximum advance booking (days) <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+            <input type="number" min={0} max={365} {...register('max_advance_booking_days', { valueAsNumber: true })} className={inputCls()} />
+          </div>
+        </div>
+      </div>
+
+      <BlockedDatesWidget ranges={blockedRanges} setRanges={setBlockedRanges} />
+
       <div className="flex gap-3 pt-2">
         <button type="button" onClick={onBack} className="flex-1 py-3 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] font-semibold rounded-xl hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors flex items-center justify-center gap-2">
           <ChevronLeft size={16} /> Back
@@ -435,11 +802,18 @@ function RequirementsStep({
   dailyRate?: number
 }) {
   const { profile } = useAuth()
-  const { register, handleSubmit, watch, setValue } = useForm<RequirementsData>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<RequirementsData>({
     resolver: zodResolver(requirementsSchema),
-    defaultValues: { min_unity_score: 0, deposit_required: false, ...defaults },
+    defaultValues: {
+      min_unity_score: 0, deposit_required: false,
+      verified_identity_required: false, kyc_approved_required: false, driving_licence_required: false,
+      commercial_use_allowed: false, sub_rental_allowed: false,
+      inspection_required_before_handover: false, inspection_required_on_return: false,
+      ...defaults,
+    },
   })
   const depositRequired = watch('deposit_required')
+  const drivingLicenceRequired = watch('driving_licence_required')
 
   const riskTier = calculateRiskTier({
     category: category ?? '',
@@ -483,7 +857,7 @@ function RequirementsStep({
             <ShieldCheck size={16} className="text-[#9B8B85] shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Security deposit</p>
-              <p className="text-xs text-[#9B8B85] mt-0.5">Held in escrow and returned when item comes back undamaged</p>
+              <p className="text-xs text-[#9B8B85] mt-0.5">Authorized at checkout and released when the item comes back undamaged</p>
             </div>
           </div>
           <Toggle checked={depositRequired} onChange={(v) => setValue('deposit_required', v)} />
@@ -497,6 +871,104 @@ function RequirementsStep({
             </div>
           </div>
         )}
+      </div>
+
+      {/* Renter requirements */}
+      <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-3">
+        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Renter requirements</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+            <input type="checkbox" {...register('verified_identity_required')} /> Verified identity required
+          </label>
+          <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+            <input type="checkbox" {...register('kyc_approved_required')} /> Approved KYC required
+          </label>
+          <div>
+            <Label>Minimum age <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+            <input type="number" min={0} max={120} {...register('min_age', { valueAsNumber: true })} className={inputCls()} />
+          </div>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+              <input type="checkbox" {...register('driving_licence_required')} /> Driving licence required
+            </label>
+            {drivingLicenceRequired && (
+              <div>
+                <input {...register('licence_class')} placeholder="e.g. Code B" className={inputCls(!!errors.licence_class)} />
+                <FieldError message={errors.licence_class?.message} />
+              </div>
+            )}
+          </div>
+        </div>
+        <div>
+          <Label>Additional requirements <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+          <textarea {...register('additional_requirements')} rows={2} className={inputCls()} />
+        </div>
+      </div>
+
+      {/* Usage rules */}
+      <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-3">
+        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Usage rules</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label>Permitted use <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+            <textarea {...register('permitted_use')} rows={2} className={inputCls()} />
+          </div>
+          <div>
+            <Label>Prohibited use <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+            <textarea {...register('prohibited_use')} rows={2} className={inputCls()} />
+          </div>
+        </div>
+        <div>
+          <Label>Geographic restriction <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+          <input {...register('geographic_restriction')} placeholder="e.g. Within Gauteng only" className={inputCls()} />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+            <input type="checkbox" {...register('commercial_use_allowed')} /> Commercial use allowed
+          </label>
+          <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+            <input type="checkbox" {...register('sub_rental_allowed')} /> Sub-rental allowed
+          </label>
+        </div>
+        <div>
+          <Label>Cleaning requirements <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+          <textarea {...register('cleaning_requirements')} rows={2} className={inputCls()} />
+        </div>
+        <div>
+          <Label>Return condition requirements <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+          <textarea {...register('return_condition_requirements')} rows={2} className={inputCls()} />
+        </div>
+        <div>
+          <Label>Additional rules <span className="text-[#9B8B85] font-normal text-xs">(optional, max 2000 characters)</span></Label>
+          <textarea {...register('merchant_custom_rules')} rows={2} className={inputCls()} />
+        </div>
+      </div>
+
+      {/* Damage & inspection */}
+      <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-3">
+        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Damage &amp; inspection</p>
+        <div>
+          <Label>Existing damage description <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+          <textarea {...register('existing_damage_description')} rows={2} className={inputCls()} />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+            <input type="checkbox" {...register('inspection_required_before_handover')} /> Inspection required before handover
+          </label>
+          <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+            <input type="checkbox" {...register('inspection_required_on_return')} /> Inspection required on return
+          </label>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label>Missing accessory consequence <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+            <textarea {...register('missing_accessory_consequence')} rows={2} className={inputCls()} />
+          </div>
+          <div>
+            <Label>Lost item consequence <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+            <textarea {...register('lost_item_consequence')} rows={2} className={inputCls()} />
+          </div>
+        </div>
       </div>
 
       {/* Risk tier — automatic, not merchant-configurable */}
@@ -602,18 +1074,25 @@ function AffiliatesStep({ onNext, onBack, defaults }: { onNext: (d: AffiliatesDa
 // ─── Step: Review & Publish ───────────────────────────────────────────────────
 
 function ReviewStep({
-  onBack, onPublish, publishing,
-  basics, pricing, requirements, affiliates, photoCount, ownershipFileName,
+  onBack, onSaveDraft, onSubmit, saving, submitting, serverError,
+  basics, pricing, requirements, affiliates, photoCount, ownershipFileName, hasOwnershipProof,
+  acceptedDeclarations, onToggleDeclaration,
 }: {
   onBack: () => void
-  onPublish: () => void
-  publishing: boolean
+  onSaveDraft: () => void
+  onSubmit: () => void
+  saving: boolean
+  submitting: boolean
+  serverError: string
   basics?: BasicsData
   pricing?: PricingData
   requirements?: RequirementsData
   affiliates?: AffiliatesData
   photoCount: number
   ownershipFileName: string
+  hasOwnershipProof: boolean
+  acceptedDeclarations: Set<string>
+  onToggleDeclaration: (type: string) => void
 }) {
   const { profile } = useAuth()
   const riskTier = calculateRiskTier({
@@ -622,6 +1101,8 @@ function ReviewStep({
     merchantKycStatus: profile?.kyc_status ?? 'none',
     merchantUnityScore: profile?.unity_score ?? 0,
   })
+  const busy = saving || submitting
+  const allDeclarationsAccepted = DECLARATION_CATALOGUE.every((d) => acceptedDeclarations.has(d.type))
 
   const rows: [string, string][] = [
     ['Title',        basics?.title ?? '—'],
@@ -637,15 +1118,15 @@ function ReviewStep({
     ['Risk tier',    RISK_TIER_LABELS[riskTier]],
     ['Affiliates',   affiliates?.accepts_affiliates ? `Yes — ${affiliates.affiliate_commission_rate ?? 0}% commission` : 'No'],
     ['Photos',       `${photoCount} uploaded`],
-    ['Ownership',    ownershipFileName || '—'],
+    ['Ownership',    ownershipFileName || (hasOwnershipProof ? 'On file' : '—')],
   ]
 
   return (
     <div className="space-y-5">
-      <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 flex gap-3">
-        <ShieldCheck size={16} className="text-green-500 shrink-0 mt-0.5" />
-        <p className="text-sm text-green-700 dark:text-green-400">
-          Your listing will go <strong>live immediately</strong> since your KYC is verified. Ownership proof will be reviewed within 24 hours.
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-4 flex gap-3">
+        <ShieldCheck size={16} className="text-blue-500 shrink-0 mt-0.5" />
+        <p className="text-sm text-blue-700 dark:text-blue-300">
+          Submitting sends your listing for review — it won&apos;t go live until Unity confirms it meets the requirements for its risk tier. You can save as a draft and come back any time before then.
         </p>
       </div>
 
@@ -658,19 +1139,52 @@ function ReviewStep({
         ))}
       </div>
 
-      <div className="flex gap-3 pt-2">
-        <button onClick={onBack} className="flex-1 py-3 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] font-semibold rounded-xl hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors flex items-center justify-center gap-2">
+      <div className="space-y-2">
+        <Label required>Declarations</Label>
+        {DECLARATION_CATALOGUE.map((d) => (
+          <label key={d.type} className="flex items-start gap-3 p-3 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={acceptedDeclarations.has(d.type)}
+              onChange={() => onToggleDeclaration(d.type)}
+              className="mt-0.5"
+            />
+            <span className="text-xs text-[#6B5B55] dark:text-[#9B8B85]">{d.wording}</span>
+          </label>
+        ))}
+        <p className="text-[11px] text-[#9B8B85]">
+          Full policy text: <a href="/rental-terms" target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">Rental Terms</a>{' '}
+          and <a href="/prohibited-items" target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">Prohibited Items Policy</a>.
+        </p>
+      </div>
+
+      {serverError && (
+        <p className="flex items-center gap-2 text-sm text-[#E03D2F] bg-[#E03D2F]/10 rounded-xl px-4 py-3">
+          <AlertCircle size={14} className="shrink-0" /> {serverError}
+        </p>
+      )}
+
+      <div className="flex flex-col sm:flex-row gap-3 pt-2">
+        <button onClick={onBack} disabled={busy} className="py-3 px-5 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] font-semibold rounded-xl hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
           <ChevronLeft size={16} /> Back
         </button>
         <button
-          onClick={onPublish}
-          disabled={publishing}
-          className="flex-2 flex-grow py-3 bg-[#8B1A1A] hover:bg-[#7A1616] disabled:opacity-60 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+          onClick={onSaveDraft}
+          disabled={busy}
+          className="flex-1 py-3 border border-[#8B1A1A] text-[#8B1A1A] font-semibold rounded-xl hover:bg-[#8B1A1A]/5 disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
         >
-          {publishing ? (
-            <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Publishing…</>
+          {saving ? <><span className="w-4 h-4 border-2 border-[#8B1A1A]/30 border-t-[#8B1A1A] rounded-full animate-spin" /> Saving…</> : 'Save as draft'}
+        </button>
+        <button
+          onClick={onSubmit}
+          disabled={busy || !allDeclarationsAccepted}
+          title={!allDeclarationsAccepted ? 'Accept all declarations to submit' : undefined}
+          className="flex-1 py-3 bg-[#8B1A1A] hover:bg-[#7A1616] disabled:opacity-60 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+        >
+          {submitting ? (
+            <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Submitting…</>
           ) : (
-            <><Check size={16} /> Publish listing</>
+            <><Check size={16} /> Submit for review</>
           )}
         </button>
       </div>
@@ -690,28 +1204,283 @@ function Plus({ size = 16 }: { size?: number }) {
 
 // ─── Main wizard ──────────────────────────────────────────────────────────────
 
-export function CreateListingFlow() {
-  const router = useRouter()
-  const [stepIdx, setStepIdx] = useState(0)
-  const [publishing, setPublishing] = useState(false)
+function listingToBasics(l: Listing, privateCategoryMetadata?: Record<string, string | undefined>): BasicsData {
+  return {
+    title: l.title,
+    category: l.category,
+    condition: (l.condition ?? 'good') as ItemCondition,
+    description: l.description ?? '',
+    replacement_value: l.replacement_value ?? 0,
+    quantity_available: l.quantity_available ?? 1,
+    province: l.province ?? '',
+    city: l.city ?? '',
+    category_metadata: (l.category_metadata as Record<string, string> | null) ?? {},
+    private_category_metadata: (privateCategoryMetadata as Record<string, string> | undefined) ?? {},
+  }
+}
+function listingToPricing(l: Listing): PricingData {
+  return {
+    daily_rate: l.daily_rate,
+    weekly_rate: l.weekly_rate ?? undefined,
+    min_rental_days: l.min_rental_days,
+    max_rental_days: l.max_rental_days ?? undefined,
+    shipping_payer: l.shipping_payer,
+    insurance_amount: l.insurance_amount ?? undefined,
+    available_from: l.available_from ?? '',
+    min_booking_notice_days: l.min_booking_notice_days ?? undefined,
+    max_advance_booking_days: l.max_advance_booking_days ?? undefined,
+  }
+}
+function listingToRequirements(l: Listing, req?: Record<string, unknown> | null): RequirementsData {
+  return {
+    min_unity_score: l.min_unity_score,
+    deposit_required: l.deposit_required,
+    deposit_amount: l.deposit_amount ?? undefined,
+    verified_identity_required: (req?.verified_identity_required as boolean) ?? false,
+    kyc_approved_required: (req?.kyc_approved_required as boolean) ?? false,
+    min_age: (req?.min_age as number | null) ?? undefined,
+    driving_licence_required: (req?.driving_licence_required as boolean) ?? false,
+    licence_class: (req?.licence_class as string | null) ?? undefined,
+    additional_requirements: (req?.additional_requirements as string | null) ?? undefined,
+    permitted_use: (req?.permitted_use as string | null) ?? undefined,
+    prohibited_use: (req?.prohibited_use as string | null) ?? undefined,
+    geographic_restriction: (req?.geographic_restriction as string | null) ?? undefined,
+    commercial_use_allowed: (req?.commercial_use_allowed as boolean) ?? false,
+    sub_rental_allowed: (req?.sub_rental_allowed as boolean) ?? false,
+    cleaning_requirements: (req?.cleaning_requirements as string | null) ?? undefined,
+    return_condition_requirements: (req?.return_condition_requirements as string | null) ?? undefined,
+    merchant_custom_rules: (req?.merchant_custom_rules as string | null) ?? undefined,
+    existing_damage_description: (req?.existing_damage_description as string | null) ?? undefined,
+    inspection_required_before_handover: (req?.inspection_required_before_handover as boolean) ?? false,
+    inspection_required_on_return: (req?.inspection_required_on_return as boolean) ?? false,
+    missing_accessory_consequence: (req?.missing_accessory_consequence as string | null) ?? undefined,
+    lost_item_consequence: (req?.lost_item_consequence as string | null) ?? undefined,
+  }
+}
+function listingToAffiliates(l: Listing): AffiliatesData {
+  return { accepts_affiliates: l.accepts_affiliates, affiliate_commission_rate: l.affiliate_commission_rate || undefined }
+}
 
-  const [basics,       setBasics]       = useState<BasicsData>()
-  const [pricing,      setPricing]      = useState<PricingData>()
-  const [requirements, setRequirements] = useState<RequirementsData>()
-  const [affiliates,   setAffiliates]   = useState<AffiliatesData>()
+export function CreateListingFlow({ draft }: { draft?: ListingDraft }) {
+  const router = useRouter()
+  const { profile } = useAuth()
+  const [stepIdx, setStepIdx] = useState(0)
+  const [saving, setSaving] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [serverError, setServerError] = useState('')
+  const busyRef = useRef(false)
+  // Idempotency keys (server-enforced — see 20260729000008's
+  // save_listing_draft/submit_listing_for_review). Reused across a failed
+  // attempt + manual retry of the SAME logical action (the point of
+  // idempotency — the server may have actually succeeded even if the
+  // client never saw the response), and only rotated after a confirmed
+  // success, since resending an old key with a since-edited payload would
+  // otherwise hit the server's "reused key with a different request" guard.
+  const saveIdemKeyRef = useRef(crypto.randomUUID())
+  const submitIdemKeyRef = useRef(crypto.randomUUID())
+
+  const [basics,       setBasics]       = useState<BasicsData | undefined>(draft && listingToBasics(draft.listing, draft.privateCategoryMetadata))
+  const [pricing,      setPricing]      = useState<PricingData | undefined>(draft && listingToPricing(draft.listing))
+  const [requirements, setRequirements] = useState<RequirementsData | undefined>(draft && { ...listingToRequirements(draft.listing, draft.requirements), deposit_amount: draft.requestedDepositAmount ?? draft.listing.deposit_amount ?? undefined })
+  const [affiliates,   setAffiliates]   = useState<AffiliatesData | undefined>(draft && listingToAffiliates(draft.listing))
   const [photos,       setPhotos]       = useState<File[]>([])
   const [ownershipFile, setOwnershipFile] = useState<File | null>(null)
+  const [conditionConfirmed, setConditionConfirmed] = useState(draft?.listing.condition_confirmed ?? false)
+  const [knownDefects, setKnownDefects] = useState(draft?.listing.known_defects ?? '')
+  const [hasDamagePhoto, setHasDamagePhoto] = useState(false)
+  const [acceptedDeclarations, setAcceptedDeclarations] = useState<Set<string>>(new Set())
+  const [blockedRanges, setBlockedRanges] = useState<BlockedDateRange[]>(
+    (draft?.availability ?? []).map((a) => ({ start_date: a.start_date, end_date: a.end_date, reason: a.reason ?? undefined }))
+  )
+
+  // Existing media (edit mode) is mutable state, not a derived constant —
+  // the merchant can remove, reorder, and re-mark the primary image before
+  // saving. Removing an existing photo/ownership-proof schedules its
+  // Storage object for deletion (processed only after a successful save —
+  // see persistDraft — so a failed save never leaves a removed-but-not-
+  // saved inconsistency).
+  const [existingPhotos, setExistingPhotos] = useState(
+    (draft?.listing.media ?? []).filter((m) => m.type === 'photo').sort((a, b) => a.display_order - b.display_order)
+  )
+  const [existingOwnershipUrl, setExistingOwnershipUrl] = useState(
+    (draft?.listing.media ?? []).find((m) => m.type === 'ownership_proof')?.url ?? null
+  )
+  const [pendingStorageRemovals, setPendingStorageRemovals] = useState<{ bucket: 'listing-media' | 'ownership-proofs'; path: string }[]>([])
+
+  const [listingId, setListingId] = useState<string | null>(draft?.listing.id ?? null)
 
   const currentStep = STEPS[stepIdx]
 
   const goNext = () => setStepIdx((i) => Math.min(i + 1, STEPS.length - 1))
   const goBack = () => setStepIdx((i) => Math.max(i - 1, 0))
 
-  const handlePublish = async () => {
-    setPublishing(true)
-    await new Promise((r) => setTimeout(r, 1500))
-    toast.success('Listing published! It\'s now live on Unity.')
-    router.push('/dashboard/merchant/listings')
+  const toggleDeclaration = (type: string) => {
+    setAcceptedDeclarations((prev) => {
+      const next = new Set(prev)
+      if (next.has(type)) next.delete(type); else next.add(type)
+      return next
+    })
+  }
+
+  const removeExistingPhoto = (id: string) => {
+    const target = existingPhotos.find((m) => m.id === id)
+    setExistingPhotos(existingPhotos.filter((m) => m.id !== id))
+    if (target) {
+      // Scheduled, not immediate — actually deleted from Storage only
+      // after the next successful save (see persistDraft), so a removal
+      // that's never saved never touches Storage at all.
+      const path = target.url.split('/listing-media/')[1] ?? target.url
+      setPendingStorageRemovals((prev) => [...prev, { bucket: 'listing-media', path }])
+    }
+  }
+
+  const replaceOwnershipFile = (f: File | null) => {
+    if (f && existingOwnershipUrl) {
+      setPendingStorageRemovals((prev) => [...prev, { bucket: 'ownership-proofs', path: existingOwnershipUrl }])
+      setExistingOwnershipUrl(null)
+    }
+    setOwnershipFile(f)
+  }
+
+  /**
+   * Uploads any newly-added local files to Storage, merges them with
+   * whatever's already on record (edit mode), and POSTs the resulting
+   * metadata + form state to /api/listings for the actual DB write. On
+   * any failure after files were uploaded this attempt, best-effort
+   * removes them so nothing orphaned is left in Storage. On success,
+   * separately processes any pending removals (existing media the
+   * merchant removed/replaced this session) — deferred until now so a
+   * failed save never leaves a "removed but not saved" inconsistency.
+   */
+  const persistDraft = async (): Promise<string> => {
+    if (!profile) throw new Error('You must be signed in to save a listing')
+
+    const uploadedThisAttempt: { bucket: 'listing-media' | 'ownership-proofs'; path: string }[] = []
+    try {
+      const newPhotoUploads = await Promise.all(
+        photos.map(async (file) => {
+          const res = await uploadListingPhoto(profile.id, file)
+          uploadedThisAttempt.push({ bucket: 'listing-media', path: res.path })
+          return res
+        })
+      )
+
+      let ownershipUrl = existingOwnershipUrl
+      if (ownershipFile) {
+        const res = await uploadOwnershipProof(profile.id, ownershipFile)
+        uploadedThisAttempt.push({ bucket: 'ownership-proofs', path: res.path })
+        ownershipUrl = res.url
+      }
+
+      // Exactly one photo is primary: existing[0] if any exist, else
+      // new[0]. Recomputed here (not trusted from prior state) so
+      // reordering/removal always yields a consistent result.
+      const media = [
+        ...existingPhotos.map((m, i) => ({
+          url: m.url,
+          type: 'photo' as const,
+          display_order: i,
+          shot_type: i === 0 ? 'primary' as const : (m.shot_type === 'primary' ? undefined : m.shot_type ?? undefined),
+        })),
+        ...newPhotoUploads.map((u, i) => ({
+          url: u.url,
+          type: 'photo' as const,
+          display_order: existingPhotos.length + i,
+          shot_type: (existingPhotos.length === 0 && i === 0 ? 'primary' : hasDamagePhoto && i === newPhotoUploads.length - 1 ? 'damage_closeup' : undefined) as
+            | 'primary' | 'damage_closeup' | undefined,
+        })),
+        ...(ownershipUrl ? [{ url: ownershipUrl, type: 'ownership_proof' as const, display_order: 0 }] : []),
+      ]
+
+      const res = await fetch('/api/listings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listing_id: listingId,
+          listing: {
+            ...basics, ...pricing, ...affiliates,
+            deposit_required: requirements?.deposit_required ?? false,
+            deposit_amount: requirements?.deposit_amount,
+            condition_confirmed: conditionConfirmed,
+            known_defects: knownDefects || undefined,
+          },
+          requirements: { ...requirements },
+          media,
+          category_metadata: basics?.category_metadata ?? {},
+          private_category_metadata: basics?.private_category_metadata ?? {},
+          availability: blockedRanges,
+          idempotency_key: saveIdemKeyRef.current,
+        }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error ?? 'Could not save your listing')
+
+      // Success — rotate the key so the *next* save (e.g. after further
+      // edits) is treated as a new logical action, not a replay of this one.
+      saveIdemKeyRef.current = crypto.randomUUID()
+      setListingId(body.listing_id)
+
+      if (pendingStorageRemovals.length > 0) {
+        await Promise.all(pendingStorageRemovals.map((p) => removeUploadedFiles(p.bucket, [p.path])))
+        setPendingStorageRemovals([])
+      }
+      setPhotos([])
+      setOwnershipFile(null)
+
+      return body.listing_id as string
+    } catch (err) {
+      await Promise.all(uploadedThisAttempt.map((u) => removeUploadedFiles(u.bucket, [u.path])))
+      throw err
+    }
+  }
+
+  const handleSaveDraft = async () => {
+    if (busyRef.current) return
+    busyRef.current = true
+    setSaving(true)
+    setServerError('')
+    try {
+      await persistDraft()
+      toast.success('Draft saved')
+      router.push('/dashboard/merchant/listings')
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : 'Could not save your listing')
+    } finally {
+      setSaving(false)
+      busyRef.current = false
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (busyRef.current) return
+    busyRef.current = true
+    setSubmitting(true)
+    setServerError('')
+    try {
+      const id = await persistDraft()
+      const res = await fetch(`/api/listings/${id}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          declaration_types: Array.from(acceptedDeclarations),
+          idempotency_key: submitIdemKeyRef.current,
+        }),
+      })
+      const body = await res.json()
+      if (!res.ok) {
+        const issues = body.completeness?.blockingIssues as string[] | undefined
+        throw new Error(issues?.length ? issues.join(' ') : (body.error ?? 'Could not submit your listing'))
+      }
+      // Success — rotate for the same reason as the save key above.
+      submitIdemKeyRef.current = crypto.randomUUID()
+      toast.success('Listing submitted for review')
+      router.push('/dashboard/merchant/listings')
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : 'Could not submit your listing')
+    } finally {
+      setSubmitting(false)
+      busyRef.current = false
+    }
   }
 
   return (
@@ -752,13 +1521,40 @@ export function CreateListingFlow() {
         <BasicsStep onNext={(d) => { setBasics(d); goNext() }} defaults={basics} />
       )}
       {currentStep.id === 'photos' && (
-        <PhotosStep onNext={goNext} onBack={goBack} photos={photos} setPhotos={setPhotos} />
+        <PhotosStep
+          onNext={goNext}
+          onBack={goBack}
+          photos={photos}
+          setPhotos={setPhotos}
+          existingPhotos={existingPhotos}
+          onRemoveExisting={removeExistingPhoto}
+          onReorderExisting={setExistingPhotos}
+          hasDeclaredDefects={knownDefects.trim().length > 0}
+          hasDamagePhoto={hasDamagePhoto}
+          setHasDamagePhoto={setHasDamagePhoto}
+        />
       )}
       {currentStep.id === 'ownership' && (
-        <OwnershipStep onNext={goNext} onBack={goBack} ownershipFile={ownershipFile} setOwnershipFile={setOwnershipFile} />
+        <OwnershipStep
+          onNext={goNext}
+          onBack={goBack}
+          ownershipFile={ownershipFile}
+          setOwnershipFile={replaceOwnershipFile}
+          hasExistingOwnershipProof={!!existingOwnershipUrl}
+          conditionConfirmed={conditionConfirmed}
+          setConditionConfirmed={setConditionConfirmed}
+          knownDefects={knownDefects}
+          setKnownDefects={setKnownDefects}
+        />
       )}
       {currentStep.id === 'pricing' && (
-        <PricingStep onNext={(d) => { setPricing(d); goNext() }} onBack={goBack} defaults={pricing} />
+        <PricingStep
+          onNext={(d) => { setPricing(d); goNext() }}
+          onBack={goBack}
+          defaults={pricing}
+          blockedRanges={blockedRanges}
+          setBlockedRanges={setBlockedRanges}
+        />
       )}
       {currentStep.id === 'requirements' && (
         <RequirementsStep
@@ -775,14 +1571,20 @@ export function CreateListingFlow() {
       {currentStep.id === 'review' && (
         <ReviewStep
           onBack={goBack}
-          onPublish={handlePublish}
-          publishing={publishing}
+          onSaveDraft={handleSaveDraft}
+          onSubmit={handleSubmit}
+          saving={saving}
+          submitting={submitting}
+          serverError={serverError}
           basics={basics}
           pricing={pricing}
           requirements={requirements}
           affiliates={affiliates}
-          photoCount={photos.length}
+          photoCount={existingPhotos.length + photos.length}
           ownershipFileName={ownershipFile?.name ?? ''}
+          hasOwnershipProof={!!existingOwnershipUrl || !!ownershipFile}
+          acceptedDeclarations={acceptedDeclarations}
+          onToggleDeclaration={toggleDeclaration}
         />
       )}
     </div>

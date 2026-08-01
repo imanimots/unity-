@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Plus, Package, DollarSign, Star, ShieldCheck, ArrowRight, Clock, CheckCircle, Users } from 'lucide-react'
 import { getServerUser, MOCK_CURRENT_PROFILE } from '@/lib/data/profiles'
+import { getListingsByMerchant } from '@/lib/data/listings'
 import { IS_MOCK_MODE, MOCK_MY_LISTINGS, MOCK_MERCHANT_BOOKINGS } from '@/lib/mock/data'
 import type { BookingStatus, ListingStatus } from '@/types'
 
@@ -33,7 +34,7 @@ export default async function MerchantDashboard() {
   const profile = serverProfile ?? (IS_MOCK_MODE ? MOCK_CURRENT_PROFILE : null)
   const displayName = profile?.display_name ?? 'there'
 
-  const myListings      = IS_MOCK_MODE ? MOCK_MY_LISTINGS : []
+  const myListings      = IS_MOCK_MODE ? MOCK_MY_LISTINGS : profile ? await getListingsByMerchant(profile.id) : []
   const myBookings      = IS_MOCK_MODE ? MOCK_MERCHANT_BOOKINGS : []
   const activeListings  = myListings.filter((l) => l.status === 'active').length
   const pendingBookings = myBookings.filter((b) => b.status === 'pending').length

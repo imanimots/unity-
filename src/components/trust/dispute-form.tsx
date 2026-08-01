@@ -180,7 +180,7 @@ export function DisputeForm({
       <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-6 flex items-start gap-3 text-sm">
         <AlertTriangle size={15} className="text-amber-500 shrink-0 mt-0.5" />
         <p className="text-amber-700 dark:text-amber-300">
-          Before raising a dispute, please try messaging the other party first. Unity mediates unresolved issues and will hold the deposit in escrow until resolved.
+          Before raising a dispute, please try messaging the other party first. Unity reviews unresolved issues and will not release a held deposit until resolved.
         </p>
       </div>
 

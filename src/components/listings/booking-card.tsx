@@ -112,7 +112,7 @@ export function BookingCard({ listing }: { listing: Listing }) {
 
       <p className="text-xs text-[#9B8B85] text-center flex items-center justify-center gap-1">
         <ShieldCheck size={12} className="text-green-500" />
-        Payment held in escrow until return confirmed
+        Secure checkout — deposit released after return confirmed
       </p>
     </div>
   )

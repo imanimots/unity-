@@ -66,22 +66,25 @@ function LoginForm() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* Email */}
           <div>
-            <label className="block text-xs font-500 uppercase tracking-[0.15em] text-[#9B8B85] mb-2">
+            <label htmlFor="login-email" className="block text-xs font-500 uppercase tracking-[0.15em] text-[#9B8B85] mb-2">
               Email
             </label>
             <input
               {...register('email')}
+              id="login-email"
               type="email"
               placeholder="you@email.com"
+              aria-invalid={!!errors.email}
+              aria-describedby={errors.email ? 'login-email-error' : undefined}
               className="w-full h-12 px-4 rounded-lg border border-[#E8E0D8] bg-white text-[#1A0A0A] placeholder:text-[#C4B8B0] focus:outline-none focus:border-[#8B1A1A] focus:ring-2 focus:ring-[#8B1A1A]/15 text-sm transition-colors"
             />
-            {errors.email && <p className="text-xs text-[#E03D2F] mt-1.5">{errors.email.message}</p>}
+            {errors.email && <p id="login-email-error" className="text-xs text-[#E03D2F] mt-1.5">{errors.email.message}</p>}
           </div>
 
           {/* Password */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-500 uppercase tracking-[0.15em] text-[#9B8B85]">
+              <label htmlFor="login-password" className="block text-xs font-500 uppercase tracking-[0.15em] text-[#9B8B85]">
                 Password
               </label>
               <Link href="/forgot-password" className="text-xs text-[#8B1A1A] hover:text-[#C4511F] transition-colors">
@@ -91,19 +94,23 @@ function LoginForm() {
             <div className="relative">
               <input
                 {...register('password')}
+                id="login-password"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Your password"
+                aria-invalid={!!errors.password}
+                aria-describedby={errors.password ? 'login-password-error' : undefined}
                 className="w-full h-12 px-4 pr-11 rounded-lg border border-[#E8E0D8] bg-white text-[#1A0A0A] placeholder:text-[#C4B8B0] focus:outline-none focus:border-[#8B1A1A] focus:ring-2 focus:ring-[#8B1A1A]/15 text-sm transition-colors"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9B8B85] hover:text-[#6B5B55] transition-colors"
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
-            {errors.password && <p className="text-xs text-[#E03D2F] mt-1.5">{errors.password.message}</p>}
+            {errors.password && <p id="login-password-error" className="text-xs text-[#E03D2F] mt-1.5">{errors.password.message}</p>}
           </div>
 
           {/* Error */}

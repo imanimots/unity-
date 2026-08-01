@@ -1,7 +1,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { Star, ShieldCheck, Calendar, Package, ArrowLeft } from 'lucide-react'
-import { IS_MOCK_MODE, MOCK_PROFILES, MOCK_REVIEWS, MOCK_LISTINGS } from '@/lib/mock/data'
+import { getProfile } from '@/lib/data/profiles'
+import { getListingsByMerchant, getProfileReviews } from '@/lib/data/listings'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -9,13 +10,13 @@ interface Props {
 
 export async function generateMetadata({ params }: Props) {
   const { id } = await params
-  const profile = IS_MOCK_MODE ? MOCK_PROFILES.find((p) => p.id === id) : null
+  const profile = await getProfile(id)
   return { title: profile ? `${profile.display_name ?? 'Profile'} — Unity` : 'Profile — Unity' }
 }
 
 export default async function PublicProfilePage({ params }: Props) {
   const { id } = await params
-  const profile = IS_MOCK_MODE ? MOCK_PROFILES.find((p) => p.id === id) : null
+  const profile = await getProfile(id)
 
   if (!profile) {
     return (
@@ -30,13 +31,10 @@ export default async function PublicProfilePage({ params }: Props) {
     )
   }
 
-  const reviews = IS_MOCK_MODE
-    ? MOCK_REVIEWS.filter((r) => r.reviewee_id === id)
-    : []
-
-  const listings = IS_MOCK_MODE
-    ? MOCK_LISTINGS.filter((l) => l.merchant_id === id)
-    : []
+  const [reviews, listings] = await Promise.all([
+    getProfileReviews(id),
+    getListingsByMerchant(id),
+  ])
 
   const displayName = profile.display_name ?? 'User'
   const fullName = profile.full_name ?? displayName

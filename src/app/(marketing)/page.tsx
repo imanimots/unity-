@@ -5,7 +5,7 @@ import { ListingCard } from '@/components/listings/listing-card'
 
 export const metadata = {
   title: 'Unity — Rent What You Need. Earn From What You Have.',
-  description: "South Africa's peer-to-peer rental marketplace. Verified users, escrow-protected payments, and thousands of items near you.",
+  description: "South Africa's peer-to-peer rental marketplace. Identity-reviewed users, test-mode checkout, and thousands of items near you.",
 }
 
 const MARQUEE_TEXT =
@@ -22,12 +22,12 @@ const STEPS = [
   {
     num: '01',
     title: 'BROWSE & BOOK',
-    desc: 'Find what you need, pick your dates, and pay securely — your money is held in escrow.',
+    desc: 'Find what you need, pick your dates, and pay securely through Unity\'s checkout.',
   },
   {
     num: '02',
     title: 'MEET & RENT',
-    desc: 'Collect or receive the item from a verified local owner and start using it.',
+    desc: 'Collect or receive the item from a reviewed local owner and start using it.',
   },
   {
     num: '03',
@@ -39,13 +39,13 @@ const STEPS = [
 const TRUST = [
   {
     icon: <ShieldCheck size={22} strokeWidth={1.5} />,
-    title: 'ESCROW PAYMENTS',
-    desc: 'Funds held securely until both sides confirm the return.',
+    title: 'TEST-MODE CHECKOUT',
+    desc: 'Unity is in public test — payments are currently simulated. See the Payment & Deposit Policy.',
   },
   {
     icon: <CheckCircle size={22} strokeWidth={1.5} />,
-    title: 'KYC VERIFIED',
-    desc: 'Every user has verified their identity before transacting.',
+    title: 'IDENTITY REVIEWED',
+    desc: 'Every user\'s identity is reviewed by Unity before transacting.',
   },
   {
     icon: <Star size={22} strokeWidth={1.5} />,
@@ -76,7 +76,7 @@ export default async function HomePage() {
               </h1>
 
               <p className="text-base text-[#6B5B55] mb-10 max-w-sm leading-relaxed">
-                Unity connects South Africans to rent and lend safely — verified users, protected payments.
+                Unity connects South Africans to rent and lend safely — reviewed users, secure checkout.
               </p>
 
               <div className="flex flex-wrap gap-3">
@@ -167,7 +167,7 @@ export default async function HomePage() {
       </section>
 
       {/* ─── 4. HOW IT WORKS ─────────────────────────────────────── */}
-      <section className="bg-white py-[120px] max-lg:py-20">
+      <section id="how-it-works" className="bg-white py-[120px] max-lg:py-20 scroll-mt-16">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-16">
 
           <div className="flex items-center gap-3 mb-4">
@@ -230,7 +230,7 @@ export default async function HomePage() {
               List an item <ArrowRight size={15} />
             </Link>
             <Link
-              href="/how-it-works"
+              href="/#how-it-works"
               className="inline-flex items-center gap-2 px-7 py-3.5 border border-white/40 text-white text-sm font-semibold rounded-full hover:border-white/80 transition-colors"
             >
               How it works

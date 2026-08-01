@@ -168,7 +168,7 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                           R{listing.deposit_amount} security deposit
                         </p>
                         <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-0.5">
-                          Held in escrow and returned when the item comes back undamaged.
+                          Authorized at checkout and released when the item comes back undamaged. See the Payment &amp; Deposit Policy.
                         </p>
                       </div>
                     </div>
@@ -265,8 +265,8 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
             {/* Trust features */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
-                { icon: <ShieldCheck size={18} className="text-green-500" />, title: 'Escrow protected', desc: 'Payment held until return confirmed' },
-                { icon: <CheckCircle size={18} className="text-blue-500" />, title: 'Verified listing', desc: 'Ownership documents checked' },
+                { icon: <ShieldCheck size={18} className="text-green-500" />, title: 'Secure checkout', desc: 'Payment authorized until return confirmed' },
+                { icon: <CheckCircle size={18} className="text-blue-500" />, title: 'Reviewed listing', desc: 'Ownership documents checked' },
                 { icon: <Star size={18} className="text-amber-400 fill-amber-400" />, title: 'Reviewed merchant', desc: 'Rated by the Unity community' },
               ].map(({ icon, title, desc }) => (
                 <div key={title} className="flex items-start gap-3 p-4 rounded-xl bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A]">

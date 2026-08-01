@@ -6,20 +6,27 @@ import Link from 'next/link'
 import {
   LayoutDashboard, Users, Package, Calendar,
   AlertTriangle, Link2, BookOpen, BarChart3,
-  Menu, X, Shield, LogOut, ChevronRight,
+  Menu, X, Shield, LogOut, ChevronRight, UserCheck, Mail,
+  Wallet, Inbox, ScrollText,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { IS_MOCK_MODE } from '@/lib/mock/data'
 
 const NAV_ITEMS = [
-  { href: '/admin',                label: 'Overview',       icon: LayoutDashboard, exact: true },
-  { href: '/admin/users',          label: 'Users',          icon: Users            },
-  { href: '/admin/listings',       label: 'Listings',       icon: Package          },
-  { href: '/admin/bookings',       label: 'Bookings',       icon: Calendar         },
-  { href: '/admin/disputes',       label: 'Disputes',       icon: AlertTriangle    },
-  { href: '/admin/affiliates',     label: 'Affiliates',     icon: Link2            },
-  { href: '/admin/knowledge-base', label: 'Knowledge Base', icon: BookOpen         },
-  { href: '/admin/analytics',      label: 'Analytics',      icon: BarChart3        },
+  { href: '/admin',                     label: 'Overview',            icon: LayoutDashboard, exact: true },
+  { href: '/admin/users',               label: 'Users',                icon: Users            },
+  { href: '/admin/verifications',       label: 'Verifications',        icon: UserCheck        },
+  { href: '/admin/listings',            label: 'Listings',             icon: Package          },
+  { href: '/admin/bookings',            label: 'Bookings',             icon: Calendar         },
+  { href: '/admin/financial-operations',label: 'Financial Operations', icon: Wallet           },
+  { href: '/admin/email-deliveries',    label: 'Email Deliveries',     icon: Inbox            },
+  { href: '/admin/exceptions',          label: 'Exception Queue',      icon: AlertTriangle    },
+  { href: '/admin/audit',               label: 'Audit Log',            icon: ScrollText       },
+  { href: '/admin/disputes',            label: 'Disputes',             icon: AlertTriangle    },
+  { href: '/admin/affiliates',          label: 'Affiliates',           icon: Link2            },
+  { href: '/admin/knowledge-base',      label: 'Knowledge Base',       icon: BookOpen         },
+  { href: '/admin/email-previews',      label: 'Email Previews',       icon: Mail             },
+  { href: '/admin/analytics',           label: 'Analytics',            icon: BarChart3        },
 ]
 
 export function AdminShell({ children }: { children: React.ReactNode }) {

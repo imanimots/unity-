@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { DollarSign, Clock, CheckCircle, ArrowRight, Building2, AlertCircle, ArrowLeft } from 'lucide-react'
 import { MOCK_MERCHANT_BOOKINGS } from '@/lib/mock/data'
+import { TestModeBanner } from '@/components/shared/test-mode-banner'
 
 export const metadata = { title: 'Payouts — Unity' }
 
@@ -40,6 +41,8 @@ export default function PayoutsPage() {
         </h1>
       </div>
 
+      <TestModeBanner className="mb-8" />
+
       {/* Available balance — featured metric */}
       <div className="bg-[#8B1A1A] rounded-xl p-8 mb-12 border-l-4 border-l-[#C4511F]">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-white/60 mb-3">Available Balance</p>
@@ -58,7 +61,7 @@ export default function PayoutsPage() {
       <div className="grid grid-cols-2 gap-4 mb-12">
         <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">In Escrow</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Pending Release</p>
             <Clock size={14} className="text-amber-400" />
           </div>
           <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">R{inEscrow}</div>

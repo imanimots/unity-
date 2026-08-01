@@ -56,6 +56,18 @@ export default function RegisterPage() {
         display_name: data.full_name.split(' ')[0],
         role,
       })
+
+      // Best-effort -- the account already exists at this point; a
+      // failure to record consent must not block registration itself.
+      try {
+        await fetch('/api/legal/accept', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ policies: ['terms', 'privacy', 'popia'], context: 'registration' }),
+        })
+      } catch {
+        // swallowed -- see comment above
+      }
     }
 
     router.push(role === 'merchant' ? '/dashboard/merchant' : '/')
@@ -111,53 +123,63 @@ export default function RegisterPage() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         {/* Full name */}
         <div>
-          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">
+          <label htmlFor="register-full-name" className="block text-xs font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">
             Full name
           </label>
           <input
             {...register('full_name')}
+            id="register-full-name"
             type="text"
             placeholder="Thabo Nkosi"
+            aria-invalid={!!errors.full_name}
+            aria-describedby={errors.full_name ? 'register-full-name-error' : undefined}
             className="w-full h-12 px-4 rounded-lg border border-[#E8E0D8] bg-white text-[#1A0A0A] placeholder:text-[#C4B8B0] focus:outline-none focus:border-[#8B1A1A] focus:ring-2 focus:ring-[#8B1A1A]/15 text-sm transition-colors"
           />
-          {errors.full_name && <p className="text-xs text-[#E03D2F] mt-1.5">{errors.full_name.message}</p>}
+          {errors.full_name && <p id="register-full-name-error" className="text-xs text-[#E03D2F] mt-1.5">{errors.full_name.message}</p>}
         </div>
 
         {/* Email */}
         <div>
-          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">
+          <label htmlFor="register-email" className="block text-xs font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">
             Email
           </label>
           <input
             {...register('email')}
+            id="register-email"
             type="email"
             placeholder="thabo@email.com"
+            aria-invalid={!!errors.email}
+            aria-describedby={errors.email ? 'register-email-error' : undefined}
             className="w-full h-12 px-4 rounded-lg border border-[#E8E0D8] bg-white text-[#1A0A0A] placeholder:text-[#C4B8B0] focus:outline-none focus:border-[#8B1A1A] focus:ring-2 focus:ring-[#8B1A1A]/15 text-sm transition-colors"
           />
-          {errors.email && <p className="text-xs text-[#E03D2F] mt-1.5">{errors.email.message}</p>}
+          {errors.email && <p id="register-email-error" className="text-xs text-[#E03D2F] mt-1.5">{errors.email.message}</p>}
         </div>
 
         {/* Password */}
         <div>
-          <label className="block text-xs font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">
+          <label htmlFor="register-password" className="block text-xs font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">
             Password
           </label>
           <div className="relative">
             <input
               {...register('password')}
+              id="register-password"
               type={showPassword ? 'text' : 'password'}
               placeholder="At least 8 characters"
+              aria-invalid={!!errors.password}
+              aria-describedby={errors.password ? 'register-password-error' : undefined}
               className="w-full h-12 px-4 pr-11 rounded-lg border border-[#E8E0D8] bg-white text-[#1A0A0A] placeholder:text-[#C4B8B0] focus:outline-none focus:border-[#8B1A1A] focus:ring-2 focus:ring-[#8B1A1A]/15 text-sm transition-colors"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9B8B85] hover:text-[#6B5B55] transition-colors"
             >
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
-          {errors.password && <p className="text-xs text-[#E03D2F] mt-1.5">{errors.password.message}</p>}
+          {errors.password && <p id="register-password-error" className="text-xs text-[#E03D2F] mt-1.5">{errors.password.message}</p>}
         </div>
 
         {/* Terms */}
