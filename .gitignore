@@ -12,6 +12,10 @@
 
 # testing
 /coverage
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache
 
 # next.js
 /.next/
@@ -36,6 +40,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# supabase CLI local cache/link metadata
+/supabase/.temp
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# QA seed credentials — never committed, see scripts/qa-seed.mjs
+.qa-credentials.local.json
