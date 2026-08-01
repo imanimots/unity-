@@ -65,3 +65,32 @@ export async function requireAdmin(): Promise<AuthedProfile | null> {
   if (!result || result.profile.role !== 'admin') return null
   return result
 }
+
+/**
+ * Server-side authentication gate for any signed-in user — the authoritative
+ * check for `(dashboard)` routes (renter dashboard, merchant dashboard,
+ * affiliate dashboard), mirroring `requireAdmin()`'s pattern. The
+ * proxy/middleware layer also redirects unauthenticated requests before they
+ * reach here, but that's defense-in-depth, not the primary control.
+ *
+ * Mock mode allows access unconditionally, same rationale as `requireAdmin()`.
+ */
+export async function requireAuth(): Promise<AuthedProfile | null> {
+  if (IS_MOCK_MODE) {
+    return { userId: MOCK_CURRENT_PROFILE.id, profile: MOCK_CURRENT_PROFILE }
+  }
+
+  return getRequestProfile()
+}
+
+/**
+ * Server-side gate for merchant-only routes (`/dashboard/merchant/*`).
+ * `'both'` profiles (renter + merchant) count as merchants here — the two
+ * roles aren't mutually exclusive in this platform's model.
+ */
+export async function requireMerchant(): Promise<AuthedProfile | null> {
+  const result = await requireAuth()
+  if (!result) return null
+  if (result.profile.role !== 'merchant' && result.profile.role !== 'both') return null
+  return result
+}

@@ -51,7 +51,7 @@ export const MOCK_CONVERSATIONS: MockConversation[] = [
       { id: 'm-2-3', sender_id: 'user-1', content: 'Quick question — are both memory cards included and formatted?', created_at: '2026-06-07T10:15:00Z', is_blocked: false, block_reason: null },
       { id: 'm-2-4', sender_id: 'user-4', content: 'Yes! Two 128GB CFexpress cards, both blank and formatted. Also two charged batteries.', created_at: '2026-06-07T10:20:00Z', is_blocked: false, block_reason: null },
       { id: 'm-2-5', sender_id: 'user-1', content: 'Can I just pay the deposit directly to your FNB account? Easier for me.', created_at: '2026-06-07T10:28:00Z', is_blocked: true, block_reason: 'Off-platform payment request' },
-      { id: 'm-2-6', sender_id: 'user-4', content: 'All payments must go through Unity — it holds the deposit in escrow and protects us both 😊 The system already handled it.', created_at: '2026-06-07T10:35:00Z', is_blocked: false, block_reason: null },
+      { id: 'm-2-6', sender_id: 'user-4', content: 'All payments must go through Unity\'s checkout — it protects us both 😊 The system already handled it.', created_at: '2026-06-07T10:35:00Z', is_blocked: false, block_reason: null },
       { id: 'm-2-7', sender_id: 'user-1', content: 'Of course, makes total sense! See you on the 8th.', created_at: '2026-06-07T10:40:00Z', is_blocked: false, block_reason: null },
       { id: 'm-2-8', sender_id: 'user-4', content: 'See you then! Come after 9am. I\'ll have the kit packed and ready.', created_at: '2026-06-08T07:00:00Z', is_blocked: false, block_reason: null },
     ],

@@ -14,6 +14,10 @@ export const MOCK_PROFILES: Profile[] = [
     avatar_url: null,
     is_affiliate: false,
     affiliate_code: null,
+    account_status: 'active',
+    status_reason: null,
+    status_changed_at: null,
+    status_changed_by: null,
     created_at: '2024-01-15T08:00:00Z',
   },
   {
@@ -28,6 +32,10 @@ export const MOCK_PROFILES: Profile[] = [
     avatar_url: null,
     is_affiliate: false,
     affiliate_code: null,
+    account_status: 'active',
+    status_reason: null,
+    status_changed_at: null,
+    status_changed_by: null,
     created_at: '2024-02-01T09:00:00Z',
   },
   {
@@ -42,6 +50,10 @@ export const MOCK_PROFILES: Profile[] = [
     avatar_url: null,
     is_affiliate: false,
     affiliate_code: null,
+    account_status: 'active',
+    status_reason: null,
+    status_changed_at: null,
+    status_changed_by: null,
     created_at: '2024-02-10T10:00:00Z',
   },
   {
@@ -56,6 +68,10 @@ export const MOCK_PROFILES: Profile[] = [
     avatar_url: null,
     is_affiliate: false,
     affiliate_code: null,
+    account_status: 'active',
+    status_reason: null,
+    status_changed_at: null,
+    status_changed_by: null,
     created_at: '2024-03-05T11:00:00Z',
   },
 ]
@@ -818,7 +834,9 @@ export const MOCK_RENTER_BOOKINGS: (Booking & { listing: Listing; merchant: Prof
   },
 ]
 
-// Helper to check if we're in mock mode
-export const IS_MOCK_MODE =
-  !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  process.env.NEXT_PUBLIC_SUPABASE_URL === 'your_project_url_here'
+// Mock mode is an explicit opt-in (NEXT_PUBLIC_MOCK_MODE=true), never an
+// implicit fallback for "Supabase isn't configured yet". Real mode is the
+// default: if Supabase env vars are missing while mock mode is off,
+// Supabase calls fail loudly (see src/lib/supabase/client.ts, server.ts,
+// proxy.ts, require-admin.ts) instead of silently substituting mock data.
+export const IS_MOCK_MODE = process.env.NEXT_PUBLIC_MOCK_MODE === 'true'
