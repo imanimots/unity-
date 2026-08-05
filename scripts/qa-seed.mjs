@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 /**
- * Unity QA seed & reset script — Step 10 (public-test MVP).
+ * Unity QA seed & reset script — Step 10 (public-test MVP), extended with
+ * buying & selling listing fixtures and Barter marketplace scenarios.
  *
- * Creates a controlled catalogue of QA accounts, listings, bookings, and
+ * Creates a controlled catalogue of QA accounts, listings (rental, sale,
+ * both, and barter-dedicated), bookings, barter agreements, and
  * email-delivery states by driving the REAL application API routes and
- * RPCs wherever one exists (booking lifecycle, moderation decisions, KYC
- * decisions) — never a direct table write for anything that has a real
- * mutation path. Direct service-role inserts are used only where no
- * route exists (initial listing/document scaffolding, backdating a
- * timestamp to simulate "overdue", the deterministic email-failure
- * fixtures) — see inline comments at each such call site.
+ * RPCs wherever one exists (booking lifecycle, barter lifecycle,
+ * moderation decisions, KYC decisions) — never a direct table write for
+ * anything that has a real mutation path. Direct service-role inserts
+ * are used only where no route exists (initial listing/document
+ * scaffolding, backdating a timestamp to simulate "overdue" or
+ * "expired", the deterministic email-failure fixtures) — see inline
+ * comments at each such call site.
  *
  * SAFETY: this script refuses to run unless ALL of the following hold,
  * and aborts loudly (never partially) if any check fails:
@@ -315,6 +318,53 @@ async function seedListings(accounts, adminCookie) {
   return ids
 }
 
+// ── Phase 2b: QA buying & selling listings ─────────────────────────────
+// These fixtures exercise the Buy toggle on /listings, the sale/both
+// rendering branches on the listing detail page, and SaleSummaryCard.
+// Real purchase/order lifecycle scenarios (pending/paid/shipped/
+// delivered/cancelled/declined) are seeded separately in Phase 3c against
+// their own dedicated fixture listings, so stock here is never consumed
+// by an order-lifecycle test.
+async function seedBuySellListings(accounts) {
+  console.log('Phase 2b: QA buying & selling listings')
+  const ids = {}
+
+  ids.forSaleCamera = await insertBaseListing(accounts.merchantA.id, {
+    title: `${QA_LISTING_MARKER} For Sale — Vintage Camera`,
+    description: 'Synthetic QA fixture — sale-only listing, no rental option.',
+    listing_type: 'sale',
+    daily_rate: null,
+    sale_price: 1200,
+    quantity_available: 3,
+    status: 'active',
+  })
+
+  ids.forSaleChair = await insertBaseListing(accounts.merchantB.id, {
+    title: `${QA_LISTING_MARKER} For Sale — Office Chair`,
+    description: 'Synthetic QA fixture — sale-only listing, second merchant.',
+    category: 'tools',
+    listing_type: 'sale',
+    daily_rate: null,
+    sale_price: 800,
+    quantity_available: 1,
+    status: 'active',
+  })
+
+  ids.rentOrBuyDrill = await insertBaseListing(accounts.merchantA.id, {
+    title: `${QA_LISTING_MARKER} Rent or Buy — Power Drill`,
+    description: 'Synthetic QA fixture — listing_type=both, shows BookingCard and SaleSummaryCard together.',
+    category: 'tools',
+    listing_type: 'both',
+    daily_rate: 50,
+    sale_price: 900,
+    quantity_available: 2,
+    status: 'active',
+  })
+
+  console.log(`  ${Object.keys(ids).length} buy/sell listings seeded`)
+  return ids
+}
+
 // ── Phase 3: QA bookings & financial states ────────────────────────────
 async function createAndAccept(renterCookie, merchantCookie, listingId, daysOffset) {
   const start = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000).toISOString()
@@ -442,6 +492,262 @@ async function seedBookings(accounts, listingIds) {
   return bookingIds
 }
 
+// ── Phase 3b: QA barter scenarios ──────────────────────────────────────
+// Drives the real /api/barter routes, same philosophy as Phase 3's
+// booking seeding. Every mutating call uses a FIXED (not random)
+// idempotency key per scenario+step — the app's own idempotency
+// infrastructure (idempotency_keys, keyed on actor+operation+key) then
+// makes the whole phase naturally safe to re-run: a second run replays
+// each step's cached result instead of creating duplicate agreements,
+// exactly like insertBaseListing's idempotent-by-title check does for
+// listings, just via a different mechanism (there's no
+// idempotent-by-title equivalent for a negotiation thread).
+//
+// Barter listings are kept entirely separate from the Phase 2 rental
+// fixtures and Phase 2b buy/sell fixtures — an "accepted" agreement
+// permanently locks its listings (no completion RPC exists yet in this
+// phase of the build), and locking a listing Phase 3 also depends on for
+// booking would make a script re-run fail against the new
+// barter-lock-check in create_booking_request.
+async function proposeBarter(cookie, body) {
+  const res = await api(cookie, 'POST', '/api/barter', body)
+  const agreementId = res.json?.agreement_id
+  if (!agreementId) throw new Error(`propose_barter failed: ${JSON.stringify(res)}`)
+  return agreementId
+}
+async function counterBarter(cookie, agreementId, body) {
+  const res = await api(cookie, 'POST', `/api/barter/${agreementId}/counter`, body)
+  if (!res.json?.agreement_id) throw new Error(`counter_barter_offer failed: ${JSON.stringify(res)}`)
+}
+async function acceptBarter(cookie, agreementId, idempotencyKey) {
+  const res = await api(cookie, 'POST', `/api/barter/${agreementId}/accept`, { idempotency_key: idempotencyKey })
+  if (res.json?.status !== 'accepted') throw new Error(`accept_barter_offer failed: ${JSON.stringify(res)}`)
+}
+async function rejectBarter(cookie, agreementId, idempotencyKey) {
+  const res = await api(cookie, 'POST', `/api/barter/${agreementId}/reject`, { rejection_reason: 'QA fixture rejection', idempotency_key: idempotencyKey })
+  if (res.json?.status !== 'rejected') throw new Error(`reject_barter_offer failed: ${JSON.stringify(res)}`)
+}
+async function cancelBarter(cookie, agreementId, idempotencyKey) {
+  const res = await api(cookie, 'POST', `/api/barter/${agreementId}/cancel`, { cancellation_reason: 'QA fixture cancellation', idempotency_key: idempotencyKey })
+  if (res.json?.status !== 'cancelled') throw new Error(`cancel_barter_agreement failed: ${JSON.stringify(res)}`)
+}
+
+async function seedBarterScenarios(accounts) {
+  console.log('Phase 3b: QA barter scenarios')
+  const merchantACookie = await cookieFor(accounts.merchantA.email, accounts.merchantA.password)
+  const merchantBCookie = await cookieFor(accounts.merchantB.email, accounts.merchantB.password)
+
+  // Dedicated fixture listings — party A = merchantA, party B = merchantB
+  // for every scenario below, so anchor ownership is consistent.
+  const l = {}
+  const barterListing = async (owner, key, title, extra = {}) =>
+    insertBaseListing(owner, {
+      title: `${QA_LISTING_MARKER} Barter Fixture — ${title}`,
+      description: `Synthetic QA fixture — barter item for the "${key}" scenario.`,
+      status: 'active',
+      ...extra,
+    })
+
+  l.proposedA = await barterListing(accounts.merchantA.id, 'proposed', 'Acoustic Guitar', { category: 'music', daily_rate: 90 })
+  l.proposedB = await barterListing(accounts.merchantB.id, 'proposed', 'Camping Tent', { category: 'outdoor', daily_rate: 70 })
+
+  l.counteredA1 = await barterListing(accounts.merchantA.id, 'countered', 'DSLR Camera', { category: 'tech', daily_rate: 200 })
+  l.counteredA2 = await barterListing(accounts.merchantA.id, 'countered', 'Camera Tripod', { category: 'tech', daily_rate: 40 })
+  l.counteredB = await barterListing(accounts.merchantB.id, 'countered', 'Electric Scooter', { category: 'outdoor', daily_rate: 150 })
+
+  l.acceptedA = await barterListing(accounts.merchantA.id, 'accepted', 'Mountain Bike', { category: 'sports', daily_rate: 120 })
+  l.acceptedB = await barterListing(accounts.merchantB.id, 'accepted', 'Kayak', { category: 'sports', daily_rate: 180 })
+
+  l.declinedA = await barterListing(accounts.merchantA.id, 'rejected-and-cancelled-pre-accept', 'Board Game Set', { category: 'events', daily_rate: 30 })
+  l.declinedB = await barterListing(accounts.merchantB.id, 'rejected-and-cancelled-pre-accept', 'Party Speaker', { category: 'events', daily_rate: 60 })
+
+  l.cancelledPostA = await barterListing(accounts.merchantA.id, 'cancelled-post-accept', 'Baby Stroller', { category: 'baby', daily_rate: 50 })
+  l.cancelledPostB = await barterListing(accounts.merchantB.id, 'cancelled-post-accept', 'Baby Carrier', { category: 'baby', daily_rate: 35 })
+
+  l.expiredA = await barterListing(accounts.merchantA.id, 'expired', 'Skateboard', { category: 'sports', daily_rate: 25 })
+  l.expiredB = await barterListing(accounts.merchantB.id, 'expired', 'Longboard', { category: 'sports', daily_rate: 25 })
+
+  const agreementIds = {}
+  const offerFields = (partyA, partyB, extra = {}) => ({
+    party_a_listing_ids: Array.isArray(partyA) ? partyA : [partyA],
+    party_b_listing_ids: Array.isArray(partyB) ? partyB : [partyB],
+    delivery_method: 'meet_in_person',
+    idempotency_key: undefined, // set per call below
+    ...extra,
+  })
+
+  // 1. proposed — awaiting response, no further action.
+  agreementIds.proposed = await proposeBarter(merchantBCookie, {
+    anchor_listing_id: l.proposedA,
+    ...offerFields(l.proposedA, l.proposedB, { message: 'QA fixture — awaiting response' }),
+    idempotency_key: 'qa-seed-barter-proposed-propose',
+  })
+
+  // 2. countered — multi-item on A's side (2 listings) to demonstrate the
+  // one-item-for-multiple-items combination.
+  agreementIds.countered = await proposeBarter(merchantBCookie, {
+    anchor_listing_id: l.counteredA1,
+    ...offerFields(l.counteredA1, l.counteredB, { message: 'QA fixture — before counter' }),
+    idempotency_key: 'qa-seed-barter-countered-propose',
+  })
+  await counterBarter(merchantACookie, agreementIds.countered, {
+    ...offerFields([l.counteredA1, l.counteredA2], l.counteredB, {
+      cash_adjustment_amount: 150,
+      cash_adjustment_payer: accounts.merchantB.id,
+      delivery_method: 'courier',
+      delivery_responsibility: 'party_b',
+      deposit_required: true,
+      deposit_amount: 300,
+      deposit_payer: 'both',
+      message: 'QA fixture — countered with an extra item plus a cash top-up',
+    }),
+    idempotency_key: 'qa-seed-barter-countered-counter',
+  })
+
+  // 3. accepted — locks both listings permanently (no completion RPC
+  // exists yet this phase), the reference case for the "committed to a
+  // barter" UI state on a listing's own detail page.
+  agreementIds.accepted = await proposeBarter(merchantBCookie, {
+    anchor_listing_id: l.acceptedA,
+    ...offerFields(l.acceptedA, l.acceptedB, { message: 'QA fixture — accepted trade' }),
+    idempotency_key: 'qa-seed-barter-accepted-propose',
+  })
+  await acceptBarter(merchantACookie, agreementIds.accepted, 'qa-seed-barter-accepted-accept')
+
+  // 4. rejected
+  agreementIds.rejected = await proposeBarter(merchantBCookie, {
+    anchor_listing_id: l.declinedA,
+    ...offerFields(l.declinedA, l.declinedB, { message: 'QA fixture — will be declined' }),
+    idempotency_key: 'qa-seed-barter-rejected-propose',
+  })
+  await rejectBarter(merchantACookie, agreementIds.rejected, 'qa-seed-barter-rejected-reject')
+
+  // 5. cancelled before acceptance — same listing pair as #4 is safe to
+  // reuse since neither a proposed nor a rejected agreement locks anything.
+  agreementIds.cancelledPreAccept = await proposeBarter(merchantBCookie, {
+    anchor_listing_id: l.declinedA,
+    ...offerFields(l.declinedA, l.declinedB, { message: 'QA fixture — will be cancelled before acceptance' }),
+    idempotency_key: 'qa-seed-barter-cancelled-pre-propose',
+  })
+  await cancelBarter(merchantBCookie, agreementIds.cancelledPreAccept, 'qa-seed-barter-cancelled-pre-cancel')
+
+  // 6. cancelled after acceptance — locks, then unlocks again via cancel;
+  // demonstrates the 'refunded' settlement path (Phase A: descriptive
+  // only, no real payment exists yet to actually release).
+  agreementIds.cancelledPostAccept = await proposeBarter(merchantBCookie, {
+    anchor_listing_id: l.cancelledPostA,
+    ...offerFields(l.cancelledPostA, l.cancelledPostB, { message: 'QA fixture — will be cancelled after acceptance' }),
+    idempotency_key: 'qa-seed-barter-cancelled-post-propose',
+  })
+  await acceptBarter(merchantACookie, agreementIds.cancelledPostAccept, 'qa-seed-barter-cancelled-post-accept')
+  await cancelBarter(merchantACookie, agreementIds.cancelledPostAccept, 'qa-seed-barter-cancelled-post-cancel')
+
+  // 7. expired — propose, backdate expires_at (no route exists for "make
+  // time pass", same documented exception as the booking phase's
+  // payment_due_at backdate), then trigger the real lazy-expiry sweep via
+  // GET /api/barter (whichever account — the sweep is agreement-agnostic).
+  agreementIds.expired = await proposeBarter(merchantBCookie, {
+    anchor_listing_id: l.expiredA,
+    ...offerFields(l.expiredA, l.expiredB, { message: 'QA fixture — will expire unanswered' }),
+    idempotency_key: 'qa-seed-barter-expired-propose',
+  })
+  await admin.from('barter_agreements').update({ expires_at: new Date(Date.now() - 3600_000).toISOString() }).eq('id', agreementIds.expired)
+  await api(merchantACookie, 'GET', '/api/barter')
+
+  console.log(`  ${Object.keys(agreementIds).length} barter agreement scenarios seeded`)
+  return agreementIds
+}
+
+// ── Phase 3c: QA order scenarios ────────────────────────────────────────
+// Drives the real /api/orders routes end to end (create, checkout, ship,
+// confirm-delivery, cancel), same philosophy as Phase 3's booking seeding
+// and Phase 3b's barter seeding: fixed idempotency keys per scenario+step
+// so a re-run replays via the app's own idempotency infrastructure
+// instead of creating duplicate orders. Each scenario gets its own
+// dedicated fixture listing (never the Phase 2b rendering-only buy/sell
+// fixtures) so stock consumed by these real purchases never interferes
+// with the Buy-toggle/SaleSummaryCard rendering fixtures.
+async function createOrder(cookie, listingId, quantity, idempotencyKey) {
+  const res = await api(cookie, 'POST', '/api/orders', { listing_id: listingId, quantity, idempotency_key: idempotencyKey })
+  const orderId = res.json?.order_id
+  if (!orderId) throw new Error(`create_order failed: ${JSON.stringify(res)}`)
+  return orderId
+}
+async function checkoutOrder(cookie, orderId, idempotencyKey, testScenario) {
+  return api(cookie, 'POST', `/api/orders/${orderId}/checkout`, { idempotency_key: idempotencyKey, test_scenario: testScenario })
+}
+async function shipOrder(cookie, orderId, idempotencyKey) {
+  const res = await api(cookie, 'POST', `/api/orders/${orderId}/ship`, { idempotency_key: idempotencyKey })
+  if (res.json?.status !== 'shipped') throw new Error(`mark_order_shipped failed: ${JSON.stringify(res)}`)
+}
+async function confirmOrderDelivery(cookie, orderId, idempotencyKey) {
+  const res = await api(cookie, 'POST', `/api/orders/${orderId}/confirm-delivery`, { idempotency_key: idempotencyKey })
+  if (res.json?.status !== 'delivered') throw new Error(`confirm_order_delivery failed: ${JSON.stringify(res)}`)
+}
+async function cancelOrder(cookie, orderId, idempotencyKey) {
+  const res = await api(cookie, 'POST', `/api/orders/${orderId}/cancel`, { cancellation_reason: 'QA fixture cancellation', idempotency_key: idempotencyKey })
+  if (res.json?.status !== 'cancelled') throw new Error(`cancel_order failed: ${JSON.stringify(res)}`)
+}
+
+async function seedOrderScenarios(accounts) {
+  console.log('Phase 3c: QA order scenarios')
+  const buyerCookie = await cookieFor(accounts.renterA.email, accounts.renterA.password)
+  const sellerCookie = await cookieFor(accounts.merchantA.email, accounts.merchantA.password)
+
+  const orderListing = async (key, title, salePrice) =>
+    insertBaseListing(accounts.merchantA.id, {
+      title: `${QA_LISTING_MARKER} Order Fixture — ${title}`,
+      description: `Synthetic QA fixture — purchase item for the "${key}" order scenario.`,
+      category: 'tools',
+      listing_type: 'sale',
+      daily_rate: null,
+      sale_price: salePrice,
+      quantity_available: 5,
+      status: 'active',
+    })
+
+  const l = {}
+  l.pendingUnpaid = await orderListing('pending-unpaid', 'Cordless Sander', 650)
+  l.paymentDeclined = await orderListing('payment-declined', 'Circular Saw', 1100)
+  l.paid = await orderListing('paid', 'Angle Grinder', 480)
+  l.shipped = await orderListing('shipped', 'Hedge Trimmer', 720)
+  l.delivered = await orderListing('delivered', 'Pressure Washer', 1450)
+  l.cancelled = await orderListing('cancelled', 'Paint Sprayer', 990)
+
+  const orderIds = {}
+
+  // 1. pending, unpaid — created, checkout never attempted.
+  orderIds.pendingUnpaid = await createOrder(buyerCookie, l.pendingUnpaid, 1, 'qa-seed-order-pending-create')
+
+  // 2. payment declined — checkout attempted and terminally declined by
+  // the mock provider; order stays 'pending' (mirrors booking's
+  // terminalDecline scenario, adapted to orders' single-charge shape).
+  orderIds.paymentDeclined = await createOrder(buyerCookie, l.paymentDeclined, 1, 'qa-seed-order-declined-create')
+  await checkoutOrder(buyerCookie, orderIds.paymentDeclined, 'qa-seed-order-declined-checkout', 'declined')
+
+  // 3. paid
+  orderIds.paid = await createOrder(buyerCookie, l.paid, 1, 'qa-seed-order-paid-create')
+  await checkoutOrder(buyerCookie, orderIds.paid, 'qa-seed-order-paid-checkout', 'success')
+
+  // 4. shipped
+  orderIds.shipped = await createOrder(buyerCookie, l.shipped, 1, 'qa-seed-order-shipped-create')
+  await checkoutOrder(buyerCookie, orderIds.shipped, 'qa-seed-order-shipped-checkout', 'success')
+  await shipOrder(sellerCookie, orderIds.shipped, 'qa-seed-order-shipped-ship')
+
+  // 5. delivered
+  orderIds.delivered = await createOrder(buyerCookie, l.delivered, 1, 'qa-seed-order-delivered-create')
+  await checkoutOrder(buyerCookie, orderIds.delivered, 'qa-seed-order-delivered-checkout', 'success')
+  await shipOrder(sellerCookie, orderIds.delivered, 'qa-seed-order-delivered-ship')
+  await confirmOrderDelivery(buyerCookie, orderIds.delivered, 'qa-seed-order-delivered-confirm')
+
+  // 6. cancelled while pending — quantity_available restored.
+  orderIds.cancelled = await createOrder(buyerCookie, l.cancelled, 1, 'qa-seed-order-cancelled-create')
+  await cancelOrder(buyerCookie, orderIds.cancelled, 'qa-seed-order-cancelled-cancel')
+
+  console.log(`  ${Object.keys(orderIds).length} order states seeded`)
+  return orderIds
+}
+
 // ── Phase 4: QA email states ───────────────────────────────────────────
 // Most email states already exist as a side effect of Phase 3's real
 // booking flows (requested/accepted/financially_ready/payment_reminder
@@ -468,7 +774,10 @@ async function main() {
   const accounts = await seedAccounts()
   const adminCookie = await cookieFor(accounts.admin.email, accounts.admin.password)
   const listingIds = await seedListings(accounts, adminCookie)
+  const buySellListingIds = await seedBuySellListings(accounts)
   const bookingIds = await seedBookings(accounts, listingIds)
+  const barterAgreementIds = await seedBarterScenarios(accounts)
+  const orderIds = await seedOrderScenarios(accounts)
   await seedEmailFailureFixtures()
 
   const credentialsPath = join(REPO_ROOT, '.qa-credentials.local.json')
@@ -486,7 +795,7 @@ async function main() {
   )
 
   console.log(`\nDone. Credentials written to ${credentialsPath} (gitignored, never printed above).`)
-  console.log(`Listings seeded: ${Object.keys(listingIds).length}. Bookings seeded: ${Object.keys(bookingIds).length}.`)
+  console.log(`Rental listings: ${Object.keys(listingIds).length}. Buy/sell listings: ${Object.keys(buySellListingIds).length}. Bookings: ${Object.keys(bookingIds).length}. Barter agreements: ${Object.keys(barterAgreementIds).length}. Orders: ${Object.keys(orderIds).length}.`)
 }
 
 main().catch((err) => {
