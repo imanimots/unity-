@@ -112,14 +112,28 @@ Admins cannot mark a payment successful, rewrite a price, alter a deposit, manua
 rental, issue a refund, or reactivate an expired booking — none of those have a safe existing
 RPC, and none was built this step.
 
+## Order operations (Step 11 Phase 6)
+
+`GET /api/admin/orders` / `GET /api/admin/orders/[id]` — **read-only by construction**, same as
+booking operations above; no existing safe RPC exists for an order-lifecycle admin override, so
+none was built. Mirrors the booking pattern exactly (`src/lib/admin/orders-service.ts`), with a
+fuller detail view (financials, history, linked dispute, audited message thread, email
+deliveries, participants) matching the spec's Part B. Full detail, including known limitations
+(no `'completed'` order status, no order-linked payout tracking, a single "failed" payment
+category rather than bookings' retryable/terminal split) in `docs/ORDER_ADMINISTRATION.md`.
+
 ## Financial operations
 
 `GET /api/admin/financial-operations` — one row per `payments` record, joined to
-`financial_workflows` (workflow status → `failureCategory: retryable | terminal`),
-`ledger_entries` (count only), and `merchant_payouts` (status only). Never selects
+`financial_workflows` (workflow status → `failureCategory: retryable | terminal` for a
+booking-linked row; `failureCategory: failed` for an order-linked row, which has no workflow
+table — see `docs/ORDER_ADMINISTRATION.md`), `ledger_entries` (count only), and
+`merchant_payouts` (status only, booking-linked rows only — `merchant_payouts` has no order
+linkage, an order row's payout status is always `'not_applicable'`). Never selects
 `payment_webhook_events` (raw provider payloads) — confirmed absent by a text-scan test. Never
 returns card data, bank details, service keys, or raw webhook content — only the fields the
-payment domain itself already normalizes (`payments.status`, `failure_reason`).
+payment domain itself already normalizes (`payments.status`, a normalized `failure_code`, never
+raw `failure_reason`/`failure_message` text).
 
 ## Email operations
 
@@ -134,8 +148,11 @@ existing Step 8 `/admin/email-previews` page is linked from this page, not dupli
 
 ## Operational exception queue
 
-`src/lib/admin/exceptions-service.ts` computes 11 categories live, every run, from current table
-state — nothing is pre-materialized except *resolutions*:
+`src/lib/admin/exceptions-service.ts` computes categories live, every run, from current table
+state — nothing is pre-materialized except *resolutions*. The original 11 categories are listed
+below; disputes, barter, and orders each added their own domain-specific categories in later
+phases (8 barter categories in Step 11 Phase 5, 7 order categories in Step 11 Phase 6 — see
+`docs/ORDER_ADMINISTRATION.md` for the order list and its stated drop-list):
 
 1. `listing_review_overdue` — `listing_moderation.moderation_status = 'pending'` older than 48h.
 2. `ownership_review_overdue` — `listing_ownership_verification.status in (pending, under_review)` older than 48h.

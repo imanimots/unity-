@@ -86,6 +86,10 @@ Events are dot-namespaced and stable — never a subject line, never derived fro
 | Identity verification | `verification.submitted`, `verification.additional_information_requested`, `verification.approved`, `verification.rejected` |
 | Bookings | `booking.requested`, `booking.rejected`, `booking.cancelled`, `booking.expired_unanswered`, `booking.payment_required`, `booking.payment_reminder`, `booking.payment_expired`, `booking.financially_ready`, `booking.started`, `booking.return_initiated`, `booking.completed` |
 | Payment / test mode | `payment.declined`, `payment.retryable_failure`, `deposit.failed` |
+| Disputes (Step 11 Phase 2) | `dispute.opened`, `dispute.evidence_requested`, `dispute.evidence_received`, `dispute.under_review`, `dispute.resolved`, `dispute.closed`, `dispute.cancelled` — generic across bookings/orders/barter, see `docs/DISPUTE_SYSTEM.md` |
+| Messaging (Step 11 Phase 3) | `message.new` — one generic event across bookings/orders/barter, gated by a two-tier debounce (presence heartbeat, then a 10-minute last-sent-message fallback) so an active conversation doesn't spam inboxes; see `docs/REAL_CHAT.md` |
+| Barter execution (Step 11 Phase 4) | `barter.accepted`, `barter.deposit_required`, `barter.ready_to_exchange`, `barter.completion_requested`, `barter.completed`, `barter.cancelled` — no separate `barter.disputed` event, since Phase 2's `dispute.opened` already fires for any transaction type including barter; see `docs/BARTER_EXECUTION.md` |
+| Orders (Step 11 Phase 6) | `order.created`, `order.payment_received`, `order.shipped`, `order.delivered`, `order.cancelled`, `order.payment_failed` — no separate `order.payment_required` (creation and "payment required" are the same moment for a purchase), no separate retryable/terminal payment-failure split (not durably stored for orders), no separate `order.dispute_opened`/`order.dispute_resolved` (Phase 2's generic dispute emails already cover orders); see `docs/ORDER_ADMINISTRATION.md` |
 
 Two consolidation decisions were made explicitly to avoid the overlapping-email pattern the
 brief warned against:
@@ -106,7 +110,7 @@ records, no separate event name needed.
 
 ## Template catalogue
 
-32 templates (`src/lib/email/templates/catalogue.ts`), all composing through one shared shell
+57 templates (`src/lib/email/templates/catalogue.ts`, 10 added in Step 11 Phase 6 for orders — see `docs/ORDER_ADMINISTRATION.md`), all composing through one shared shell
 (`renderShell()` in `src/lib/email/templates/shared.ts`) rather than 32 hand-authored HTML
 files. Each entry is:
 

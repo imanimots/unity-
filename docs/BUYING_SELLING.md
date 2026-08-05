@@ -1,11 +1,23 @@
 # Unity — Buying & Selling Architecture
 
-## Status: database design only
+> **Note:** this document predates the real order/checkout implementation (Step 7) and the
+> admin/email layer built on top of it (Step 11 Phase 6). For the current order lifecycle, admin
+> monitoring, exception queue, and transactional emails, see `docs/ORDER_ADMINISTRATION.md`.
 
-This document and the accompanying migration
-(`supabase/migrations/20260720000003_buying_selling_schema.sql`) define the
-schema. **No application code — API routes, UI, or TypeScript types — has
-been built against it yet.** That's Phase 2, once this design is approved.
+## Status: Phase 2A live (browse + listing creation) — purchasing not yet built
+
+The schema (`supabase/migrations/20260720000003_buying_selling_schema.sql`,
+extended by `20260809000001_listing_type_both.sql` and
+`20260809000002_listing_type_both_usage.sql` to add a `'both'` type) is live,
+and so is the merchant-facing half of Phase 2: a merchant can choose
+Sell/Rent/Both when creating a listing, the wizard branches its pricing step
+accordingly, and the public browse page's Buy/Rent toggle (`?mode=buy|rent`,
+the Marketplace Mode Selector on `/listings`) filters real listings by
+`listing_type`. The buyer-facing half — an actual purchase/checkout flow that
+creates `orders` rows — is **not** built yet; a sale listing's detail page
+shows its real price with a "Buying is coming soon" notice instead
+(`src/components/listings/sale-summary-card.tsx`). See "What Phase 2 needs to
+build" below for what's left.
 
 ## Why buying/selling matters now
 
@@ -56,12 +68,16 @@ was nothing to migrate.
 ## Schema summary
 
 **`listings`** gains:
-- `listing_type` enum (`'rental' | 'sale'`), default `'rental'`
+- `listing_type` enum (`'rental' | 'sale' | 'both'`), default `'rental'` — the
+  third value, `'both'`, was added in `20260809000001_listing_type_both.sql`
+  once Phase 2A needed it; see "One listing, both prices" below for why it's
+  a single row rather than two linked listings
 - `sale_price numeric(10,2)`, nullable
 - `quantity_available int`, default 1
 - `daily_rate` becomes nullable (previously `NOT NULL`)
-- `CHECK` constraint: rental rows must have `daily_rate` set and `sale_price`
-  null; sale rows must have `sale_price` set and `daily_rate` null
+- `CHECK` constraint (`listings_type_pricing_chk`): `rental` rows must have
+  `daily_rate` set and `sale_price` null; `sale` rows must have `sale_price`
+  set and `daily_rate` null; `both` rows must have **both** set
 
 Everything else on `listings` — title, description, category, condition,
 `listing_media`, ownership proof, `min_unity_score`, `risk_tier`,
@@ -95,17 +111,47 @@ merchant affiliate program (toggle + commission rate) works identically for
 sale listings — the MVP brief calls out "affiliate promotion of individual
 listings" without distinguishing rental vs. sale.
 
-## What Phase 2 needs to build (not done yet)
+## "Both" — one listing, both prices
 
-- `Order` TypeScript type, `ListingType`/`sale_price`/`quantity_available` on
-  the `Listing` type
-- A sale variant of the listing creation wizard (or branching the existing
-  one on `listing_type`) — pricing step becomes "sale price" instead of
-  daily/weekly rate; no min-rental-days/shipping-payer-for-return concepts
-  apply the same way
-- A purchase checkout flow (parallel to `booking-flow.tsx`) — no date
-  picker, no return step; escrow releases on delivery confirmation instead
-  of return confirmation
+When Phase 2A needed a `listing_type = 'both'` option (list an item as
+available to either rent or buy outright), two shapes were possible: one
+listing row carrying both `daily_rate` and `sale_price`, or two separate
+linked listings (one rental, one sale) sharing a common item reference.
+**Chosen: one row, both prices** — specifically because it lets a single
+`quantity_available` govern both transaction paths, so a physical item can
+never be double-committed to a rental and a sale at the same time. Two
+linked listings would need their own cross-listing quantity-reservation
+logic to get the same guarantee. The tradeoff: `save_listing_draft` must
+clear the irrelevant price field via `CASE` (not `coalesce`) whenever a
+merchant switches a draft's type, so a listing can never end up with a
+stale price value that violates `listings_type_pricing_chk`.
+
+## What Phase 2 needs to build
+
+Done (this pass):
+- ✅ `Order` TypeScript type, `ListingType`/`sale_price` on the `Listing`
+  type (`src/types/index.ts`)
+- ✅ Listing creation wizard branches on Sell/Rent/Both — a new "Type" step
+  (`TypeStep` in `create-listing-flow.tsx`) picks `listing_type`, the
+  pricing step conditionally shows Sale price vs. Daily/Weekly rate (or
+  both), and the deposit/renter-requirements step is skipped entirely for
+  pure `sale` listings
+- ✅ `save_listing_draft` persists `listing_type`/`sale_price`, clearing the
+  now-irrelevant price field on a type switch (CASE-based, not coalesce —
+  see the migration's own comment for why coalesce would violate the CHECK
+  constraint)
+- ✅ `computeListingCompleteness` branches required fields on
+  `rentable`/`sellable` derived from `listing_type`
+- ✅ Browse page (`/listings`) Buy/Rent/Barter toggle filters real listings
+  by `listing_type` via `?mode=` — Barter has no backing data model, so it
+  shows a "coming soon" state rather than querying listings
+- ✅ Listing detail page renders `SaleSummaryCard` (price, quantity,
+  "Buying is coming soon") alongside or instead of `BookingCard`
+
+Not done yet:
+- A purchase checkout flow (parallel to `booking-flow.tsx`) that actually
+  creates `orders` rows — no date picker, no return step; escrow releases on
+  delivery confirmation instead of return confirmation
 - API routes / server actions for creating orders, transitioning order
   status, and the same PayFast integration gap noted for bookings (no
   ITN webhook exists yet for either flow)
