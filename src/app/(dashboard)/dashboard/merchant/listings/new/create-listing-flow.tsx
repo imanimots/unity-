@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useRef, useCallback, useMemo } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -9,8 +9,9 @@ import { toast } from 'sonner'
 import {
   ChevronLeft, ChevronRight, Check, Upload, X, ImagePlus,
   FileText, AlertCircle, ShieldCheck, Info, Star, UserCheck,
+  ShoppingBag, Calendar, ArrowLeftRight,
 } from 'lucide-react'
-import { CATEGORIES, type ItemCondition, type ShippingPayer, type Listing, type ListingMedia } from '@/types'
+import { CATEGORIES, type ItemCondition, type ShippingPayer, type Listing, type ListingMedia, type ListingType } from '@/types'
 import { calculateRiskTier, getRiskRequirements, RISK_TIER_LABELS } from '@/lib/risk/engine'
 import { useAuth } from '@/hooks/use-auth'
 import { validatePhotoFile, validateOwnershipProofFile, uploadListingPhoto, uploadOwnershipProof, removeUploadedFiles } from '@/lib/listings/storage'
@@ -20,8 +21,14 @@ import type { ListingDraft } from '@/lib/data/listings'
 import type { BlockedDateRange } from '@/lib/listings/validation'
 
 // ─── Step definitions ────────────────────────────────────────────────────────
+// 'requirements' (deposit/renter criteria) only applies when the item can
+// be rented — filtered out for a pure 'sale' listing, see the `steps`
+// useMemo below. Every other step is genuinely shared between sell/rent/
+// both (title, photos, ownership proof, affiliate settings — see
+// docs/BUYING_SELLING.md's reasoning for why these aren't duplicated).
 
-const STEPS = [
+const BASE_STEPS = [
+  { id: 'type',         title: 'Type',         desc: 'Sell, rent, or both' },
   { id: 'basics',       title: 'Basics',       desc: 'Title, category & condition' },
   { id: 'photos',       title: 'Photos',       desc: 'At least 3 item photos' },
   { id: 'ownership',    title: 'Ownership',    desc: 'Proof of ownership' },
@@ -31,7 +38,7 @@ const STEPS = [
   { id: 'review',       title: 'Review',       desc: 'Confirm & publish' },
 ] as const
 
-type StepId = typeof STEPS[number]['id']
+type StepId = typeof BASE_STEPS[number]['id']
 
 // ─── Zod schemas per step ────────────────────────────────────────────────────
 
@@ -48,20 +55,40 @@ const basicsSchema = z.object({
   private_category_metadata: z.record(z.string(), z.string()).optional(),
 })
 
+// One schema, not three separate ones — PricingData needs to stay a
+// single consistent type used by state/ReviewStep/persistDraft, and
+// rental vs. sale vs. both differ only in WHICH fields are required, not
+// in the shape. Requirement branching happens in superRefine, keyed off
+// `listing_type` (always present — set by the Type step before Pricing
+// is ever reached).
 const pricingSchema = z.object({
-  daily_rate:       z.number({ error: 'Required' }).min(10, 'Minimum rate is R10/day'),
+  listing_type:     z.enum(['rental', 'sale', 'both'] as const),
+  daily_rate:       z.number().min(10, 'Minimum rate is R10/day').optional(),
   weekly_rate:      z.number().optional(),
-  min_rental_days:  z.number().min(1).max(30),
+  min_rental_days:  z.number().min(1).max(30).optional(),
   max_rental_days:  z.number().min(1).max(365).optional(),
   shipping_payer:   z.enum(['renter', 'merchant', 'split', 'negotiate'] as const),
   insurance_amount: z.number().optional(),
-  available_from:   z.string().min(1, 'Please choose an availability start date'),
+  available_from:   z.string().optional(),
   min_booking_notice_days: z.number().min(0).max(90).optional(),
   max_advance_booking_days: z.number().min(0).max(365).optional(),
-}).refine(
-  (d) => !d.max_rental_days || d.max_rental_days >= d.min_rental_days,
-  { message: 'Maximum rental duration cannot be less than the minimum', path: ['max_rental_days'] }
-)
+  sale_price:       z.number().min(1, 'Enter a sale price').optional(),
+}).superRefine((d, ctx) => {
+  const rentable = d.listing_type === 'rental' || d.listing_type === 'both'
+  const sellable = d.listing_type === 'sale' || d.listing_type === 'both'
+
+  if (rentable) {
+    if (d.daily_rate === undefined) ctx.addIssue({ code: 'custom', message: 'Required', path: ['daily_rate'] })
+    if (d.min_rental_days === undefined) ctx.addIssue({ code: 'custom', message: 'Required', path: ['min_rental_days'] })
+    if (!d.available_from) ctx.addIssue({ code: 'custom', message: 'Please choose an availability start date', path: ['available_from'] })
+    if (d.max_rental_days && d.min_rental_days && d.max_rental_days < d.min_rental_days) {
+      ctx.addIssue({ code: 'custom', message: 'Maximum rental duration cannot be less than the minimum', path: ['max_rental_days'] })
+    }
+  }
+  if (sellable && d.sale_price === undefined) {
+    ctx.addIssue({ code: 'custom', message: 'Required', path: ['sale_price'] })
+  }
+})
 
 const requirementsSchema = z.object({
   min_unity_score:  z.number().min(0).max(5),
@@ -188,6 +215,61 @@ function CategoryFieldsSection({ category, register }: {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// ─── Step: Type (sell / rent / both) ───────────────────────────────────────────
+// Drives every later step: Pricing branches its fields, and Requirements
+// (rental-only deposit/renter-criteria) is skipped entirely for a pure
+// 'sale' listing — see the `steps` useMemo in CreateListingFlow.
+
+const TYPE_OPTIONS: { value: ListingType; label: string; desc: string; icon: React.ReactNode }[] = [
+  { value: 'sale', label: 'SELL', desc: 'One-time purchase — the buyer pays once and keeps the item.', icon: <ShoppingBag size={20} strokeWidth={1.5} /> },
+  { value: 'rental', label: 'RENT', desc: 'Renters pay for a date range and return the item afterwards.', icon: <Calendar size={20} strokeWidth={1.5} /> },
+  { value: 'both', label: 'BOTH', desc: 'List it for rent and for sale at the same time.', icon: <ArrowLeftRight size={20} strokeWidth={1.5} /> },
+]
+
+function TypeStep({ onNext, defaults }: { onNext: (t: ListingType) => void; defaults?: ListingType }) {
+  const [selected, setSelected] = useState<ListingType>(defaults ?? 'rental')
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3" role="radiogroup" aria-label="Listing type">
+        {TYPE_OPTIONS.map(({ value, label, desc, icon }) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={selected === value}
+            onClick={() => setSelected(value)}
+            className={`relative flex flex-col items-start gap-2 p-5 rounded-xl border-2 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B1A1A] focus-visible:ring-offset-2 ${
+              selected === value
+                ? 'border-[#8B1A1A] bg-[#FAF8F5] dark:bg-[#1A1010]'
+                : 'border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] hover:border-[#8B1A1A]/40'
+            }`}
+          >
+            {selected === value && (
+              <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[#8B1A1A] flex items-center justify-center">
+                <Check size={11} className="text-white" />
+              </span>
+            )}
+            <div className="text-[#8B1A1A]">{icon}</div>
+            <span className="text-sm font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tracking-wide">{label}</span>
+            <span className="text-xs text-[#6B5B55] dark:text-[#9B8B85] leading-relaxed">{desc}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-3 pt-2">
+        <button
+          type="button"
+          onClick={() => onNext(selected)}
+          className="flex-1 py-3 bg-[#8B1A1A] text-white font-semibold rounded-xl hover:bg-[#7A1616] transition-colors flex items-center justify-center gap-2"
+        >
+          Continue <ChevronRight size={16} />
+        </button>
+      </div>
     </div>
   )
 }
@@ -680,56 +762,75 @@ function BlockedDatesWidget({ ranges, setRanges }: { ranges: BlockedDateRange[];
 }
 
 function PricingStep({
-  onNext, onBack, defaults, blockedRanges, setBlockedRanges,
+  onNext, onBack, defaults, blockedRanges, setBlockedRanges, listingType,
 }: {
   onNext: (d: PricingData) => void
   onBack: () => void
   defaults?: Partial<PricingData>
   blockedRanges: BlockedDateRange[]
   setBlockedRanges: (r: BlockedDateRange[]) => void
+  listingType: ListingType
 }) {
+  const rentable = listingType === 'rental' || listingType === 'both'
+  const sellable = listingType === 'sale' || listingType === 'both'
+
   const { register, handleSubmit, formState: { errors } } = useForm<PricingData>({
     resolver: zodResolver(pricingSchema),
-    defaultValues: { min_rental_days: 1, shipping_payer: 'renter', ...defaults },
+    defaultValues: { min_rental_days: 1, shipping_payer: 'renter', ...defaults, listing_type: listingType },
   })
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-5">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {sellable && (
         <div>
-          <Label required>Daily rate (R)</Label>
+          <Label required>Sale price (R)</Label>
           <div className="relative">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[#9B8B85] font-medium">R</span>
-            <input type="number" min={10} {...register('daily_rate', { valueAsNumber: true })} placeholder="0" className={`${inputCls(!!errors.daily_rate)} pl-8`} />
+            <input type="number" min={1} {...register('sale_price', { valueAsNumber: true })} placeholder="0" className={`${inputCls(!!errors.sale_price)} pl-8`} />
           </div>
-          <FieldError message={errors.daily_rate?.message} />
+          <FieldError message={errors.sale_price?.message} />
         </div>
+      )}
 
-        <div>
-          <Label>Weekly rate (R) <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
-          <div className="relative">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[#9B8B85] font-medium">R</span>
-            <input type="number" min={0} {...register('weekly_rate', { valueAsNumber: true })} placeholder="0" className={`${inputCls(!!errors.weekly_rate)} pl-8`} />
+      {rentable && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label required>Daily rate (R)</Label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[#9B8B85] font-medium">R</span>
+                <input type="number" min={10} {...register('daily_rate', { valueAsNumber: true })} placeholder="0" className={`${inputCls(!!errors.daily_rate)} pl-8`} />
+              </div>
+              <FieldError message={errors.daily_rate?.message} />
+            </div>
+
+            <div>
+              <Label>Weekly rate (R) <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[#9B8B85] font-medium">R</span>
+                <input type="number" min={0} {...register('weekly_rate', { valueAsNumber: true })} placeholder="0" className={`${inputCls(!!errors.weekly_rate)} pl-8`} />
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <Label required>Minimum rental (days)</Label>
-          <input type="number" min={1} max={30} {...register('min_rental_days', { valueAsNumber: true })} className={inputCls(!!errors.min_rental_days)} />
-          <FieldError message={errors.min_rental_days?.message} />
-        </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label required>Minimum rental (days)</Label>
+              <input type="number" min={1} max={30} {...register('min_rental_days', { valueAsNumber: true })} className={inputCls(!!errors.min_rental_days)} />
+              <FieldError message={errors.min_rental_days?.message} />
+            </div>
 
-        <div>
-          <Label>Insurance per day (R) <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
-          <div className="relative">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[#9B8B85] font-medium">R</span>
-            <input type="number" min={0} {...register('insurance_amount', { valueAsNumber: true })} placeholder="0" className={`${inputCls()} pl-8`} />
+            <div>
+              <Label>Insurance per day (R) <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[#9B8B85] font-medium">R</span>
+                <input type="number" min={0} {...register('insurance_amount', { valueAsNumber: true })} placeholder="0" className={`${inputCls()} pl-8`} />
+              </div>
+              <p className="text-xs text-[#9B8B85] mt-1">Charged to the renter per day. Leave blank to skip.</p>
+            </div>
           </div>
-          <p className="text-xs text-[#9B8B85] mt-1">Charged to the renter per day. Leave blank to skip.</p>
-        </div>
-      </div>
+        </>
+      )}
 
       <div>
         <Label required>Who pays shipping?</Label>
@@ -750,33 +851,37 @@ function PricingStep({
         </div>
       </div>
 
-      <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-4">
-        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Availability</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <Label required>Available from</Label>
-            <input type="date" {...register('available_from')} className={inputCls(!!errors.available_from)} />
-            <FieldError message={errors.available_from?.message} />
+      {rentable && (
+        <>
+          <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-4">
+            <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Availability</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label required>Available from</Label>
+                <input type="date" {...register('available_from')} className={inputCls(!!errors.available_from)} />
+                <FieldError message={errors.available_from?.message} />
+              </div>
+              <div>
+                <Label>Maximum rental (days) <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+                <input type="number" min={1} max={365} {...register('max_rental_days', { valueAsNumber: true })} className={inputCls(!!errors.max_rental_days)} />
+                <FieldError message={errors.max_rental_days?.message} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label>Minimum booking notice (days) <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+                <input type="number" min={0} max={90} {...register('min_booking_notice_days', { valueAsNumber: true })} className={inputCls()} />
+              </div>
+              <div>
+                <Label>Maximum advance booking (days) <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
+                <input type="number" min={0} max={365} {...register('max_advance_booking_days', { valueAsNumber: true })} className={inputCls()} />
+              </div>
+            </div>
           </div>
-          <div>
-            <Label>Maximum rental (days) <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
-            <input type="number" min={1} max={365} {...register('max_rental_days', { valueAsNumber: true })} className={inputCls(!!errors.max_rental_days)} />
-            <FieldError message={errors.max_rental_days?.message} />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <Label>Minimum booking notice (days) <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
-            <input type="number" min={0} max={90} {...register('min_booking_notice_days', { valueAsNumber: true })} className={inputCls()} />
-          </div>
-          <div>
-            <Label>Maximum advance booking (days) <span className="text-[#9B8B85] font-normal text-xs">(optional)</span></Label>
-            <input type="number" min={0} max={365} {...register('max_advance_booking_days', { valueAsNumber: true })} className={inputCls()} />
-          </div>
-        </div>
-      </div>
 
-      <BlockedDatesWidget ranges={blockedRanges} setRanges={setBlockedRanges} />
+          <BlockedDatesWidget ranges={blockedRanges} setRanges={setBlockedRanges} />
+        </>
+      )}
 
       <div className="flex gap-3 pt-2">
         <button type="button" onClick={onBack} className="flex-1 py-3 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] font-semibold rounded-xl hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors flex items-center justify-center gap-2">
@@ -1108,6 +1213,8 @@ function ReviewStep({
     ['Title',        basics?.title ?? '—'],
     ['Category',     CATEGORIES.find((c) => c.id === basics?.category)?.label ?? '—'],
     ['Condition',    basics?.condition ? { new: 'New', like_new: 'Like new', good: 'Good', fair: 'Fair' }[basics.condition] : '—'],
+    ['Listing type', pricing?.listing_type ? { rental: 'Rent only', sale: 'Sell only', both: 'Rent & sell' }[pricing.listing_type] : '—'],
+    ['Sale price',   pricing?.sale_price ? `R${pricing.sale_price}` : 'Not for sale'],
     ['Daily rate',   pricing?.daily_rate ? `R${pricing.daily_rate}` : '—'],
     ['Weekly rate',  pricing?.weekly_rate ? `R${pricing.weekly_rate}` : 'Not set'],
     ['Min days',     pricing?.min_rental_days ? `${pricing.min_rental_days} day(s)` : '—'],
@@ -1220,7 +1327,9 @@ function listingToBasics(l: Listing, privateCategoryMetadata?: Record<string, st
 }
 function listingToPricing(l: Listing): PricingData {
   return {
-    daily_rate: l.daily_rate,
+    listing_type: l.listing_type ?? 'rental',
+    daily_rate: l.daily_rate ?? undefined,
+    sale_price: l.sale_price ?? undefined,
     weekly_rate: l.weekly_rate ?? undefined,
     min_rental_days: l.min_rental_days,
     max_rental_days: l.max_rental_days ?? undefined,
@@ -1263,6 +1372,7 @@ function listingToAffiliates(l: Listing): AffiliatesData {
 
 export function CreateListingFlow({ draft }: { draft?: ListingDraft }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { profile } = useAuth()
   const [stepIdx, setStepIdx] = useState(0)
   const [saving, setSaving] = useState(false)
@@ -1308,10 +1418,17 @@ export function CreateListingFlow({ draft }: { draft?: ListingDraft }) {
   const [pendingStorageRemovals, setPendingStorageRemovals] = useState<{ bucket: 'listing-media' | 'ownership-proofs'; path: string }[]>([])
 
   const [listingId, setListingId] = useState<string | null>(draft?.listing.id ?? null)
+  const [listingType, setListingType] = useState<ListingType>(draft?.listing.listing_type ?? 'rental')
 
-  const currentStep = STEPS[stepIdx]
+  // 'requirements' (deposit/renter criteria) only applies when the item
+  // can be rented — skipped entirely for a pure 'sale' listing.
+  const steps = useMemo(
+    () => BASE_STEPS.filter((s) => s.id !== 'requirements' || listingType !== 'sale'),
+    [listingType]
+  )
+  const currentStep = steps[stepIdx]
 
-  const goNext = () => setStepIdx((i) => Math.min(i + 1, STEPS.length - 1))
+  const goNext = () => setStepIdx((i) => Math.min(i + 1, steps.length - 1))
   const goBack = () => setStepIdx((i) => Math.max(i - 1, 0))
 
   const toggleDeclaration = (type: string) => {
@@ -1399,6 +1516,11 @@ export function CreateListingFlow({ draft }: { draft?: ListingDraft }) {
           listing_id: listingId,
           listing: {
             ...basics, ...pricing, ...affiliates,
+            // Always sourced from state directly (not just the `...pricing`
+            // spread) so an early draft-save — before the Pricing step has
+            // even been reached — still persists the type chosen in the
+            // very first step.
+            listing_type: listingType,
             deposit_required: requirements?.deposit_required ?? false,
             deposit_amount: requirements?.deposit_amount,
             condition_confirmed: conditionConfirmed,
@@ -1434,6 +1556,22 @@ export function CreateListingFlow({ draft }: { draft?: ListingDraft }) {
     }
   }
 
+  // If we arrived here mid-barter-proposal ("Create New Listing for This
+  // Trade"), send the merchant back to that flow instead of the listings
+  // dashboard — the barter dialog reads these same query params to
+  // reopen and restore its previously-selected items (see
+  // propose-trade-button.tsx / counter-offer-dialog.tsx). Reuses the
+  // existing listing wizard completely unmodified otherwise (Decision 12
+  // of the Barter Marketplace MVP Implementation Plan).
+  function getPostSaveRedirect(): string {
+    if (searchParams.get('returnTo') !== 'barter-propose') return '/dashboard/merchant/listings'
+    const anchor = searchParams.get('anchor')
+    const agreement = searchParams.get('agreement')
+    if (agreement) return `/dashboard/barter/${agreement}?returnTo=barter-propose&agreement=${agreement}&counter=1`
+    if (anchor) return `/listings/${anchor}?returnTo=barter-propose&anchor=${anchor}`
+    return '/dashboard/merchant/listings'
+  }
+
   const handleSaveDraft = async () => {
     if (busyRef.current) return
     busyRef.current = true
@@ -1442,7 +1580,7 @@ export function CreateListingFlow({ draft }: { draft?: ListingDraft }) {
     try {
       await persistDraft()
       toast.success('Draft saved')
-      router.push('/dashboard/merchant/listings')
+      router.push(getPostSaveRedirect())
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Could not save your listing')
     } finally {
@@ -1474,7 +1612,7 @@ export function CreateListingFlow({ draft }: { draft?: ListingDraft }) {
       // Success — rotate for the same reason as the save key above.
       submitIdemKeyRef.current = crypto.randomUUID()
       toast.success('Listing submitted for review')
-      router.push('/dashboard/merchant/listings')
+      router.push(getPostSaveRedirect())
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Could not submit your listing')
     } finally {
@@ -1488,13 +1626,13 @@ export function CreateListingFlow({ draft }: { draft?: ListingDraft }) {
       <div className="mb-8">
         <h1 className="text-2xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED]">Create a listing</h1>
         <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mt-1">
-          Step {stepIdx + 1} of {STEPS.length} — {currentStep.desc}
+          Step {stepIdx + 1} of {steps.length} — {currentStep.desc}
         </p>
       </div>
 
       {/* Progress bar */}
       <div className="flex items-center gap-1 mb-8 overflow-x-auto pb-1">
-        {STEPS.map((step, i) => (
+        {steps.map((step, i) => (
           <div key={step.id} className="flex items-center gap-1 shrink-0">
             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
               i < stepIdx  ? 'bg-[#8B1A1A] text-white' :
@@ -1506,7 +1644,7 @@ export function CreateListingFlow({ draft }: { draft?: ListingDraft }) {
             <span className={`text-xs font-medium hidden sm:block ${
               i === stepIdx ? 'text-[#1A0A0A] dark:text-[#F5F0ED]' : 'text-[#9B8B85]'
             }`}>{step.title}</span>
-            {i < STEPS.length - 1 && (
+            {i < steps.length - 1 && (
               <div className={`h-px w-4 sm:w-6 transition-colors ${i < stepIdx ? 'bg-[#8B1A1A]' : 'bg-[#F2EDE8] dark:bg-[#2A1A1A]'}`} />
             )}
           </div>
@@ -1517,6 +1655,9 @@ export function CreateListingFlow({ draft }: { draft?: ListingDraft }) {
         <h2 className="text-lg font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED]">{currentStep.title}</h2>
       </div>
 
+      {currentStep.id === 'type' && (
+        <TypeStep onNext={(t) => { setListingType(t); goNext() }} defaults={listingType} />
+      )}
       {currentStep.id === 'basics' && (
         <BasicsStep onNext={(d) => { setBasics(d); goNext() }} defaults={basics} />
       )}
@@ -1554,6 +1695,7 @@ export function CreateListingFlow({ draft }: { draft?: ListingDraft }) {
           defaults={pricing}
           blockedRanges={blockedRanges}
           setBlockedRanges={setBlockedRanges}
+          listingType={listingType}
         />
       )}
       {currentStep.id === 'requirements' && (

@@ -3,16 +3,28 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, Check } from 'lucide-react'
 import { COUNTRIES, DEFAULT_COUNTRY, STORAGE_KEY, getCountry, type Country } from '@/lib/countries'
+import { useAuth } from '@/hooks/use-auth'
+
+/** unity_country as a cookie too, not just localStorage -- Server Components can't read localStorage, so a cookie is what resolveEffectiveCountry() reads for anonymous users. A UX preference, not auth state, so a plain long-lived cookie is fine. */
+function setCountryCookie(countryId: string) {
+  const secure = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : ''
+  document.cookie = `${STORAGE_KEY}=${countryId}; path=/; max-age=31536000; SameSite=Lax${secure}`
+}
 
 export function CountrySelector() {
-  const [selected, setSelected] = useState<Country>(DEFAULT_COUNTRY)
+  // Lazy initializer, not a mount effect + setState -- server renders
+  // DEFAULT_COUNTRY (window is undefined during SSR), client's first
+  // render after hydration reads the real stored value directly. Same
+  // established pattern already used for barter's mount-derived state
+  // this session.
+  const [selected, setSelected] = useState<Country>(() => {
+    if (typeof window === 'undefined') return DEFAULT_COUNTRY
+    const stored = localStorage.getItem(STORAGE_KEY)
+    return stored ? getCountry(stored) : DEFAULT_COUNTRY
+  })
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) setSelected(getCountry(stored))
-  }, [])
+  const { user } = useAuth()
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -22,10 +34,30 @@ export function CountrySelector() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  function select(country: Country) {
+  async function select(country: Country) {
+    const previous = selected
     setSelected(country)
     localStorage.setItem(STORAGE_KEY, country.id)
+    setCountryCookie(country.id)
     setOpen(false)
+
+    // Anonymous users: cookie + localStorage only, no profile call.
+    if (!user) return
+
+    try {
+      const res = await fetch('/api/profile/country', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ country_id: country.id }),
+      })
+      if (!res.ok) throw new Error('country update failed')
+    } catch {
+      // Recover cleanly -- roll the selection back rather than leaving the
+      // UI showing a country that never actually persisted server-side.
+      setSelected(previous)
+      localStorage.setItem(STORAGE_KEY, previous.id)
+      setCountryCookie(previous.id)
+    }
   }
 
   const activeCountries = COUNTRIES.filter((c) => c.active)

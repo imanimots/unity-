@@ -19,7 +19,7 @@ const STEP_LABELS: Record<Step, string> = {
 
 const STEPS: Step[] = ['dates', 'review', 'confirmed']
 
-function ListingSummaryCard({ listing, coverImage }: { listing: Listing; coverImage: string | undefined }) {
+function ListingSummaryCard({ listing, coverImage }: { listing: Listing & { daily_rate: number }; coverImage: string | undefined }) {
   return (
     <div className="flex items-center gap-4 p-4 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] mb-8">
       <div className="relative w-16 h-14 rounded-lg overflow-hidden bg-[#F2EDE8] dark:bg-[#2A1A1A] shrink-0">
@@ -90,7 +90,7 @@ function StepIndicator({ current }: { current: Step }) {
   )
 }
 
-export function BookingFlow({ listing }: { listing: Listing }) {
+export function BookingFlow({ listing }: { listing: Listing & { daily_rate: number } }) {
   const [step, setStep] = useState<Step>('dates')
   const [range, setRange] = useState<DateRange | undefined>()
   const [renterMessage, setRenterMessage] = useState('')

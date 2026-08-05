@@ -1,14 +1,18 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ShieldCheck, Star, MapPin, ArrowLeft, ArrowRight, CheckCircle, UserCheck } from 'lucide-react'
-import { getListing, getSimilarListings, getListingReviews, getAverageRating } from '@/lib/data/listings'
+import { ShieldCheck, Star, MapPin, ArrowLeft, ArrowRight, CheckCircle, UserCheck, Repeat } from 'lucide-react'
+import { getListing, getSimilarListings, getListingReviews, getAverageRating, getListingsByMerchant } from '@/lib/data/listings'
 import { getRiskRequirements, RISK_TIER_LABELS } from '@/lib/risk/engine'
 import { ImageGallery } from '@/components/listings/image-gallery'
 import { BookingCard } from '@/components/listings/booking-card'
+import { SaleSummaryCard } from '@/components/listings/sale-summary-card'
 import { ListingCard } from '@/components/listings/listing-card'
 import { CATEGORIES } from '@/types'
 import { AffiliateCookieSetter } from '@/components/listings/affiliate-cookie-setter'
 import { AffiliateButton } from '@/components/listings/affiliate-button'
+import { ProposeTradeButton } from '@/components/barter/propose-trade-button'
+import { getRequestProfile } from '@/lib/supabase/require-admin'
+import { isListingBarterLocked, getAllBarterLockedListingIds } from '@/lib/barter/listing-lock'
 
 const CITY_BY_MERCHANT: Record<string, string> = {
   'user-1': 'Johannesburg', 'user-2': 'Sandton',
@@ -57,6 +61,25 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
   const riskRequirements = getRiskRequirements(listing.risk_tier)
   const hasRequirements =
     listing.min_unity_score > 0 || listing.deposit_required || riskRequirements.ownershipVerificationRequired
+
+  // Barter — locked listings still render their own detail page (just
+  // hide Book/Buy/Propose-Trade CTAs); only the browse query excludes
+  // them. See the Barter Marketplace MVP Implementation Plan, Decision 4.
+  const isBarterLocked = await isListingBarterLocked(listing.id)
+  const viewer = await getRequestProfile()
+  const canProposeTrade = Boolean(viewer) && viewer!.userId !== listing.merchant_id && !isBarterLocked
+
+  let viewerListings: Awaited<ReturnType<typeof getListingsByMerchant>> = []
+  let ownerListings: Awaited<ReturnType<typeof getListingsByMerchant>> = []
+  if (canProposeTrade) {
+    const [rawViewerListings, rawOwnerListings] = await Promise.all([
+      getListingsByMerchant(viewer!.userId),
+      getListingsByMerchant(listing.merchant_id),
+    ])
+    const lockedIds = await getAllBarterLockedListingIds()
+    viewerListings = rawViewerListings.filter((l) => l.status === 'active' && !lockedIds.has(l.id))
+    ownerListings = rawOwnerListings.filter((l) => l.status === 'active' && !lockedIds.has(l.id))
+  }
 
   return (
     <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen">
@@ -240,27 +263,51 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
               </div>
             )}
 
-            {/* Rental details */}
-            <div>
-              <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-4">Rental Details</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  { label: 'Daily rate', value: `R${listing.daily_rate}` },
-                  ...(listing.weekly_rate ? [{ label: 'Weekly rate', value: `R${listing.weekly_rate}` }] : []),
-                  { label: 'Minimum rental', value: `${listing.min_rental_days} day${listing.min_rental_days !== 1 ? 's' : ''}` },
-                  ...(listing.insurance_amount ? [{ label: 'Insurance', value: `R${listing.insurance_amount}/day` }] : []),
-                  { label: 'Shipping', value: SHIPPING_LABEL[listing.shipping_payer] },
-                ].map(({ label, value }) => (
-                  <div
-                    key={label}
-                    className="flex justify-between items-center px-4 py-3 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm"
-                  >
-                    <span className="text-[#6B5B55] dark:text-[#9B8B85]">{label}</span>
-                    <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{value}</span>
-                  </div>
-                ))}
+            {/* Rental details — only for a listing that has a daily rate (rental or both) */}
+            {listing.daily_rate !== null && listing.daily_rate !== undefined && (
+              <div>
+                <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-4">Rental Details</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    { label: 'Daily rate', value: `R${listing.daily_rate}` },
+                    ...(listing.weekly_rate ? [{ label: 'Weekly rate', value: `R${listing.weekly_rate}` }] : []),
+                    { label: 'Minimum rental', value: `${listing.min_rental_days} day${listing.min_rental_days !== 1 ? 's' : ''}` },
+                    ...(listing.insurance_amount ? [{ label: 'Insurance', value: `R${listing.insurance_amount}/day` }] : []),
+                    { label: 'Shipping', value: SHIPPING_LABEL[listing.shipping_payer] },
+                  ].map(({ label, value }) => (
+                    <div
+                      key={label}
+                      className="flex justify-between items-center px-4 py-3 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm"
+                    >
+                      <span className="text-[#6B5B55] dark:text-[#9B8B85]">{label}</span>
+                      <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{value}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Sale details — only for a listing that has a sale price (sale or both) */}
+            {listing.sale_price !== null && listing.sale_price !== undefined && (
+              <div>
+                <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-4">Sale Details</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    { label: 'Price', value: `R${listing.sale_price}` },
+                    ...(typeof listing.quantity_available === 'number' ? [{ label: 'Quantity available', value: String(listing.quantity_available) }] : []),
+                    { label: 'Shipping', value: SHIPPING_LABEL[listing.shipping_payer] },
+                  ].map(({ label, value }) => (
+                    <div
+                      key={label}
+                      className="flex justify-between items-center px-4 py-3 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm"
+                    >
+                      <span className="text-[#6B5B55] dark:text-[#9B8B85]">{label}</span>
+                      <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Trust features */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -338,10 +385,35 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
             )}
           </div>
 
-          {/* ── RIGHT COLUMN — sticky booking card ── */}
+          {/* ── RIGHT COLUMN — sticky booking/sale card(s) ── */}
           <div className="hidden lg:block">
-            <div className="sticky top-24">
-              <BookingCard listing={listing} />
+            <div className="sticky top-24 space-y-5">
+              {isBarterLocked ? (
+                <div className="rounded-2xl border border-[#8B1A1A]/30 bg-[#8B1A1A]/5 p-5 text-center">
+                  <Repeat size={22} className="mx-auto text-[#8B1A1A] mb-2" />
+                  <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Committed to a barter trade</p>
+                  <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-1">
+                    This item is currently part of an accepted trade and isn&apos;t available to book, buy, or trade for.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {listing.daily_rate !== null && listing.daily_rate !== undefined && (
+                    <BookingCard listing={{ ...listing, daily_rate: listing.daily_rate }} />
+                  )}
+                  {listing.sale_price !== null && listing.sale_price !== undefined && (
+                    <SaleSummaryCard listing={{ ...listing, sale_price: listing.sale_price }} />
+                  )}
+                  {canProposeTrade && (
+                    <ProposeTradeButton
+                      anchorListing={listing}
+                      currentUserId={viewer!.userId}
+                      myListings={viewerListings}
+                      ownerListings={ownerListings}
+                    />
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -361,13 +433,39 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
       </div>
 
       {/* ── Mobile sticky CTA ── */}
-      <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 px-4 pb-2 bg-gradient-to-t from-[#FAF8F5] dark:from-[#0F0A0A] pt-4">
-        <Link
-          href={`/listings/${listing.id}/book`}
-          className="flex items-center justify-center gap-2 w-full py-3.5 bg-[#8B1A1A] text-white font-semibold rounded-xl text-sm shadow-lg hover:bg-[#7A1616] transition-colors"
-        >
-          Book Now — R{listing.daily_rate}/day <ArrowRight size={16} />
-        </Link>
+      <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 px-4 pb-2 bg-gradient-to-t from-[#FAF8F5] dark:from-[#0F0A0A] pt-4 space-y-2">
+        {isBarterLocked ? (
+          <div className="flex items-center justify-center gap-2 w-full py-3.5 bg-white dark:bg-[#1A1010] border border-[#8B1A1A]/30 text-[#8B1A1A] font-semibold rounded-xl text-sm shadow-lg">
+            <Repeat size={15} /> Committed to a barter trade
+          </div>
+        ) : (
+          <>
+            {listing.daily_rate !== null && listing.daily_rate !== undefined ? (
+              <Link
+                href={`/listings/${listing.id}/book`}
+                className="flex items-center justify-center gap-2 w-full py-3.5 bg-[#8B1A1A] text-white font-semibold rounded-xl text-sm shadow-lg hover:bg-[#7A1616] transition-colors"
+              >
+                Book Now — R{listing.daily_rate}/day <ArrowRight size={16} />
+              </Link>
+            ) : listing.sale_price !== null && listing.sale_price !== undefined ? (
+              <Link
+                href={`/listings/${listing.id}/buy`}
+                className="flex items-center justify-center gap-2 w-full py-3.5 bg-[#8B1A1A] text-white font-semibold rounded-xl text-sm shadow-lg hover:bg-[#7A1616] transition-colors"
+              >
+                Buy Now — R{listing.sale_price} <ArrowRight size={16} />
+              </Link>
+            ) : null}
+            {canProposeTrade && (
+              <ProposeTradeButton
+                anchorListing={listing}
+                currentUserId={viewer!.userId}
+                myListings={viewerListings}
+                ownerListings={ownerListings}
+                className="flex items-center justify-center gap-2 w-full py-3.5 bg-white dark:bg-[#1A1010] border border-[#8B1A1A] text-[#8B1A1A] font-semibold rounded-xl text-sm shadow-lg hover:bg-[#8B1A1A]/5 transition-colors"
+              />
+            )}
+          </>
+        )}
       </div>
     </div>
   )

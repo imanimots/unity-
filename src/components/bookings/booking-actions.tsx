@@ -3,8 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Check, X, Play, PackageCheck, Ban, CreditCard } from 'lucide-react'
+import { Check, X, Play, PackageCheck, Ban, CreditCard, MessageCircle } from 'lucide-react'
 import type { BookingLifecycleStatus } from '@/lib/bookings/status-labels'
+import { OpenDisputeDialog } from '@/components/disputes/open-dispute-dialog'
+
+/** A dispute only makes sense once the transaction has actually progressed past pure negotiation. */
+const DISPUTABLE_STATUSES: BookingLifecycleStatus[] = ['active', 'return_pending', 'returned', 'completed']
 
 interface Props {
   bookingId: string
@@ -67,7 +71,7 @@ export function BookingActions({ bookingId, status, role, financiallyReady = fal
   const [error, setError] = useState<string | null>(null)
 
   const actions = availableActions(status, role, financiallyReady)
-  if (actions.length === 0) return null
+  const showDispute = DISPUTABLE_STATUSES.includes(status)
 
   async function run(action: ActionKind) {
     const meta = ACTION_LABELS[action]
@@ -134,6 +138,21 @@ export function BookingActions({ bookingId, status, role, financiallyReady = fal
         })}
       </div>
       {error && <p className="text-xs text-red-600 dark:text-red-400 mt-2">{error}</p>}
+      <div className="mt-3 flex flex-wrap items-center gap-4">
+        <Link
+          href={`/chat?booking=${bookingId}`}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#6B5B55] dark:text-[#9B8B85] hover:underline"
+        >
+          <MessageCircle size={13} /> Message
+        </Link>
+        {showDispute && (
+          <OpenDisputeDialog
+            transactionType="booking"
+            transactionId={bookingId}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#8B1A1A] hover:underline"
+          />
+        )}
+      </div>
     </div>
   )
 }

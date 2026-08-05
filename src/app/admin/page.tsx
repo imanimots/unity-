@@ -21,6 +21,16 @@ interface OverviewStats {
   overdue_payment_deadlines: number
   failed_financial_workflows: number
   retryable_email_failures: number
+  proposed_barter_agreements: number
+  accepted_barter_agreements: number
+  in_progress_barter_agreements: number
+  disputed_barter_agreements: number
+  admin_held_barter_agreements: number
+  orders_awaiting_payment: number
+  orders_paid_awaiting_shipment: number
+  orders_shipped_awaiting_delivery: number
+  orders_disputed: number
+  orders_payment_failed: number
   generated_at: string
 }
 
@@ -91,6 +101,28 @@ export default async function AdminOverviewPage() {
           <StatCard label="Financially ready" value={stats.financially_ready_bookings} />
           <StatCard label="Active rentals" value={stats.active_rentals} />
           <StatCard label="Overdue deadlines" value={stats.overdue_payment_deadlines} />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Barter</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <StatCard label="Proposed" value={stats.proposed_barter_agreements} />
+          <StatCard label="Accepted" value={stats.accepted_barter_agreements} />
+          <StatCard label="In progress" value={stats.in_progress_barter_agreements} />
+          <StatCard label="Disputed" value={stats.disputed_barter_agreements} />
+          <StatCard label="Admin held" value={stats.admin_held_barter_agreements} />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Orders</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <StatCard label="Awaiting payment" value={stats.orders_awaiting_payment} />
+          <StatCard label="Paid, awaiting shipment" value={stats.orders_paid_awaiting_shipment} />
+          <StatCard label="Shipped, awaiting delivery" value={stats.orders_shipped_awaiting_delivery} />
+          <StatCard label="Disputed" value={stats.orders_disputed} />
+          <StatCard label="Payment failed" value={stats.orders_payment_failed} />
         </div>
       </section>
 

@@ -8,6 +8,7 @@ import {
   Sun, Moon, Menu, X, Home, Search,
   MessageCircle, User, ChevronDown, LogOut,
   Package, Calendar, ExternalLink, Link2,
+  ShoppingBag, Store, Repeat, AlertTriangle,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { CountrySelector } from '@/components/shared/country-selector'
@@ -101,6 +102,22 @@ export function Navbar() {
                       <Link href="/dashboard/merchant" onClick={() => setProfileOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
                         <Package size={14} className="text-[#9B8B85]" /> My Listings
+                      </Link>
+                      <Link href="/dashboard/orders" onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                        <ShoppingBag size={14} className="text-[#9B8B85]" /> My Purchases
+                      </Link>
+                      <Link href="/dashboard/merchant/orders" onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                        <Store size={14} className="text-[#9B8B85]" /> My Sales
+                      </Link>
+                      <Link href="/dashboard/barter" onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                        <Repeat size={14} className="text-[#9B8B85]" /> My Trades
+                      </Link>
+                      <Link href="/dashboard/disputes" onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                        <AlertTriangle size={14} className="text-[#9B8B85]" /> My Disputes
                       </Link>
                       <Link href="/dashboard/affiliate" onClick={() => setProfileOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">

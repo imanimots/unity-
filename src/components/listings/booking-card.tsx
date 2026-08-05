@@ -12,7 +12,8 @@ const SHIPPING_LABEL: Record<string, string> = {
   negotiate: 'To be negotiated',
 }
 
-export function BookingCard({ listing }: { listing: Listing }) {
+/** Only ever rendered for a listing that has a daily rate (rental or both) — see the caller's guard on the listing detail page. */
+export function BookingCard({ listing }: { listing: Listing & { daily_rate: number } }) {
   const [days, setDays] = useState(listing.min_rental_days)
 
   const rate = days >= 7 && listing.weekly_rate

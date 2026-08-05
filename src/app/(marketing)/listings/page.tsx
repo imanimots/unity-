@@ -1,8 +1,10 @@
 import { getListings } from '@/lib/data/listings'
+import { resolveEffectiveCountry } from '@/lib/resolve-effective-country'
 import { ListingCard } from '@/components/listings/listing-card'
 import { FilterBar } from '@/components/listings/filter-bar'
+import { MarketplaceModeSelectorContainer } from '@/components/listings/marketplace-mode-selector-container'
 import type { ListingFilters } from '@/lib/data/listings'
-import { Search } from 'lucide-react'
+import { Search, ArrowLeftRight } from 'lucide-react'
 
 export const metadata = {
   title: 'Browse Listings — Unity',
@@ -15,20 +17,37 @@ interface PageProps {
     category?: string
     sort?: string
     maxPrice?: string
+    mode?: string
   }>
+}
+
+const MODE_LABELS: Record<string, string> = {
+  rent: 'available to rent',
+  buy: 'available to buy',
 }
 
 export default async function ListingsPage({ searchParams }: PageProps) {
   const params = await searchParams
+  const mode = params.mode === 'buy' || params.mode === 'barter' ? params.mode : 'rent'
+  const isBarter = mode === 'barter'
+
+  const { countryId } = await resolveEffectiveCountry()
 
   const filters: ListingFilters = {
     query: params.q,
     category: params.category,
     sort: params.sort as ListingFilters['sort'],
     maxPrice: params.maxPrice ? Number(params.maxPrice) : undefined,
+    mode: isBarter ? undefined : mode,
+    countryId,
   }
 
-  const listings = await getListings(filters)
+  // Bartering has no backing data model yet (see MarketplaceModeSelector's
+  // own comment and the homepage's "Coming soon" Bartering card) — the
+  // toggle is real, but selecting it intentionally shows a coming-soon
+  // state instead of querying listings for a transaction type that
+  // doesn't exist yet.
+  const listings = isBarter ? [] : await getListings(filters)
 
   return (
     <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen">
@@ -64,8 +83,9 @@ export default async function ListingsPage({ searchParams }: PageProps) {
 
           {/* Result count */}
           <p className="text-[#9B8B85] text-sm mt-4">
-            {listings.length} item{listings.length !== 1 ? 's' : ''} available to rent
-            {params.category && ` in ${params.category}`}
+            {isBarter
+              ? 'Bartering is coming soon'
+              : `${listings.length} item${listings.length !== 1 ? 's' : ''} ${MODE_LABELS[mode]}${params.category ? ` in ${params.category}` : ''}`}
           </p>
         </div>
       </section>
@@ -77,9 +97,22 @@ export default async function ListingsPage({ searchParams }: PageProps) {
         </div>
       </div>
 
+      {/* ── MARKETPLACE MODE SELECTOR — drives ?mode=buy|rent|barter above ── */}
+      <MarketplaceModeSelectorContainer />
+
       {/* ── LISTING GRID ── */}
-      <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-10 lg:py-14">
-        {listings.length === 0 ? (
+      <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-10 lg:py-14 pb-32">
+        {isBarter ? (
+          <div className="text-center py-24">
+            <ArrowLeftRight size={48} strokeWidth={1.5} className="mx-auto mb-5 text-[#9B8B85]" />
+            <h2 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] mb-3">
+              Bartering is coming soon
+            </h2>
+            <p className="text-[#6B5B55] dark:text-[#9B8B85]">
+              Trading items directly isn&apos;t live yet — check back soon, or browse Buy and Rent in the meantime.
+            </p>
+          </div>
+        ) : listings.length === 0 ? (
           <div className="text-center py-24">
             <p className="text-5xl mb-5">🔍</p>
             <h2 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] mb-3">

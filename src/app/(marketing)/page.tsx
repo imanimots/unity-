@@ -1,22 +1,17 @@
 import Link from 'next/link'
-import { ArrowRight, ShieldCheck, Star, CheckCircle } from 'lucide-react'
+import Image from 'next/image'
+import { ArrowRight, ShieldCheck, Star, CheckCircle, ShoppingBag, ArrowLeftRight } from 'lucide-react'
 import { getListings } from '@/lib/data/listings'
+import { resolveEffectiveCountry } from '@/lib/resolve-effective-country'
 import { ListingCard } from '@/components/listings/listing-card'
 
 export const metadata = {
   title: 'Unity — Rent What You Need. Earn From What You Have.',
-  description: "South Africa's peer-to-peer rental marketplace. Identity-reviewed users, test-mode checkout, and thousands of items near you.",
+  description: "South Africa's peer-to-peer rental marketplace. Identity-reviewed users and test-mode checkout.",
 }
 
 const MARQUEE_TEXT =
   'CAMERAS • CAMPING • POWER TOOLS • DRONES • BICYCLES • AUDIO GEAR • LIGHTING • PROJECTORS • SPORTS • GARDEN • EVENTS • VEHICLES • '
-
-const STATS = [
-  { value: '1,200+', label: 'Items listed' },
-  { value: '4.9★', label: 'Avg rating' },
-  { value: 'ZAR R0', label: 'Fees — first rental' },
-  { value: '24h', label: 'Support' },
-]
 
 const STEPS = [
   {
@@ -33,6 +28,61 @@ const STEPS = [
     num: '03',
     title: 'RETURN & REVIEW',
     desc: 'Hand it back in good shape, get your deposit released, and leave an honest review.',
+  },
+]
+
+// Rental and Ambassador are real, working experiences — screenshotted
+// directly from the live pages. Buying & Selling browsing and listing
+// creation are real too, but use an illustrative icon panel rather than a
+// screenshot since no dedicated marketing screenshot exists yet — see
+// docs/BUYING_SELLING.md. Purchasing itself (checkout/orders) isn't live,
+// so its CTA goes straight to the real Buy-filtered browse view rather
+// than claiming a purchase flow exists. Bartering has no backing feature
+// at all yet, so it stays "Coming soon".
+const PLATFORM_FEATURES = [
+  {
+    key: 'rental',
+    label: 'RENTAL MARKETPLACE',
+    heading: 'BROWSE AND BOOK ITEMS NEAR YOU.',
+    desc: 'Rent cameras, tools, camping gear and more from reviewed local owners — pick your dates and check out securely.',
+    image: '/home-features/rental-marketplace.png',
+    imageAlt: 'Screenshot of the Unity rental listings browse page',
+    icon: null,
+    cta: { label: 'Browse Rentals', href: '/listings' },
+    comingSoon: false,
+  },
+  {
+    key: 'buy-sell',
+    label: 'BUYING & SELLING MARKETPLACE',
+    heading: 'BUY AND SELL ITEMS OUTRIGHT.',
+    desc: 'Buy and sell items outright, alongside renting — using the same trusted, identity-reviewed community and secure test-mode checkout.',
+    image: null,
+    imageAlt: null,
+    icon: <ShoppingBag size={40} strokeWidth={1.5} />,
+    cta: { label: 'Browse For Sale', href: '/listings?mode=buy' },
+    comingSoon: false,
+  },
+  {
+    key: 'barter',
+    label: 'BARTERING',
+    heading: 'TRADE ITEMS DIRECTLY.',
+    desc: 'Swap what you have for what you need — no cash required. More details on how bartering will work are coming soon.',
+    image: null,
+    imageAlt: null,
+    icon: <ArrowLeftRight size={40} strokeWidth={1.5} />,
+    cta: null,
+    comingSoon: true,
+  },
+  {
+    key: 'ambassador',
+    label: 'AMBASSADOR / AFFILIATE PROGRAM',
+    heading: 'EARN BY REFERRING NEW MEMBERS.',
+    desc: 'Share your referral link and earn commission every time someone you refer completes a rental.',
+    image: '/home-features/ambassador-program.png',
+    imageAlt: 'Screenshot of the Unity Ambassador Program page',
+    icon: null,
+    cta: { label: 'Learn More', href: '/ambassadors' },
+    comingSoon: false,
   },
 ]
 
@@ -55,7 +105,8 @@ const TRUST = [
 ]
 
 export default async function HomePage() {
-  const featured = await getListings({ sort: 'rating' })
+  const { countryId } = await resolveEffectiveCountry()
+  const featured = await getListings({ sort: 'rating', countryId })
   const topListings = featured.slice(0, 6)
 
   return (
@@ -104,16 +155,6 @@ export default async function HomePage() {
               {/* Tall rectangle — top-right overlapping */}
               <div className="absolute left-[300px] top-0 bg-[#EDE8E0] h-[300px] w-[240px]" />
             </div>
-          </div>
-
-          {/* Stat strip */}
-          <div className="mt-20 max-lg:mt-14 border-t border-[#F2EDE8] pt-10 grid grid-cols-2 sm:grid-cols-4 gap-8">
-            {STATS.map(({ value, label }) => (
-              <div key={label}>
-                <div className="text-2xl font-extrabold text-[#1A0A0A] leading-none mb-1">{value}</div>
-                <div className="section-label">{label}</div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
@@ -191,12 +232,81 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ─── 5. TRUST SECTION ────────────────────────────────────── */}
-      <section className="bg-[#1A0A0A] py-[120px] max-lg:py-20 text-white">
+      {/* ─── 5. PLATFORM FEATURES ────────────────────────────────── */}
+      <section className="bg-[#FAF8F5] py-[120px] max-lg:py-20">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-16">
 
           <div className="flex items-center gap-3 mb-4">
             <span className="section-label">[04]</span>
+            <span className="section-label">WHAT UNITY OFFERS</span>
+          </div>
+          <h2 className="section-heading text-[#1A0A0A] mb-16 max-lg:mb-12">FOUR WAYS TO USE UNITY.</h2>
+
+          <div className="flex flex-col gap-20 max-lg:gap-14">
+            {PLATFORM_FEATURES.map((feature, i) => {
+              const imageFirst = i % 2 === 0
+              const media = (
+                <div className={`flex-1 min-w-0 ${imageFirst ? 'lg:order-1' : 'lg:order-2'}`}>
+                  {feature.image ? (
+                    <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-[#F2EDE8] border border-[#F2EDE8]">
+                      <Image
+                        src={feature.image}
+                        alt={feature.imageAlt ?? ''}
+                        fill
+                        className="object-cover object-top"
+                        sizes="(max-width: 1024px) 100vw, 50vw"
+                      />
+                    </div>
+                  ) : (
+                    <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-[#F2EDE8] border border-[#F2EDE8] flex items-center justify-center">
+                      <div className="text-[#9B8B85]">{feature.icon}</div>
+                    </div>
+                  )}
+                </div>
+              )
+              const text = (
+                <div className={`flex-1 min-w-0 flex flex-col justify-center ${imageFirst ? 'lg:order-2' : 'lg:order-1'}`}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="section-label">{feature.label}</span>
+                    {feature.comingSoon && (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#E8E0D8] text-[#6B5B55] text-[10px] font-bold uppercase tracking-[0.1em]">
+                        Coming soon
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-2xl lg:text-3xl font-extrabold uppercase text-[#1A0A0A] mb-4 leading-tight">
+                    {feature.heading}
+                  </h3>
+                  <p className="text-base text-[#6B5B55] leading-relaxed mb-6 max-w-md">
+                    {feature.desc}
+                  </p>
+                  {feature.cta && (
+                    <Link
+                      href={feature.cta.href}
+                      className="inline-flex items-center gap-2 w-fit text-sm font-semibold text-[#1A0A0A] border-b border-[#1A0A0A] pb-0.5 hover:text-[#8B1A1A] hover:border-[#8B1A1A] transition-colors"
+                    >
+                      {feature.cta.label} <ArrowRight size={14} />
+                    </Link>
+                  )}
+                </div>
+              )
+              return (
+                <div key={feature.key} className="flex flex-col lg:flex-row lg:items-center gap-10 lg:gap-16">
+                  {media}
+                  {text}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── 6. TRUST SECTION ────────────────────────────────────── */}
+      <section className="bg-[#1A0A0A] py-[120px] max-lg:py-20 text-white">
+        <div className="max-w-[1400px] mx-auto px-6 lg:px-16">
+
+          <div className="flex items-center gap-3 mb-4">
+            <span className="section-label">[05]</span>
             <span className="section-label" style={{ color: '#6B5B55' }}>TRUST</span>
           </div>
           <h2 className="section-heading text-white mb-16 max-lg:mb-12">
