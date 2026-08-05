@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     if (searchParams.get('format') === 'csv') {
       return csvResponse(
         'financial-operations.csv',
-        ['paymentId', 'bookingReference', 'paymentType', 'status', 'amount', 'currency', 'workflowStatus', 'failureCategory', 'ledgerEntryCount', 'payoutStatus'],
+        ['paymentId', 'bookingReference', 'orderReference', 'paymentType', 'status', 'amount', 'currency', 'workflowStatus', 'failureCategory', 'ledgerEntryCount', 'payoutStatus'],
         rows
       )
     }

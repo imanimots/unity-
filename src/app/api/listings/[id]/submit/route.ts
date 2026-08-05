@@ -81,6 +81,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .from('listings')
       .select(`
         id, merchant_id, status, title, category, condition, description, daily_rate,
+        listing_type, sale_price,
         min_rental_days, max_rental_days, shipping_payer, condition_confirmed, known_defects,
         replacement_value, quantity_available, province, city, available_from,
         deposit_required, category_metadata
@@ -156,6 +157,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       category: listingRow.category,
       condition: listingRow.condition ?? undefined,
       description: listingRow.description ?? undefined,
+      listing_type: listingRow.listing_type ?? 'rental',
+      sale_price: listingRow.sale_price ?? undefined,
       daily_rate: listingRow.daily_rate,
       min_rental_days: listingRow.min_rental_days,
       max_rental_days: listingRow.max_rental_days ?? undefined,

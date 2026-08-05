@@ -83,6 +83,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     category: listing.category,
     condition: listing.condition ?? undefined,
     description: listing.description ?? undefined,
+    listing_type: listing.listing_type ?? 'rental',
+    sale_price: listing.sale_price ?? undefined,
     daily_rate: listing.daily_rate,
     min_rental_days: listing.min_rental_days,
     max_rental_days: listing.max_rental_days ?? undefined,
