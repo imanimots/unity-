@@ -11,6 +11,17 @@ const FULL_SYNTHETIC_VARS: TemplateVars = {
   feedback: 'Example feedback text.',
   paymentDueAt: '15 Aug 2026, 14:00',
   totalAmount: 'R2,500.00',
+  raiserName: 'Sam Raiser',
+  respondentName: 'Jane Respondent',
+  title: 'Item arrived damaged',
+  transactionReference: 'UN-TEST0001',
+  outcomeLabel: 'Merchant wins',
+  note: 'Please upload a photo of the damage.',
+  cancellation_reason: 'Resolved outside the platform.',
+  senderName: 'Sam Sender',
+  messagePreview: 'Hey, is this still available?',
+  agreementReference: 'BT-TEST0001',
+  orderReference: 'OR-TEST0001',
 }
 
 const FORBIDDEN_CLAIM_PATTERNS = [
@@ -97,6 +108,10 @@ describe('email template catalogue (category: Templates)', () => {
       'booking.payment_required', 'booking.payment_reminder', 'booking.payment_expired', 'booking.financially_ready',
       'booking.started', 'booking.return_initiated', 'booking.completed',
       'payment.declined', 'payment.retryable_failure', 'deposit.failed',
+      'dispute.opened', 'dispute.evidence_requested', 'dispute.evidence_received', 'dispute.under_review', 'dispute.resolved', 'dispute.closed', 'dispute.cancelled',
+      'message.new',
+      'barter.accepted', 'barter.deposit_required', 'barter.ready_to_exchange', 'barter.completion_requested', 'barter.completed', 'barter.cancelled',
+      'order.created', 'order.payment_received', 'order.shipped', 'order.delivered', 'order.cancelled', 'order.payment_failed',
     ])
     for (const t of EMAIL_TEMPLATES) {
       expect(knownEvents.has(t.event), `unexpected event "${t.event}" on template "${t.id}"`).toBe(true)

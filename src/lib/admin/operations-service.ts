@@ -190,14 +190,16 @@ export async function getAdminBookingDetail(admin: SupabaseClient, bookingId: st
 
 export interface AdminFinancialRow {
   paymentId: string
-  bookingId: string
+  bookingId: string | null
   bookingReference: string | null
+  orderId: string | null
+  orderReference: string | null
   paymentType: string
   status: string
   amount: number
   currency: string
   workflowStatus: string | null
-  failureCategory: 'retryable' | 'terminal' | null
+  failureCategory: 'retryable' | 'terminal' | 'failed' | null
   failureReason: string | null
   ledgerEntryCount: number
   payoutStatus: string | null
@@ -208,11 +210,27 @@ export interface AdminFinancialRow {
  * workflow status, ledger-entry count, payout state. Never selects raw
  * provider payloads/webhook bodies — payment_webhook_events is not
  * queried here at all.
+ *
+ * Step 11 Phase 6: extended (not forked) to also label order-linked rows
+ * correctly. Before this, an order-linked payment row rendered with a
+ * silent null booking reference and null failure category -- the exact,
+ * confirmed-real bug this fix targets. `booking_id`/`order_id` are
+ * nullable side-by-side (exactly one populated per row, same
+ * exactly-one-of shape `payments` itself enforces). An order row never
+ * has a `financial_workflows` entry (orders use a single-step charge
+ * flow, see chargeOrderPayment()'s own header comment) -- its
+ * failureCategory is derived directly from `payment.status === 'failed'`
+ * instead, a deliberately simpler category than bookings' retryable/
+ * terminal split, because that split isn't durably stored for orders
+ * (see docs/ORDER_ADMINISTRATION.md). `merchant_payouts` has no
+ * order_id/payment_id column at all -- an order row's payoutStatus is
+ * never queried for, always `'not_applicable'`, not left to fall
+ * through to a lookup that can never match.
  */
 export async function listFinancialOperations(admin: SupabaseClient, filters: { status?: string; limit?: number }): Promise<AdminFinancialRow[]> {
   let query = admin
     .from('payments')
-    .select('id, booking_id, payment_type, status, amount, currency, failure_reason, bookings(booking_reference)')
+    .select('id, booking_id, order_id, payment_type, status, amount, currency, failure_reason, bookings(booking_reference), orders(order_reference)')
     .order('requested_at', { ascending: false })
     .limit(filters.limit ?? DEFAULT_LIMIT)
 
@@ -222,7 +240,7 @@ export async function listFinancialOperations(admin: SupabaseClient, filters: { 
   if (error) throw error
   if (!payments || payments.length === 0) return []
 
-  const bookingIds = Array.from(new Set(payments.map((p) => p.booking_id)))
+  const bookingIds = Array.from(new Set(payments.map((p) => p.booking_id).filter((id): id is string => !!id)))
   const paymentIds = payments.map((p) => p.id)
 
   const [{ data: workflows }, { data: ledgerRows }, { data: payouts }] = await Promise.all([
@@ -239,12 +257,35 @@ export async function listFinancialOperations(admin: SupabaseClient, filters: { 
   }
 
   return payments.map((p) => {
-    const workflowStatus = workflowByBooking.get(p.booking_id) ?? null
-    const failureCategory = workflowStatus === 'failed_retryable' ? 'retryable' : workflowStatus === 'failed_terminal' ? 'terminal' : null
+    if (p.order_id) {
+      const failureCategory: AdminFinancialRow['failureCategory'] = p.status === 'failed' ? 'failed' : null
+      return {
+        paymentId: p.id,
+        bookingId: null,
+        bookingReference: null,
+        orderId: p.order_id,
+        orderReference: (p.orders as unknown as { order_reference: string } | null)?.order_reference ?? null,
+        paymentType: p.payment_type,
+        status: p.status,
+        amount: p.amount,
+        currency: p.currency,
+        workflowStatus: null,
+        failureCategory,
+        failureReason: p.failure_reason,
+        ledgerEntryCount: ledgerCountByPayment.get(p.id) ?? 0,
+        payoutStatus: 'not_applicable',
+      }
+    }
+
+    const workflowStatus = p.booking_id ? (workflowByBooking.get(p.booking_id) ?? null) : null
+    const failureCategory: AdminFinancialRow['failureCategory'] =
+      workflowStatus === 'failed_retryable' ? 'retryable' : workflowStatus === 'failed_terminal' ? 'terminal' : null
     return {
       paymentId: p.id,
       bookingId: p.booking_id,
       bookingReference: (p.bookings as unknown as { booking_reference: string } | null)?.booking_reference ?? null,
+      orderId: null,
+      orderReference: null,
       paymentType: p.payment_type,
       status: p.status,
       amount: p.amount,
@@ -253,7 +294,7 @@ export async function listFinancialOperations(admin: SupabaseClient, filters: { 
       failureCategory,
       failureReason: p.failure_reason,
       ledgerEntryCount: ledgerCountByPayment.get(p.id) ?? 0,
-      payoutStatus: payoutByBooking.get(p.booking_id) ?? null,
+      payoutStatus: p.booking_id ? (payoutByBooking.get(p.booking_id) ?? null) : null,
     }
   })
 }

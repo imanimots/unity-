@@ -27,6 +27,9 @@ export function mapBookingRpcError(message: string | undefined): { status: numbe
   if (m.includes('you cannot book your own listing')) {
     return { status: 403, error: 'You cannot book your own listing.' }
   }
+  if (m.includes('currently committed to a barter agreement')) {
+    return { status: 409, error: 'This listing is currently committed to a barter agreement and cannot be booked.' }
+  }
   if (m.includes('below the minimum rental period')) {
     return { status: 422, error: 'The requested duration is below this listing’s minimum rental period.' }
   }

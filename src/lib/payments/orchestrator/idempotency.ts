@@ -27,4 +27,16 @@ export function computeOrchestratorPayoutHash(bookingId: string): string {
   return md5(`create_merchant_payout|${bookingId}`)
 }
 
+export function computeAuthorizeBarterDepositHash(paymentId: string): string {
+  return md5(`authorize_barter_deposit|${paymentId}`)
+}
+
+export function computeReleaseBarterDepositHash(paymentId: string): string {
+  return md5(`release_barter_deposit|${paymentId}`)
+}
+
+export function computeChargeBarterCashAdjustmentHash(paymentId: string): string {
+  return md5(`charge_barter_cash_adjustment|${paymentId}`)
+}
+
 export { checkIdempotentReplay } from '@/lib/bookings/idempotency'

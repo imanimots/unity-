@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { deriveBarterFinancialReadiness, type BarterDepositRequirement } from '@/lib/barter/financial-readiness'
 
 export type ExceptionSeverity = 'low' | 'medium' | 'high'
-export type ExceptionEntityType = 'listing' | 'identity_verification' | 'booking' | 'email_delivery' | 'user'
+export type ExceptionEntityType = 'listing' | 'identity_verification' | 'booking' | 'email_delivery' | 'user' | 'dispute' | 'barter_agreement' | 'order'
 
 export interface AdminException {
   id: string
@@ -74,6 +75,60 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
     admin.from('bookings').select('id, booking_reference, renter_total_amount').in('status', ['accepted', 'active', 'return_pending', 'completed']).gt('renter_total_amount', 0),
     admin.from('financial_workflows').select('booking_id'),
     admin.from('exception_resolutions').select('exception_type, entity_type, entity_id'),
+  ])
+
+  const [{ data: overdueDisputes }] = await Promise.all([
+    admin.from('disputes').select('id, title, status, created_at').in('status', ['open', 'evidence', 'under_review']).lt('created_at', threshold),
+  ])
+
+  // Step 11 Phase 5 closure -- barter categories, absorbing the former
+  // "Phase 5 (Barter Phase C)" roadmap item. Every category mirrors an
+  // existing pattern above exactly (overdue reviews, failed payments,
+  // suspended-with-open-commitment); no automatic financial correction
+  // is invented, every suggestedAction points at an existing admin
+  // surface.
+  const [
+    { data: staleBarterProposals },
+    { data: accruedAcceptedBarter },
+    { data: failedBarterPayments },
+    { data: disputedBarterAgreements },
+    { data: staleAwaitingConfirmation },
+    { data: heldBarterAgreements },
+    { data: frozenCancelledBarter },
+    { data: completedWithUnresolvedDeposit },
+  ] = await Promise.all([
+    admin.from('barter_agreements').select('id, agreement_reference, status, proposed_at').in('status', ['proposed', 'countered']).lt('proposed_at', threshold),
+    admin.from('barter_agreements').select('id, agreement_reference, accepted_offer_id, accepted_at, party_a_id, party_b_id').eq('status', 'accepted').not('accepted_at', 'is', null).lt('accepted_at', threshold),
+    admin.from('payments').select('id, barter_agreement_id, payment_type, updated_at, barter_agreements(agreement_reference)').in('payment_type', ['barter_deposit', 'barter_cash_adjustment']).eq('status', 'failed'),
+    admin.from('barter_agreements').select('id, agreement_reference, updated_at').eq('status', 'disputed'),
+    admin.from('barter_agreements').select('id, agreement_reference, updated_at').eq('status', 'awaiting_confirmation').lt('updated_at', threshold),
+    admin.from('barter_agreements').select('id, agreement_reference, admin_hold_reason, updated_at').eq('admin_hold', true),
+    admin.from('barter_agreements').select('id, agreement_reference, updated_at').eq('status', 'cancelled').eq('cancellation_settlement', 'frozen_pending_dispute'),
+    admin.from('payments').select('id, barter_agreement_id, updated_at, barter_agreements(agreement_reference, status)').eq('payment_type', 'barter_deposit').eq('status', 'authorised'),
+  ])
+
+  // Step 11 Phase 6 -- order categories. Every category mirrors an
+  // existing pattern above exactly (overdue reviews, failed payments,
+  // suspended-with-open-commitment); no automatic financial correction
+  // is invented, every suggestedAction points at an existing admin
+  // surface. order_payment_failed is a single category, not a
+  // retryable/terminal split -- orders have no financial_workflows-style
+  // stored classification the way bookings do (see
+  // docs/ORDER_ADMINISTRATION.md, "failure category").
+  const [
+    { data: staleUnpaidOrders },
+    { data: failedOrderPayments },
+    { data: staleAwaitingShipment },
+    { data: staleAwaitingDelivery },
+    { data: disputedOrders },
+    { data: cancelledOrdersWithPayment },
+  ] = await Promise.all([
+    admin.from('orders').select('id, order_reference, status, created_at').eq('status', 'pending').lt('created_at', threshold),
+    admin.from('payments').select('id, order_id, updated_at, orders(order_reference, status)').eq('payment_type', 'order_payment').eq('status', 'failed'),
+    admin.from('orders').select('id, order_reference, paid_at').eq('status', 'paid').not('paid_at', 'is', null).lt('paid_at', threshold),
+    admin.from('orders').select('id, order_reference, shipped_at').eq('status', 'shipped').not('shipped_at', 'is', null).lt('shipped_at', threshold),
+    admin.from('orders').select('id, order_reference, created_at').eq('status', 'disputed'),
+    admin.from('payments').select('id, order_id, status, updated_at, orders(order_reference, status)').eq('payment_type', 'order_payment').in('status', ['authorised', 'captured']),
   ])
 
   const resolvedSet = new Set((resolutions ?? []).map((r) => `${r.exception_type}:${r.entity_type}:${r.entity_id}`))
@@ -247,6 +302,286 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
       suggestedAction: `Inspect at /admin/bookings, booking ${row.id}`,
       resolved: isResolved('booking_missing_financial_workflow', 'booking', row.id),
     })
+  }
+
+  for (const row of overdueDisputes ?? []) {
+    exceptions.push({
+      id: exceptionId('dispute_open_too_long', row.id),
+      type: 'dispute_open_too_long',
+      severity: 'high',
+      entityType: 'dispute',
+      entityId: row.id,
+      summary: `Dispute "${row.title}" has been ${row.status.replace('_', ' ')} for over ${REVIEW_OVERDUE_HOURS}h`,
+      detectedAt: row.created_at,
+      suggestedAction: `Open the dispute at /admin/disputes/${row.id}`,
+      resolved: isResolved('dispute_open_too_long', 'dispute', row.id),
+    })
+  }
+
+  // ── Step 11 Phase 5 closure: barter categories ──
+
+  for (const row of staleBarterProposals ?? []) {
+    exceptions.push({
+      id: exceptionId('barter_proposal_stale', row.id),
+      type: 'barter_proposal_stale',
+      severity: 'low',
+      entityType: 'barter_agreement',
+      entityId: row.id,
+      summary: `Trade ${row.agreement_reference} has been "${row.status}" for over ${REVIEW_OVERDUE_HOURS}h with no response`,
+      detectedAt: row.proposed_at,
+      suggestedAction: `Inspect at /admin/barter/${row.id}`,
+      resolved: isResolved('barter_proposal_stale', 'barter_agreement', row.id),
+    })
+  }
+
+  // Financial readiness re-derived per agreement (not a plain column
+  // filter) -- reuses the same deriveBarterFinancialReadiness() the
+  // mark_barter_progress RPC and the trade UI both already use, so this
+  // exception category can never disagree with what the RPC would
+  // actually allow.
+  if (accruedAcceptedBarter && accruedAcceptedBarter.length > 0) {
+    const offerIds = accruedAcceptedBarter.map((a) => a.accepted_offer_id).filter((id): id is string => !!id)
+    const agreementIds = accruedAcceptedBarter.map((a) => a.id)
+    const [{ data: offers }, { data: barterPayments }] = await Promise.all([
+      offerIds.length
+        ? admin.from('barter_offers').select('id, agreement_id, deposit_required, deposit_payer, cash_adjustment_amount').in('id', offerIds)
+        : Promise.resolve({ data: [] as { id: string; agreement_id: string; deposit_required: boolean; deposit_payer: string | null; cash_adjustment_amount: number }[] }),
+      admin.from('payments').select('barter_agreement_id, payment_type, renter_id, status').in('barter_agreement_id', agreementIds),
+    ])
+    const offerByAgreement = new Map((offers ?? []).map((o) => [o.agreement_id, o]))
+
+    for (const row of accruedAcceptedBarter) {
+      const offer = offerByAgreement.get(row.id)
+      if (!offer) continue
+      const payments = (barterPayments ?? []).filter((p) => p.barter_agreement_id === row.id)
+      const depositRequirements: BarterDepositRequirement[] = []
+      if (offer.deposit_required && (offer.deposit_payer === 'party_a' || offer.deposit_payer === 'both')) {
+        const payer = payments.find((p) => p.payment_type === 'barter_deposit' && p.renter_id === row.party_a_id)
+        depositRequirements.push({ payer: 'party_a', status: (payer?.status as BarterDepositRequirement['status']) ?? 'pending' })
+      }
+      if (offer.deposit_required && (offer.deposit_payer === 'party_b' || offer.deposit_payer === 'both')) {
+        const payer = payments.find((p) => p.payment_type === 'barter_deposit' && p.renter_id === row.party_b_id)
+        depositRequirements.push({ payer: 'party_b', status: (payer?.status as BarterDepositRequirement['status']) ?? 'pending' })
+      }
+      const cashPayment = payments.find((p) => p.payment_type === 'barter_cash_adjustment')
+      const readiness = deriveBarterFinancialReadiness({
+        depositRequirements,
+        cashAdjustmentRequired: offer.cash_adjustment_amount > 0,
+        cashAdjustmentStatus: (cashPayment?.status as BarterDepositRequirement['status']) ?? null,
+      })
+      if (readiness === 'financially_ready' || readiness === 'no_payment_required') continue
+
+      exceptions.push({
+        id: exceptionId('barter_accepted_awaiting_financial_readiness', row.id),
+        type: 'barter_accepted_awaiting_financial_readiness',
+        severity: 'medium',
+        entityType: 'barter_agreement',
+        entityId: row.id,
+        summary: `Trade ${row.agreement_reference} has been accepted for over ${REVIEW_OVERDUE_HOURS}h but is still not financially ready`,
+        detectedAt: row.accepted_at,
+        suggestedAction: `Inspect at /admin/barter/${row.id}`,
+        resolved: isResolved('barter_accepted_awaiting_financial_readiness', 'barter_agreement', row.id),
+      })
+    }
+  }
+
+  for (const row of failedBarterPayments ?? []) {
+    const ref = (row.barter_agreements as unknown as { agreement_reference: string } | null)?.agreement_reference ?? row.barter_agreement_id
+    exceptions.push({
+      id: exceptionId('barter_payment_failed', row.id),
+      type: 'barter_payment_failed',
+      severity: 'high',
+      entityType: 'barter_agreement',
+      entityId: row.barter_agreement_id,
+      summary: `A ${row.payment_type === 'barter_deposit' ? 'deposit' : 'cash adjustment'} payment failed on trade ${ref}`,
+      detectedAt: row.updated_at,
+      suggestedAction: `Inspect at /admin/barter/${row.barter_agreement_id}`,
+      resolved: isResolved('barter_payment_failed', 'barter_agreement', row.barter_agreement_id),
+    })
+  }
+
+  for (const row of disputedBarterAgreements ?? []) {
+    exceptions.push({
+      id: exceptionId('barter_disputed', row.id),
+      type: 'barter_disputed',
+      severity: 'high',
+      entityType: 'barter_agreement',
+      entityId: row.id,
+      summary: `Trade ${row.agreement_reference} is currently disputed`,
+      detectedAt: row.updated_at,
+      suggestedAction: `Review the linked dispute, then inspect the trade at /admin/barter/${row.id}`,
+      resolved: isResolved('barter_disputed', 'barter_agreement', row.id),
+    })
+  }
+
+  for (const row of staleAwaitingConfirmation ?? []) {
+    exceptions.push({
+      id: exceptionId('barter_awaiting_confirmation_stale', row.id),
+      type: 'barter_awaiting_confirmation_stale',
+      severity: 'medium',
+      entityType: 'barter_agreement',
+      entityId: row.id,
+      summary: `Trade ${row.agreement_reference} has been awaiting completion confirmation for over ${REVIEW_OVERDUE_HOURS}h`,
+      detectedAt: row.updated_at,
+      suggestedAction: `Inspect at /admin/barter/${row.id}`,
+      resolved: isResolved('barter_awaiting_confirmation_stale', 'barter_agreement', row.id),
+    })
+  }
+
+  for (const row of heldBarterAgreements ?? []) {
+    exceptions.push({
+      id: exceptionId('barter_admin_held', row.id),
+      type: 'barter_admin_held',
+      severity: 'low',
+      entityType: 'barter_agreement',
+      entityId: row.id,
+      summary: `Trade ${row.agreement_reference} is on admin hold${row.admin_hold_reason ? `: ${row.admin_hold_reason}` : ''}`,
+      detectedAt: row.updated_at,
+      suggestedAction: `Review and release the hold at /admin/barter/${row.id} if appropriate`,
+      resolved: isResolved('barter_admin_held', 'barter_agreement', row.id),
+    })
+  }
+
+  for (const row of frozenCancelledBarter ?? []) {
+    exceptions.push({
+      id: exceptionId('barter_cancelled_frozen_pending_dispute', row.id),
+      type: 'barter_cancelled_frozen_pending_dispute',
+      severity: 'high',
+      entityType: 'barter_agreement',
+      entityId: row.id,
+      summary: `Trade ${row.agreement_reference} was cancelled with funds frozen pending dispute resolution -- no automatic settlement exists yet`,
+      detectedAt: row.updated_at,
+      suggestedAction: `Manually reconcile — inspect at /admin/barter/${row.id}`,
+      resolved: isResolved('barter_cancelled_frozen_pending_dispute', 'barter_agreement', row.id),
+    })
+  }
+
+  for (const row of completedWithUnresolvedDeposit ?? []) {
+    const agreementInfo = row.barter_agreements as unknown as { agreement_reference: string; status: string } | null
+    if (agreementInfo?.status !== 'completed') continue
+    exceptions.push({
+      id: exceptionId('barter_completed_with_unresolved_deposit', row.id),
+      type: 'barter_completed_with_unresolved_deposit',
+      severity: 'high',
+      entityType: 'barter_agreement',
+      entityId: row.barter_agreement_id,
+      summary: `Trade ${agreementInfo.agreement_reference} is completed but a deposit was never released -- data inconsistency, requires manual reconciliation`,
+      detectedAt: row.updated_at,
+      suggestedAction: `Manually reconcile — inspect at /admin/barter/${row.barter_agreement_id}`,
+      resolved: isResolved('barter_completed_with_unresolved_deposit', 'barter_agreement', row.barter_agreement_id),
+    })
+  }
+
+  // ── Step 11 Phase 6: order categories ──
+
+  for (const row of staleUnpaidOrders ?? []) {
+    exceptions.push({
+      id: exceptionId('order_awaiting_payment_too_long', row.id),
+      type: 'order_awaiting_payment_too_long',
+      severity: 'medium',
+      entityType: 'order',
+      entityId: row.id,
+      summary: `Order ${row.order_reference} has been awaiting payment for over ${REVIEW_OVERDUE_HOURS}h`,
+      detectedAt: row.created_at,
+      suggestedAction: `Inspect at /admin/orders/${row.id}`,
+      resolved: isResolved('order_awaiting_payment_too_long', 'order', row.id),
+    })
+  }
+
+  for (const row of failedOrderPayments ?? []) {
+    const order = row.orders as unknown as { order_reference: string; status: string } | null
+    if (order?.status !== 'pending') continue
+    exceptions.push({
+      id: exceptionId('order_payment_failed', row.order_id),
+      type: 'order_payment_failed',
+      severity: 'high',
+      entityType: 'order',
+      entityId: row.order_id,
+      summary: `Payment failed for order ${order.order_reference}`,
+      detectedAt: row.updated_at,
+      suggestedAction: `Inspect at /admin/orders/${row.order_id}`,
+      resolved: isResolved('order_payment_failed', 'order', row.order_id),
+    })
+  }
+
+  for (const row of staleAwaitingShipment ?? []) {
+    exceptions.push({
+      id: exceptionId('order_paid_awaiting_shipment_too_long', row.id),
+      type: 'order_paid_awaiting_shipment_too_long',
+      severity: 'medium',
+      entityType: 'order',
+      entityId: row.id,
+      summary: `Order ${row.order_reference} has been paid and awaiting shipment for over ${REVIEW_OVERDUE_HOURS}h`,
+      detectedAt: row.paid_at,
+      suggestedAction: `Inspect at /admin/orders/${row.id}`,
+      resolved: isResolved('order_paid_awaiting_shipment_too_long', 'order', row.id),
+    })
+  }
+
+  for (const row of staleAwaitingDelivery ?? []) {
+    exceptions.push({
+      id: exceptionId('order_shipped_awaiting_delivery_too_long', row.id),
+      type: 'order_shipped_awaiting_delivery_too_long',
+      severity: 'medium',
+      entityType: 'order',
+      entityId: row.id,
+      summary: `Order ${row.order_reference} has been shipped and awaiting delivery confirmation for over ${REVIEW_OVERDUE_HOURS}h`,
+      detectedAt: row.shipped_at,
+      suggestedAction: `Inspect at /admin/orders/${row.id}`,
+      resolved: isResolved('order_shipped_awaiting_delivery_too_long', 'order', row.id),
+    })
+  }
+
+  for (const row of disputedOrders ?? []) {
+    exceptions.push({
+      id: exceptionId('order_disputed', row.id),
+      type: 'order_disputed',
+      severity: 'high',
+      entityType: 'order',
+      entityId: row.id,
+      summary: `Order ${row.order_reference} is currently disputed`,
+      detectedAt: row.created_at,
+      suggestedAction: `Review the linked dispute, then inspect the order at /admin/orders/${row.id}`,
+      resolved: isResolved('order_disputed', 'order', row.id),
+    })
+  }
+
+  for (const row of cancelledOrdersWithPayment ?? []) {
+    const order = row.orders as unknown as { order_reference: string; status: string } | null
+    if (order?.status !== 'cancelled') continue
+    exceptions.push({
+      id: exceptionId('order_cancelled_with_unresolved_payment', row.order_id),
+      type: 'order_cancelled_with_unresolved_payment',
+      severity: 'high',
+      entityType: 'order',
+      entityId: row.order_id,
+      summary: `Order ${order.order_reference} was cancelled but its payment is still ${row.status} -- no automatic refund exists yet`,
+      detectedAt: row.updated_at,
+      suggestedAction: `Manually reconcile — inspect at /admin/orders/${row.order_id}`,
+      resolved: isResolved('order_cancelled_with_unresolved_payment', 'order', row.order_id),
+    })
+  }
+
+  for (const user of suspendedWithBookings ?? []) {
+    const { data: openOrders } = await admin
+      .from('orders')
+      .select('id')
+      .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+      .in('status', ['pending', 'paid', 'shipped'])
+      .limit(1)
+    if (openOrders && openOrders.length > 0) {
+      exceptions.push({
+        id: exceptionId('suspended_account_with_open_order', user.id),
+        type: 'suspended_account_with_open_order',
+        severity: 'high',
+        entityType: 'user',
+        entityId: user.id,
+        summary: `${user.full_name ?? user.display_name ?? user.id} is suspended but has an open order`,
+        detectedAt: now,
+        suggestedAction: `Review at /admin/users, user ${user.id}`,
+        resolved: isResolved('suspended_account_with_open_order', 'user', user.id),
+      })
+    }
   }
 
   return exceptions.sort((a, b) => (a.resolved === b.resolved ? 0 : a.resolved ? 1 : -1))

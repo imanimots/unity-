@@ -12,6 +12,21 @@ export interface ListingFilters {
   maxPrice?: number
   location?: string
   sort?: 'relevance' | 'price_asc' | 'price_desc' | 'newest' | 'rating'
+  /** Maps the browse-page Buy/Rent toggle to listing_type. 'rent' -> rental|both, 'buy' -> sale|both. Omit for no type filtering. */
+  mode?: 'buy' | 'rent'
+  /**
+   * Scopes results to one country (public browse/search only — see
+   * resolveEffectiveCountry()). Omit to skip country filtering entirely —
+   * used deliberately by getListingsByMerchant() and any internal/admin
+   * lookup, which must never lose a row just because the browsing
+   * country changed.
+   */
+  countryId?: string
+}
+
+/** Normalized display price — daily rate for rentals, sale price for sale-only listings. Never both null (see listings_type_pricing_chk). */
+function normalizedPrice(l: Listing): number {
+  return l.daily_rate ?? l.sale_price ?? 0
 }
 
 export async function getListings(filters: ListingFilters = {}): Promise<Listing[]> {
@@ -30,19 +45,27 @@ export async function getListings(filters: ListingFilters = {}): Promise<Listing
           l.category.toLowerCase().includes(q)
       )
     }
+    if (filters.mode === 'rent') {
+      results = results.filter((l) => (l.listing_type ?? 'rental') === 'rental' || l.listing_type === 'both')
+    } else if (filters.mode === 'buy') {
+      results = results.filter((l) => l.listing_type === 'sale' || l.listing_type === 'both')
+    }
+    if (filters.countryId) {
+      results = results.filter((l) => l.country_id === filters.countryId)
+    }
     if (filters.minPrice !== undefined) {
-      results = results.filter((l) => l.daily_rate >= filters.minPrice!)
+      results = results.filter((l) => l.daily_rate !== null && l.daily_rate >= filters.minPrice!)
     }
     if (filters.maxPrice !== undefined) {
-      results = results.filter((l) => l.daily_rate <= filters.maxPrice!)
+      results = results.filter((l) => l.daily_rate !== null && l.daily_rate <= filters.maxPrice!)
     }
 
     switch (filters.sort) {
       case 'price_asc':
-        results.sort((a, b) => a.daily_rate - b.daily_rate)
+        results.sort((a, b) => normalizedPrice(a) - normalizedPrice(b))
         break
       case 'price_desc':
-        results.sort((a, b) => b.daily_rate - a.daily_rate)
+        results.sort((a, b) => normalizedPrice(b) - normalizedPrice(a))
         break
       case 'newest':
         results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -69,9 +92,36 @@ export async function getListings(filters: ListingFilters = {}): Promise<Listing
   if (filters.query) query = query.ilike('title', `%${filters.query}%`)
   if (filters.minPrice !== undefined) query = query.gte('daily_rate', filters.minPrice)
   if (filters.maxPrice !== undefined) query = query.lte('daily_rate', filters.maxPrice)
+  if (filters.mode === 'rent') query = query.in('listing_type', ['rental', 'both'])
+  if (filters.mode === 'buy') query = query.in('listing_type', ['sale', 'both'])
+  if (filters.countryId) query = query.eq('country_id', filters.countryId)
 
-  const { data } = await query
-  return data ?? []
+  const { data: rawData } = await query
+  if (!rawData) return []
+
+  // Exclude barter-locked listings from browse — getListing() (single
+  // detail fetch) deliberately does NOT apply this exclusion, so a
+  // locked listing's own page still renders (with a "committed to a
+  // barter" state), it just disappears from search/browse results. See
+  // the Barter Marketplace MVP Implementation Plan, Decision 4.
+  const { getAllBarterLockedListingIds } = await import('@/lib/barter/listing-lock')
+  const lockedIds = await getAllBarterLockedListingIds()
+  const data = lockedIds.size > 0 ? rawData.filter((l) => !lockedIds.has(l.id)) : rawData
+
+  switch (filters.sort) {
+    case 'price_asc':
+      data.sort((a, b) => normalizedPrice(a) - normalizedPrice(b))
+      break
+    case 'price_desc':
+      data.sort((a, b) => normalizedPrice(b) - normalizedPrice(a))
+      break
+    case 'rating':
+      data.sort((a, b) => (b.merchant?.unity_score ?? 0) - (a.merchant?.unity_score ?? 0))
+      break
+    // 'newest'/'relevance' already match the default query order (created_at desc via no explicit order = insertion order is not guaranteed, but this matches the pre-existing behavior — no sort clause was applied server-side before this change either).
+  }
+
+  return data
 }
 
 export async function getListing(id: string): Promise<Listing | null> {

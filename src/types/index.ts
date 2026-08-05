@@ -35,6 +35,33 @@ export type RiskTier = 'low' | 'medium' | 'high'
 
 export type AccountStatus = 'active' | 'restricted' | 'suspended'
 
+/**
+ * See docs/BUYING_SELLING.md — 'both' means one listing row carries a
+ * daily_rate AND a sale_price simultaneously (not two separate listings),
+ * so the same quantity_available governs both paths and a unit can never
+ * be double-committed to a rental and a sale at once.
+ */
+export type ListingType = 'rental' | 'sale' | 'both'
+export type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'disputed' | 'cancelled'
+
+/**
+ * See the Barter Marketplace MVP Implementation Plan — one barter_agreements
+ * row per negotiation thread (never re-created for a counter-offer);
+ * 'draft' is deliberately not a value here, matching how bookings are
+ * created directly at 'requested' — a proposer's in-progress offer is
+ * client-side state only, never persisted until propose_barter succeeds.
+ */
+export type BarterStatus =
+  | 'proposed' | 'countered' | 'accepted' | 'preparing' | 'in_transit'
+  | 'awaiting_confirmation' | 'completed'
+  | 'rejected' | 'cancelled' | 'expired' | 'disputed'
+
+export type BarterOfferStatus = 'pending' | 'accepted' | 'superseded' | 'rejected' | 'withdrawn'
+export type BarterDeliveryMethod = 'meet_in_person' | 'courier' | 'self_collection' | 'other'
+export type BarterDeliveryResponsibility = 'party_a' | 'party_b' | 'shared' | 'each_handles_own' | 'not_applicable'
+export type BarterDepositPayer = 'party_a' | 'party_b' | 'both'
+export type BarterUserAgentCategory = 'mobile' | 'desktop' | 'unknown'
+
 export interface Profile {
   id: string
   full_name: string | null
@@ -69,13 +96,18 @@ export interface Listing {
   description: string | null
   category: string
   condition: ItemCondition | null
-  daily_rate: number
+  // Nullable since the buying/selling migration — a pure 'sale' listing
+  // has no daily_rate at all. See listings_type_pricing_chk: exactly the
+  // fields matching listing_type are ever set.
+  daily_rate: number | null
   weekly_rate: number | null
   min_rental_days: number
   // Added by the buying/selling migration (20260720000003) — not
   // previously reflected here; optional since it predates this and older
   // mock fixtures don't set it.
   quantity_available?: number
+  listing_type?: ListingType
+  sale_price?: number | null
   deposit_required: boolean
   deposit_amount: number | null
   insurance_amount: number | null
@@ -312,6 +344,249 @@ export interface Booking {
   merchant?: Profile
 }
 
+/**
+ * Parallel to Booking, for sale listings — see docs/BUYING_SELLING.md.
+ * Every field here is authored directly against the live migration SQL
+ * (supabase/migrations/20260812000003_orders_schema_hardening.sql),
+ * deliberately avoiding the drift already present in Booking/BookingStatus
+ * elsewhere in this file (which still reflect a pre-hardening schema).
+ * `payfast_payment_id` is a legacy, unused column — see
+ * docs/PAYMENT_ARCHITECTURE.md — real payment status lives on the linked
+ * `payments` row (payment_type='order_payment'), not here.
+ */
+export interface Order {
+  id: string
+  order_reference: string
+  listing_id: string
+  buyer_id: string
+  seller_id: string
+  quantity: number
+  unit_price: number
+  shipping_fee: number
+  total_amount: number
+  status: OrderStatus
+  pre_sale_media_url: string | null
+  payfast_payment_id: string | null
+  affiliate_id: string | null
+  affiliate_commission_amount: number | null
+  paid_at: string | null
+  shipped_at: string | null
+  delivered_at: string | null
+  cancelled_at: string | null
+  cancelled_by: string | null
+  cancellation_reason: string | null
+  created_at: string
+  listing?: Listing
+  buyer?: Profile
+  seller?: Profile
+}
+
+/** Append-only, same shape and shared immutability trigger as BookingHistory/BarterHistoryEntry. */
+export interface OrderHistoryEntry {
+  id: string
+  order_id: string
+  actor_user_id: string | null
+  actor_role: 'buyer' | 'seller' | 'system' | 'admin'
+  event_type: string
+  previous_status: OrderStatus | null
+  new_status: OrderStatus
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export type DisputeStatus = 'open' | 'evidence' | 'under_review' | 'resolved' | 'closed' | 'cancelled' | 'escalated'
+export type DisputeOutcome = 'favor_raiser' | 'favor_respondent' | 'mutual_agreement' | 'manual_settlement'
+
+/**
+ * The one generic dispute resource reused identically by bookings,
+ * orders, and barter — exactly one of booking_id/order_id/
+ * barter_agreement_id is ever set (enforced by disputes_one_transaction_chk).
+ * Authored directly against the live migration SQL (supabase/migrations/
+ * 20260814000002_disputes_schema_hardening.sql), not a hoped-for shape.
+ */
+export interface Dispute {
+  id: string
+  booking_id: string | null
+  order_id: string | null
+  barter_agreement_id: string | null
+  raised_by: string
+  title: string
+  reason: string | null
+  description: string
+  requested_resolution: string
+  status: DisputeStatus
+  assigned_admin_id: string | null
+  outcome: DisputeOutcome | null
+  resolution_notes: string | null
+  resolved_by: string | null
+  resolved_at: string | null
+  closed_by: string | null
+  closed_at: string | null
+  cancelled_by: string | null
+  cancelled_at: string | null
+  cancellation_reason: string | null
+  evidence_requested_by: string | null
+  evidence_requested_at: string | null
+  evidence_request_note: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Append-only, same shape/immutability trigger as OrderHistoryEntry/BarterHistoryEntry. */
+export interface DisputeHistoryEntry {
+  id: string
+  dispute_id: string
+  actor_user_id: string | null
+  actor_role: 'raiser' | 'respondent' | 'admin' | 'system'
+  event_type: string
+  previous_status: string | null
+  new_status: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+/** Immutable, append-only — no update/delete client policy exists at all, mirrors BarterOfferMedia's storage-plus-table pattern. */
+export interface DisputeEvidence {
+  id: string
+  dispute_id: string
+  uploaded_by: string
+  storage_path: string
+  file_type: 'image' | 'pdf' | 'document'
+  display_order: number
+  created_at: string
+}
+
+/**
+ * One row per negotiation thread — id is never re-pointed by a counter,
+ * chat/disputes/payments/history all link to it. accepted_offer_id is
+ * set exactly once by accept_barter_offer() and never changes again,
+ * which is what makes accepted terms immutable. Every field here is
+ * authored directly against the live migration SQL (supabase/migrations/
+ * 20260810000003_barter_schema.sql), not against a hoped-for shape —
+ * deliberately avoiding the drift already present in Booking/BookingStatus
+ * above (which still reflect the pre-Phase-2B schema).
+ */
+export interface BarterAgreement {
+  id: string
+  agreement_reference: string
+  anchor_listing_id: string
+  party_a_id: string
+  party_b_id: string
+  status: BarterStatus
+  current_offer_id: string | null
+  accepted_offer_id: string | null
+  version: number
+  admin_hold: boolean
+  admin_hold_reason: string | null
+  proposed_at: string
+  accepted_at: string | null
+  rejected_at: string | null
+  rejected_by: string | null
+  rejection_reason: string | null
+  cancelled_at: string | null
+  cancelled_by: string | null
+  cancellation_reason: string | null
+  cancellation_settlement: string | null
+  expires_at: string | null
+  completed_at: string | null
+  disputed_at: string | null
+  updated_at: string
+  anchor_listing?: Listing
+  party_a?: Profile
+  party_b?: Profile
+  current_offer?: BarterOffer
+  accepted_offer?: BarterOffer
+}
+
+/** One row per negotiation round — a complete replacement package, never a partial patch against the previous version. */
+export interface BarterOffer {
+  id: string
+  agreement_id: string
+  version: number
+  proposed_by: string
+  status: BarterOfferStatus
+  cash_adjustment_amount: number
+  cash_adjustment_payer: string | null
+  delivery_method: BarterDeliveryMethod
+  delivery_notes: string | null
+  delivery_responsibility: BarterDeliveryResponsibility | null
+  deposit_required: boolean
+  deposit_amount: number | null
+  deposit_currency: string
+  deposit_payer: BarterDepositPayer | null
+  message: string | null
+  created_at: string
+  items?: BarterOfferItem[]
+  media?: BarterOfferMedia[]
+}
+
+/** offered_by identifies which party contributed this listing — validated server-side against listings.merchant_id, never trusted from the client. */
+export interface BarterOfferItem {
+  id: string
+  offer_id: string
+  listing_id: string
+  offered_by: string
+  created_at: string
+  listing?: Listing
+}
+
+/** Optional evidence photos/videos scoped to a specific offer version — part of the versioned contractual record, distinct from chat. */
+export interface BarterOfferMedia {
+  id: string
+  offer_id: string
+  uploaded_by: string
+  storage_path: string
+  media_type: 'photo' | 'video'
+  display_order: number
+  created_at: string
+}
+
+/**
+ * One row per party per agreement — completion only occurs once both
+ * exist. No IP address is captured (POPIA-conscious minimal collection);
+ * user_agent_category is a coarse bucket, never a raw UA string.
+ */
+export interface BarterConfirmation {
+  id: string
+  agreement_id: string
+  party_id: string
+  confirmation_note: string | null
+  user_agent_category: BarterUserAgentCategory | null
+  confirmed_at: string
+}
+
+/** Append-only, same shape and shared immutability trigger as BookingHistory. */
+export interface BarterHistoryEntry {
+  id: string
+  agreement_id: string
+  actor_user_id: string | null
+  actor_role: 'party_a' | 'party_b' | 'system' | 'admin'
+  event_type: string
+  previous_status: BarterStatus | null
+  new_status: BarterStatus
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+/**
+ * Step 11 Phase 4 -- a deposit or cash-adjustment payment row scoped to
+ * a barter agreement. renter_id/merchant_id are repurposed as generic
+ * payer/counterparty ids (same repurposing precedent orders already
+ * established for buyer_id/seller_id).
+ */
+export interface BarterPayment {
+  id: string
+  barter_agreement_id: string
+  renter_id: string
+  merchant_id: string
+  payment_type: 'barter_deposit' | 'barter_cash_adjustment'
+  status: string
+  amount: number
+  currency: string
+  provider: string
+  created_at: string
+}
+
 export interface Review {
   id: string
   booking_id: string
@@ -323,26 +598,28 @@ export interface Review {
   reviewer?: Profile
 }
 
-export interface Dispute {
+export interface MessageAttachment {
   id: string
-  booking_id: string
-  raised_by: string
-  reason: string | null
-  evidence_urls: string[]
-  status: 'open' | 'resolved' | 'escalated'
-  resolution_notes: string | null
+  message_id: string
+  uploaded_by: string
+  storage_path: string
+  file_type: 'image' | 'pdf' | 'document'
   created_at: string
 }
 
 export interface Message {
   id: string
-  booking_id: string
+  booking_id: string | null
+  order_id: string | null
+  barter_agreement_id: string | null
+  dispute_id: string | null
   sender_id: string
   content: string
   is_filtered: boolean
   filter_reason: string | null
   created_at: string
   sender?: Profile
+  attachments?: MessageAttachment[]
 }
 
 export interface AffiliateReferral {

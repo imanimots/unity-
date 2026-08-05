@@ -99,3 +99,158 @@ export async function loadUserDisplayName(admin: SupabaseClient, userId: string)
   const { data } = await admin.from('profiles').select('display_name, full_name').eq('id', userId).maybeSingle()
   return displayName(data)
 }
+
+export interface DisputeEmailContext {
+  disputeId: string
+  title: string
+  raiserId: string
+  raiserName: string
+  respondentId: string
+  respondentName: string
+  transactionReference: string
+}
+
+/**
+ * Resolves "the other party" generically from whichever of
+ * booking_id/order_id/barter_agreement_id is set -- same pattern
+ * open_dispute() itself uses to compute v_respondent_id, just re-derived
+ * here since the RPC's result isn't always available at every dispatch
+ * site (e.g. an admin action route only has dispute_id).
+ */
+export async function loadDisputeEmailContext(admin: SupabaseClient, disputeId: string): Promise<DisputeEmailContext | null> {
+  const { data: dispute } = await admin.from('disputes').select('id, title, raised_by, booking_id, order_id, barter_agreement_id').eq('id', disputeId).maybeSingle()
+  if (!dispute) return null
+
+  let respondentId: string | null = null
+  let transactionReference = ''
+
+  if (dispute.booking_id) {
+    const { data: booking } = await admin.from('bookings').select('booking_reference, renter_id, merchant_id').eq('id', dispute.booking_id).maybeSingle()
+    if (booking) {
+      transactionReference = booking.booking_reference ?? dispute.booking_id.slice(0, 8).toUpperCase()
+      respondentId = booking.renter_id === dispute.raised_by ? booking.merchant_id : booking.renter_id
+    }
+  } else if (dispute.order_id) {
+    const { data: order } = await admin.from('orders').select('order_reference, buyer_id, seller_id').eq('id', dispute.order_id).maybeSingle()
+    if (order) {
+      transactionReference = order.order_reference ?? dispute.order_id.slice(0, 8).toUpperCase()
+      respondentId = order.buyer_id === dispute.raised_by ? order.seller_id : order.buyer_id
+    }
+  } else if (dispute.barter_agreement_id) {
+    const { data: agreement } = await admin.from('barter_agreements').select('agreement_reference, party_a_id, party_b_id').eq('id', dispute.barter_agreement_id).maybeSingle()
+    if (agreement) {
+      transactionReference = agreement.agreement_reference ?? dispute.barter_agreement_id.slice(0, 8).toUpperCase()
+      respondentId = agreement.party_a_id === dispute.raised_by ? agreement.party_b_id : agreement.party_a_id
+    }
+  }
+
+  if (!respondentId) return null
+
+  const [raiserName, respondentName] = await Promise.all([loadUserDisplayName(admin, dispute.raised_by), loadUserDisplayName(admin, respondentId)])
+
+  return {
+    disputeId: dispute.id,
+    title: dispute.title,
+    raiserId: dispute.raised_by,
+    raiserName,
+    respondentId,
+    respondentName,
+    transactionReference,
+  }
+}
+
+export interface BarterEmailContext {
+  agreementId: string
+  agreementReference: string
+  anchorListingTitle: string
+  partyAId: string
+  partyAName: string
+  partyBId: string
+  partyBName: string
+}
+
+/**
+ * Step 11 Phase 4 -- the one shared query every barter email dispatch
+ * call site uses to build its vars, mirroring loadDisputeEmailContext's
+ * shape. Returns null if the agreement can't be found (the caller
+ * should skip dispatch entirely, never fabricate context).
+ */
+export async function loadBarterEmailContext(admin: SupabaseClient, agreementId: string): Promise<BarterEmailContext | null> {
+  const { data: agreement } = await admin
+    .from('barter_agreements')
+    .select('id, agreement_reference, anchor_listing_id, party_a_id, party_b_id')
+    .eq('id', agreementId)
+    .maybeSingle()
+  if (!agreement) return null
+
+  const [{ data: listing }, partyAName, partyBName] = await Promise.all([
+    admin.from('listings').select('title').eq('id', agreement.anchor_listing_id).maybeSingle(),
+    loadUserDisplayName(admin, agreement.party_a_id),
+    loadUserDisplayName(admin, agreement.party_b_id),
+  ])
+
+  return {
+    agreementId: agreement.id,
+    agreementReference: agreement.agreement_reference,
+    anchorListingTitle: listing?.title ?? 'Listing',
+    partyAId: agreement.party_a_id,
+    partyAName,
+    partyBId: agreement.party_b_id,
+    partyBName,
+  }
+}
+
+export interface OrderEmailContext {
+  orderId: string
+  orderReference: string
+  listingTitle: string
+  buyerId: string
+  buyerName: string
+  sellerId: string
+  sellerName: string
+  totalAmount: number
+  currency: string
+}
+
+/**
+ * Step 11 Phase 6 -- the one shared query every order email dispatch call
+ * site uses to build its vars, mirroring loadBarterEmailContext()'s
+ * shape. `totalAmount` comes from the order row's own immutable
+ * total_amount (snapshotted at create_order() time, never mutated after
+ * -- see docs/ORDER_ADMINISTRATION.md). `listingTitle` is a live lookup
+ * through listing_id -- orders has no listing-title snapshot column, so
+ * a listing renamed after the sale changes what an old order email
+ * displays, identical to loadBookingEmailContext()/
+ * loadBarterEmailContext()'s own pre-existing behavior, not a new gap.
+ * Returns null if the order can't be found (the caller should skip
+ * dispatch entirely, never fabricate context).
+ */
+export async function loadOrderEmailContext(admin: SupabaseClient, orderId: string): Promise<OrderEmailContext | null> {
+  const { data: order } = await admin
+    .from('orders')
+    .select('id, order_reference, listing_id, buyer_id, seller_id, total_amount')
+    .eq('id', orderId)
+    .maybeSingle()
+  if (!order) return null
+
+  const [{ data: listing }, buyerName, sellerName] = await Promise.all([
+    admin.from('listings').select('title').eq('id', order.listing_id).maybeSingle(),
+    loadUserDisplayName(admin, order.buyer_id),
+    loadUserDisplayName(admin, order.seller_id),
+  ])
+
+  return {
+    orderId: order.id,
+    orderReference: order.order_reference,
+    listingTitle: listing?.title ?? 'Listing',
+    buyerId: order.buyer_id,
+    buyerName,
+    sellerId: order.seller_id,
+    sellerName,
+    totalAmount: order.total_amount,
+    // orders has no currency column of its own (unlike bookings) -- the
+    // platform is ZAR-only at launch, matching CLAUDE.md's "all monetary
+    // values in ZAR" ground rule.
+    currency: 'ZAR',
+  }
+}

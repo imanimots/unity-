@@ -35,8 +35,11 @@ export interface RiskRequirements {
   manualReviewRequired: boolean
 }
 
-const TIER_RANK: Record<RiskTier, number> = { low: 0, medium: 1, high: 2 }
-const RANK_TIER: RiskTier[] = ['low', 'medium', 'high']
+// Exported so other domains needing "max risk tier across N inputs" (e.g.
+// src/lib/barter/risk.ts, computing the max across every listing offered
+// in a trade) reuse this exact ranking instead of duplicating it.
+export const TIER_RANK: Record<RiskTier, number> = { low: 0, medium: 1, high: 2 }
+export const RANK_TIER: RiskTier[] = ['low', 'medium', 'high']
 
 // Categories whose inherent risk profile puts a floor under the value-based tier,
 // regardless of the price/rate — e.g. a cheap vehicle rental is still high risk.

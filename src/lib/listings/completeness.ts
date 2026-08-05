@@ -27,6 +27,10 @@ export interface CompletenessInput {
   category?: string
   condition?: string
   description?: string
+  // Defaults to 'rental' when omitted — matches the pre-existing behavior
+  // for every caller written before the buying/selling feature existed.
+  listing_type?: 'rental' | 'sale' | 'both'
+  sale_price?: number
   daily_rate?: number
   min_rental_days?: number
   max_rental_days?: number
@@ -81,19 +85,28 @@ export function computeListingCompleteness(input: CompletenessInput): Completene
     blockingIssues.push('Only merchant accounts can list items.')
   }
 
+  const listingType = input.listing_type ?? 'rental'
+  const rentable = listingType === 'rental' || listingType === 'both'
+  const sellable = listingType === 'sale' || listingType === 'both'
+
   if (!input.title || input.title.trim().length < 10) missingFields.push('title')
   if (!input.category) missingFields.push('category')
   if (!input.condition) missingFields.push('condition')
   if (!input.description || input.description.trim().length < 50) missingFields.push('description')
-  if (!input.daily_rate || input.daily_rate <= 0) missingFields.push('daily_rate')
-  if (!input.min_rental_days || input.min_rental_days < 1) missingFields.push('min_rental_days')
+  if (rentable) {
+    if (!input.daily_rate || input.daily_rate <= 0) missingFields.push('daily_rate')
+    if (!input.min_rental_days || input.min_rental_days < 1) missingFields.push('min_rental_days')
+    if (!input.available_from) missingFields.push('available_from')
+  }
+  if (sellable) {
+    if (!input.sale_price || input.sale_price <= 0) missingFields.push('sale_price')
+  }
   if (!input.shipping_payer) missingFields.push('shipping_payer')
   if (!input.condition_confirmed) missingFields.push('condition_confirmed')
   if (!input.replacement_value || input.replacement_value <= 0) missingFields.push('replacement_value')
   if (!input.quantity_available || input.quantity_available < 1) missingFields.push('quantity_available')
   if (!input.province) missingFields.push('province')
   if (!input.city) missingFields.push('city')
-  if (!input.available_from) missingFields.push('available_from')
 
   if (input.max_rental_days && input.min_rental_days && input.max_rental_days < input.min_rental_days) {
     blockingIssues.push('Maximum rental duration cannot be less than the minimum.')

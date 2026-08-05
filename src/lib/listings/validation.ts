@@ -76,6 +76,8 @@ const baseListingFields = {
   category: z.string().min(1, 'Please select a category'),
   condition: conditionEnum,
   description: z.string().trim().min(50, 'Description must be at least 50 characters').max(4000, 'Description is too long'),
+  listing_type: z.enum(['rental', 'sale', 'both']).optional(),
+  sale_price: z.number().positive('Sale price must be a positive amount').max(1_000_000).optional(),
   daily_rate: z.number({ error: 'Required' }).positive('Daily rate must be a positive amount').max(1_000_000),
   weekly_rate: z.number().positive().max(1_000_000).optional(),
   min_rental_days: z.number().int().min(1).max(30),

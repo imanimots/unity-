@@ -22,4 +22,10 @@ export function getCountry(id: string): Country {
   return COUNTRIES.find((c) => c.id === id) ?? DEFAULT_COUNTRY
 }
 
+/** True only for a country that's both a known code AND currently active — a "coming soon" code is known but not supported for real filtering/persistence. */
+export function isSupportedCountry(id: string | null | undefined): boolean {
+  if (!id) return false
+  return COUNTRIES.some((c) => c.id === id && c.active)
+}
+
 export const STORAGE_KEY = 'unity_country'
