@@ -1,0 +1,22 @@
+-- ============================================================
+-- Step 11 Phase 7 -- close a confirmed live security hole on
+-- affiliate_referrals before any other affiliate work begins.
+-- ============================================================
+-- Live-tested this session with a real (non-service-role) authenticated
+-- QA session: a direct PostgREST insert of
+-- { affiliate_id: self, commission_amount: 999999, status: 'paid' }
+-- succeeded against "affiliate_referrals: affiliate insert" -- any
+-- authenticated user could fabricate an arbitrary, already-"paid"
+-- commission row, entirely bypassing every application route. The
+-- WITH CHECK clause only verified affiliate_id = auth.uid() and said
+-- nothing about commission_amount/status/booking_id/listing_id being
+-- trustworthy.
+--
+-- Dropped alone, first, before any restructuring migration in this
+-- phase, so the hole is closed even if a later migration needs
+-- revision. affiliate_referrals carries zero live rows (confirmed) --
+-- no data is at risk from removing this policy immediately.
+-- Apply via: Supabase Dashboard -> SQL Editor -> Run
+-- ============================================================
+
+drop policy if exists "affiliate_referrals: affiliate insert" on public.affiliate_referrals;
