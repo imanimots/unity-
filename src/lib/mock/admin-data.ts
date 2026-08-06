@@ -64,28 +64,6 @@ export type AdminDispute = {
   resolved_at?: string
 }
 
-export type AdminAffiliate = {
-  id: string
-  name: string
-  email: string
-  code: string
-  total_referrals: number
-  total_commission: number
-  pending_payout: number
-  paid_out: number
-  status: 'active' | 'inactive'
-  joined_at: string
-}
-
-export type PendingPayout = {
-  id: string
-  affiliate_name: string
-  affiliate_code: string
-  amount: number
-  referral_count: number
-  period: string
-}
-
 // ─── Mock Users ───────────────────────────────────────────────────────────────
 
 export const ADMIN_MOCK_USERS: AdminUser[] = [
@@ -209,27 +187,6 @@ export const ADMIN_MOCK_DISPUTES: AdminDispute[] = [
     resolved_in_favour_of: 'renter',
     resolved_at: '2026-06-10',
   },
-]
-
-// ─── Mock Affiliates ──────────────────────────────────────────────────────────
-
-export const ADMIN_MOCK_AFFILIATES: AdminAffiliate[] = [
-  { id: 'a-1', name: 'Imani Mokoena',  email: 'imani@example.co.za',   code: 'AFC-IM48', total_referrals: 14, total_commission: 3240,  pending_payout: 720,  paid_out: 2520, status: 'active',   joined_at: '2026-01-20' },
-  { id: 'a-2', name: 'Ayesha Patel',   email: 'ayesha@example.co.za',  code: 'AFC-AP46', total_referrals: 9,  total_commission: 1890,  pending_payout: 450,  paid_out: 1440, status: 'active',   joined_at: '2026-02-10' },
-  { id: 'a-3', name: 'Zanele Khumalo', email: 'zanele@example.co.za',  code: 'AFC-ZK45', total_referrals: 22, total_commission: 5610,  pending_payout: 1080, paid_out: 4530, status: 'active',   joined_at: '2026-01-12' },
-  { id: 'a-4', name: 'Naledi Moroe',   email: 'naledi@example.co.za',  code: 'AFC-NM41', total_referrals: 6,  total_commission: 840,   pending_payout: 240,  paid_out: 600,  status: 'active',   joined_at: '2026-02-18' },
-  { id: 'a-5', name: 'Kagiso Motsepe', email: 'kagiso@example.co.za',  code: 'AFC-KM43', total_referrals: 11, total_commission: 2310,  pending_payout: 660,  paid_out: 1650, status: 'active',   joined_at: '2026-02-12' },
-  { id: 'a-6', name: 'Sarah Adams',    email: 'sarah@example.co.za',   code: 'AFC-SA47', total_referrals: 7,  total_commission: 1260,  pending_payout: 360,  paid_out: 900,  status: 'active',   joined_at: '2026-01-18' },
-  { id: 'a-7', name: 'Ruan Botha',     email: 'ruan@example.co.za',    code: 'AFC-RB12', total_referrals: 2,  total_commission: 180,   pending_payout: 0,    paid_out: 180,  status: 'inactive', joined_at: '2026-03-15' },
-]
-
-export const ADMIN_PENDING_PAYOUTS: PendingPayout[] = [
-  { id: 'pp-1', affiliate_name: 'Zanele Khumalo', affiliate_code: 'AFC-ZK45', amount: 1080, referral_count: 4, period: 'June 2026' },
-  { id: 'pp-2', affiliate_name: 'Imani Mokoena',  affiliate_code: 'AFC-IM48', amount: 720,  referral_count: 3, period: 'June 2026' },
-  { id: 'pp-3', affiliate_name: 'Kagiso Motsepe', affiliate_code: 'AFC-KM43', amount: 660,  referral_count: 2, period: 'June 2026' },
-  { id: 'pp-4', affiliate_name: 'Sarah Adams',    affiliate_code: 'AFC-SA47', amount: 360,  referral_count: 1, period: 'June 2026' },
-  { id: 'pp-5', affiliate_name: 'Ayesha Patel',   affiliate_code: 'AFC-AP46', amount: 450,  referral_count: 2, period: 'June 2026' },
-  { id: 'pp-6', affiliate_name: 'Naledi Moroe',   affiliate_code: 'AFC-NM41', amount: 240,  referral_count: 1, period: 'June 2026' },
 ]
 
 // ─── Platform Stats ───────────────────────────────────────────────────────────

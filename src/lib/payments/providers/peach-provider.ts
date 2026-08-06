@@ -10,6 +10,8 @@ import type {
   RefundResult,
   MerchantPayoutInput,
   MerchantPayoutResult,
+  AffiliatePayoutInput,
+  AffiliatePayoutResult,
   WebhookVerificationInput,
   WebhookVerificationResult,
   HealthCheckResult,
@@ -67,6 +69,11 @@ export class PeachPaymentsProvider implements PaymentProvider {
   async createMerchantPayout(_input: MerchantPayoutInput): Promise<MerchantPayoutResult> {
     void _input
     throw new NotImplementedError(this.name, 'createMerchantPayout')
+  }
+
+  async createAffiliatePayout(_input: AffiliatePayoutInput): Promise<AffiliatePayoutResult> {
+    void _input
+    throw new NotImplementedError(this.name, 'createAffiliatePayout')
   }
 
   /**

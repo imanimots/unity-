@@ -4,6 +4,7 @@ import { prepareBookingFinancials } from './prepare-booking-financials'
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../provider-errors'
 import { getPaymentProvider } from '../registry'
 import type { MockScenario } from '../provider'
+import { qualifyRentalPaymentAffiliateCommission } from '@/lib/affiliate/qualify'
 
 /**
  * The one genuinely multi-step workflow in this pass: it makes up to two
@@ -51,13 +52,25 @@ export async function authorizeBookingFinancials(
 
   const workflowId: string = started.workflow_id
   if (started.status === 'completed') {
-    return started.result as AuthorizeBookingFinancialsResult
+    const cached = started.result as AuthorizeBookingFinancialsResult
+    // Step 11 Phase 7: this is a THIRD hook point, earlier than the two
+    // inside ensureRentalCharged() below -- a workflow that already
+    // reached 'completed' on a prior call short-circuits here and never
+    // reaches ensureRentalCharged() at all on any later replay. Without
+    // this call, qualification would only ever fire once, on whichever
+    // single invocation happened to be the one that actually captured the
+    // payment -- silently skipped on every legitimate later replay (e.g.
+    // a retried checkout request). Best-effort, never throws.
+    if (cached.rentalPaymentId) {
+      await qualifyRentalPaymentAffiliateCommission(admin, bookingId, cached.rentalPaymentId)
+    }
+    return cached
   }
 
   const { rentalPaymentId, depositPaymentId } = await prepareBookingFinancials(ctx, bookingId, idempotencyKey)
 
   try {
-    const rentalStatus = await ensureRentalCharged(admin, provider, workflowId, rentalPaymentId, ctx.testRentalScenario)
+    const rentalStatus = await ensureRentalCharged(admin, provider, workflowId, bookingId, rentalPaymentId, ctx.testRentalScenario)
     const depositStatus = depositPaymentId
       ? await ensureDepositAuthorised(admin, provider, workflowId, depositPaymentId, ctx.testDepositScenario)
       : null
@@ -89,11 +102,17 @@ async function ensureRentalCharged(
   admin: OrchestratorContext['admin'],
   provider: ReturnType<typeof getPaymentProvider>,
   workflowId: string,
+  bookingId: string,
   paymentId: string,
   testScenario?: MockScenario
 ): Promise<string> {
   const { data: payment } = await admin.from('payments').select('status').eq('id', paymentId).maybeSingle()
-  if (payment?.status === 'captured') return payment.status
+  if (payment?.status === 'captured') {
+    // Step 11 Phase 7: re-attempted on every replay -- see the matching
+    // comment in charge-order-payment.ts.
+    await qualifyRentalPaymentAffiliateCommission(admin, bookingId, paymentId)
+    return payment.status
+  }
 
   await admin.rpc('update_financial_workflow_progress', { p_workflow_id: workflowId, p_status: 'processing', p_current_step: 'rental_authorization' })
 
@@ -129,6 +148,10 @@ async function ensureRentalCharged(
       p_provider_reference: charge.providerReference,
       p_actor_type: 'system',
     })
+
+    // Step 11 Phase 7: best-effort, never throws -- see charge-order-payment.ts.
+    await qualifyRentalPaymentAffiliateCommission(admin, bookingId, paymentId)
+
     return 'captured'
   } catch (err) {
     throw await handleProviderError(admin, workflowId, err)

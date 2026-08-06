@@ -3,6 +3,7 @@ import { OrchestrationError, type OrchestrationErrorCode } from './errors'
 import { prepareOrderFinancials } from './prepare-order-financials'
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../provider-errors'
 import { getPaymentProvider } from '../registry'
+import { qualifySaleAffiliateCommission } from '@/lib/affiliate/qualify'
 
 export interface ChargeOrderPaymentResult {
   paymentId: string
@@ -41,6 +42,11 @@ export async function chargeOrderPayment(
 
   const { data: payment } = await admin.from('payments').select('status, provider_reference').eq('id', paymentId).maybeSingle()
   if (payment?.status === 'captured') {
+    // Step 11 Phase 7: re-attempted on every replay, not just the first
+    // capture -- qualify_sale_affiliate_commission() is itself idempotent,
+    // and this also covers a prior call that captured the payment but
+    // crashed before reaching qualification.
+    await qualifySaleAffiliateCommission(admin, orderId, paymentId)
     return { paymentId, status: 'captured', orderStatus: 'paid' }
   }
 
@@ -95,6 +101,11 @@ export async function chargeOrderPayment(
     if (markPaidError) {
       throw new OrchestrationError('internal_consistency_error', `Payment captured but order could not be marked paid: ${markPaidError.message}`)
     }
+
+    // Step 11 Phase 7: affiliate commission qualification is best-effort
+    // and never throws -- a qualification failure must never roll back
+    // or fail the customer's own payment (Part J).
+    await qualifySaleAffiliateCommission(admin, orderId, paymentId)
 
     return { paymentId, status: 'captured', orderStatus: 'paid' }
   } catch (err) {

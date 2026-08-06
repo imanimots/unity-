@@ -11,6 +11,8 @@ import type {
   RefundResult,
   MerchantPayoutInput,
   MerchantPayoutResult,
+  AffiliatePayoutInput,
+  AffiliatePayoutResult,
   WebhookVerificationInput,
   WebhookVerificationResult,
   HealthCheckResult,
@@ -80,6 +82,20 @@ export class MockProvider implements PaymentProvider {
   async createMerchantPayout(input: MerchantPayoutInput): Promise<MerchantPayoutResult> {
     this.applyScenario('createMerchantPayout', input.mockScenario)
     return { providerReference: `mock_payout_${randomUUID()}`, status: 'pending' }
+  }
+
+  /**
+   * Deterministic mock affiliate payout -- clearly labeled ("mock_" prefix
+   * on every reference) so nothing here is ever mistaken for a real bank
+   * transfer. Same scenario-selection contract as every other method:
+   * 'declined' resolves to a failed result, everything else succeeds.
+   */
+  async createAffiliatePayout(input: AffiliatePayoutInput): Promise<AffiliatePayoutResult> {
+    this.applyScenario('createAffiliatePayout', input.mockScenario)
+    if (input.mockScenario === 'declined') {
+      return { providerReference: `mock_affiliate_payout_failed_${randomUUID()}`, status: 'failed', failureReason: 'mock payout declined' }
+    }
+    return { providerReference: `mock_affiliate_payout_${randomUUID()}`, status: 'paid' }
   }
 
   async verifyWebhook(input: WebhookVerificationInput): Promise<WebhookVerificationResult> {

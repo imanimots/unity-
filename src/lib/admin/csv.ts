@@ -4,10 +4,18 @@
  * sufficient"). Every caller passes only the columns it has already
  * decided are export-safe; this function does not decide what's
  * sensitive, it just serializes what it's given.
+ *
+ * Step 11 Phase 7: a leading =/+/-/@ (or tab/CR, the same formula-
+ * injection vectors Excel/Sheets recognize) is prefixed with a literal
+ * single quote before quoting -- a spreadsheet then renders the cell as
+ * text instead of evaluating it as a formula. Applies to every CSV
+ * export in this codebase, not just affiliate's, since they all share
+ * this one function.
  */
 export function toCsv<T extends object>(columns: (keyof T & string)[], rows: T[]): string {
   const escape = (value: unknown): string => {
-    const s = value === null || value === undefined ? '' : String(value)
+    let s = value === null || value === undefined ? '' : String(value)
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`
     if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
     return s
   }

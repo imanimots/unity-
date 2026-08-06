@@ -89,6 +89,27 @@ export interface MerchantPayoutResult {
 }
 
 /**
+ * Step 11 Phase 7 -- affiliate commission payouts. Deliberately its own
+ * method, not a reuse of createMerchantPayout(): a merchant payout can
+ * cover many bookings at once (a batching concept that doesn't apply
+ * here -- affiliate payouts are always 1:1 with one commission row),
+ * and the two recipient types are financially distinct ledgers.
+ */
+export interface AffiliatePayoutInput {
+  affiliateId: string
+  commissionId: string
+  amount: number
+  currency: string
+  mockScenario?: MockScenario
+}
+
+export interface AffiliatePayoutResult {
+  providerReference: string
+  status: 'paid' | 'failed'
+  failureReason?: string
+}
+
+/**
  * `headers` is a generic bag (lower-cased header names -> value) rather
  * than a single `signatureHeader` string -- a real incompatibility found
  * during Phase 2D discovery, not a hypothetical one: Peach's Checkout
@@ -129,6 +150,7 @@ export interface PaymentProvider {
   chargeRental(input: ChargeInput): Promise<ChargeResult>
   refund(input: RefundInput): Promise<RefundResult>
   createMerchantPayout(input: MerchantPayoutInput): Promise<MerchantPayoutResult>
+  createAffiliatePayout(input: AffiliatePayoutInput): Promise<AffiliatePayoutResult>
   verifyWebhook(input: WebhookVerificationInput): Promise<WebhookVerificationResult>
   healthCheck(): Promise<HealthCheckResult>
 }

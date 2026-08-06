@@ -22,6 +22,10 @@ const FULL_SYNTHETIC_VARS: TemplateVars = {
   messagePreview: 'Hey, is this still available?',
   agreementReference: 'BT-TEST0001',
   orderReference: 'OR-TEST0001',
+  affiliateCode: 'AFC-TEST',
+  commissionAmount: 'R80.00',
+  voidReason: 'transaction was cancelled',
+  adjustmentAmount: 'R10.00',
 }
 
 const FORBIDDEN_CLAIM_PATTERNS = [
@@ -112,6 +116,8 @@ describe('email template catalogue (category: Templates)', () => {
       'message.new',
       'barter.accepted', 'barter.deposit_required', 'barter.ready_to_exchange', 'barter.completion_requested', 'barter.completed', 'barter.cancelled',
       'order.created', 'order.payment_received', 'order.shipped', 'order.delivered', 'order.cancelled', 'order.payment_failed',
+      'affiliate.enrolled', 'affiliate.commission_approved', 'affiliate.commission_held', 'affiliate.payout_queued', 'affiliate.commission_paid',
+      'affiliate.payout_failed', 'affiliate.commission_voided', 'affiliate.adjustment_created', 'merchant.affiliate_enabled', 'merchant.affiliate_disabled',
     ])
     for (const t of EMAIL_TEMPLATES) {
       expect(knownEvents.has(t.event), `unexpected event "${t.event}" on template "${t.id}"`).toBe(true)

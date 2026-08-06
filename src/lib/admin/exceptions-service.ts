@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { deriveBarterFinancialReadiness, type BarterDepositRequirement } from '@/lib/barter/financial-readiness'
 
 export type ExceptionSeverity = 'low' | 'medium' | 'high'
-export type ExceptionEntityType = 'listing' | 'identity_verification' | 'booking' | 'email_delivery' | 'user' | 'dispute' | 'barter_agreement' | 'order'
+export type ExceptionEntityType = 'listing' | 'identity_verification' | 'booking' | 'email_delivery' | 'user' | 'dispute' | 'barter_agreement' | 'order' | 'affiliate_commission'
 
 export interface AdminException {
   id: string
@@ -580,6 +580,159 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
         detectedAt: now,
         suggestedAction: `Review at /admin/users, user ${user.id}`,
         resolved: isResolved('suspended_account_with_open_order', 'user', user.id),
+      })
+    }
+  }
+
+  // ── Step 11 Phase 7: affiliate commission categories ──
+  // "successful eligible payment missing commission" is deliberately
+  // NOT built as a live-computed category here -- detecting it
+  // correctly requires a 3-way join (payment -> transaction -> a
+  // matching attribution -> anti-join against affiliate_commissions)
+  // that's either expensive on every admin page load or, restricted to
+  // a narrow recent window, would rarely have a real candidate anyway
+  // (qualification runs synchronously inside the same payment-capture
+  // call in the overwhelming majority of cases; a genuine miss is a
+  // rare best-effort-call failure already logged via console.error).
+  // Documented as a known limitation, not silently dropped.
+  const [
+    { data: stalePendingCommissions },
+    { data: staleHeldCommissions },
+    { data: staleApprovedCommissions },
+    { data: stalePayoutQueuedCommissions },
+    { data: failedPayoutCommissions },
+    { data: staleProcessingCommissions },
+    { data: paidCommissionsForRefundCheck },
+    { data: suspendedAffiliates },
+  ] = await Promise.all([
+    admin.from('affiliate_commissions').select('id, listing_id, created_at').eq('status', 'pending').lt('created_at', threshold),
+    admin.from('affiliate_commissions').select('id, listing_id, updated_at').eq('status', 'held').lt('updated_at', threshold),
+    admin.from('affiliate_commissions').select('id, listing_id, approved_at').eq('status', 'approved').not('approved_at', 'is', null).lt('approved_at', threshold),
+    admin.from('affiliate_commissions').select('id, listing_id, updated_at').eq('status', 'payout_queued').lt('updated_at', threshold),
+    admin.from('affiliate_commissions').select('id, listing_id, updated_at').eq('status', 'failed'),
+    admin.from('affiliate_commissions').select('id, listing_id, payout_requested_at').eq('status', 'processing').not('payout_requested_at', 'is', null).lt('payout_requested_at', threshold),
+    admin.from('affiliate_commissions').select('id, listing_id, updated_at, payments(status)').eq('status', 'paid'),
+    admin.from('profiles').select('id, full_name, display_name').eq('is_affiliate', true).eq('account_status', 'suspended'),
+  ])
+
+  for (const row of stalePendingCommissions ?? []) {
+    exceptions.push({
+      id: exceptionId('affiliate_commission_pending_stale', row.id),
+      type: 'affiliate_commission_pending_stale',
+      severity: 'medium',
+      entityType: 'affiliate_commission',
+      entityId: row.id,
+      summary: `Commission has been pending review for over ${REVIEW_OVERDUE_HOURS}h`,
+      detectedAt: row.created_at,
+      suggestedAction: `Inspect at /admin/affiliate-commissions/${row.id}`,
+      resolved: isResolved('affiliate_commission_pending_stale', 'affiliate_commission', row.id),
+    })
+  }
+
+  for (const row of staleHeldCommissions ?? []) {
+    exceptions.push({
+      id: exceptionId('affiliate_commission_held_stale', row.id),
+      type: 'affiliate_commission_held_stale',
+      severity: 'medium',
+      entityType: 'affiliate_commission',
+      entityId: row.id,
+      summary: `Commission has been on hold for over ${REVIEW_OVERDUE_HOURS}h`,
+      detectedAt: row.updated_at,
+      suggestedAction: `Review and release or void at /admin/affiliate-commissions/${row.id}`,
+      resolved: isResolved('affiliate_commission_held_stale', 'affiliate_commission', row.id),
+    })
+  }
+
+  for (const row of staleApprovedCommissions ?? []) {
+    exceptions.push({
+      id: exceptionId('affiliate_commission_approved_not_queued', row.id),
+      type: 'affiliate_commission_approved_not_queued',
+      severity: 'medium',
+      entityType: 'affiliate_commission',
+      entityId: row.id,
+      summary: `Commission was approved over ${REVIEW_OVERDUE_HOURS}h ago but has not been queued for payout -- the queue-payouts sweep may be stuck`,
+      detectedAt: row.approved_at,
+      suggestedAction: `Inspect at /admin/affiliate-commissions/${row.id}`,
+      resolved: isResolved('affiliate_commission_approved_not_queued', 'affiliate_commission', row.id),
+    })
+  }
+
+  for (const row of stalePayoutQueuedCommissions ?? []) {
+    exceptions.push({
+      id: exceptionId('affiliate_commission_payout_stuck', row.id),
+      type: 'affiliate_commission_payout_stuck',
+      severity: 'high',
+      entityType: 'affiliate_commission',
+      entityId: row.id,
+      summary: `Commission has been payout-queued for over ${REVIEW_OVERDUE_HOURS}h without processing -- the process-payouts sweep may be stuck`,
+      detectedAt: row.updated_at,
+      suggestedAction: `Inspect at /admin/affiliate-commissions/${row.id}`,
+      resolved: isResolved('affiliate_commission_payout_stuck', 'affiliate_commission', row.id),
+    })
+  }
+
+  for (const row of failedPayoutCommissions ?? []) {
+    exceptions.push({
+      id: exceptionId('affiliate_commission_payout_failed', row.id),
+      type: 'affiliate_commission_payout_failed',
+      severity: 'high',
+      entityType: 'affiliate_commission',
+      entityId: row.id,
+      summary: `A payout attempt failed for this commission`,
+      detectedAt: row.updated_at,
+      suggestedAction: `Retry or record a manual payout at /admin/affiliate-commissions/${row.id}`,
+      resolved: isResolved('affiliate_commission_payout_failed', 'affiliate_commission', row.id),
+    })
+  }
+
+  for (const row of staleProcessingCommissions ?? []) {
+    exceptions.push({
+      id: exceptionId('affiliate_commission_provider_result_not_reconciled', row.id),
+      type: 'affiliate_commission_provider_result_not_reconciled',
+      severity: 'high',
+      entityType: 'affiliate_commission',
+      entityId: row.id,
+      summary: `Commission has been processing for over ${REVIEW_OVERDUE_HOURS}h with no provider result recorded`,
+      detectedAt: row.payout_requested_at,
+      suggestedAction: `Manually reconcile — inspect at /admin/affiliate-commissions/${row.id}`,
+      resolved: isResolved('affiliate_commission_provider_result_not_reconciled', 'affiliate_commission', row.id),
+    })
+  }
+
+  for (const row of paidCommissionsForRefundCheck ?? []) {
+    const paymentStatus = (row.payments as unknown as { status: string } | null)?.status
+    if (!paymentStatus || !['refunded', 'partially_refunded', 'chargeback'].includes(paymentStatus)) continue
+    exceptions.push({
+      id: exceptionId('affiliate_commission_paid_then_refunded', row.id),
+      type: 'affiliate_commission_paid_then_refunded',
+      severity: 'high',
+      entityType: 'affiliate_commission',
+      entityId: row.id,
+      summary: `This commission was already paid, but its underlying payment is now ${paymentStatus} -- requires admin review before any recovery`,
+      detectedAt: row.updated_at,
+      suggestedAction: `Manually reconcile — consider an append-only adjustment at /admin/affiliate-commissions/${row.id}`,
+      resolved: isResolved('affiliate_commission_paid_then_refunded', 'affiliate_commission', row.id),
+    })
+  }
+
+  for (const affiliate of suspendedAffiliates ?? []) {
+    const { data: openCommissions } = await admin
+      .from('affiliate_commissions')
+      .select('id')
+      .eq('affiliate_id', affiliate.id)
+      .in('status', ['pending', 'held', 'approved', 'payout_queued', 'processing'])
+      .limit(1)
+    if (openCommissions && openCommissions.length > 0) {
+      exceptions.push({
+        id: exceptionId('suspended_affiliate_with_open_commissions', affiliate.id),
+        type: 'suspended_affiliate_with_open_commissions',
+        severity: 'high',
+        entityType: 'user',
+        entityId: affiliate.id,
+        summary: `${affiliate.full_name ?? affiliate.display_name ?? affiliate.id} is suspended but has open affiliate commissions`,
+        detectedAt: now,
+        suggestedAction: `Review at /admin/users, user ${affiliate.id}`,
+        resolved: isResolved('suspended_affiliate_with_open_commissions', 'user', affiliate.id),
       })
     }
   }

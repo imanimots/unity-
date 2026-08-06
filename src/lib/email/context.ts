@@ -254,3 +254,75 @@ export async function loadOrderEmailContext(admin: SupabaseClient, orderId: stri
     currency: 'ZAR',
   }
 }
+
+export interface AffiliateCommissionEmailContext {
+  commissionId: string
+  listingTitle: string
+  affiliateId: string
+  affiliateName: string
+  merchantId: string
+  merchantName: string
+  commissionAmount: number
+  currency: string
+  transactionReference: string
+}
+
+/**
+ * Step 11 Phase 7 -- the one shared query every affiliate commission
+ * email dispatch call site uses to build its vars. Reference (order/
+ * booking) is resolved generically from whichever of order_id/booking_id
+ * is set, mirroring loadDisputeEmailContext()'s own pattern. Returns
+ * null if the commission can't be found (the caller should skip
+ * dispatch entirely, never fabricate context).
+ */
+export async function loadAffiliateCommissionEmailContext(admin: SupabaseClient, commissionId: string): Promise<AffiliateCommissionEmailContext | null> {
+  const { data: commission } = await admin
+    .from('affiliate_commissions')
+    .select('id, listing_id, affiliate_id, merchant_id, commission_amount, currency, order_id, booking_id')
+    .eq('id', commissionId)
+    .maybeSingle()
+  if (!commission) return null
+
+  const [{ data: listing }, affiliateName, merchantName, reference] = await Promise.all([
+    admin.from('listings').select('title').eq('id', commission.listing_id).maybeSingle(),
+    loadUserDisplayName(admin, commission.affiliate_id),
+    loadUserDisplayName(admin, commission.merchant_id),
+    (async () => {
+      if (commission.order_id) {
+        const { data } = await admin.from('orders').select('order_reference').eq('id', commission.order_id).maybeSingle()
+        return data?.order_reference ?? commission.order_id.slice(0, 8).toUpperCase()
+      }
+      if (commission.booking_id) {
+        const { data } = await admin.from('bookings').select('booking_reference').eq('id', commission.booking_id).maybeSingle()
+        return data?.booking_reference ?? commission.booking_id.slice(0, 8).toUpperCase()
+      }
+      return commission.id.slice(0, 8).toUpperCase()
+    })(),
+  ])
+
+  return {
+    commissionId: commission.id,
+    listingTitle: listing?.title ?? 'Listing',
+    affiliateId: commission.affiliate_id,
+    affiliateName,
+    merchantId: commission.merchant_id,
+    merchantName,
+    commissionAmount: commission.commission_amount,
+    currency: commission.currency ?? 'ZAR',
+    transactionReference: reference,
+  }
+}
+
+export interface AffiliateListingEmailContext {
+  listingId: string
+  listingTitle: string
+  merchantId: string
+  merchantName: string
+}
+
+export async function loadAffiliateListingEmailContext(admin: SupabaseClient, listingId: string): Promise<AffiliateListingEmailContext | null> {
+  const { data: listing } = await admin.from('listings').select('id, title, merchant_id').eq('id', listingId).maybeSingle()
+  if (!listing) return null
+  const merchantName = await loadUserDisplayName(admin, listing.merchant_id)
+  return { listingId: listing.id, listingTitle: listing.title, merchantId: listing.merchant_id, merchantName }
+}
