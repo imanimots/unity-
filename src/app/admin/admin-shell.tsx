@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, Package, Calendar,
   AlertTriangle, Link2, BookOpen, BarChart3,
   Menu, X, Shield, LogOut, ChevronRight, UserCheck, Mail,
-  Wallet, Inbox, ScrollText, Repeat, ShoppingBag,
+  Wallet, Inbox, ScrollText, Repeat, ShoppingBag, DollarSign,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { IS_MOCK_MODE } from '@/lib/mock/data'
@@ -26,6 +26,7 @@ const NAV_ITEMS = [
   { href: '/admin/barter',              label: 'Barter Trades',        icon: Repeat           },
   { href: '/admin/orders',              label: 'Orders',               icon: ShoppingBag      },
   { href: '/admin/affiliates',          label: 'Affiliates',           icon: Link2            },
+  { href: '/admin/affiliate-commissions', label: 'Affiliate Commissions', icon: DollarSign     },
   { href: '/admin/knowledge-base',      label: 'Knowledge Base',       icon: BookOpen         },
   { href: '/admin/email-previews',      label: 'Email Previews',       icon: Mail             },
   { href: '/admin/analytics',           label: 'Analytics',            icon: BarChart3        },

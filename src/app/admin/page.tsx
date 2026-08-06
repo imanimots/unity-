@@ -31,6 +31,11 @@ interface OverviewStats {
   orders_shipped_awaiting_delivery: number
   orders_disputed: number
   orders_payment_failed: number
+  affiliate_commissions_pending: number
+  affiliate_commissions_held: number
+  affiliate_commissions_payout_queued: number
+  affiliate_commissions_failed: number
+  active_affiliates: number
   generated_at: string
 }
 
@@ -123,6 +128,17 @@ export default async function AdminOverviewPage() {
           <StatCard label="Shipped, awaiting delivery" value={stats.orders_shipped_awaiting_delivery} />
           <StatCard label="Disputed" value={stats.orders_disputed} />
           <StatCard label="Payment failed" value={stats.orders_payment_failed} />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Affiliates</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <StatCard label="Active affiliates" value={stats.active_affiliates} />
+          <StatCard label="Commissions pending" value={stats.affiliate_commissions_pending} />
+          <StatCard label="Commissions held" value={stats.affiliate_commissions_held} />
+          <StatCard label="Payout queued" value={stats.affiliate_commissions_payout_queued} />
+          <StatCard label="Payout failed" value={stats.affiliate_commissions_failed} />
         </div>
       </section>
 

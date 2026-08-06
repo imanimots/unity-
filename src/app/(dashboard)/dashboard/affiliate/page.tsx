@@ -1,51 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft, Link2, Copy, Check, TrendingUp, Clock,
   Users, Zap, Star,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
+import { AFFILIATE_COMMISSION_STATUS_LABELS, type AffiliateCommissionStatus } from '@/lib/affiliate/status-labels'
 
-const MOCK_MY_REFERRALS = [
-  {
-    id: 'ref-1',
-    listing_title: 'DJI Mavic 3 Pro Drone + ND Filters',
-    rental_date: '2026-05-10',
-    rental_fee: 2400,
-    commission_amount: 240,
-    status: 'paid' as const,
-  },
-  {
-    id: 'ref-2',
-    listing_title: 'Sony A7R V Camera + 50mm Lens',
-    rental_date: '2026-05-22',
-    rental_fee: 1800,
-    commission_amount: 180,
-    status: 'paid' as const,
-  },
-  {
-    id: 'ref-3',
-    listing_title: 'Nikon Z6 II Mirrorless Camera + 24-70mm',
-    rental_date: '2026-06-03',
-    rental_fee: 1200,
-    commission_amount: 120,
-    status: 'pending' as const,
-  },
-  {
-    id: 'ref-4',
-    listing_title: 'Campmaster 4-Person Tent + Sleeping Bags',
-    rental_date: '2026-06-08',
-    rental_fee: 600,
-    commission_amount: 60,
-    status: 'pending' as const,
-  },
-]
+interface AffiliateListing {
+  id: string
+  title: string
+  listing_type: 'rental' | 'sale' | 'both'
+  daily_rate: number | null
+  sale_price: number | null
+  commission_rate: number
+  thumbnail_url: string | null
+}
 
-const STATUS_STYLES = {
-  pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  paid:    'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+interface AffiliateCommission {
+  id: string
+  transactionType: 'sale' | 'rental'
+  listingTitle: string | null
+  reference: string | null
+  commissionAmount: number
+  currency: string
+  status: AffiliateCommissionStatus
+  createdAt: string
 }
 
 function BecomeAffiliateCard({ onActivate, loading }: { onActivate: () => void; loading: boolean }) {
@@ -59,7 +41,7 @@ function BecomeAffiliateCard({ onActivate, loading }: { onActivate: () => void; 
         Become an Affiliate
       </h2>
       <p className="text-[#6B5B55] dark:text-[#9B8B85] mb-2 leading-relaxed">
-        Earn commission on every rental you refer. Share affiliate links for any listing that accepts referrals and get paid when the booking completes.
+        Earn commission on completed rentals and sales you refer, only on listings the merchant has specifically enabled. Barter trades never earn commission.
       </p>
       <p className="text-sm text-[#9B8B85] mb-10">
         No approval needed — activate instantly and start earning today.
@@ -68,7 +50,7 @@ function BecomeAffiliateCard({ onActivate, loading }: { onActivate: () => void; 
       <div className="grid grid-cols-3 gap-3 mb-10 text-center">
         {[
           { icon: <Link2 size={20} className="text-[#C4511F]" />, label: 'Share links', desc: 'for any listing that accepts affiliates' },
-          { icon: <Star size={20} className="text-[#C4511F]" />, label: 'Earn commission', desc: 'on every completed booking' },
+          { icon: <Star size={20} className="text-[#C4511F]" />, label: 'Earn commission', desc: 'on completed eligible sales or rentals' },
           { icon: <TrendingUp size={20} className="text-[#C4511F]" />, label: 'Track earnings', desc: 'in your affiliate dashboard' },
         ].map(({ icon, label, desc }) => (
           <div key={label} className="p-4 rounded-xl bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A]">
@@ -96,16 +78,45 @@ function BecomeAffiliateCard({ onActivate, loading }: { onActivate: () => void; 
 
 export default function AffiliateDashboardPage() {
   const { profile } = useAuth()
+  const [isAffiliate, setIsAffiliate] = useState<boolean | null>(null)
+  const [affiliateCode, setAffiliateCode] = useState<string | null>(null)
   const [activating, setActivating] = useState(false)
-  const [localAffiliateCode, setLocalAffiliateCode] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null
-    return localStorage.getItem('unity_affiliate_code')
-  })
   const [copied, setCopied] = useState(false)
-  const [tab, setTab] = useState<'all' | 'pending' | 'paid'>('all')
+  const [listings, setListings] = useState<AffiliateListing[]>([])
+  const [commissions, setCommissions] = useState<AffiliateCommission[]>([])
+  const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState<'all' | AffiliateCommissionStatus>('all')
 
-  const affiliateCode = profile?.affiliate_code || localAffiliateCode
-  const isAffiliate = profile?.is_affiliate || !!localAffiliateCode
+  const loadMe = useCallback(async () => {
+    const res = await fetch('/api/affiliate/me')
+    if (!res.ok) return
+    const data = await res.json()
+    setIsAffiliate(data.is_affiliate)
+    setAffiliateCode(data.affiliate_code)
+  }, [])
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [listingsRes, commissionsRes] = await Promise.all([fetch('/api/affiliate/listings'), fetch('/api/affiliate/commissions')])
+      if (listingsRes.ok) setListings((await listingsRes.json()).listings ?? [])
+      if (commissionsRes.ok) setCommissions((await commissionsRes.json()).commissions ?? [])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadMe()
+  }, [loadMe, profile])
+
+  useEffect(() => {
+    if (isAffiliate) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadData()
+    }
+  }, [isAffiliate, loadData])
 
   async function handleActivate() {
     setActivating(true)
@@ -113,23 +124,16 @@ export default function AffiliateDashboardPage() {
       const res = await fetch('/api/affiliate/activate', { method: 'POST' })
       if (res.ok) {
         const data = await res.json()
-        setLocalAffiliateCode(data.affiliate_code)
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('unity_affiliate_code', data.affiliate_code)
-        }
-        return
+        setAffiliateCode(data.affiliate_code)
+        setIsAffiliate(true)
       }
-    } catch {
-      // Supabase not available — use local mock code
+    } finally {
+      setActivating(false)
     }
+  }
 
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-    const code = `AFC-${Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')}`
-    setLocalAffiliateCode(code)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('unity_affiliate_code', code)
-    }
-    setActivating(false)
+  if (isAffiliate === null) {
+    return <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center text-sm text-[#9B8B85]">Loading…</div>
   }
 
   if (!isAffiliate) {
@@ -151,24 +155,25 @@ export default function AffiliateDashboardPage() {
       await navigator.clipboard.writeText(affiliateCode)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch {}
+    } catch {
+      // ignore clipboard failures
+    }
   }
 
-  const filtered = tab === 'all' ? MOCK_MY_REFERRALS : MOCK_MY_REFERRALS.filter((r) => r.status === tab)
-  const totalPaid = MOCK_MY_REFERRALS.filter((r) => r.status === 'paid').reduce((s, r) => s + r.commission_amount, 0)
-  const totalPending = MOCK_MY_REFERRALS.filter((r) => r.status === 'pending').reduce((s, r) => s + r.commission_amount, 0)
+  const filtered = tab === 'all' ? commissions : commissions.filter((c) => c.status === tab)
+  const totalPaid = commissions.filter((c) => c.status === 'paid').reduce((sum, c) => sum + c.commissionAmount, 0)
+  const totalPending = commissions
+    .filter((c) => ['pending', 'held', 'approved', 'payout_queued', 'processing'].includes(c.status))
+    .reduce((sum, c) => sum + c.commissionAmount, 0)
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-
-      {/* Back */}
       <div className="mb-8">
         <Link href="/dashboard/renter" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
           <ArrowLeft size={13} /> Back
         </Link>
       </div>
 
-      {/* Page heading */}
       <div className="mb-12">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">Referral Program</p>
         <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight">
@@ -176,12 +181,9 @@ export default function AffiliateDashboardPage() {
         </h1>
       </div>
 
-      {/* Affiliate code — hero card */}
       <div className="bg-[#1A0A0A] dark:bg-[#0F0A0A] rounded-xl p-8 mb-12 border border-[#2A1A1A]">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-4">Your Affiliate Code</p>
-        <div className="text-5xl lg:text-6xl font-extrabold tracking-widest text-white leading-none mb-6">
-          {affiliateCode}
-        </div>
+        <div className="text-5xl lg:text-6xl font-extrabold tracking-widest text-white leading-none mb-6">{affiliateCode}</div>
         <div className="flex items-center gap-3">
           <button
             onClick={handleCopyCode}
@@ -194,58 +196,62 @@ export default function AffiliateDashboardPage() {
           </Link>
         </div>
         <p className="text-xs text-[#6B5B55] mt-4">
-          Browse listings and use the &quot;Get affiliate link&quot; button on any listing that accepts affiliates.
+          Browse affiliate-enabled listings below and copy your share link — commission is only earned on listings the merchant has enabled, and never on barter trades.
         </p>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12">
         <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Total Earned</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Total Paid</p>
             <TrendingUp size={14} className="text-green-500" />
           </div>
-          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">R{totalPaid}</div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-green-600 dark:text-green-400 mt-2">Commissions paid</p>
+          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">R{totalPaid.toFixed(0)}</div>
         </div>
         <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Pending</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">In Progress</p>
             <Clock size={14} className="text-amber-400" />
           </div>
-          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">R{totalPending}</div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-amber-600 dark:text-amber-400 mt-2">Awaiting payout</p>
+          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">R{totalPending.toFixed(0)}</div>
         </div>
         <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Referrals</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Commissions</p>
             <Users size={14} className="text-[#9B8B85]" />
           </div>
-          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">{MOCK_MY_REFERRALS.length}</div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] mt-2">Bookings referred</p>
+          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">{commissions.length}</div>
         </div>
       </div>
 
-      {/* Referral history */}
       <div className="mb-12">
-        <div className="flex items-end justify-between mb-2">
-          <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Referral History</p>
-          <span className="text-xs text-[#9B8B85]">Demo data — real referrals appear after schema setup</span>
-        </div>
+        <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-4">Affiliate-Enabled Listings</p>
+        {loading ? (
+          <p className="text-sm text-[#9B8B85]">Loading…</p>
+        ) : listings.length === 0 ? (
+          <p className="text-sm text-[#9B8B85]">No listings currently accept affiliates.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {listings.map((l) => (
+              <AffiliateListingCard key={l.id} listing={l} affiliateCode={affiliateCode} />
+            ))}
+          </div>
+        )}
+      </div>
 
-        {/* Tabs */}
-        <div className="flex gap-0 mb-6 border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
-          {(['all', 'pending', 'paid'] as const).map((key) => (
+      <div className="mb-12">
+        <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">Commission History</p>
+
+        <div className="flex gap-0 mb-6 border-b border-[#F2EDE8] dark:border-[#2A1A1A] overflow-x-auto">
+          {(['all', 'pending', 'held', 'approved', 'payout_queued', 'paid', 'failed', 'voided'] as const).map((key) => (
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`px-4 py-3 text-[11px] font-medium uppercase tracking-[0.12em] border-b-2 -mb-px transition-colors ${
-                tab === key
-                  ? 'border-[#8B1A1A] text-[#8B1A1A]'
-                  : 'border-transparent text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED]'
+              className={`px-4 py-3 text-[11px] font-medium uppercase tracking-[0.12em] border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                tab === key ? 'border-[#8B1A1A] text-[#8B1A1A]' : 'border-transparent text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED]'
               }`}
             >
-              {key.charAt(0).toUpperCase() + key.slice(1)}
+              {key === 'all' ? 'All' : AFFILIATE_COMMISSION_STATUS_LABELS[key].label}
             </button>
           ))}
         </div>
@@ -253,28 +259,28 @@ export default function AffiliateDashboardPage() {
         {filtered.length === 0 ? (
           <div className="text-center py-16">
             <Link2 size={28} className="mx-auto text-[#9B8B85] mb-3" />
-            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">No referrals in this category yet.</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">No commissions in this category yet.</p>
           </div>
         ) : (
           <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] overflow-hidden">
             <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-5 py-3 border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
               <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85]">Listing</span>
-              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] text-right">Rental fee</span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] text-right">Type</span>
               <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] text-right">Commission</span>
               <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] text-right">Status</span>
             </div>
             <div>
-              {filtered.map((r) => (
-                <div key={r.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 items-center px-5 py-4 border-b border-[#F2EDE8] dark:border-[#2A1A1A] last:border-b-0 hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors">
+              {filtered.map((c) => (
+                <div key={c.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 items-center px-5 py-4 border-b border-[#F2EDE8] dark:border-[#2A1A1A] last:border-b-0 hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors">
                   <div>
-                    <div className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] truncate pr-2">{r.listing_title}</div>
-                    <div className="text-xs text-[#9B8B85]">{new Date(r.rental_date).toLocaleDateString('en-ZA')}</div>
+                    <div className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] truncate pr-2">{c.listingTitle ?? '—'}</div>
+                    <div className="text-xs text-[#9B8B85]">{new Date(c.createdAt).toLocaleDateString('en-ZA')}</div>
                   </div>
-                  <div className="text-sm text-[#6B5B55] dark:text-[#9B8B85] text-right">R{r.rental_fee}</div>
-                  <div className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] text-right">R{r.commission_amount}</div>
+                  <div className="text-sm text-[#6B5B55] dark:text-[#9B8B85] text-right capitalize">{c.transactionType}</div>
+                  <div className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] text-right">R{c.commissionAmount.toFixed(2)}</div>
                   <div className="flex justify-end">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${STATUS_STYLES[r.status]}`}>
-                      {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${AFFILIATE_COMMISSION_STATUS_LABELS[c.status].classes}`}>
+                      {AFFILIATE_COMMISSION_STATUS_LABELS[c.status].label}
                     </span>
                   </div>
                 </div>
@@ -285,9 +291,48 @@ export default function AffiliateDashboardPage() {
       </div>
 
       <p className="text-xs text-[#9B8B85] text-center">
-        Commissions are paid out monthly. Questions?{' '}
+        Commissions are processed automatically after a short review period.{' '}
         <Link href="/chat" className="underline hover:text-[#6B5B55] dark:hover:text-[#9B8B85]">Contact support</Link>
       </p>
+    </div>
+  )
+}
+
+function AffiliateListingCard({ listing, affiliateCode }: { listing: AffiliateListing; affiliateCode: string | null }) {
+  const [copied, setCopied] = useState(false)
+  const link = typeof window !== 'undefined' && affiliateCode ? `${window.location.origin}/listings/${listing.id}?ref=${affiliateCode}` : ''
+
+  const handleCopy = async () => {
+    if (!link) return
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // ignore clipboard failures
+    }
+  }
+
+  return (
+    <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-4">
+      <div className="flex items-center gap-3 mb-3">
+        {listing.thumbnail_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={listing.thumbnail_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+        ) : (
+          <div className="w-12 h-12 rounded-lg bg-[#F2EDE8] dark:bg-[#2A1A1A] shrink-0" />
+        )}
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] truncate">{listing.title}</p>
+          <p className="text-xs text-[#9B8B85]">{listing.commission_rate}% commission</p>
+        </div>
+      </div>
+      <button
+        onClick={handleCopy}
+        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#8B1A1A] text-white text-xs font-semibold hover:bg-[#7A1616] transition-colors"
+      >
+        {copied ? <><Check size={13} /> Copied!</> : <><Copy size={13} /> Copy link</>}
+      </button>
     </div>
   )
 }
