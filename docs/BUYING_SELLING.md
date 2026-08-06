@@ -2,7 +2,9 @@
 
 > **Note:** this document predates the real order/checkout implementation (Step 7) and the
 > admin/email layer built on top of it (Step 11 Phase 6). For the current order lifecycle, admin
-> monitoring, exception queue, and transactional emails, see `docs/ORDER_ADMINISTRATION.md`.
+> monitoring, exception queue, and transactional emails, see `docs/ORDER_ADMINISTRATION.md`. A
+> completed, eligible sale payment on an affiliate-enabled listing generates one affiliate
+> commission automatically (Step 11 Phase 7) — see `docs/AFFILIATE_SYSTEM.md`.
 
 ## Status: Phase 2A live (browse + listing creation) — purchasing not yet built
 

@@ -122,6 +122,20 @@ deliveries, participants) matching the spec's Part B. Full detail, including kno
 (no `'completed'` order status, no order-linked payout tracking, a single "failed" payment
 category rather than bookings' retryable/terminal split) in `docs/ORDER_ADMINISTRATION.md`.
 
+## Affiliate operations (Step 11 Phase 7)
+
+`GET /api/admin/affiliates` / `GET /api/admin/affiliates/[id]` (affiliate profiles, listing-level
+enablement) and `GET /api/admin/affiliate-commissions` / `GET /api/admin/affiliate-commissions/[id]`
+(+CSV) mirror the order-operations pattern above, with one real difference: **this domain does
+have a narrow, reason-mandatory admin override surface** —
+`POST /api/admin/affiliate-commissions/[id]/{hold,release,void,retry,mark-paid,adjust}` — because
+a commission genuinely needs manual intervention paths (a stuck automatic payout, a refund
+discovered after payout) that neither bookings nor orders required. No route can edit a
+commission's original amount/rate/affiliate/customer/listing/payment reference — a correction is
+always either a `void` or a new append-only `affiliate_commission_adjustments` row. Full detail,
+including the automatic review→approve→payout lifecycle and the barter-never-qualifies guard, in
+`docs/AFFILIATE_SYSTEM.md`.
+
 ## Financial operations
 
 `GET /api/admin/financial-operations` — one row per `payments` record, joined to
@@ -150,9 +164,10 @@ existing Step 8 `/admin/email-previews` page is linked from this page, not dupli
 
 `src/lib/admin/exceptions-service.ts` computes categories live, every run, from current table
 state — nothing is pre-materialized except *resolutions*. The original 11 categories are listed
-below; disputes, barter, and orders each added their own domain-specific categories in later
-phases (8 barter categories in Step 11 Phase 5, 7 order categories in Step 11 Phase 6 — see
-`docs/ORDER_ADMINISTRATION.md` for the order list and its stated drop-list):
+below; disputes, barter, orders, and affiliates each added their own domain-specific categories in
+later phases (8 barter categories in Step 11 Phase 5, 7 order categories in Step 11 Phase 6, 8
+affiliate categories in Step 11 Phase 7 — see `docs/ORDER_ADMINISTRATION.md` / `docs/AFFILIATE_SYSTEM.md`
+for those lists and their stated drop-lists):
 
 1. `listing_review_overdue` — `listing_moderation.moderation_status = 'pending'` older than 48h.
 2. `ownership_review_overdue` — `listing_ownership_verification.status in (pending, under_review)` older than 48h.

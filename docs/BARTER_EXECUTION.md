@@ -92,6 +92,13 @@ Mirrors `verify-dispute-locking.mjs`/`verify-chat-security.mjs`'s exact shape an
 
 Deposit **capture/forfeiture** (the losing side of a dispute keeping the other party's deposit) is not built this phase — `capture_deposit_amount` exists and is generic enough to reuse, but no barter-side wrapper or route calls it. A disputed barter's deposits stay `authorised`/frozen until a future phase adds real dispute-driven financial settlement — exactly matching how Phase 2's disputes already freeze *booking* financial resolution the same way. No courier/tracking integration — `in_transit` is a self-reported status, not backed by any shipment-tracking provider, matching the brief's explicit exclusion. `barter-deposit-required` does not also nudge cash-adjustment-only payers by email this phase (they see their obligation on the trade page).
 
+## Affiliate commission (Step 11 Phase 7 addendum)
+
+**Barter transactions do not generate affiliate commission.** No barter completion or progress
+RPC calls either affiliate qualification RPC, and neither RPC's parameter shape can accept a
+barter agreement reference at all — there is structurally no path from a barter transaction to a
+commission row, not merely a runtime check that could be bypassed. See `docs/AFFILIATE_SYSTEM.md`.
+
 ## Future live-payment integration
 
 Nothing in this phase is provider-specific. `authorizeBarterDeposit`/`releaseBarterDeposit`/`chargeBarterCashAdjustment` all go through `getPaymentProvider()` exactly like every booking/order financial function — swapping `PAYMENT_PROVIDER=mock` for a real provider requires no changes to any file this phase touched, the same one-line registry swap every other domain in this codebase already relies on.

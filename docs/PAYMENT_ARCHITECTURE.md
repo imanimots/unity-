@@ -102,7 +102,8 @@ and a `platform_fee` entry (5%, `round(amount * 0.05, 2)`); a deposit reaching
 
 `src/lib/payments/provider.ts` defines the `PaymentProvider` interface
 (`createPaymentIntent`, `authorizeDeposit`, `captureDeposit`, `releaseDeposit`,
-`chargeRental`, `refund`, `createMerchantPayout`, `verifyWebhook`, `healthCheck`). The
+`chargeRental`, `refund`, `createMerchantPayout`, `createAffiliatePayout` (Step 11 Phase 7 —
+see `docs/AFFILIATE_SYSTEM.md`), `verifyWebhook`, `healthCheck`). The
 booking/payment engine is written against this interface only.
 
 `src/lib/payments/registry.ts` resolves a provider by name (`PAYMENT_PROVIDER` env var,

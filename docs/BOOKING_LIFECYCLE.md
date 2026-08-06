@@ -216,6 +216,13 @@ gate (checked in the route, not the RPC — the RPC itself is unchanged) and
 expiries land on the same `expired` status value; only `payment_expired_at` distinguishes
 which one fired. Full detail: `docs/PAYMENT_READINESS.md`.
 
+## Affiliate commission (Step 11 Phase 7 addendum)
+
+A successful `rental_charge` payment (never a `deposit` payment) on an affiliate-enabled listing
+with a valid, product-specific attribution generates exactly one affiliate commission —
+qualification is hooked into the payment orchestrator (`authorize-booking-financials.ts`), never
+into any booking-status RPC in this file. See `docs/AFFILIATE_SYSTEM.md`.
+
 ## Known limitations / future extension points
 
 - Weekly/weekend/monthly rate blending is not implemented — daily rate only.

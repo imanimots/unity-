@@ -196,6 +196,24 @@ require `Authorization: Bearer <INTERNAL_CRON_SECRET>`:
 Configure via Vercel Cron (`vercel.json`'s `crons` array) once a schedule is decided — not
 configured automatically per this step's own stop condition.
 
+## 12a. Affiliate commission automation (Step 11 Phase 7)
+
+Four more `INTERNAL_CRON_SECRET`-gated routes, same 503-until-configured / bearer-token pattern
+as §12. None is wired to Vercel Cron yet — invoke manually (or via a shell loop) until a schedule
+is decided:
+
+```
+curl -X POST https://<host>/api/internal/affiliate/review-and-approve -H "Authorization: Bearer $INTERNAL_CRON_SECRET"
+curl -X POST https://<host>/api/internal/affiliate/queue-payouts -H "Authorization: Bearer $INTERNAL_CRON_SECRET"
+curl -X POST https://<host>/api/internal/affiliate/process-payouts -H "Authorization: Bearer $INTERNAL_CRON_SECRET"
+curl -X POST https://<host>/api/internal/affiliate/reconcile-refunds -H "Authorization: Bearer $INTERNAL_CRON_SECRET"
+```
+
+Recommended order and cadence: run `review-and-approve` then `queue-payouts` then
+`process-payouts` in sequence (each only acts on rows the previous step already moved),
+hourly; run `reconcile-refunds` on its own, every few hours. Each processes a bounded batch and
+is safely re-runnable. See `docs/AFFILIATE_SYSTEM.md` for what each transition does.
+
 ## 13. Incident handling
 
 1. Identify scope: is it one user, one booking, or systemic? Check `/admin/exceptions` and

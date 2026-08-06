@@ -58,6 +58,12 @@ future dispute/admin phase is the intended caller); the function itself still en
 "trusted server-side caller" is a deployment fact, not something the function can verify
 about its own caller.
 
+**Affiliate commission qualification (Step 11 Phase 7 addendum).** `authorizeBookingFinancials()`
+and order checkout's `chargeOrderPayment()` each call a best-effort, try/catch-wrapped affiliate
+qualification RPC immediately after a `rental_charge`/`order_payment` capture succeeds — never a
+new workflow, never able to affect the payment's own status or block/roll back the underlying
+charge on failure. See `docs/AFFILIATE_SYSTEM.md`.
+
 ## Why only one workflow needed a `financial_workflows` row
 
 `financial_workflows` (new table, `supabase/migrations/20260802000001_financial_workflow_schema.sql`)
