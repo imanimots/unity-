@@ -33,7 +33,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
-import { randomBytes, randomUUID } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -136,6 +136,9 @@ async function seedAccounts() {
     { key: 'renterA', email: 'qa-renter-a@unitytest.internal', role: 'renter' },
     { key: 'restrictedUser', email: 'qa-restricted@unitytest.internal', role: 'renter' },
     { key: 'suspendedUser', email: 'qa-suspended@unitytest.internal', role: 'merchant' },
+    // Step 11 Phase 7 -- affiliate system regression fixtures.
+    { key: 'affiliateA', email: 'qa-affiliate-a@unitytest.internal', role: 'renter' },
+    { key: 'affiliateB', email: 'qa-affiliate-b@unitytest.internal', role: 'renter' },
   ]
 
   for (const r of roster) {
@@ -366,14 +369,27 @@ async function seedBuySellListings(accounts) {
 }
 
 // ── Phase 3: QA bookings & financial states ────────────────────────────
-async function createAndAccept(renterCookie, merchantCookie, listingId, daysOffset) {
-  const start = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000).toISOString()
-  const end = new Date(Date.now() + (daysOffset + 3) * 24 * 60 * 60 * 1000).toISOString()
+// Fixed anchor date (not `Date.now()`) + a fixed per-scenario idempotency
+// key, not `randomUUID()`. create_booking_request's own idempotency check
+// hashes listing_id/start_at/end_at/message — a stable hash requires a
+// literal fixed date, not one computed relative to whenever the script
+// happens to run. This is what makes a re-run genuinely idempotent
+// (replays the cached booking) instead of creating a new row every time,
+// matching the fixed-key convention seedBarterScenarios/seedOrderScenarios
+// already use below. 2030-01-01 is comfortably far enough in the future
+// that create_booking_request's `start_at must be in the future` check
+// will keep passing on first creation for years; every run after the
+// first hits the idempotency cache and never re-evaluates that check.
+const QA_BOOKING_DATE_ANCHOR = new Date('2030-01-01T00:00:00.000Z').getTime()
+
+async function createAndAccept(renterCookie, merchantCookie, listingId, daysOffset, scenarioKey) {
+  const start = new Date(QA_BOOKING_DATE_ANCHOR + daysOffset * 24 * 60 * 60 * 1000).toISOString()
+  const end = new Date(QA_BOOKING_DATE_ANCHOR + (daysOffset + 3) * 24 * 60 * 60 * 1000).toISOString()
   const created = await api(renterCookie, 'POST', '/api/bookings', {
     listing_id: listingId,
     start_at: start,
     end_at: end,
-    idempotency_key: `qa-seed-booking-${randomUUID()}`,
+    idempotency_key: `qa-seed-booking-${scenarioKey}`,
   })
   const bookingId = created.json?.booking_id
   if (!bookingId) throw new Error(`booking creation failed: ${JSON.stringify(created)}`)
@@ -416,10 +432,13 @@ async function seedBookings(accounts, listingIds) {
   const merchantACookie = await cookieFor(accounts.merchantA.email, accounts.merchantA.password)
   const merchantBCookie = await cookieFor(accounts.merchantB.email, accounts.merchantB.password)
   const bookingIds = {}
-  // Randomized starting point so a re-run after a partial failure never
-  // collides with dates a previous run already booked (booking_history is
-  // immutable — old QA bookings from a prior run are never deleted).
-  let offset = 100 + Math.floor(Math.random() * 5000)
+  // Fixed, non-overlapping offsets from the fixed QA_BOOKING_DATE_ANCHOR
+  // (not a randomized, Date.now()-relative start) — see createAndAccept's
+  // own comment. Every scenario gets a fixed idempotency key AND a fixed
+  // date, so a re-run replays the exact same booking row via the RPC's own
+  // idempotency cache instead of creating a new one — this is the actual
+  // fix for the bookings_no_overlap_when_blocking accumulation flake.
+  let offset = 100
   const nextOffset = () => {
     const v = offset
     offset += 20 // wide spacing so no two seeded bookings can ever collide on any shared listing
@@ -427,36 +446,36 @@ async function seedBookings(accounts, listingIds) {
   }
 
   // 1. requested
-  bookingIds.requested = await createAndAccept(renterCookie, merchantACookie, listingIds.dailyRate, nextOffset())
+  bookingIds.requested = await createAndAccept(renterCookie, merchantACookie, listingIds.dailyRate, nextOffset(), 'requested')
 
   // 2. accepted, awaiting payment
-  bookingIds.acceptedAwaitingPayment = await createAndAccept(renterCookie, merchantBCookie, listingIds.dailyRate, nextOffset())
+  bookingIds.acceptedAwaitingPayment = await createAndAccept(renterCookie, merchantBCookie, listingIds.dailyRate, nextOffset(), 'accepted-awaiting-payment')
   await api(merchantBCookie, 'POST', `/api/bookings/${bookingIds.acceptedAwaitingPayment}/accept`, { idempotency_key: `qa-seed-accept-${bookingIds.acceptedAwaitingPayment}` })
 
   // 3. financially ready
-  bookingIds.financiallyReady = await createAndAccept(renterCookie, merchantACookie, listingIds.lowRiskNoDeposit, nextOffset())
+  bookingIds.financiallyReady = await createAndAccept(renterCookie, merchantACookie, listingIds.lowRiskNoDeposit, nextOffset(), 'financially-ready')
   await api(merchantACookie, 'POST', `/api/bookings/${bookingIds.financiallyReady}/accept`, { idempotency_key: `qa-seed-accept-${bookingIds.financiallyReady}` })
   await api(renterCookie, 'POST', `/api/bookings/${bookingIds.financiallyReady}/checkout`, { test_scenario: 'success', idempotency_key: `qa-seed-checkout-${bookingIds.financiallyReady}` })
 
   // 4. retryable payment failure
-  bookingIds.retryableFailure = await createAndAccept(renterCookie, merchantACookie, listingIds.lowRiskDeposit, nextOffset())
+  bookingIds.retryableFailure = await createAndAccept(renterCookie, merchantACookie, listingIds.lowRiskDeposit, nextOffset(), 'retryable-failure')
   await api(merchantACookie, 'POST', `/api/bookings/${bookingIds.retryableFailure}/accept`, { idempotency_key: `qa-seed-accept-${bookingIds.retryableFailure}` })
   await api(renterCookie, 'POST', `/api/bookings/${bookingIds.retryableFailure}/checkout`, { test_scenario: 'rental_retryable_failure', idempotency_key: `qa-seed-checkout-${bookingIds.retryableFailure}` })
 
   // 5. terminal decline
-  bookingIds.terminalDecline = await createAndAccept(renterCookie, merchantACookie, listingIds.weeklyRate, nextOffset())
+  bookingIds.terminalDecline = await createAndAccept(renterCookie, merchantACookie, listingIds.weeklyRate, nextOffset(), 'terminal-decline')
   await api(merchantACookie, 'POST', `/api/bookings/${bookingIds.terminalDecline}/accept`, { idempotency_key: `qa-seed-accept-${bookingIds.terminalDecline}` })
   await api(renterCookie, 'POST', `/api/bookings/${bookingIds.terminalDecline}/checkout`, { test_scenario: 'rental_declined', idempotency_key: `qa-seed-checkout-${bookingIds.terminalDecline}` })
 
   // 6. active rental (financially ready -> start)
-  bookingIds.activeRental = await createAndAccept(renterCookie, merchantACookie, listingIds.lowRiskDeposit, nextOffset())
+  bookingIds.activeRental = await createAndAccept(renterCookie, merchantACookie, listingIds.lowRiskDeposit, nextOffset(), 'active-rental')
   await api(merchantACookie, 'POST', `/api/bookings/${bookingIds.activeRental}/accept`, { idempotency_key: `qa-seed-accept-${bookingIds.activeRental}` })
   await api(renterCookie, 'POST', `/api/bookings/${bookingIds.activeRental}/checkout`, { test_scenario: 'success', idempotency_key: `qa-seed-checkout-${bookingIds.activeRental}` })
   await backdateToStartable(bookingIds.activeRental)
   await api(renterCookie, 'POST', `/api/bookings/${bookingIds.activeRental}/start`, { idempotency_key: `qa-seed-start-${bookingIds.activeRental}` })
 
   // 7. return pending
-  bookingIds.returnPending = await createAndAccept(renterCookie, merchantBCookie, listingIds.disclosedDamage, nextOffset())
+  bookingIds.returnPending = await createAndAccept(renterCookie, merchantBCookie, listingIds.disclosedDamage, nextOffset(), 'return-pending')
   await api(merchantBCookie, 'POST', `/api/bookings/${bookingIds.returnPending}/accept`, { idempotency_key: `qa-seed-accept-${bookingIds.returnPending}` })
   await api(renterCookie, 'POST', `/api/bookings/${bookingIds.returnPending}/checkout`, { test_scenario: 'success', idempotency_key: `qa-seed-checkout-${bookingIds.returnPending}` })
   await backdateToStartable(bookingIds.returnPending)
@@ -464,7 +483,7 @@ async function seedBookings(accounts, listingIds) {
   await api(renterCookie, 'POST', `/api/bookings/${bookingIds.returnPending}/return`, { idempotency_key: `qa-seed-return-${bookingIds.returnPending}` })
 
   // 8. completed
-  bookingIds.completed = await createAndAccept(renterCookie, merchantACookie, listingIds.dailyRate, nextOffset())
+  bookingIds.completed = await createAndAccept(renterCookie, merchantACookie, listingIds.dailyRate, nextOffset(), 'completed')
   await api(merchantACookie, 'POST', `/api/bookings/${bookingIds.completed}/accept`, { idempotency_key: `qa-seed-accept-${bookingIds.completed}` })
   await api(renterCookie, 'POST', `/api/bookings/${bookingIds.completed}/checkout`, { test_scenario: 'success', idempotency_key: `qa-seed-checkout-${bookingIds.completed}` })
   await backdateToStartable(bookingIds.completed)
@@ -473,12 +492,12 @@ async function seedBookings(accounts, listingIds) {
   await api(merchantACookie, 'POST', `/api/bookings/${bookingIds.completed}/confirm-return`, { idempotency_key: `qa-seed-confirm-${bookingIds.completed}` })
 
   // 9. cancelled
-  bookingIds.cancelled = await createAndAccept(renterCookie, merchantBCookie, listingIds.mediumRiskOwnershipVerified, nextOffset())
+  bookingIds.cancelled = await createAndAccept(renterCookie, merchantBCookie, listingIds.mediumRiskOwnershipVerified, nextOffset(), 'cancelled')
   await api(renterCookie, 'POST', `/api/bookings/${bookingIds.cancelled}/cancel`, { reason: 'QA fixture cancellation', idempotency_key: `qa-seed-cancel-${bookingIds.cancelled}` })
 
   // 10. expired unpaid — accept, then backdate payment_due_at (no route
   // exists for "make time pass"), then sweep via the real internal route.
-  bookingIds.expiredUnpaid = await createAndAccept(renterCookie, merchantACookie, listingIds.dailyRate, nextOffset())
+  bookingIds.expiredUnpaid = await createAndAccept(renterCookie, merchantACookie, listingIds.dailyRate, nextOffset(), 'expired-unpaid')
   await api(merchantACookie, 'POST', `/api/bookings/${bookingIds.expiredUnpaid}/accept`, { idempotency_key: `qa-seed-accept-${bookingIds.expiredUnpaid}` })
   await admin.from('bookings').update({ payment_due_at: new Date(Date.now() - 3600_000).toISOString() }).eq('id', bookingIds.expiredUnpaid)
   const cronSecret = process.env.INTERNAL_CRON_SECRET
@@ -768,18 +787,7 @@ async function seedEmailFailureFixtures() {
 }
 
 // ── Run ─────────────────────────────────────────────────────────────
-async function main() {
-  console.log(`QA seed starting against ${SUPABASE_URL} (${APP_URL})\n`)
-
-  const accounts = await seedAccounts()
-  const adminCookie = await cookieFor(accounts.admin.email, accounts.admin.password)
-  const listingIds = await seedListings(accounts, adminCookie)
-  const buySellListingIds = await seedBuySellListings(accounts)
-  const bookingIds = await seedBookings(accounts, listingIds)
-  const barterAgreementIds = await seedBarterScenarios(accounts)
-  const orderIds = await seedOrderScenarios(accounts)
-  await seedEmailFailureFixtures()
-
+function writeCredentials(accounts) {
   const credentialsPath = join(REPO_ROOT, '.qa-credentials.local.json')
   writeFileSync(
     credentialsPath,
@@ -793,6 +801,26 @@ async function main() {
       2
     )
   )
+  return credentialsPath
+}
+
+async function main() {
+  console.log(`QA seed starting against ${SUPABASE_URL} (${APP_URL})\n`)
+
+  const accounts = await seedAccounts()
+  // Written immediately after account creation, not only at the very end --
+  // a failure in a later phase (listings/bookings/barter/orders) must not
+  // discard already-created account credentials, forcing a full re-run.
+  writeCredentials(accounts)
+  const adminCookie = await cookieFor(accounts.admin.email, accounts.admin.password)
+  const listingIds = await seedListings(accounts, adminCookie)
+  const buySellListingIds = await seedBuySellListings(accounts)
+  const bookingIds = await seedBookings(accounts, listingIds)
+  const barterAgreementIds = await seedBarterScenarios(accounts)
+  const orderIds = await seedOrderScenarios(accounts)
+  await seedEmailFailureFixtures()
+
+  const credentialsPath = writeCredentials(accounts)
 
   console.log(`\nDone. Credentials written to ${credentialsPath} (gitignored, never printed above).`)
   console.log(`Rental listings: ${Object.keys(listingIds).length}. Buy/sell listings: ${Object.keys(buySellListingIds).length}. Bookings: ${Object.keys(bookingIds).length}. Barter agreements: ${Object.keys(barterAgreementIds).length}. Orders: ${Object.keys(orderIds).length}.`)
