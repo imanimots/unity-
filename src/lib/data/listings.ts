@@ -29,6 +29,19 @@ function normalizedPrice(l: Listing): number {
   return l.daily_rate ?? l.sale_price ?? 0
 }
 
+/**
+ * Applied to every REAL public marketplace query path (browse, homepage,
+ * similar-listings) so a QA/DEMO/regression fixture never appears on a
+ * surface a real visitor can reach. Deliberately NOT applied to
+ * getListingsByMerchant()'s private-dashboard call sites (those opt in
+ * via `{ includeTest: true }` instead) or to getListing()'s single-id
+ * lookup (an unlisted, non-indexed fixture detail page staying directly
+ * reachable by its owner/QA scripts is fine — see docs/SEO_HARDENING.md).
+ */
+export function excludeTestListings<T extends { eq: (column: string, value: unknown) => T }>(query: T): T {
+  return query.eq('is_test', false)
+}
+
 export async function getListings(filters: ListingFilters = {}): Promise<Listing[]> {
   if (IS_MOCK_MODE) {
     let results = [...MOCK_LISTINGS]
@@ -83,10 +96,12 @@ export async function getListings(filters: ListingFilters = {}): Promise<Listing
   const supabase = await createClient()
   if (!supabase) return []
 
-  let query = supabase
-    .from('listings')
-    .select('*, merchant:profiles(*), media:listing_media(*)')
-    .eq('status', 'active')
+  let query = excludeTestListings(
+    supabase
+      .from('listings')
+      .select('*, merchant:profiles(*), media:listing_media(*)')
+      .eq('status', 'active')
+  )
 
   if (filters.category) query = query.eq('category', filters.category)
   if (filters.query) query = query.ilike('title', `%${filters.query}%`)
@@ -153,10 +168,12 @@ export async function getSimilarListings(listing: Listing, limit = 4): Promise<L
   const supabase = await createClient()
   if (!supabase) return []
 
-  const { data } = await supabase
-    .from('listings')
-    .select('*, merchant:profiles(*), media:listing_media(*)')
-    .eq('status', 'active')
+  const { data } = await excludeTestListings(
+    supabase
+      .from('listings')
+      .select('*, merchant:profiles(*), media:listing_media(*)')
+      .eq('status', 'active')
+  )
     .eq('category', listing.category)
     .neq('id', listing.id)
     .limit(limit)
@@ -173,7 +190,16 @@ export function getListingReviews(listingId: string) {
   return []
 }
 
-export async function getListingsByMerchant(merchantId: string): Promise<Listing[]> {
+/**
+ * `includeTest` defaults to false (safe default -- excludes the caller's
+ * own QA/DEMO fixtures) since most callers of this function are public or
+ * semi-public surfaces (a merchant's public profile grid, a barter
+ * propose-trade candidate list). Only a merchant's own private listings-
+ * management dashboard passes `includeTest: true` explicitly, so their
+ * own test fixture (e.g. the [DEMO] Affiliate Camera Listing) stays
+ * visible to them there.
+ */
+export async function getListingsByMerchant(merchantId: string, options: { includeTest?: boolean } = {}): Promise<Listing[]> {
   if (IS_MOCK_MODE) {
     return MOCK_LISTINGS.filter((l) => l.merchant_id === merchantId)
   }
@@ -182,11 +208,15 @@ export async function getListingsByMerchant(merchantId: string): Promise<Listing
   const supabase = await createClient()
   if (!supabase) return []
 
-  const { data } = await supabase
+  let query = supabase
     .from('listings')
     .select('*, merchant:profiles(*), media:listing_media(*)')
     .eq('merchant_id', merchantId)
     .order('created_at', { ascending: false })
+
+  if (!options.includeTest) query = query.eq('is_test', false)
+
+  const { data } = await query
 
   return data ?? []
 }

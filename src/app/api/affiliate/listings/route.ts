@@ -29,6 +29,7 @@ export async function GET() {
     .from('listings')
     .select('id, title, listing_type, daily_rate, sale_price, affiliate_commission_rate, merchant_id, listing_media(url, display_order)')
     .eq('status', 'active')
+    .eq('is_test', false)
     .eq('accepts_affiliates', true)
     .in('listing_type', ['rental', 'sale', 'both'])
     .order('created_at', { ascending: false })

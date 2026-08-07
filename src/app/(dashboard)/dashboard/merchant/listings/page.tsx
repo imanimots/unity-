@@ -75,7 +75,7 @@ async function getMyListings(): Promise<Listing[]> {
   if (IS_MOCK_MODE) return MOCK_MY_LISTINGS
   const { profile } = await getServerUser()
   if (!profile) return []
-  return getListingsByMerchant(profile.id)
+  return getListingsByMerchant(profile.id, { includeTest: true })
 }
 
 /**

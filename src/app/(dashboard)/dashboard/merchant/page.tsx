@@ -34,7 +34,7 @@ export default async function MerchantDashboard() {
   const profile = serverProfile ?? (IS_MOCK_MODE ? MOCK_CURRENT_PROFILE : null)
   const displayName = profile?.display_name ?? 'there'
 
-  const myListings      = IS_MOCK_MODE ? MOCK_MY_LISTINGS : profile ? await getListingsByMerchant(profile.id) : []
+  const myListings      = IS_MOCK_MODE ? MOCK_MY_LISTINGS : profile ? await getListingsByMerchant(profile.id, { includeTest: true }) : []
   const myBookings      = IS_MOCK_MODE ? MOCK_MERCHANT_BOOKINGS : []
   const activeListings  = myListings.filter((l) => l.status === 'active').length
   const pendingBookings = myBookings.filter((b) => b.status === 'pending').length

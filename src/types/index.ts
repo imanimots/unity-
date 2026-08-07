@@ -119,6 +119,9 @@ export interface Listing {
   status: ListingStatus
   ownership_verified: boolean
   created_at: string
+  // QA/regression/demo fixture marker (Unity SEO Pre-Launch Hardening) —
+  // optional since mock fixtures predate this column.
+  is_test?: boolean
   // Everything below was added in Phase 2A (docs/LISTING_SCHEMA.md) and is
   // optional here — existing mock fixtures in src/lib/mock/data.ts predate
   // these columns and aren't required to set them, matching how `merchant`/
