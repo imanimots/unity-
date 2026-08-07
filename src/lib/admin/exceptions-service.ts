@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { deriveBarterFinancialReadiness, type BarterDepositRequirement } from '@/lib/barter/financial-readiness'
 
 export type ExceptionSeverity = 'low' | 'medium' | 'high'
-export type ExceptionEntityType = 'listing' | 'identity_verification' | 'booking' | 'email_delivery' | 'user' | 'dispute' | 'barter_agreement' | 'order' | 'affiliate_commission'
+export type ExceptionEntityType = 'listing' | 'identity_verification' | 'booking' | 'email_delivery' | 'user' | 'dispute' | 'barter_agreement' | 'order' | 'affiliate_commission' | 'merchant_payout'
 
 export interface AdminException {
   id: string
@@ -735,6 +735,256 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
         resolved: isResolved('suspended_affiliate_with_open_commissions', 'user', affiliate.id),
       })
     }
+  }
+
+  // ------------------------------------------------------------
+  // Step 11 Phase 8: merchant payout categories. refund_block and
+  // chargeback_block from the spec's suggested list are folded into
+  // merchant_payout_source_payment_invalid -- all three describe the
+  // same underlying fact (the rental payment is no longer 'captured'
+  // for an unpaid payout), so three near-identical categories would
+  // just be noise. Read-only detection only, matching every other
+  // category in this file -- nothing here ever mutates a payout.
+  // ------------------------------------------------------------
+  const [
+    { data: unpaidPayouts },
+    { data: stalePendingPayouts },
+    { data: staleProcessingPayouts },
+    { data: failedPayouts },
+    { data: paidPayouts },
+    { data: allPayoutsForDuplicateCheck },
+    { data: nonPendingPayoutIds },
+    { data: historyRows },
+  ] = await Promise.all([
+    admin.from('merchant_payouts').select('id, booking_id, merchant_id, amount, status').in('status', ['pending', 'processing']),
+    admin.from('merchant_payouts').select('id, created_at').eq('status', 'pending').lt('created_at', threshold),
+    admin.from('merchant_payouts').select('id, processing_started_at').eq('status', 'processing').not('processing_started_at', 'is', null).lt('processing_started_at', threshold),
+    admin.from('merchant_payouts').select('id, updated_at').eq('status', 'failed'),
+    admin.from('merchant_payouts').select('id, booking_id, updated_at, provider_reference').eq('status', 'paid'),
+    admin.from('merchant_payouts').select('id, booking_id, created_at'),
+    admin.from('merchant_payouts').select('id, status, processing_started_by').neq('status', 'pending'),
+    admin.from('merchant_payout_history').select('payout_id'),
+  ])
+
+  const unpaidBookingIds = Array.from(new Set((unpaidPayouts ?? []).map((p) => p.booking_id).filter((id): id is string => !!id)))
+  const paidBookingIds = Array.from(new Set((paidPayouts ?? []).map((p) => p.booking_id).filter((id): id is string => !!id)))
+  const allRelevantBookingIds = Array.from(new Set([...unpaidBookingIds, ...paidBookingIds]))
+
+  const [{ data: relevantRentalPayments }, { data: relevantDisputes }, { data: relevantMerchants }] = await Promise.all([
+    allRelevantBookingIds.length ? admin.from('payments').select('booking_id, status').in('booking_id', allRelevantBookingIds).eq('payment_type', 'rental_charge') : Promise.resolve({ data: [] }),
+    allRelevantBookingIds.length ? admin.from('disputes').select('booking_id, status').in('booking_id', allRelevantBookingIds).not('status', 'in', '(resolved,closed,cancelled)') : Promise.resolve({ data: [] }),
+    (unpaidPayouts ?? []).length ? admin.from('profiles').select('id, account_status').in('id', (unpaidPayouts ?? []).map((p) => p.merchant_id)) : Promise.resolve({ data: [] }),
+  ])
+
+  const rentalPaymentStatusByBooking = new Map((relevantRentalPayments ?? []).map((p) => [p.booking_id, p.status]))
+  const disputedBookingIdSet = new Set((relevantDisputes ?? []).map((d) => d.booking_id))
+  const restrictedMerchantIds = new Set((relevantMerchants ?? []).filter((m) => m.account_status === 'suspended' || m.account_status === 'restricted').map((m) => m.id))
+
+  for (const payout of unpaidPayouts ?? []) {
+    if (!payout.booking_id) continue
+    const rentalStatus = rentalPaymentStatusByBooking.get(payout.booking_id)
+    if (rentalStatus && rentalStatus !== 'captured') {
+      exceptions.push({
+        id: exceptionId('merchant_payout_source_payment_invalid', payout.id),
+        type: 'merchant_payout_source_payment_invalid',
+        severity: 'high',
+        entityType: 'merchant_payout',
+        entityId: payout.id,
+        summary: `This unpaid payout's source rental payment is now "${rentalStatus}" -- processing must not continue`,
+        detectedAt: now,
+        suggestedAction: `Review at /admin/payouts/${payout.id}`,
+        resolved: isResolved('merchant_payout_source_payment_invalid', 'merchant_payout', payout.id),
+      })
+    }
+    if (disputedBookingIdSet.has(payout.booking_id)) {
+      exceptions.push({
+        id: exceptionId('merchant_payout_unresolved_dispute', payout.id),
+        type: 'merchant_payout_unresolved_dispute',
+        severity: 'high',
+        entityType: 'merchant_payout',
+        entityId: payout.id,
+        summary: 'This payout is blocked by an unresolved dispute on its source booking',
+        detectedAt: now,
+        suggestedAction: `Review the linked dispute at /admin/payouts/${payout.id}`,
+        resolved: isResolved('merchant_payout_unresolved_dispute', 'merchant_payout', payout.id),
+      })
+    }
+    if (restrictedMerchantIds.has(payout.merchant_id)) {
+      exceptions.push({
+        id: exceptionId('merchant_payout_restricted_merchant', payout.id),
+        type: 'merchant_payout_restricted_merchant',
+        severity: 'high',
+        entityType: 'merchant_payout',
+        entityId: payout.id,
+        summary: 'This payout belongs to a suspended or restricted merchant',
+        detectedAt: now,
+        suggestedAction: `Review the merchant account at /admin/users, then /admin/payouts/${payout.id}`,
+        resolved: isResolved('merchant_payout_restricted_merchant', 'merchant_payout', payout.id),
+      })
+    }
+  }
+
+  for (const row of stalePendingPayouts ?? []) {
+    exceptions.push({
+      id: exceptionId('merchant_payout_pending_overdue', row.id),
+      type: 'merchant_payout_pending_overdue',
+      severity: 'medium',
+      entityType: 'merchant_payout',
+      entityId: row.id,
+      summary: `Payout has been pending for over ${REVIEW_OVERDUE_HOURS}h`,
+      detectedAt: row.created_at,
+      suggestedAction: `Inspect at /admin/payouts/${row.id}`,
+      resolved: isResolved('merchant_payout_pending_overdue', 'merchant_payout', row.id),
+    })
+  }
+
+  for (const row of staleProcessingPayouts ?? []) {
+    exceptions.push({
+      id: exceptionId('merchant_payout_processing_overdue', row.id),
+      type: 'merchant_payout_processing_overdue',
+      severity: 'medium',
+      entityType: 'merchant_payout',
+      entityId: row.id,
+      summary: `Payout has been processing for over ${REVIEW_OVERDUE_HOURS}h with no resolution`,
+      detectedAt: row.processing_started_at,
+      suggestedAction: `Mark paid or failed at /admin/payouts/${row.id}`,
+      resolved: isResolved('merchant_payout_processing_overdue', 'merchant_payout', row.id),
+    })
+  }
+
+  for (const row of failedPayouts ?? []) {
+    exceptions.push({
+      id: exceptionId('merchant_payout_failed', row.id),
+      type: 'merchant_payout_failed',
+      severity: 'medium',
+      entityType: 'merchant_payout',
+      entityId: row.id,
+      summary: 'Payout is in a failed state and awaiting retry or review',
+      detectedAt: row.updated_at,
+      suggestedAction: `Retry or review at /admin/payouts/${row.id}`,
+      resolved: isResolved('merchant_payout_failed', 'merchant_payout', row.id),
+    })
+  }
+
+  for (const payout of paidPayouts ?? []) {
+    if (!payout.booking_id) continue
+    const rentalStatus = rentalPaymentStatusByBooking.get(payout.booking_id)
+    if (rentalStatus && ['refunded', 'partially_refunded', 'chargeback'].includes(rentalStatus)) {
+      exceptions.push({
+        id: exceptionId('merchant_payout_paid_then_refunded', payout.id),
+        type: 'merchant_payout_paid_then_refunded',
+        severity: 'high',
+        entityType: 'merchant_payout',
+        entityId: payout.id,
+        summary: `This payout was already paid, but its source payment is now "${rentalStatus}" -- requires admin review before any recovery`,
+        detectedAt: payout.updated_at,
+        suggestedAction: `Manually reconcile at /admin/payouts/${payout.id} -- do not rewrite the paid record`,
+        resolved: isResolved('merchant_payout_paid_then_refunded', 'merchant_payout', payout.id),
+      })
+    }
+    if (disputedBookingIdSet.has(payout.booking_id)) {
+      exceptions.push({
+        id: exceptionId('merchant_payout_paid_then_disputed', payout.id),
+        type: 'merchant_payout_paid_then_disputed',
+        severity: 'high',
+        entityType: 'merchant_payout',
+        entityId: payout.id,
+        summary: 'This payout was already paid, but a dispute has since opened on its source booking',
+        detectedAt: now,
+        suggestedAction: `Review the linked dispute at /admin/payouts/${payout.id} -- do not rewrite the paid record`,
+        resolved: isResolved('merchant_payout_paid_then_disputed', 'merchant_payout', payout.id),
+      })
+    }
+    if (!payout.provider_reference) {
+      exceptions.push({
+        id: exceptionId('merchant_payout_paid_without_reference', payout.id),
+        type: 'merchant_payout_paid_without_reference',
+        severity: 'medium',
+        entityType: 'merchant_payout',
+        entityId: payout.id,
+        summary: 'Payout is marked paid but has no recorded payout reference',
+        detectedAt: payout.updated_at,
+        suggestedAction: `Investigate at /admin/payouts/${payout.id}`,
+        resolved: isResolved('merchant_payout_paid_without_reference', 'merchant_payout', payout.id),
+      })
+    }
+  }
+
+  const bookingPayoutCounts = new Map<string, number>()
+  for (const row of allPayoutsForDuplicateCheck ?? []) {
+    if (!row.booking_id) continue
+    bookingPayoutCounts.set(row.booking_id, (bookingPayoutCounts.get(row.booking_id) ?? 0) + 1)
+  }
+  for (const row of allPayoutsForDuplicateCheck ?? []) {
+    if (!row.booking_id || (bookingPayoutCounts.get(row.booking_id) ?? 0) <= 1) continue
+    exceptions.push({
+      id: exceptionId('merchant_payout_duplicate', row.id),
+      type: 'merchant_payout_duplicate',
+      severity: 'high',
+      entityType: 'merchant_payout',
+      entityId: row.id,
+      summary: 'More than one payout row exists for the same source booking',
+      detectedAt: row.created_at,
+      suggestedAction: `Investigate at /admin/payouts/${row.id}`,
+      resolved: isResolved('merchant_payout_duplicate', 'merchant_payout', row.id),
+    })
+  }
+
+  const historyPayoutIds = new Set((historyRows ?? []).map((h) => h.payout_id))
+  for (const row of nonPendingPayoutIds ?? []) {
+    if (historyPayoutIds.has(row.id)) continue
+    exceptions.push({
+      id: exceptionId('merchant_payout_missing_history', row.id),
+      type: 'merchant_payout_missing_history',
+      severity: 'high',
+      entityType: 'merchant_payout',
+      entityId: row.id,
+      summary: `Payout is in status "${row.status}" but has no immutable history record -- integrity issue`,
+      detectedAt: now,
+      suggestedAction: `Investigate at /admin/payouts/${row.id}`,
+      resolved: isResolved('merchant_payout_missing_history', 'merchant_payout', row.id),
+    })
+    if (row.status === 'processing' && !row.processing_started_by) {
+      exceptions.push({
+        id: exceptionId('merchant_payout_processing_without_actor', row.id),
+        type: 'merchant_payout_processing_without_actor',
+        severity: 'medium',
+        entityType: 'merchant_payout',
+        entityId: row.id,
+        summary: 'Payout is processing but has no recorded actor who started it',
+        detectedAt: now,
+        suggestedAction: `Investigate at /admin/payouts/${row.id}`,
+        resolved: isResolved('merchant_payout_processing_without_actor', 'merchant_payout', row.id),
+      })
+    }
+  }
+
+  const bookingIdsWithPayout = new Set((allPayoutsForDuplicateCheck ?? []).map((p) => p.booking_id).filter(Boolean))
+  const { data: completedBookingsForMissingPayout } = await admin
+    .from('bookings')
+    .select('id')
+    .eq('status', 'completed')
+  for (const booking of completedBookingsForMissingPayout ?? []) {
+    if (bookingIdsWithPayout.has(booking.id)) continue
+    const { data: capturedRental } = await admin
+      .from('payments')
+      .select('id')
+      .eq('booking_id', booking.id)
+      .eq('payment_type', 'rental_charge')
+      .eq('status', 'captured')
+      .maybeSingle()
+    if (!capturedRental) continue
+    exceptions.push({
+      id: exceptionId('merchant_payout_missing_for_completed_booking', booking.id),
+      type: 'merchant_payout_missing_for_completed_booking',
+      severity: 'high',
+      entityType: 'booking',
+      entityId: booking.id,
+      summary: 'This booking is completed with a captured rental payment but has no payout record -- run the reconcile-missing sweep or investigate',
+      detectedAt: now,
+      suggestedAction: 'POST /api/internal/payouts/reconcile-missing, or inspect the booking directly',
+      resolved: isResolved('merchant_payout_missing_for_completed_booking', 'booking', booking.id),
+    })
   }
 
   return exceptions.sort((a, b) => (a.resolved === b.resolved ? 0 : a.resolved ? 1 : -1))
