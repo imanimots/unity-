@@ -1,5 +1,43 @@
-import { describe, it, expect } from 'vitest'
-import { getListings, excludeTestListings } from '../listings'
+import { describe, it, expect, vi } from 'vitest'
+import { getListings, getListing, getSimilarListings, getListingsByMerchant, excludeTestListings } from '../listings'
+import { createClient as mockedCreateClient } from '@/lib/supabase/server'
+
+/**
+ * Regression coverage for the pre-existing listing-detail 404 bug found
+ * during Unity SEO Pre-Launch Hardening: `listings` gained two more FKs
+ * to `profiles` (`affiliate_enabled_by`, `affiliate_rate_updated_by`,
+ * added by the Phase 7 affiliate migration), which makes a bare
+ * `profiles(*)` embed ambiguous to PostgREST (error PGRST201) --
+ * silently breaking every function in this file that joins to the
+ * merchant profile. The fix is to always qualify the embed with the
+ * exact FK constraint name (`profiles!listings_merchant_id_fkey`).
+ * This test proves every real-Supabase-path query in listings.ts still
+ * uses the qualified form, without needing a live database -- it mocks
+ * '@/lib/supabase/server' directly since these functions dynamically
+ * import it.
+ */
+function fakeSupabaseClient(selectCalls: string[]) {
+  const builder = {
+    select(arg: string) {
+      selectCalls.push(arg)
+      return builder
+    },
+    eq() { return builder },
+    neq() { return builder },
+    order() { return builder },
+    limit() { return builder },
+    single() { return Promise.resolve({ data: null, error: null }) },
+    maybeSingle() { return Promise.resolve({ data: null, error: null }) },
+    then(resolve: (v: { data: unknown }) => void) { resolve({ data: [] }) },
+  }
+  return {
+    from() { return builder },
+  }
+}
+
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn(),
+}))
 
 /** Minimal fake query-builder that only records .eq() calls — enough to prove the real filter is actually applied, without mocking the full Supabase client chain. */
 function fakeQuery() {
@@ -24,6 +62,37 @@ describe('excludeTestListings — the one filter every real public listing query
     const result = excludeTestListings(fakeQuery())
     expect(result.calls).toHaveLength(1)
     expect(result.calls[0][0]).toBe('is_test')
+  })
+})
+
+describe('listing-detail 404 regression (category: Listing Detail) — every query embeds profiles through the exact FK, never the ambiguous bare form', () => {
+  it('1. getListing() qualifies the merchant embed with listings_merchant_id_fkey', async () => {
+    const selectCalls: string[] = []
+    vi.mocked(mockedCreateClient).mockResolvedValue(fakeSupabaseClient(selectCalls) as never)
+    await getListing('11111111-1111-1111-1111-111111111111')
+    expect(selectCalls.some((s) => s.includes('profiles!listings_merchant_id_fkey'))).toBe(true)
+    expect(selectCalls.some((s) => /[^!]profiles\(/.test(s))).toBe(false)
+  })
+
+  it('2. getListings() qualifies the merchant embed with listings_merchant_id_fkey', async () => {
+    const selectCalls: string[] = []
+    vi.mocked(mockedCreateClient).mockResolvedValue(fakeSupabaseClient(selectCalls) as never)
+    await getListings({})
+    expect(selectCalls.some((s) => s.includes('profiles!listings_merchant_id_fkey'))).toBe(true)
+  })
+
+  it('3. getSimilarListings() qualifies the merchant embed with listings_merchant_id_fkey', async () => {
+    const selectCalls: string[] = []
+    vi.mocked(mockedCreateClient).mockResolvedValue(fakeSupabaseClient(selectCalls) as never)
+    await getSimilarListings({ id: 'x', category: 'tech' } as never)
+    expect(selectCalls.some((s) => s.includes('profiles!listings_merchant_id_fkey'))).toBe(true)
+  })
+
+  it('4. getListingsByMerchant() qualifies the merchant embed with listings_merchant_id_fkey', async () => {
+    const selectCalls: string[] = []
+    vi.mocked(mockedCreateClient).mockResolvedValue(fakeSupabaseClient(selectCalls) as never)
+    await getListingsByMerchant('11111111-1111-1111-1111-111111111111')
+    expect(selectCalls.some((s) => s.includes('profiles!listings_merchant_id_fkey'))).toBe(true)
   })
 })
 

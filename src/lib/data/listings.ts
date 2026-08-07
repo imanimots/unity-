@@ -99,7 +99,7 @@ export async function getListings(filters: ListingFilters = {}): Promise<Listing
   let query = excludeTestListings(
     supabase
       .from('listings')
-      .select('*, merchant:profiles(*), media:listing_media(*)')
+      .select('*, merchant:profiles!listings_merchant_id_fkey(*), media:listing_media(*)')
       .eq('status', 'active')
   )
 
@@ -150,7 +150,7 @@ export async function getListing(id: string): Promise<Listing | null> {
 
   const { data } = await supabase
     .from('listings')
-    .select('*, merchant:profiles(*), media:listing_media(*)')
+    .select('*, merchant:profiles!listings_merchant_id_fkey(*), media:listing_media(*)')
     .eq('id', id)
     .single()
 
@@ -171,7 +171,7 @@ export async function getSimilarListings(listing: Listing, limit = 4): Promise<L
   const { data } = await excludeTestListings(
     supabase
       .from('listings')
-      .select('*, merchant:profiles(*), media:listing_media(*)')
+      .select('*, merchant:profiles!listings_merchant_id_fkey(*), media:listing_media(*)')
       .eq('status', 'active')
   )
     .eq('category', listing.category)
@@ -210,7 +210,7 @@ export async function getListingsByMerchant(merchantId: string, options: { inclu
 
   let query = supabase
     .from('listings')
-    .select('*, merchant:profiles(*), media:listing_media(*)')
+    .select('*, merchant:profiles!listings_merchant_id_fkey(*), media:listing_media(*)')
     .eq('merchant_id', merchantId)
     .order('created_at', { ascending: false })
 
