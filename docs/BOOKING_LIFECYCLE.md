@@ -223,6 +223,13 @@ with a valid, product-specific attribution generates exactly one affiliate commi
 qualification is hooked into the payment orchestrator (`authorize-booking-financials.ts`), never
 into any booking-status RPC in this file. See `docs/AFFILIATE_SYSTEM.md`.
 
+## Merchant payout (Step 11 Phase 8 addendum)
+
+A booking reaching `completed` (via `confirm_return()`) triggers a best-effort merchant payout
+creation call — never blocking the return confirmation itself. This is a hook into the payment
+orchestrator (`create-merchant-payout.ts`), never into `confirm_return()`'s own SQL. See
+`docs/MERCHANT_PAYOUT_WORKFLOW.md`.
+
 ## Known limitations / future extension points
 
 - Weekly/weekend/monthly rate blending is not implemented — daily rate only.

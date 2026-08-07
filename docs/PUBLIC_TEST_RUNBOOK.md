@@ -214,6 +214,22 @@ Recommended order and cadence: run `review-and-approve` then `queue-payouts` the
 hourly; run `reconcile-refunds` on its own, every few hours. Each processes a bounded batch and
 is safely re-runnable. See `docs/AFFILIATE_SYSTEM.md` for what each transition does.
 
+## 12b. Merchant payout reconciliation (Step 11 Phase 8)
+
+Two more `INTERNAL_CRON_SECRET`-gated routes, same pattern as §12/§12a. Neither is wired to
+Vercel Cron yet:
+
+```
+curl -X POST https://<host>/api/internal/payouts/reconcile-missing -H "Authorization: Bearer $INTERNAL_CRON_SECRET"
+curl -X POST https://<host>/api/internal/payouts/reconcile -H "Authorization: Bearer $INTERNAL_CRON_SECRET"
+```
+
+Recommended cadence: run `reconcile-missing` first (repairs a completed booking that ended up
+with no payout row due to a transient failure at booking completion), hourly; run `reconcile`
+afterward (read-only detection of stalled/mismatched/paid-then-refunded payouts, surfaced to the
+exception queue, never mutates) on the same or a slower cadence. Both process a bounded batch and
+are safely re-runnable. See `docs/MERCHANT_PAYOUT_WORKFLOW.md` for what each does.
+
 ## 13. Incident handling
 
 1. Identify scope: is it one user, one booking, or systemic? Check `/admin/exceptions` and

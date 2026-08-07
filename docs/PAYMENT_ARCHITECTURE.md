@@ -106,6 +106,12 @@ and a `platform_fee` entry (5%, `round(amount * 0.05, 2)`); a deposit reaching
 see `docs/AFFILIATE_SYSTEM.md`), `verifyWebhook`, `healthCheck`). The
 booking/payment engine is written against this interface only.
 
+As of Step 11 Phase 8, the orchestrator's `createMerchantPayout()` function (payout *creation*)
+deliberately never calls `PaymentProvider.createMerchantPayout()` (the provider *method*, still
+present on the interface, still implemented by the mock/Peach-stub providers) — creating the
+pending payout obligation and actually processing it through a provider are two separate
+lifecycle events. See `docs/MERCHANT_PAYOUT_WORKFLOW.md`.
+
 `src/lib/payments/registry.ts` resolves a provider by name (`PAYMENT_PROVIDER` env var,
 default `mock`). Two providers registered:
 

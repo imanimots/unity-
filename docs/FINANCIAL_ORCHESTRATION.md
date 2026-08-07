@@ -41,7 +41,7 @@ just a design review.
 | Authorize booking financials | `authorizeBookingFinancials(ctx, bookingId, idempotencyKey?)` | up to 2 (rental charge, deposit auth) | `financial_workflows` row + per-payment status check |
 | Release deposit | `releaseDeposit(ctx, bookingId, idempotencyKey?)` | 1 (release) | payment status (`released` short-circuits) + `idempotency_keys` |
 | Capture deposit | `captureDeposit(ctx, bookingId, amount, reason, idempotencyKey?)` | 1 (capture) | `capture_deposit_amount` RPC's own idempotency handling |
-| Create merchant payout | `createMerchantPayout(ctx, bookingId, idempotencyKey?)` | 1 (payout) | `create_merchant_payout` RPC's own idempotency handling |
+| Create merchant payout | `createMerchantPayout(ctx, bookingId, idempotencyKey?)` | 0 (Step 11 Phase 8 — creates the pending obligation only, never calls a provider; see below) | `create_merchant_payout` RPC's own idempotency handling |
 
 **Prepare** derives both amounts entirely from the booking's own immutable financial
 snapshot (`subtotal_amount`, `deposit_amount_snapshot`) — there is no amount parameter on
@@ -57,6 +57,15 @@ future dispute/admin phase is the intended caller); the function itself still en
 `amount > 0` and a non-empty `reason` as if it might be called from anywhere, since
 "trusted server-side caller" is a deployment fact, not something the function can verify
 about its own caller.
+
+**Merchant payout creation (Step 11 Phase 8 addendum).** `createMerchantPayout()` had zero call
+sites anywhere in the app until this phase — now hooked into `POST /api/bookings/[id]/confirm-return`
+as a best-effort call after the booking reaches `completed`. As of this phase it also **never
+calls a payout provider** (a binding review correction) — it creates the `pending` payout
+obligation only; provider invocation belongs to a later, separately-approved processing
+integration. A missing payout caused by a transient failure at this hook is repaired by
+`POST /api/internal/payouts/reconcile-missing`, not by retrying the confirm-return call. See
+`docs/MERCHANT_PAYOUT_WORKFLOW.md`.
 
 **Affiliate commission qualification (Step 11 Phase 7 addendum).** `authorizeBookingFinancials()`
 and order checkout's `chargeOrderPayment()` each call a best-effort, try/catch-wrapped affiliate
@@ -334,7 +343,7 @@ total.
 | `authorizeBookingFinancials` (fresh, full success — includes prepare) | 4.61s | start/resume RPC, prepare (above), rental: select+update-progress+provider+attempt+transition, deposit: same 5 steps, final progress update |
 | `authorizeBookingFinancials` (resume — rental already captured, only deposit retried) | 3.17s | start/resume RPC, prepare selects (2), rental: 1 select (skip, already captured), deposit: full 5-step sequence, final progress update |
 | `releaseDeposit` (isolated) | 3.47s | booking select, deposit select, idempotency check, provider call, transition RPC, idempotency insert |
-| `createMerchantPayout` (isolated, rental already captured) | 2.71s | booking select, existing-payout select, rental-payment select, ledger select, provider call, payout RPC |
+| `createMerchantPayout` (isolated, rental already captured) | 2.71s (Phase 2C measurement, predates Phase 8's removal of the provider call below — expect fewer round trips now) | booking select, existing-payout select, rental-payment select, ledger select, payout RPC (no provider call as of Step 11 Phase 8 — see below) |
 | `accept_booking_request` + `authorizeBookingFinancials` combined (historical — Phase 2C measurement; as of Step 5 these are two separate requests, see `docs/MOCK_CHECKOUT.md`) | 4.47s | booking accept RPC + full authorize sequence above |
 
 No premature optimization was applied. One real, identifiable pattern worth naming for a

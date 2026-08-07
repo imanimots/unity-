@@ -91,6 +91,7 @@ Events are dot-namespaced and stable — never a subject line, never derived fro
 | Barter execution (Step 11 Phase 4) | `barter.accepted`, `barter.deposit_required`, `barter.ready_to_exchange`, `barter.completion_requested`, `barter.completed`, `barter.cancelled` — no separate `barter.disputed` event, since Phase 2's `dispute.opened` already fires for any transaction type including barter; see `docs/BARTER_EXECUTION.md` |
 | Orders (Step 11 Phase 6) | `order.created`, `order.payment_received`, `order.shipped`, `order.delivered`, `order.cancelled`, `order.payment_failed` — no separate `order.payment_required` (creation and "payment required" are the same moment for a purchase), no separate retryable/terminal payment-failure split (not durably stored for orders), no separate `order.dispute_opened`/`order.dispute_resolved` (Phase 2's generic dispute emails already cover orders); see `docs/ORDER_ADMINISTRATION.md` |
 | Affiliates (Step 11 Phase 7) | `affiliate.enrolled`, `affiliate.commission_approved`, `affiliate.commission_held`, `affiliate.payout_queued`, `affiliate.commission_paid`, `affiliate.payout_failed`, `affiliate.commission_voided`, `affiliate.adjustment_created`, `merchant.affiliate_enabled`, `merchant.affiliate_disabled` — no separate `affiliate.commission_pending` (too early/noisy, the dashboard already reflects it live), no `affiliate.listing_link_ready` (redundant with the dashboard), no `merchant.affiliate_commission_created` (would fire once per sale for an active merchant, excessive); see `docs/AFFILIATE_SYSTEM.md` |
+| Merchant payouts (Step 11 Phase 8) | `merchant_payout.created`, `merchant_payout.processing`, `merchant_payout.paid`, `merchant_payout.failed`, `merchant_payout.retry_started` — all merchant-facing only; per the spec, admin operational alerts use the exception queue rather than email; see `docs/MERCHANT_PAYOUT_WORKFLOW.md` |
 
 Two consolidation decisions were made explicitly to avoid the overlapping-email pattern the
 brief warned against:
@@ -111,7 +112,7 @@ records, no separate event name needed.
 
 ## Template catalogue
 
-67 templates (`src/lib/email/templates/catalogue.ts`, 10 added in Step 11 Phase 6 for orders — see `docs/ORDER_ADMINISTRATION.md` — and 10 more added in Step 11 Phase 7 for affiliates — see `docs/AFFILIATE_SYSTEM.md`), all composing through one shared shell
+72 templates (`src/lib/email/templates/catalogue.ts`, 10 added in Step 11 Phase 6 for orders — see `docs/ORDER_ADMINISTRATION.md` — 10 more added in Step 11 Phase 7 for affiliates — see `docs/AFFILIATE_SYSTEM.md` — and 5 more added in Step 11 Phase 8 for merchant payouts — see `docs/MERCHANT_PAYOUT_WORKFLOW.md`), all composing through one shared shell
 (`renderShell()` in `src/lib/email/templates/shared.ts`) rather than 32 hand-authored HTML
 files. Each entry is:
 

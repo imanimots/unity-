@@ -136,6 +136,20 @@ always either a `void` or a new append-only `affiliate_commission_adjustments` r
 including the automatic review→approve→payout lifecycle and the barter-never-qualifies guard, in
 `docs/AFFILIATE_SYSTEM.md`.
 
+## Merchant payout operations (Step 11 Phase 8)
+
+`GET /api/admin/payouts` (+CSV) / `GET /api/admin/payouts/[id]` mirror the order/affiliate
+operations pattern above, with a narrow, reason-mandatory override surface like affiliates':
+`POST /api/admin/payouts/[id]/{mark-processing,mark-paid,mark-failed,retry}`. Unlike every prior
+domain, this phase found the underlying workflow had never actually been triggered at all — the
+amount-calculating orchestrator function existed and was tested, but nothing in the app ever
+called it. It is now wired into booking completion (`confirm-return`), and a dedicated internal
+recovery route (`POST /api/internal/payouts/reconcile-missing`) repairs any booking that reaches
+`completed` without a payout row due to a transient failure. No route can edit a payout's
+original amount/currency/merchant/booking — a correction is either `mark_payout_failed` (with a
+normalized category, never raw text) or the existing `retry_payout` path; nothing rewrites a
+`paid` row. Full detail in `docs/MERCHANT_PAYOUT_WORKFLOW.md`.
+
 ## Financial operations
 
 `GET /api/admin/financial-operations` — one row per `payments` record, joined to
@@ -164,10 +178,11 @@ existing Step 8 `/admin/email-previews` page is linked from this page, not dupli
 
 `src/lib/admin/exceptions-service.ts` computes categories live, every run, from current table
 state — nothing is pre-materialized except *resolutions*. The original 11 categories are listed
-below; disputes, barter, orders, and affiliates each added their own domain-specific categories in
-later phases (8 barter categories in Step 11 Phase 5, 7 order categories in Step 11 Phase 6, 8
-affiliate categories in Step 11 Phase 7 — see `docs/ORDER_ADMINISTRATION.md` / `docs/AFFILIATE_SYSTEM.md`
-for those lists and their stated drop-lists):
+below; disputes, barter, orders, affiliates, and merchant payouts each added their own
+domain-specific categories in later phases (8 barter categories in Step 11 Phase 5, 7 order
+categories in Step 11 Phase 6, 8 affiliate categories in Step 11 Phase 7, 14 merchant payout
+categories in Step 11 Phase 8 — see `docs/ORDER_ADMINISTRATION.md` / `docs/AFFILIATE_SYSTEM.md` /
+`docs/MERCHANT_PAYOUT_WORKFLOW.md` for those lists and their stated drop-lists):
 
 1. `listing_review_overdue` — `listing_moderation.moderation_status = 'pending'` older than 48h.
 2. `ownership_review_overdue` — `listing_ownership_verification.status in (pending, under_review)` older than 48h.
