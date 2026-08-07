@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Plus_Jakarta_Sans } from 'next/font/google'
 import { ThemeProvider } from 'next-themes'
 import { Toaster } from 'sonner'
-import { ChatWidget } from '@/components/assistant/chat-widget'
+import { AssistantWidgetLoader } from '@/components/assistant/assistant-widget-loader'
 import { getAppUrl, getDefaultRobotsMeta } from '@/lib/seo/config'
 import './globals.css'
 
@@ -43,7 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
-          <ChatWidget />
+          <AssistantWidgetLoader />
           <Toaster position="top-center" richColors />
         </ThemeProvider>
       </body>

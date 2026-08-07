@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { ShieldCheck, Star, MapPin, Heart } from 'lucide-react'
 import type { Listing } from '@/types'
 import { CATEGORIES } from '@/types'
+import { deriveListingRatingDisplay } from '@/lib/listings/rating-display'
 
 const CITY_BY_MERCHANT: Record<string, string> = {
   'user-1': 'Johannesburg',
@@ -29,8 +30,9 @@ export function ListingCard({ listing, priority = false }: ListingCardProps) {
   const coverImage = listing.media?.[0]?.url
   const city = CITY_BY_MERCHANT[listing.merchant_id] ?? 'South Africa'
   const categoryLabel = CATEGORIES.find((c) => c.id === listing.category)?.label ?? listing.category
-  const score = listing.merchant?.unity_score ?? 5.0
-  const reviewCount = Math.floor(score * 8 + listing.id.length)
+  // No genuine item-level review count exists in this schema yet (see
+  // src/lib/listings/rating-display.ts) — never fabricate one.
+  const rating = deriveListingRatingDisplay({ averageRating: null, reviewCount: 0 })
 
   return (
     <Link href={`/listings/${listing.id}`} className="group block">
@@ -94,11 +96,15 @@ export function ListingCard({ listing, priority = false }: ListingCardProps) {
         </div>
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1 text-xs text-[#9B8B85]">
-            <Star size={11} className="text-amber-400 fill-amber-400" />
-            <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{score.toFixed(1)}</span>
-            <span>({reviewCount})</span>
-          </div>
+          {rating.show ? (
+            <div className="flex items-center gap-1 text-xs text-[#9B8B85]">
+              <Star size={11} className="text-amber-400 fill-amber-400" />
+              <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{rating.score.toFixed(1)}</span>
+              <span>({rating.reviewCount})</span>
+            </div>
+          ) : (
+            <span />
+          )}
           <div className="text-sm">
             <span className="font-extrabold text-[#8B1A1A]">R{listing.daily_rate}</span>
             <span className="text-[#9B8B85] text-xs"> /day</span>

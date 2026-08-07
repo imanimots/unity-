@@ -328,7 +328,7 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
             {/* Trust features */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
-                { icon: <ShieldCheck size={18} className="text-green-500" />, title: 'Secure checkout', desc: 'Payment authorized until return confirmed' },
+                { icon: <ShieldCheck size={18} className="text-green-500" />, title: 'Secure checkout', desc: 'Test mode — payments are simulated during Unity’s public test' },
                 { icon: <CheckCircle size={18} className="text-blue-500" />, title: 'Reviewed listing', desc: 'Ownership documents checked' },
                 { icon: <Star size={18} className="text-amber-400 fill-amber-400" />, title: 'Reviewed merchant', desc: 'Rated by the Unity community' },
               ].map(({ icon, title, desc }) => (

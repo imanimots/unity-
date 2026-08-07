@@ -17,6 +17,10 @@ const nextConfig: NextConfig = {
         hostname: '*.supabase.co',
       },
     ],
+    // AVIF checked first (best compression), WebP as the fallback for
+    // browsers that don't support it — Next.js otherwise only serves
+    // WebP by default (Unity SEO Pre-Launch Hardening, Part K).
+    formats: ['image/avif', 'image/webp'],
   },
   // X-Robots-Tag on genuinely non-HTML/private surfaces (Unity SEO
   // Pre-Launch Hardening, Part D/E) -- reinforces the meta-tag noindex on

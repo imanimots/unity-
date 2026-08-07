@@ -113,7 +113,7 @@ export function BookingCard({ listing }: { listing: Listing & { daily_rate: numb
 
       <p className="text-xs text-[#9B8B85] text-center flex items-center justify-center gap-1">
         <ShieldCheck size={12} className="text-green-500" />
-        Secure checkout — deposit released after return confirmed
+        Test checkout — payments are simulated during Unity&apos;s public test
       </p>
     </div>
   )
