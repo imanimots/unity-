@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { getListings, getListing, getSimilarListings, getListingsByMerchant, excludeTestListings } from '../listings'
+import { getListings, getListing, getSimilarListings, getListingsByMerchant, getProfileReviews, excludeTestListings } from '../listings'
 import { createClient as mockedCreateClient } from '@/lib/supabase/server'
 
 /**
@@ -93,6 +93,29 @@ describe('listing-detail 404 regression (category: Listing Detail) — every que
     vi.mocked(mockedCreateClient).mockResolvedValue(fakeSupabaseClient(selectCalls) as never)
     await getListingsByMerchant('11111111-1111-1111-1111-111111111111')
     expect(selectCalls.some((s) => s.includes('profiles!listings_merchant_id_fkey'))).toBe(true)
+  })
+})
+
+describe('getProfileReviews relationship ambiguity fix (category: Listing Detail) — reviews has two FKs to profiles (reviewer_id, reviewee_id), so the reviewer embed must be FK-qualified', () => {
+  it('5. getProfileReviews() qualifies the reviewer embed with reviews_reviewer_id_fkey, never the ambiguous bare form', async () => {
+    const selectCalls: string[] = []
+    vi.mocked(mockedCreateClient).mockResolvedValue(fakeSupabaseClient(selectCalls) as never)
+    await getProfileReviews('11111111-1111-1111-1111-111111111111')
+    expect(selectCalls.some((s) => s.includes('profiles!reviews_reviewer_id_fkey'))).toBe(true)
+    expect(selectCalls.some((s) => /[^!]profiles\(/.test(s))).toBe(false)
+  })
+
+  it('6. getProfileReviews() still filters by reviewee_id -- no unrelated behavior change', async () => {
+    const calls: Array<[string, unknown]> = []
+    const builder = {
+      select() { return builder },
+      eq(column: string, value: unknown) { calls.push([column, value]); return builder },
+      order() { return builder },
+      then(resolve: (v: { data: unknown }) => void) { resolve({ data: [] }) },
+    }
+    vi.mocked(mockedCreateClient).mockResolvedValue({ from: () => builder } as never)
+    await getProfileReviews('22222222-2222-2222-2222-222222222222')
+    expect(calls).toContainEqual(['reviewee_id', '22222222-2222-2222-2222-222222222222'])
   })
 })
 

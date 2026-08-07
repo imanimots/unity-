@@ -230,9 +230,15 @@ export async function getProfileReviews(revieweeId: string) {
   const supabase = await createClient()
   if (!supabase) return []
 
+  // `reviews` has two FK relationships to `profiles` (reviewer_id,
+  // reviewee_id), so a bare `profiles(*)` embed is ambiguous to
+  // PostgREST (error PGRST201) -- the same failure class fixed for
+  // `listings` during Unity SEO Pre-Launch Hardening. Qualify with the
+  // exact FK constraint name, confirmed live via PostgREST's own error
+  // hint.
   const { data } = await supabase
     .from('reviews')
-    .select('*, reviewer:profiles(*)')
+    .select('*, reviewer:profiles!reviews_reviewer_id_fkey(*)')
     .eq('reviewee_id', revieweeId)
     .order('created_at', { ascending: false })
 
