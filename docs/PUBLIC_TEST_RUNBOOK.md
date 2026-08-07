@@ -230,6 +230,20 @@ afterward (read-only detection of stalled/mismatched/paid-then-refunded payouts,
 exception queue, never mutates) on the same or a slower cadence. Both process a bounded batch and
 are safely re-runnable. See `docs/MERCHANT_PAYOUT_WORKFLOW.md` for what each does.
 
+## 12c. SEO pre-launch safety verification
+
+`scripts/verify-seo-prelaunch-safety.mjs` (same safety gate as every other
+`verify-*.mjs` script). Requires `npm run dev` already running for its
+live-HTTP checks (indexation meta tags, `robots.txt`, `sitemap.xml`) and the
+`is_test` migration applied for its live-DB checks (test-fixture query
+exclusion). Rerunnable. See `docs/SEO_HARDENING.md` for what it verifies and
+the exact blockers before `SEO_INDEXING_ENABLED` should ever be set to
+`true`.
+
+```
+QA_SEED_ENABLED=true QA_SEED_CONFIRM=UNITY_DEV_ONLY QA_SEED_PROJECT_REF=<ref> node scripts/verify-seo-prelaunch-safety.mjs
+```
+
 ## 13. Incident handling
 
 1. Identify scope: is it one user, one booking, or systemic? Check `/admin/exceptions` and
