@@ -49,6 +49,8 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env): EnvVa
     check('INTERNAL_CRON_SECRET', env.INTERNAL_CRON_SECRET, { required: true, detail: 'protects the unpaid-expiry and email-sweep internal routes — required for those crons to ever run' }),
 
     // Optional
+    check('SEO_INDEXING_ENABLED', env.SEO_INDEXING_ENABLED ?? 'false', { required: false, allowed: ['false', 'true'], detail: 'must stay "false" until a permanent domain, Search Console, legal approval, and real inventory are in place — see src/lib/seo/config.ts' }),
+    check('SEO_MARKETPLACE_INDEXING_ENABLED', env.SEO_MARKETPLACE_INDEXING_ENABLED ?? 'false', { required: false, allowed: ['false', 'true'], detail: 'independent of SEO_INDEXING_ENABLED — must also stay "false" for now' }),
     check('ANTHROPIC_API_KEY', env.ANTHROPIC_API_KEY, { required: false, detail: 'AI assistant falls back to a canned response when unset' }),
     check('RESEND_API_KEY', env.RESEND_API_KEY, { required: false, detail: 'only needed when EMAIL_PROVIDER=resend' }),
     check('VOYAGE_API_KEY', env.VOYAGE_API_KEY, { required: false, detail: 'assistant falls back to ILIKE search when unset' }),

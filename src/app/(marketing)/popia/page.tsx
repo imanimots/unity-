@@ -2,13 +2,16 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
 import { getLegalDocument } from '@/lib/legal/registry'
+import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
+import { absoluteUrl } from '@/lib/seo/config'
 
 const doc = getLegalDocument('popia')!
 
 export const metadata: Metadata = {
   title: `${doc.title} — Unity`,
   description: 'Unity\'s notice under the Protection of Personal Information Act (POPIA).',
-  alternates: { canonical: '/popia' },
+  alternates: { canonical: absoluteUrl('/popia') },
+  robots: legalRobotsMeta(doc),
 }
 
 export default function PopiaPage() {

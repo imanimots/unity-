@@ -2,13 +2,16 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
 import { getLegalDocument } from '@/lib/legal/registry'
+import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
+import { absoluteUrl } from '@/lib/seo/config'
 
 const doc = getLegalDocument('prohibited-items')!
 
 export const metadata: Metadata = {
   title: `${doc.title} — Unity`,
   description: 'Items and transactions that are not permitted on Unity.',
-  alternates: { canonical: '/prohibited-items' },
+  alternates: { canonical: absoluteUrl('/prohibited-items') },
+  robots: legalRobotsMeta(doc),
 }
 
 export default function ProhibitedItemsPage() {

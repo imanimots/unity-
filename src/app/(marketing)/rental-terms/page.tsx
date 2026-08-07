@@ -2,13 +2,16 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
 import { getLegalDocument } from '@/lib/legal/registry'
+import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
+import { absoluteUrl } from '@/lib/seo/config'
 
 const doc = getLegalDocument('rental-terms')!
 
 export const metadata: Metadata = {
   title: `${doc.title} — Unity`,
   description: 'How a rental booking works on Unity, from request to return.',
-  alternates: { canonical: '/rental-terms' },
+  alternates: { canonical: absoluteUrl('/rental-terms') },
+  robots: legalRobotsMeta(doc),
 }
 
 export default function RentalTermsPage() {

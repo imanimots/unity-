@@ -3,13 +3,16 @@ import Link from 'next/link'
 import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
 import { TestModeBanner } from '@/components/shared/test-mode-banner'
 import { getLegalDocument } from '@/lib/legal/registry'
+import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
+import { absoluteUrl } from '@/lib/seo/config'
 
 const doc = getLegalDocument('disputes')!
 
 export const metadata: Metadata = {
   title: `${doc.title} — Unity`,
   description: 'How a booking dispute is raised and reviewed on Unity.',
-  alternates: { canonical: '/disputes' },
+  alternates: { canonical: absoluteUrl('/disputes') },
+  robots: legalRobotsMeta(doc),
 }
 
 export default function DisputesPage() {

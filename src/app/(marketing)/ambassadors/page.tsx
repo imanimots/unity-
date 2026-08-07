@@ -1,7 +1,18 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { CheckCircle, Users, TrendingUp, Globe, ArrowRight, Star, Zap } from 'lucide-react'
+import { absoluteUrl, isIndexingEnabled } from '@/lib/seo/config'
 
-export const metadata = { title: 'Ambassador Program — Unity' }
+const TITLE = 'Ambassador Program — Unity'
+const DESCRIPTION = 'Earn commission referring new renters and merchants to Unity.'
+
+export const metadata: Metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: isIndexingEnabled() ? { canonical: absoluteUrl('/ambassadors') } : undefined,
+  openGraph: { title: TITLE, description: DESCRIPTION, url: absoluteUrl('/ambassadors'), type: 'website' },
+  twitter: { card: 'summary_large_image', title: TITLE, description: DESCRIPTION },
+}
 
 const TIERS = [
   {

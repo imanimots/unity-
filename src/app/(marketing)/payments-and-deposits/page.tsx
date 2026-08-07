@@ -3,13 +3,16 @@ import Link from 'next/link'
 import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
 import { TestModeBanner } from '@/components/shared/test-mode-banner'
 import { getLegalDocument } from '@/lib/legal/registry'
+import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
+import { absoluteUrl } from '@/lib/seo/config'
 
 const doc = getLegalDocument('payments-and-deposits')!
 
 export const metadata: Metadata = {
   title: `${doc.title} — Unity`,
   description: 'How payments and security deposits currently work on Unity, in test mode and in a future live environment.',
-  alternates: { canonical: '/payments-and-deposits' },
+  alternates: { canonical: absoluteUrl('/payments-and-deposits') },
+  robots: legalRobotsMeta(doc),
 }
 
 export default function PaymentsAndDepositsPage() {

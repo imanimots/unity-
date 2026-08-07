@@ -2,13 +2,16 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
 import { getLegalDocument } from '@/lib/legal/registry'
+import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
+import { absoluteUrl } from '@/lib/seo/config'
 
 const doc = getLegalDocument('privacy')!
 
 export const metadata: Metadata = {
   title: `${doc.title} — Unity`,
   description: 'How Unity collects, uses, and protects personal information.',
-  alternates: { canonical: '/privacy' },
+  alternates: { canonical: absoluteUrl('/privacy') },
+  robots: legalRobotsMeta(doc),
 }
 
 export default function PrivacyPage() {

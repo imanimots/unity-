@@ -2,13 +2,16 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
 import { getLegalDocument } from '@/lib/legal/registry'
+import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
+import { absoluteUrl } from '@/lib/seo/config'
 
 const doc = getLegalDocument('delivery-and-handover')!
 
 export const metadata: Metadata = {
   title: `${doc.title} — Unity`,
   description: 'How items are handed over between renter and merchant on Unity today.',
-  alternates: { canonical: '/delivery-and-handover' },
+  alternates: { canonical: absoluteUrl('/delivery-and-handover') },
+  robots: legalRobotsMeta(doc),
 }
 
 export default function DeliveryAndHandoverPage() {

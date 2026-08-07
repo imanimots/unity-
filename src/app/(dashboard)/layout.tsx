@@ -1,6 +1,17 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { Navbar } from '@/components/shared/navbar'
 import { requireAuth } from '@/lib/supabase/require-admin'
+import { PERMANENT_NOINDEX } from '@/lib/seo/config'
+
+// Every authenticated dashboard route (renter/merchant/orders/barter/
+// disputes/checkout/booking-transaction pages) is always noindex,
+// regardless of the future SEO_INDEXING_ENABLED flag (Unity SEO
+// Pre-Launch Hardening, Part E). robots.txt separately Disallows /dashboard/
+// entirely (genuinely private, auth-gated infrastructure) — this meta
+// directive is defense-in-depth for the case a URL is somehow reached
+// despite that.
+export const metadata: Metadata = { robots: PERMANENT_NOINDEX }
 
 // Server-side authorization gate for every route under this group (renter
 // dashboard, merchant dashboard, affiliate dashboard). This is the

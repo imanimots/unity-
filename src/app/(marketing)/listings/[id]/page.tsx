@@ -13,6 +13,7 @@ import { AffiliateButton } from '@/components/listings/affiliate-button'
 import { ProposeTradeButton } from '@/components/barter/propose-trade-button'
 import { getRequestProfile } from '@/lib/supabase/require-admin'
 import { isListingBarterLocked, getAllBarterLockedListingIds } from '@/lib/barter/listing-lock'
+import { absoluteUrl, isMarketplaceIndexingEnabled, PERMANENT_NOINDEX } from '@/lib/seo/config'
 
 const CITY_BY_MERCHANT: Record<string, string> = {
   'user-1': 'Johannesburg', 'user-2': 'Sandton',
@@ -36,10 +37,25 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps) {
   const { id } = await params
   const listing = await getListing(id)
-  if (!listing) return { title: 'Listing not found — Unity' }
+  if (!listing) return { title: 'Listing not found — Unity', robots: PERMANENT_NOINDEX }
+
+  const title = `${listing.title} — Unity`
+  const description = listing.description?.slice(0, 160)
+  const image = listing.media?.[0]?.url
+  const url = absoluteUrl(`/listings/${id}`)
+
+  // A test/QA/DEMO fixture's detail page always stays noindex, regardless
+  // of the marketplace flag — it's never meant to be a public search
+  // result even once real listing indexing is turned on.
+  const marketplaceIndexable = isMarketplaceIndexingEnabled() && !listing.is_test
+
   return {
-    title: `${listing.title} — Unity`,
-    description: listing.description?.slice(0, 160),
+    title,
+    description,
+    alternates: marketplaceIndexable ? { canonical: url } : undefined,
+    robots: marketplaceIndexable ? { index: true, follow: true } : PERMANENT_NOINDEX,
+    openGraph: { title, description, url, type: 'website', ...(image ? { images: [{ url: image }] } : {}) },
+    twitter: { card: 'summary_large_image', title, description, ...(image ? { images: [image] } : {}) },
   }
 }
 

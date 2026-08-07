@@ -1,4 +1,13 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
+import { PERMANENT_NOINDEX } from '@/lib/seo/config'
+
+// Login/register/verify are always noindex, regardless of the future
+// SEO_INDEXING_ENABLED flag (Unity SEO Pre-Launch Hardening, Part E) --
+// these are public-but-low-value auth surfaces, never crawl-blocked
+// (robots.txt still permits crawling them so this directive stays
+// observable), just never worth a search result.
+export const metadata: Metadata = { robots: PERMANENT_NOINDEX }
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (

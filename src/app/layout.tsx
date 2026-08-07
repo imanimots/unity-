@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans } from 'next/font/google'
 import { ThemeProvider } from 'next-themes'
 import { Toaster } from 'sonner'
 import { ChatWidget } from '@/components/assistant/chat-widget'
+import { getAppUrl, getDefaultRobotsMeta } from '@/lib/seo/config'
 import './globals.css'
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -13,19 +14,26 @@ const plusJakarta = Plus_Jakarta_Sans({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getAppUrl()),
   title: 'Unity — Rent What You Need. Earn From What You Have.',
-  description: "South Africa's peer-to-peer rental marketplace. Identity-reviewed users, test-mode checkout, and thousands of items to rent near you.",
-  keywords: ['rental', 'peer to peer', 'South Africa', 'rent', 'earn', 'marketplace'],
+  description: "South Africa's peer-to-peer rental marketplace. Identity-reviewed users, test-mode checkout.",
+  // The root default — every page inherits this unless it sets its own
+  // `robots` (an explicit child value always wins). See src/lib/seo/config.ts.
+  robots: getDefaultRobotsMeta(),
   openGraph: {
     title: 'Unity — Rent What You Need.',
     description: "South Africa's peer-to-peer rental marketplace, currently in public test.",
     type: 'website',
+    locale: 'en_ZA',
+  },
+  twitter: {
+    card: 'summary_large_image',
   },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${plusJakarta.variable} h-full antialiased`}>
+    <html lang="en-ZA" suppressHydrationWarning className={`${plusJakarta.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-[#FAF8F5] dark:bg-[#0F0A0A] text-[#1A0A0A] dark:text-[#F5F0ED]">
         <a
           href="#main-content"

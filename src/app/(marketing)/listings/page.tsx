@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { getListings } from '@/lib/data/listings'
 import { resolveEffectiveCountry } from '@/lib/resolve-effective-country'
 import { ListingCard } from '@/components/listings/listing-card'
@@ -5,10 +6,23 @@ import { FilterBar } from '@/components/listings/filter-bar'
 import { MarketplaceModeSelectorContainer } from '@/components/listings/marketplace-mode-selector-container'
 import type { ListingFilters } from '@/lib/data/listings'
 import { Search, ArrowLeftRight } from 'lucide-react'
+import { absoluteUrl, isMarketplaceIndexingEnabled, getMarketplaceRobotsMeta } from '@/lib/seo/config'
 
-export const metadata = {
-  title: 'Browse Listings — Unity',
-  description: 'Find items to rent near you across South Africa.',
+const TITLE = 'Browse Listings — Unity'
+const DESCRIPTION = 'Find items to rent near you across South Africa.'
+
+export const metadata: Metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  // Controlled independently by the marketplace indexing gate, never the
+  // general one — see src/lib/seo/config.ts. Always points at the bare
+  // canonical path regardless of any ?q=/?category=/?sort= on the actual
+  // visited URL, so query-parameter variants never create a second,
+  // conflicting canonical identity for this page.
+  alternates: isMarketplaceIndexingEnabled() ? { canonical: absoluteUrl('/listings') } : undefined,
+  robots: getMarketplaceRobotsMeta(),
+  openGraph: { title: TITLE, description: DESCRIPTION, url: absoluteUrl('/listings'), type: 'website' },
+  twitter: { card: 'summary_large_image', title: TITLE, description: DESCRIPTION },
 }
 
 interface PageProps {

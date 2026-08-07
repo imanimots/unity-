@@ -3,13 +3,16 @@ import Link from 'next/link'
 import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
 import { TestModeBanner } from '@/components/shared/test-mode-banner'
 import { getLegalDocument } from '@/lib/legal/registry'
+import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
+import { absoluteUrl } from '@/lib/seo/config'
 
 const doc = getLegalDocument('refunds')!
 
 export const metadata: Metadata = {
   title: `${doc.title} — Unity`,
   description: 'How refunds are handled on Unity, today and in a future live environment.',
-  alternates: { canonical: '/refunds' },
+  alternates: { canonical: absoluteUrl('/refunds') },
+  robots: legalRobotsMeta(doc),
 }
 
 export default function RefundsPage() {

@@ -1,13 +1,16 @@
 import type { Metadata } from 'next'
 import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
 import { getLegalDocument } from '@/lib/legal/registry'
+import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
+import { absoluteUrl } from '@/lib/seo/config'
 
 const doc = getLegalDocument('contact')!
 
 export const metadata: Metadata = {
   title: `${doc.title} — Unity`,
   description: 'How to reach Unity for support, legal, or privacy matters.',
-  alternates: { canonical: '/contact' },
+  alternates: { canonical: absoluteUrl('/contact') },
+  robots: legalRobotsMeta(doc),
 }
 
 export default function ContactPage() {

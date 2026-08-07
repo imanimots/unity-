@@ -2,13 +2,16 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
 import { getLegalDocument } from '@/lib/legal/registry'
+import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
+import { absoluteUrl } from '@/lib/seo/config'
 
 const doc = getLegalDocument('terms')!
 
 export const metadata: Metadata = {
   title: `${doc.title} — Unity`,
   description: 'The terms that govern use of the Unity peer-to-peer rental marketplace.',
-  alternates: { canonical: '/terms' },
+  alternates: { canonical: absoluteUrl('/terms') },
+  robots: legalRobotsMeta(doc),
 }
 
 export default function TermsPage() {

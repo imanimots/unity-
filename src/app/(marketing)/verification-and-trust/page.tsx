@@ -2,13 +2,16 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
 import { getLegalDocument } from '@/lib/legal/registry'
+import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
+import { absoluteUrl } from '@/lib/seo/config'
 
 const doc = getLegalDocument('verification-and-trust')!
 
 export const metadata: Metadata = {
   title: `${doc.title} — Unity`,
   description: 'What Unity actually checks before you rent or list — and what "verified" does and does not mean.',
-  alternates: { canonical: '/verification-and-trust' },
+  alternates: { canonical: absoluteUrl('/verification-and-trust') },
+  robots: legalRobotsMeta(doc),
 }
 
 export default function VerificationAndTrustPage() {

@@ -1,13 +1,22 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowRight, ShieldCheck, Star, CheckCircle, ShoppingBag, ArrowLeftRight } from 'lucide-react'
 import { getListings } from '@/lib/data/listings'
 import { resolveEffectiveCountry } from '@/lib/resolve-effective-country'
 import { ListingCard } from '@/components/listings/listing-card'
+import { absoluteUrl, isIndexingEnabled } from '@/lib/seo/config'
 
-export const metadata = {
-  title: 'Unity — Rent What You Need. Earn From What You Have.',
-  description: "South Africa's peer-to-peer rental marketplace. Identity-reviewed users and test-mode checkout.",
+const TITLE = 'Unity — Rent What You Need. Earn From What You Have.'
+const DESCRIPTION = "South Africa's peer-to-peer rental marketplace. Identity-reviewed users and test-mode checkout."
+
+export const metadata: Metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  // Omitted while indexing is disabled — see src/lib/seo/config.ts.
+  alternates: isIndexingEnabled() ? { canonical: absoluteUrl('/') } : undefined,
+  openGraph: { title: TITLE, description: DESCRIPTION, url: absoluteUrl('/'), type: 'website' },
+  twitter: { card: 'summary_large_image', title: TITLE, description: DESCRIPTION },
 }
 
 const MARQUEE_TEXT =
