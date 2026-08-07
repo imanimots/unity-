@@ -5,6 +5,8 @@ import { bookingActionSchema } from '@/lib/bookings/validation'
 import { mapBookingRpcError } from '@/lib/bookings/rpc-errors'
 import { computeBookingIdOnlyHash, checkIdempotentReplay } from '@/lib/bookings/idempotency'
 import { sendTemplate, loadBookingEmailContext } from '@/lib/email'
+import { createMerchantPayout } from '@/lib/payments/orchestrator'
+import { notifyMerchantPayoutEvent } from '@/lib/payouts/notify'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -102,6 +104,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     } catch (emailErr) {
       console.error('[bookings.confirm-return] email dispatch failed', { bookingId, emailErr })
+    }
+
+    // Step 11 Phase 8: best-effort payout-obligation creation, never
+    // blocking the return confirmation itself. Creates only a 'pending'
+    // row -- no provider is called here (see create-merchant-payout.ts's
+    // own header comment). A transient failure here is recovered by the
+    // reconcile-missing internal sweep, not by the merchant retrying
+    // this route.
+    try {
+      const payoutIdempotencyKey = parsed.data.idempotency_key ? `${parsed.data.idempotency_key}-payout` : undefined
+      const payout = await createMerchantPayout({ admin }, bookingId, payoutIdempotencyKey)
+      try {
+        await notifyMerchantPayoutEvent(admin, payout.payoutId, 'merchant_payout.created')
+      } catch (emailErr) {
+        console.error('[bookings.confirm-return] payout-created email dispatch failed', { bookingId, payoutId: payout.payoutId, emailErr })
+      }
+    } catch (payoutErr) {
+      console.error('[bookings.confirm-return] payout creation failed', { bookingId, payoutErr })
     }
 
     return NextResponse.json(data)

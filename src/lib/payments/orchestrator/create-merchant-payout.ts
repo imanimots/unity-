@@ -1,6 +1,5 @@
 import type { OrchestratorContext, CreateMerchantPayoutResult } from './types'
 import { OrchestrationError } from './errors'
-import { getPaymentProvider } from '../registry'
 
 /**
  * Derives the payable amount entirely from ledger data -- never a
@@ -14,17 +13,24 @@ import { getPaymentProvider } from '../registry'
  * idempotency_keys handling -- reused directly. The duplicate-payout
  * guard below only fires when this ISN'T a legitimate replay: an exact
  * same-key retry must still resolve to the RPC's cached result, not the
- * "a payout already exists" error (found live -- an early, unconditional
- * existence check was blocking retries of the very call that created the
- * row it was checking for).
+ * "a payout already exists" error.
+ *
+ * Step 11 Phase 8: this function creates the PENDING OBLIGATION only --
+ * it must never call a payout provider (mock or real). Creating a
+ * payout and processing/paying it out are separate lifecycle events;
+ * provider invocation belongs only to a future, explicitly approved
+ * processing integration. This is also why the duplicate-payout guard
+ * no longer excludes 'failed' payouts (was `.neq('status', 'failed')`)
+ * -- once Phase 8's retry_payout() RPC exists (failed -> processing on
+ * the SAME row), a failed payout is never superseded by a fresh row
+ * here; it is retried in place.
  */
 export async function createMerchantPayout(
   ctx: OrchestratorContext,
   bookingId: string,
   idempotencyKey?: string
 ): Promise<CreateMerchantPayoutResult> {
-  const { admin, providerName = 'mock' } = ctx
-  const provider = getPaymentProvider(providerName)
+  const { admin } = ctx
 
   const { data: booking } = await admin.from('bookings').select('id, merchant_id, status').eq('id', bookingId).maybeSingle()
   if (!booking) throw new OrchestrationError('missing_payment', 'Booking not found')
@@ -33,7 +39,6 @@ export async function createMerchantPayout(
     .from('merchant_payouts')
     .select('id, status, idempotency_key')
     .eq('booking_id', bookingId)
-    .neq('status', 'failed')
     .maybeSingle()
 
   const isMatchingReplay = existingPayout && idempotencyKey && existingPayout.idempotency_key === idempotencyKey
@@ -64,8 +69,6 @@ export async function createMerchantPayout(
     throw new OrchestrationError('payout_unavailable', 'No merchant proceeds are available to pay out for this booking')
   }
 
-  const payoutResult = await provider.createMerchantPayout({ merchantId: booking.merchant_id, amount: payableAmount, currency: 'ZAR' })
-
   const { data, error } = await admin.rpc('create_merchant_payout', {
     p_merchant_id: booking.merchant_id,
     p_booking_id: bookingId,
@@ -79,8 +82,6 @@ export async function createMerchantPayout(
     }
     throw new OrchestrationError('internal_consistency_error', error.message)
   }
-
-  void payoutResult // provider reference already recorded via create_merchant_payout's own ledger entry; nothing further to persist here this phase
 
   return { payoutId: data.payout_id, amount: payableAmount, status: 'pending' }
 }
