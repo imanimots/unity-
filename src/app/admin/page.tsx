@@ -36,6 +36,11 @@ interface OverviewStats {
   affiliate_commissions_payout_queued: number
   affiliate_commissions_failed: number
   active_affiliates: number
+  merchant_payouts_pending: number
+  merchant_payouts_processing: number
+  merchant_payouts_failed: number
+  merchant_payouts_pending_overdue: number
+  merchant_payouts_processing_overdue: number
   generated_at: string
 }
 
@@ -139,6 +144,17 @@ export default async function AdminOverviewPage() {
           <StatCard label="Commissions held" value={stats.affiliate_commissions_held} />
           <StatCard label="Payout queued" value={stats.affiliate_commissions_payout_queued} />
           <StatCard label="Payout failed" value={stats.affiliate_commissions_failed} />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Merchant Payouts</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <StatCard label="Pending" value={stats.merchant_payouts_pending} />
+          <StatCard label="Processing" value={stats.merchant_payouts_processing} />
+          <StatCard label="Failed" value={stats.merchant_payouts_failed} />
+          <StatCard label="Pending overdue" value={stats.merchant_payouts_pending_overdue} />
+          <StatCard label="Processing overdue" value={stats.merchant_payouts_processing_overdue} />
         </div>
       </section>
 

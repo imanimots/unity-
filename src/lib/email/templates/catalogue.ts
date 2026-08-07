@@ -1024,6 +1024,99 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       cta: { label: 'Reply on Unity', path: '/chat' },
     }),
   },
+  // ---------------- MERCHANT PAYOUTS (Step 11 Phase 8) ----------------
+  {
+    id: 'merchant-payout-created',
+    version: '1',
+    event: 'merchant_payout.created',
+    requiredVars: ['merchantName', 'listingTitle', 'bookingReference', 'payoutAmount'],
+    subject: (v) => `Payout created for "${s(v, 'listingTitle')}"`,
+    build: (v) => ({
+      preheader: 'Unity has created a payout record for your completed rental',
+      greeting: `Hi ${s(v, 'merchantName')},`,
+      bodyParagraphs: [
+        `Unity has created a payout record for the completed rental of "${s(v, 'listingTitle')}". It has not started processing yet.`,
+      ],
+      summary: { title: 'Payout', rows: [{ label: 'Booking', value: s(v, 'bookingReference') }, { label: 'Amount', value: s(v, 'payoutAmount') }] },
+      cta: { label: 'View your payouts', path: '/dashboard/merchant/payouts' },
+      testModeNotice: true,
+    }),
+  },
+  {
+    id: 'merchant-payout-processing',
+    version: '1',
+    event: 'merchant_payout.processing',
+    requiredVars: ['merchantName', 'listingTitle', 'bookingReference', 'payoutAmount'],
+    subject: (v) => `Payout processing for "${s(v, 'listingTitle')}"`,
+    build: (v) => ({
+      preheader: 'Unity is processing this payout',
+      greeting: `Hi ${s(v, 'merchantName')},`,
+      bodyParagraphs: [
+        `Unity is processing your payout for "${s(v, 'listingTitle')}". No automated payout provider is currently connected — this records that payout processing has begun.`,
+      ],
+      summary: { title: 'Payout', rows: [{ label: 'Booking', value: s(v, 'bookingReference') }, { label: 'Amount', value: s(v, 'payoutAmount') }] },
+      cta: { label: 'View your payouts', path: '/dashboard/merchant/payouts' },
+      testModeNotice: true,
+    }),
+  },
+  {
+    id: 'merchant-payout-paid',
+    version: '1',
+    event: 'merchant_payout.paid',
+    requiredVars: ['merchantName', 'listingTitle', 'bookingReference', 'payoutAmount', 'payoutReference'],
+    subject: (v) => `Payout marked as paid for "${s(v, 'listingTitle')}"`,
+    build: (v) => ({
+      preheader: 'Manual payout recorded',
+      greeting: `Hi ${s(v, 'merchantName')},`,
+      bodyParagraphs: [
+        `Unity recorded this payout as paid for "${s(v, 'listingTitle')}". Manual payout recorded — no automated provider was used.`,
+      ],
+      summary: {
+        title: 'Payout',
+        rows: [
+          { label: 'Booking', value: s(v, 'bookingReference') },
+          { label: 'Amount', value: s(v, 'payoutAmount') },
+          { label: 'Reference', value: s(v, 'payoutReference') },
+        ],
+      },
+      cta: { label: 'View your payouts', path: '/dashboard/merchant/payouts' },
+      testModeNotice: true,
+    }),
+  },
+  {
+    id: 'merchant-payout-failed',
+    version: '1',
+    event: 'merchant_payout.failed',
+    requiredVars: ['merchantName', 'listingTitle', 'bookingReference', 'failureMessage'],
+    subject: (v) => `Payout issue for "${s(v, 'listingTitle')}"`,
+    build: (v) => ({
+      preheader: 'This payout could not be completed',
+      greeting: `Hi ${s(v, 'merchantName')},`,
+      bodyParagraphs: [
+        `This payout could not be completed for "${s(v, 'listingTitle')}". ${s(v, 'failureMessage')} Unity will review or retry it.`,
+      ],
+      summary: { title: 'Payout', rows: [{ label: 'Booking', value: s(v, 'bookingReference') }] },
+      cta: { label: 'View your payouts', path: '/dashboard/merchant/payouts' },
+      testModeNotice: true,
+    }),
+  },
+  {
+    id: 'merchant-payout-retry-started',
+    version: '1',
+    event: 'merchant_payout.retry_started',
+    requiredVars: ['merchantName', 'listingTitle', 'bookingReference', 'payoutAmount'],
+    subject: (v) => `Payout retry started for "${s(v, 'listingTitle')}"`,
+    build: (v) => ({
+      preheader: 'Unity is retrying this payout',
+      greeting: `Hi ${s(v, 'merchantName')},`,
+      bodyParagraphs: [
+        `Unity is retrying your payout for "${s(v, 'listingTitle')}". No automated payout provider is currently connected — this records that payout processing has resumed.`,
+      ],
+      summary: { title: 'Payout', rows: [{ label: 'Booking', value: s(v, 'bookingReference') }, { label: 'Amount', value: s(v, 'payoutAmount') }] },
+      cta: { label: 'View your payouts', path: '/dashboard/merchant/payouts' },
+      testModeNotice: true,
+    }),
+  },
 ]
 
 const TEMPLATES_BY_ID = new Map(EMAIL_TEMPLATES.map((t) => [t.id, t]))

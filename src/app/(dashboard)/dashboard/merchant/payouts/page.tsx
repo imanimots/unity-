@@ -1,39 +1,82 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { DollarSign, Clock, CheckCircle, ArrowRight, Building2, AlertCircle, ArrowLeft } from 'lucide-react'
-import { MOCK_MERCHANT_BOOKINGS } from '@/lib/mock/data'
+import { ArrowLeft, Clock, CheckCircle, AlertCircle, Loader2, Wallet } from 'lucide-react'
 import { TestModeBanner } from '@/components/shared/test-mode-banner'
 
-export const metadata = { title: 'Payouts — Unity' }
+interface MerchantPayout {
+  id: string
+  amount: number
+  currency: string
+  status: 'pending' | 'processing' | 'paid' | 'failed'
+  payoutReference: string | null
+  failureMessage: string | null
+  bookingReference: string | null
+  listingTitle: string | null
+  createdAt: string
+  processingStartedAt: string | null
+  paidAt: string | null
+  failedAt: string | null
+}
 
-const MOCK_PAYOUT_HISTORY = [
-  { id: 'pay-1', amount: 1200,  date: '2026-05-30', status: 'paid',    ref: 'UNI-PAY-0041', booking: 'Nikon Z6 II · 4 days' },
-  { id: 'pay-2', amount: 500,   date: '2026-04-18', status: 'paid',    ref: 'UNI-PAY-0028', booking: 'Campmaster Tent · 5 days' },
-  { id: 'pay-3', amount: 2100,  date: '2026-03-05', status: 'paid',    ref: 'UNI-PAY-0019', booking: 'Nikon Z6 II · 7 days' },
-]
+const STATUS_EXPLANATIONS: Record<MerchantPayout['status'], string> = {
+  pending: 'Unity has created your payout record. It has not started processing yet.',
+  processing: 'Unity is processing this payout. No automated payout provider is currently connected.',
+  paid: 'Unity recorded this payout as paid.',
+  failed: 'This payout could not be completed. Unity will review or retry it.',
+}
+
+const STATUS_BADGE_CLASSES: Record<MerchantPayout['status'], string> = {
+  pending: 'bg-[#F2EDE8] text-[#6B5B55] dark:bg-[#2A1A1A] dark:text-[#9B8B85]',
+  processing: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+  paid: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+}
+
+const STATUS_ICON: Record<MerchantPayout['status'], React.ReactNode> = {
+  pending: <Clock size={13} />,
+  processing: <Loader2 size={13} className="animate-spin" />,
+  paid: <CheckCircle size={13} />,
+  failed: <AlertCircle size={13} />,
+}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 export default function PayoutsPage() {
-  const completedBookings = MOCK_MERCHANT_BOOKINGS.filter((b) => b.status === 'returned')
-  const activeBookings    = MOCK_MERCHANT_BOOKINGS.filter((b) => b.status === 'active')
+  const [payouts, setPayouts] = useState<MerchantPayout[]>([])
+  const [totals, setTotals] = useState({ pending: 0, processing: 0, paid: 0, failed: 0 })
+  const [loading, setLoading] = useState(true)
 
-  const availableBalance = completedBookings.reduce((sum, b) => sum + b.rental_fee, 0)
-  const inEscrow         = activeBookings.reduce((sum, b) => sum + b.total_amount, 0)
-  const allTimePaid      = MOCK_PAYOUT_HISTORY.reduce((sum, p) => sum + p.amount, 0)
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/payouts/me')
+      if (res.ok) {
+        const data = await res.json()
+        setPayouts(data.payouts ?? [])
+        setTotals(data.totals ?? { pending: 0, processing: 0, paid: 0, failed: 0 })
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadData()
+  }, [loadData])
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-
-      {/* Back */}
       <div className="mb-8">
         <Link href="/dashboard/merchant" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
           <ArrowLeft size={13} /> Back
         </Link>
       </div>
 
-      {/* Page heading */}
       <div className="mb-12">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">Earnings</p>
         <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight">
@@ -43,104 +86,72 @@ export default function PayoutsPage() {
 
       <TestModeBanner className="mb-8" />
 
-      {/* Available balance — featured metric */}
-      <div className="bg-[#8B1A1A] rounded-xl p-8 mb-12 border-l-4 border-l-[#C4511F]">
-        <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-white/60 mb-3">Available Balance</p>
+      <div className="bg-[#8B1A1A] rounded-xl p-8 mb-8 border-l-4 border-l-[#C4511F]">
+        <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-white/60 mb-3">Total Paid</p>
         <div className="text-5xl lg:text-6xl font-extrabold text-white leading-none mb-2">
-          R{availableBalance}
+          R{totals.paid.toFixed(0)}
         </div>
-        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/50">Ready to withdraw</p>
-        {availableBalance > 0 && (
-          <button className="mt-6 flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold uppercase tracking-[0.1em] rounded-xl transition-colors">
-            Withdraw Funds <ArrowRight size={14} />
-          </button>
-        )}
+        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/50">Manually recorded by Unity — no automated provider is connected</p>
       </div>
 
-      {/* Secondary balance stats */}
-      <div className="grid grid-cols-2 gap-4 mb-12">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12">
         <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Pending Release</p>
-            <Clock size={14} className="text-amber-400" />
-          </div>
-          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">R{inEscrow}</div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mt-2">Released on return</p>
+          <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">Pending</p>
+          <div className="text-3xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">R{totals.pending.toFixed(0)}</div>
         </div>
-
         <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">All-Time Paid</p>
-            <CheckCircle size={14} className="text-green-400" />
-          </div>
-          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">R{allTimePaid}</div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mt-2">{MOCK_PAYOUT_HISTORY.length} payouts</p>
+          <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">Processing</p>
+          <div className="text-3xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">R{totals.processing.toFixed(0)}</div>
+        </div>
+        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+          <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">Failed</p>
+          <div className="text-3xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">R{totals.failed.toFixed(0)}</div>
         </div>
       </div>
 
-      {/* Bank account setup */}
-      <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-5 mb-12">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#F2EDE8] dark:bg-[#2A1A1A] flex items-center justify-center">
-              <Building2 size={18} className="text-[#6B5B55] dark:text-[#9B8B85]" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Bank account</p>
-              <p className="text-xs text-[#9B8B85]">Not yet configured</p>
-            </div>
-          </div>
-          <button className="px-3 py-1.5 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] text-xs font-medium uppercase tracking-[0.08em] rounded-lg hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors flex items-center gap-1.5">
-            Add Account <ArrowRight size={12} />
-          </button>
-        </div>
-
-        <div className="mt-4 pt-4 border-t border-[#F2EDE8] dark:border-[#2A1A1A] flex items-start gap-2">
-          <AlertCircle size={13} className="text-amber-400 shrink-0 mt-0.5" />
-          <p className="text-xs text-[#9B8B85]">
-            You need a verified bank account to receive payouts. Unity supports all major South African banks.
-            Bank details are encrypted and handled securely.
-          </p>
-        </div>
-      </div>
-
-      {/* Payout history */}
       <div className="mb-12">
-        <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-5">Payout History</p>
+        <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-4">Payout History</p>
 
-        {MOCK_PAYOUT_HISTORY.length === 0 ? (
-          <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-12 text-center">
-            <DollarSign size={32} className="mx-auto text-[#9B8B85] mb-3" />
-            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">No payouts yet. Complete a rental to start earning.</p>
+        {loading ? (
+          <p className="text-sm text-[#9B8B85]">Loading…</p>
+        ) : payouts.length === 0 ? (
+          <div className="text-center py-16">
+            <Wallet size={28} className="mx-auto text-[#9B8B85] mb-3" />
+            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">No payouts yet</p>
+            <p className="text-xs text-[#9B8B85] mt-2">A payout is created automatically once a rental completes.</p>
           </div>
         ) : (
           <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] overflow-hidden">
-            {MOCK_PAYOUT_HISTORY.map((p) => (
-              <div key={p.id} className="flex items-center gap-4 px-5 py-4 border-b border-[#F2EDE8] dark:border-[#2A1A1A] last:border-b-0 hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors">
-                <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
-                  <CheckCircle size={14} className="text-green-500" />
+            {payouts.map((p) => (
+              <div key={p.id} className="px-5 py-4 border-b border-[#F2EDE8] dark:border-[#2A1A1A] last:border-b-0">
+                <div className="flex items-center justify-between gap-4 mb-1.5">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] truncate">{p.listingTitle ?? p.bookingReference ?? 'Rental payout'}</div>
+                    <div className="text-xs text-[#9B8B85]">{formatDate(p.createdAt)}{p.bookingReference ? ` · ${p.bookingReference}` : ''}</div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">R{Number(p.amount).toFixed(2)}</span>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium capitalize ${STATUS_BADGE_CLASSES[p.status]}`}>
+                      {STATUS_ICON[p.status]} {p.status}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{p.booking}</p>
-                  <p className="text-xs text-[#9B8B85] mt-0.5">{p.ref} · {formatDate(p.date)}</p>
-                </div>
-                <div className="shrink-0 font-semibold text-green-600 dark:text-green-400 text-sm">
-                  +R{p.amount}
-                </div>
+                <p className="text-xs text-[#9B8B85] leading-relaxed">
+                  {p.status === 'failed' && p.failureMessage ? p.failureMessage : STATUS_EXPLANATIONS[p.status]}
+                </p>
+                {p.status === 'paid' && p.payoutReference && (
+                  <p className="text-[11px] text-[#9B8B85] mt-1">Reference: {p.payoutReference}</p>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Unity fee note */}
-      <div className="p-4 bg-[#FAF8F5] dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A]">
-        <p className="text-xs text-[#9B8B85] leading-relaxed">
-          Unity charges a <strong className="text-[#6B5B55] dark:text-[#9B8B85]">5% platform fee</strong> on each completed rental, deducted before payout.
-          Deposits and insurance fees are collected from renters and handled separately.
-          <Link href="/pricing" className="text-[#8B1A1A] underline ml-1 hover:no-underline">Learn more</Link>
-        </p>
-      </div>
+      <p className="text-xs text-[#9B8B85] text-center">
+        Payouts are recorded manually by Unity while no automated payout provider is connected.{' '}
+        <Link href="/chat" className="underline hover:text-[#6B5B55] dark:hover:text-[#9B8B85]">Contact support</Link>
+      </p>
     </div>
   )
 }
