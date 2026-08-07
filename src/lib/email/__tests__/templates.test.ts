@@ -26,6 +26,9 @@ const FULL_SYNTHETIC_VARS: TemplateVars = {
   commissionAmount: 'R80.00',
   voidReason: 'transaction was cancelled',
   adjustmentAmount: 'R10.00',
+  payoutAmount: 'R1,200.00',
+  payoutReference: 'MOCK-PAYOUT-TEST0001',
+  failureMessage: 'Unity is reviewing an internal payout issue.',
 }
 
 const FORBIDDEN_CLAIM_PATTERNS = [
@@ -118,6 +121,7 @@ describe('email template catalogue (category: Templates)', () => {
       'order.created', 'order.payment_received', 'order.shipped', 'order.delivered', 'order.cancelled', 'order.payment_failed',
       'affiliate.enrolled', 'affiliate.commission_approved', 'affiliate.commission_held', 'affiliate.payout_queued', 'affiliate.commission_paid',
       'affiliate.payout_failed', 'affiliate.commission_voided', 'affiliate.adjustment_created', 'merchant.affiliate_enabled', 'merchant.affiliate_disabled',
+      'merchant_payout.created', 'merchant_payout.processing', 'merchant_payout.paid', 'merchant_payout.failed', 'merchant_payout.retry_started',
     ])
     for (const t of EMAIL_TEMPLATES) {
       expect(knownEvents.has(t.event), `unexpected event "${t.event}" on template "${t.id}"`).toBe(true)
