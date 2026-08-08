@@ -273,20 +273,14 @@ console.log('=== Scenario E: dispute cancellation (no adjudication) restores boo
 
 console.log('=== Scenario F: commission hold/release is keyed on disputes.status, unaffected by the booking.status fix ===')
 {
-  // Pre-existing, documented, out-of-scope Phase 2 limitation (unrelated
-  // to this corrective fix): reconcileCommissionDisputes() scans up to
-  // UNITY_COMMISSION_SWEEP_BATCH_LIMIT (100) pending/held/adjusted
-  // commissions with no ORDER BY. Across this long session, many other
-  // scripts' fixtures (Phase 2's own commission regression, Phase 8's
-  // payout regression, etc.) have accumulated well past that cap, so a
-  // freshly created commission is not guaranteed to be reached by any
-  // single sweep call -- this is a scaling characteristic of the sweep
-  // itself, not a defect in the dispute/booking-status fix under test
-  // here. Detected explicitly below rather than silently retried or
-  // silently passed.
-  const { count: candidatePoolSize } = await admin.from('unity_commissions').select('id', { count: 'exact', head: true }).in('status', ['pending', 'adjusted', 'held'])
-  const sweepMayNotReachNewRows = (candidatePoolSize ?? 0) > 100
-
+  // reconcileCommissionDisputes() previously scanned only a single
+  // unordered .limit(100) page, so a freshly created commission was not
+  // guaranteed to be reached once the live candidate pool exceeded 100
+  // rows (confirmed live, 154-164+ across this project's history). Fixed
+  // by the commission-reconciliation batching/pagination corrective
+  // maintenance pass (deterministic keyset pagination walking every
+  // candidate exactly once per run, regardless of pool size) -- this
+  // check no longer needs to tolerate or detect that condition.
   const listingId = await insertRentalListing(merchantAId, `${QA_LISTING_MARKER} — F`)
   const anchor = Date.now() + 30 * 24 * 60 * 60 * 1000
   const created = await api(renterACookie, 'POST', '/api/bookings', { listing_id: listingId, start_at: new Date(anchor).toISOString(), end_at: new Date(anchor + 3 * 24 * 60 * 60 * 1000).toISOString(), idempotency_key: `dispute-payout-f-create-${RUN_ID}` })
@@ -301,13 +295,7 @@ console.log('=== Scenario F: commission hold/release is keyed on disputes.status
   const sweepHeld = await fetch(APP_URL + '/api/internal/commissions/reconcile-refunds', { method: 'POST', headers: { Authorization: `Bearer ${process.env.INTERNAL_CRON_SECRET}` } })
   const { data: commissionHeld } = await admin.from('unity_commissions').select('status').eq('payment_id', rentalPayment.id).single()
 
-  if (commissionHeld?.status === 'held') {
-    check('F1. unresolved dispute holds the Unity commission (keyed on disputes.status)', sweepHeld.status === 200, { sweepStatus: sweepHeld.status, commissionHeld })
-  } else if (sweepMayNotReachNewRows) {
-    console.log(`  SKIP F1. sweep did not reach this run's commission within its batch limit (${candidatePoolSize} candidates > 100) -- pre-existing Phase 2 sweep scaling limitation, unrelated to this fix; not counted as a failure`)
-  } else {
-    check('F1. unresolved dispute holds the Unity commission (keyed on disputes.status)', false, { sweepStatus: sweepHeld.status, commissionHeld, candidatePoolSize })
-  }
+  check('F1. unresolved dispute holds the Unity commission (keyed on disputes.status)', sweepHeld.status === 200 && commissionHeld?.status === 'held', { sweepStatus: sweepHeld.status, commissionHeld })
 
   await startReviewAndResolve(adminCookie, disputeId, 'favor_respondent', `f-${RUN_ID}`)
   const sweepReleased = await fetch(APP_URL + '/api/internal/commissions/reconcile-refunds', { method: 'POST', headers: { Authorization: `Bearer ${process.env.INTERNAL_CRON_SECRET}` } })

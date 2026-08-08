@@ -519,6 +519,95 @@ console.log('=== Scenario L: Merchant payout reads the EFFECTIVE Unity commissio
   )
 }
 
+console.log('=== Scenario M: Large-pool (150+) reconciliation -- full coverage, ordinal >100 processing, idempotent retry ===')
+{
+  // Financial Maintenance: commission reconciliation batching/pagination
+  // fix. reconcileCommissionDisputes()/reconcileCommissionRefunds() used
+  // to fetch a single unordered .limit(100) page, so once the live
+  // candidate pool exceeded 100 rows (confirmed live, 154-164+ across
+  // this project's history), some eligible rows were never even
+  // examined by any given sweep run. Fixed via deterministic keyset
+  // pagination (ORDER BY created_at, id) that walks every candidate
+  // exactly once per run regardless of pool size. This scenario proves
+  // it: ensures a 150+ candidate pool genuinely exists, plants 3
+  // individually-verifiable actionable fixtures at the TAIL of created_at
+  // order (guaranteed ordinal position > 100), and proves each is
+  // correctly reconciled -- not merely scanned -- plus idempotent retry.
+  const TARGET_POOL_SIZE = 150
+  const { count: poolBefore } = await admin.from('unity_commissions').select('id', { count: 'exact', head: true }).in('status', ['pending', 'adjusted', 'held'])
+  const shortfall = Math.max(0, TARGET_POOL_SIZE - (poolBefore ?? 0))
+
+  if (shortfall > 0) {
+    const fillerListingId = await insertSaleListing(merchantBId, `${QA_LISTING_MARKER} — M Filler`, 50)
+    const CONCURRENCY = 10
+    for (let i = 0; i < shortfall; i += CONCURRENCY) {
+      const batch = []
+      for (let j = i; j < Math.min(i + CONCURRENCY, shortfall); j++) {
+        batch.push(completeOrderPurchase(renterACookie, fillerListingId, `m-filler-${j}-${RUN_ID}`))
+      }
+      await Promise.all(batch)
+    }
+  }
+
+  // Three tail-ordinal actionable fixtures, created last so they sort
+  // after every other candidate by created_at.
+  const disputeListingId = await insertSaleListing(merchantBId, `${QA_LISTING_MARKER} — M DisputeHold`, 500)
+  const { orderId: disputeOrderId, paymentId: disputePaymentId } = await completeOrderPurchase(renterACookie, disputeListingId, `m-dispute-${RUN_ID}`)
+  const disputeOpenRes = await api(renterACookie, 'POST', '/api/disputes', {
+    order_id: disputeOrderId, title: 'Large-pool regression dispute', description: 'Scenario M fixture', requested_resolution: 'N/A',
+    idempotency_key: `commission-regression-m-dispute-open-${RUN_ID}`,
+  })
+  check('M1. dispute opens against the tail-ordinal order fixture', disputeOpenRes.status === 201, disputeOpenRes)
+
+  const fullRefundListingId = await insertSaleListing(merchantBId, `${QA_LISTING_MARKER} — M FullRefund`, 1000)
+  const { paymentId: fullRefundPaymentId } = await completeOrderPurchase(renterACookie, fullRefundListingId, `m-fullrefund-${RUN_ID}`)
+  const { data: fullRefundResult } = await admin.rpc('create_refund', { p_payment_id: fullRefundPaymentId, p_amount: 1000, p_reason: 'Scenario M full refund', p_idempotency_key: `commission-regression-m-fullrefund-${RUN_ID}` })
+  await admin.from('refunds').update({ status: 'completed' }).eq('id', fullRefundResult.refund_id)
+  await admin.rpc('transition_payment_status', { p_payment_id: fullRefundPaymentId, p_new_status: 'refunded', p_actor_type: 'system' })
+
+  const partialRefundListingId = await insertSaleListing(merchantBId, `${QA_LISTING_MARKER} — M PartialRefund`, 1000)
+  const { paymentId: partialRefundPaymentId } = await completeOrderPurchase(renterACookie, partialRefundListingId, `m-partialrefund-${RUN_ID}`)
+  const partialRefundCommissionBefore = await getCommissionByPayment(partialRefundPaymentId)
+  const { data: partialRefundResult } = await admin.rpc('create_refund', { p_payment_id: partialRefundPaymentId, p_amount: 400, p_reason: 'Scenario M partial refund', p_idempotency_key: `commission-regression-m-partialrefund-${RUN_ID}` })
+  await admin.from('refunds').update({ status: 'completed' }).eq('id', partialRefundResult.refund_id)
+  await admin.rpc('transition_payment_status', { p_payment_id: partialRefundPaymentId, p_new_status: 'partially_refunded', p_actor_type: 'system' })
+
+  const { count: poolAfter } = await admin.from('unity_commissions').select('id', { count: 'exact', head: true }).in('status', ['pending', 'adjusted', 'held'])
+  check('M2. candidate pool now exceeds 150 -- this is genuinely a >100-row scenario', (poolAfter ?? 0) >= TARGET_POOL_SIZE, { poolBefore, shortfall, poolAfter })
+
+  const disputeCommissionCreatedAt = (await getCommissionByPayment(disputePaymentId))?.created_at
+  const { count: precedingCount } = await admin.from('unity_commissions').select('id', { count: 'exact', head: true }).in('status', ['pending', 'adjusted', 'held']).lt('created_at', disputeCommissionCreatedAt)
+  check('M3. the dispute-hold fixture sits at ordinal position > 100 (candidates created before it)', (precedingCount ?? 0) > 100, { precedingCount })
+
+  const sweep1 = await internalApi('/api/internal/commissions/reconcile-refunds')
+  check('M4. sweep run 1 responds 200', sweep1.status === 200, sweep1)
+  check('M5. sweep run 1 scans the full candidate pool, not capped at 100', (sweep1.json?.disputesScanned ?? 0) >= TARGET_POOL_SIZE && (sweep1.json?.refundsScanned ?? 0) >= TARGET_POOL_SIZE, sweep1.json)
+  check('M6. sweep run 1 reports zero failures', sweep1.json?.disputesFailed === 0 && sweep1.json?.refundsFailed === 0, sweep1.json)
+
+  const disputeCommissionAfterRun1 = await getCommissionByPayment(disputePaymentId)
+  check('M7. the tail-ordinal dispute fixture was actually held (not merely scanned)', disputeCommissionAfterRun1?.status === 'held', disputeCommissionAfterRun1)
+
+  const fullRefundCommissionAfterRun1 = await getCommissionByPayment(fullRefundPaymentId)
+  check('M8. the tail-ordinal full-refund fixture was voided', fullRefundCommissionAfterRun1?.status === 'voided', fullRefundCommissionAfterRun1)
+
+  const expectedPartialEffective = Math.round(600 * partialRefundCommissionBefore.standard_rate_bps) / 10000
+  const { data: adjustmentsAfterRun1 } = await admin.from('unity_commission_adjustments').select('amount').eq('commission_id', partialRefundCommissionBefore.id)
+  const partialEffectiveAfterRun1 = Number(partialRefundCommissionBefore.commission_amount) + (adjustmentsAfterRun1 ?? []).reduce((sum, a) => sum + Number(a.amount), 0)
+  check('M9. the tail-ordinal partial-refund fixture was adjusted to the correct proportional amount', partialEffectiveAfterRun1 === expectedPartialEffective, { partialEffectiveAfterRun1, expectedPartialEffective, adjustmentsAfterRun1 })
+
+  const sweep2 = await internalApi('/api/internal/commissions/reconcile-refunds')
+  check('M10. sweep run 2 responds 200 and scans the full pool again', sweep2.status === 200 && (sweep2.json?.disputesScanned ?? 0) >= TARGET_POOL_SIZE, sweep2.json)
+
+  const { data: adjustmentsAfterRun2 } = await admin.from('unity_commission_adjustments').select('id').eq('commission_id', partialRefundCommissionBefore.id)
+  check('M11. no duplicate adjustment was created by the second run', (adjustmentsAfterRun2 ?? []).length === (adjustmentsAfterRun1 ?? []).length, { before: adjustmentsAfterRun1?.length, after: adjustmentsAfterRun2?.length })
+
+  const disputeCommissionAfterRun2 = await getCommissionByPayment(disputePaymentId)
+  check('M12. dispute-hold fixture unchanged on the second run (still held, no error)', disputeCommissionAfterRun2?.status === 'held', disputeCommissionAfterRun2)
+
+  const fullRefundCommissionAfterRun2 = await getCommissionByPayment(fullRefundPaymentId)
+  check('M13. full-refund fixture unchanged on the second run (still voided, no duplicate void)', fullRefundCommissionAfterRun2?.status === 'voided', fullRefundCommissionAfterRun2)
+}
+
 console.log('=== Final cleanup ===')
 await resetToStarter(merchantAId, adminId)
 await resetToStarter(merchantBId, adminId)
