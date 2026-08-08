@@ -14,6 +14,7 @@ export type ExceptionEntityType =
   | 'affiliate_commission'
   | 'merchant_payout'
   | 'merchant_subscription'
+  | 'unity_commission'
 
 export interface AdminException {
   id: string
@@ -1051,6 +1052,70 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
         resolved: isResolved('merchant_subscription_repeated_billing_failures', 'merchant_subscription', merchantId),
       })
     }
+  }
+
+  // ------------------------------------------------------------
+  // Unity Phase 2: Unity commission categories. Read-only detection
+  // only -- nothing here mutates a commission.
+  // ------------------------------------------------------------
+  const { data: overdueHeldCommissions } = await admin
+    .from('unity_commissions')
+    .select('id, merchant_id, updated_at')
+    .eq('status', 'held')
+    .lt('updated_at', threshold)
+
+  for (const row of overdueHeldCommissions ?? []) {
+    exceptions.push({
+      id: exceptionId('unity_commission_held_overdue', row.id),
+      type: 'unity_commission_held_overdue',
+      severity: 'medium',
+      entityType: 'unity_commission',
+      entityId: row.id,
+      summary: `This commission has been held for over ${REVIEW_OVERDUE_HOURS}h -- the underlying dispute may need attention`,
+      detectedAt: row.updated_at,
+      suggestedAction: `Review at /admin/commissions/${row.id}`,
+      resolved: isResolved('unity_commission_held_overdue', 'unity_commission', row.id),
+    })
+  }
+
+  const [{ data: capturedOrderPayments }, { data: qualifiedOrderPaymentIds }] = await Promise.all([
+    admin.from('payments').select('id, order_id, captured_at').eq('payment_type', 'order_payment').eq('status', 'captured').lt('captured_at', threshold),
+    admin.from('unity_commissions').select('payment_id').eq('transaction_type', 'sale'),
+  ])
+  const qualifiedOrderPaymentIdSet = new Set((qualifiedOrderPaymentIds ?? []).map((r) => r.payment_id))
+  for (const payment of capturedOrderPayments ?? []) {
+    if (qualifiedOrderPaymentIdSet.has(payment.id)) continue
+    exceptions.push({
+      id: exceptionId('unity_commission_missing_for_sale', payment.id),
+      type: 'unity_commission_missing_for_sale',
+      severity: 'high',
+      entityType: 'order',
+      entityId: payment.order_id,
+      summary: 'This order payment captured successfully but no Unity commission was ever qualified -- the qualification hook may have failed',
+      detectedAt: payment.captured_at,
+      suggestedAction: `Inspect payment ${payment.id} and, if genuinely missing, re-trigger qualification manually`,
+      resolved: isResolved('unity_commission_missing_for_sale', 'order', payment.order_id),
+    })
+  }
+
+  const [{ data: capturedRentalPayments }, { data: qualifiedRentalPaymentIds }] = await Promise.all([
+    admin.from('payments').select('id, booking_id, captured_at').eq('payment_type', 'rental_charge').in('status', ['captured', 'partially_captured']).lt('captured_at', threshold),
+    admin.from('unity_commissions').select('payment_id').eq('transaction_type', 'rental'),
+  ])
+  const qualifiedRentalPaymentIdSet = new Set((qualifiedRentalPaymentIds ?? []).map((r) => r.payment_id))
+  for (const payment of capturedRentalPayments ?? []) {
+    if (qualifiedRentalPaymentIdSet.has(payment.id)) continue
+    exceptions.push({
+      id: exceptionId('unity_commission_missing_for_rental', payment.id),
+      type: 'unity_commission_missing_for_rental',
+      severity: 'high',
+      entityType: 'booking',
+      entityId: payment.booking_id,
+      summary: 'This rental_charge payment captured successfully but no Unity commission was ever qualified -- the qualification hook may have failed',
+      detectedAt: payment.captured_at,
+      suggestedAction: `Inspect payment ${payment.id} and, if genuinely missing, re-trigger qualification manually`,
+      resolved: isResolved('unity_commission_missing_for_rental', 'booking', payment.booking_id),
+    })
   }
 
   return exceptions.sort((a, b) => (a.resolved === b.resolved ? 0 : a.resolved ? 1 : -1))
