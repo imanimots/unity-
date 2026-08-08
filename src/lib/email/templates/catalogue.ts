@@ -1221,6 +1221,37 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       testModeNotice: true,
     }),
   },
+
+  // ---------------- UNITY COMMISSION (Unity Phase 2) ----------------
+  {
+    id: 'unity-commission-voided',
+    version: '1',
+    event: 'unity_commission.voided',
+    requiredVars: ['recipientName', 'listingTitle', 'transactionReference', 'voidReason'],
+    subject: (v) => `Commission voided for "${s(v, 'listingTitle')}"`,
+    build: (v) => ({
+      preheader: 'A Unity commission charge has been voided',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [`The Unity commission charged for "${s(v, 'listingTitle')}" has been voided. Reason: ${s(v, 'voidReason')}.`],
+      summary: { title: 'Commission', rows: [{ label: 'Reference', value: s(v, 'transactionReference') }] },
+      cta: { label: 'View your commissions', path: '/dashboard/merchant/commissions' },
+    }),
+  },
+  {
+    id: 'unity-commission-adjusted',
+    version: '1',
+    event: 'unity_commission.adjusted',
+    requiredVars: ['recipientName', 'listingTitle', 'transactionReference', 'adjustmentAmount'],
+    subject: (v) => `Your Unity commission for "${s(v, 'listingTitle')}" was adjusted`,
+    build: (v) => ({
+      preheader: 'A Unity commission adjustment was recorded',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [`An adjustment of ${s(v, 'adjustmentAmount')} was recorded against the Unity commission charged for "${s(v, 'listingTitle')}", following a partial refund.`],
+      summary: { title: 'Commission', rows: [{ label: 'Reference', value: s(v, 'transactionReference') }] },
+      cta: { label: 'View your commissions', path: '/dashboard/merchant/commissions' },
+      testModeNotice: true,
+    }),
+  },
 ]
 
 const TEMPLATES_BY_ID = new Map(EMAIL_TEMPLATES.map((t) => [t.id, t]))

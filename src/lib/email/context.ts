@@ -313,6 +313,58 @@ export async function loadAffiliateCommissionEmailContext(admin: SupabaseClient,
   }
 }
 
+export interface UnityCommissionEmailContext {
+  commissionId: string
+  listingTitle: string
+  merchantId: string
+  merchantName: string
+  commissionAmount: number
+  currency: string
+  transactionReference: string
+}
+
+/**
+ * Unity Phase 2 -- the one shared query every Unity commission email
+ * dispatch call site uses to build its vars. Mirrors
+ * loadAffiliateCommissionEmailContext()'s exact shape. Returns null if
+ * the commission can't be found (the caller should skip dispatch
+ * entirely, never fabricate context).
+ */
+export async function loadUnityCommissionEmailContext(admin: SupabaseClient, commissionId: string): Promise<UnityCommissionEmailContext | null> {
+  const { data: commission } = await admin
+    .from('unity_commissions')
+    .select('id, listing_id, merchant_id, commission_amount, currency, order_id, booking_id')
+    .eq('id', commissionId)
+    .maybeSingle()
+  if (!commission) return null
+
+  const [{ data: listing }, merchantName, reference] = await Promise.all([
+    admin.from('listings').select('title').eq('id', commission.listing_id).maybeSingle(),
+    loadUserDisplayName(admin, commission.merchant_id),
+    (async () => {
+      if (commission.order_id) {
+        const { data } = await admin.from('orders').select('order_reference').eq('id', commission.order_id).maybeSingle()
+        return data?.order_reference ?? commission.order_id.slice(0, 8).toUpperCase()
+      }
+      if (commission.booking_id) {
+        const { data } = await admin.from('bookings').select('booking_reference').eq('id', commission.booking_id).maybeSingle()
+        return data?.booking_reference ?? commission.booking_id.slice(0, 8).toUpperCase()
+      }
+      return commission.id.slice(0, 8).toUpperCase()
+    })(),
+  ])
+
+  return {
+    commissionId: commission.id,
+    listingTitle: listing?.title ?? 'Listing',
+    merchantId: commission.merchant_id,
+    merchantName,
+    commissionAmount: commission.commission_amount,
+    currency: commission.currency ?? 'ZAR',
+    transactionReference: reference,
+  }
+}
+
 export interface AffiliateListingEmailContext {
   listingId: string
   listingTitle: string

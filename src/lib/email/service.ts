@@ -18,6 +18,7 @@ export type RelatedEntityType =
   | 'profile'
   | 'merchant_payout'
   | 'merchant_subscription'
+  | 'unity_commission'
 
 export interface SendTemplateRequest {
   eventType: string
