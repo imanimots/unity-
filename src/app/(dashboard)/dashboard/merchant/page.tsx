@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { Plus, Package, DollarSign, Star, ShieldCheck, ArrowRight, Clock, CheckCircle, Users } from 'lucide-react'
+import { Plus, Package, DollarSign, Star, ShieldCheck, ArrowRight, Clock, CheckCircle, Users, Percent } from 'lucide-react'
 import { getServerUser, MOCK_CURRENT_PROFILE } from '@/lib/data/profiles'
 import { getListingsByMerchant } from '@/lib/data/listings'
 import { IS_MOCK_MODE, MOCK_MY_LISTINGS, MOCK_MERCHANT_BOOKINGS } from '@/lib/mock/data'
@@ -253,6 +253,15 @@ export default async function MerchantDashboard() {
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Payouts</p>
               <p className="text-xs text-[#9B8B85] mt-0.5">Earnings & withdrawals</p>
+            </div>
+          </Link>
+          <Link href="/dashboard/merchant/commissions" className="flex items-center gap-3 p-4 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors">
+            <div className="w-9 h-9 rounded-xl bg-[#F2EDE8] dark:bg-[#2A1A1A] flex items-center justify-center shrink-0">
+              <Percent size={16} className="text-[#8B1A1A]" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Unity Commission</p>
+              <p className="text-xs text-[#9B8B85] mt-0.5">What Unity charges you</p>
             </div>
           </Link>
           <Link href="/dashboard/merchant/affiliates" className="flex items-center gap-3 p-4 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors">

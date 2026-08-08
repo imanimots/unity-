@@ -46,6 +46,11 @@ interface OverviewStats {
   merchant_subscriptions_pending_change: number
   merchant_subscriptions_cancelled: number
   merchant_subscriptions_due_for_reversion: number
+  unity_commissions_pending: number
+  unity_commissions_held: number
+  unity_commissions_earned: number
+  unity_commissions_voided: number
+  unity_commissions_high_value_sales: number
   generated_at: string
 }
 
@@ -171,6 +176,17 @@ export default async function AdminOverviewPage() {
           <StatCard label="Pending change" value={stats.merchant_subscriptions_pending_change} />
           <StatCard label="Cancelled (reverting)" value={stats.merchant_subscriptions_cancelled} />
           <StatCard label="Due for reversion" value={stats.merchant_subscriptions_due_for_reversion} />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Unity Commissions</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <StatCard label="Pending" value={stats.unity_commissions_pending} />
+          <StatCard label="Held" value={stats.unity_commissions_held} />
+          <StatCard label="Earned" value={stats.unity_commissions_earned} />
+          <StatCard label="Voided" value={stats.unity_commissions_voided} />
+          <StatCard label="High-value sales" value={stats.unity_commissions_high_value_sales} />
         </div>
       </section>
 
