@@ -1,4 +1,5 @@
 import type { MerchantSubscriptionPlan } from '@/types'
+import { applyBps } from '@/lib/money/basis-points'
 
 export interface MonthlyVolumeCents {
   salesVolumeCents: number
@@ -13,21 +14,10 @@ export interface PlanCostBreakdown {
   totalCostCents: number
 }
 
-/**
- * All money math here is integer cents and integer basis points --
- * never floating point. Rounds to the nearest cent per component
- * (banker's-rounding-free, plain round-half-up via Math.round, which is
- * the same rounding every other financial calculation in this codebase
- * already uses).
- */
-function commissionCents(volumeCents: number, bps: number): number {
-  return Math.round((volumeCents * bps) / 10000)
-}
-
 /** Barter is not a parameter here on purpose -- there is no volume input for it because its commission is always 0 on every plan, enforced by the plan model's own barter_commission_bps check constraint. */
 export function computeMonthlyPlanCost(plan: MerchantSubscriptionPlan, volume: MonthlyVolumeCents): PlanCostBreakdown {
-  const salesCommissionCents = commissionCents(volume.salesVolumeCents, plan.sales_commission_bps)
-  const rentalCommissionCents = commissionCents(volume.rentalVolumeCents, plan.rental_commission_bps)
+  const salesCommissionCents = applyBps(volume.salesVolumeCents, plan.sales_commission_bps)
+  const rentalCommissionCents = applyBps(volume.rentalVolumeCents, plan.rental_commission_bps)
   return {
     planId: plan.id,
     monthlyFeeCents: plan.monthly_fee_cents,
