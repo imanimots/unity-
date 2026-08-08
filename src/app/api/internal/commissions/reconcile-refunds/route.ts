@@ -37,7 +37,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       disputesHeld: disputeResult.held,
       disputesReleased: disputeResult.released,
+      disputesScanned: disputeResult.scanned,
+      disputesFailed: disputeResult.failed,
       refundsConsidered: refundResult.considered,
+      refundsScanned: refundResult.scanned,
+      refundsFailed: refundResult.failed,
       voided: refundResult.voided,
       adjusted: refundResult.adjusted,
     })
