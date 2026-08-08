@@ -2,7 +2,18 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { deriveBarterFinancialReadiness, type BarterDepositRequirement } from '@/lib/barter/financial-readiness'
 
 export type ExceptionSeverity = 'low' | 'medium' | 'high'
-export type ExceptionEntityType = 'listing' | 'identity_verification' | 'booking' | 'email_delivery' | 'user' | 'dispute' | 'barter_agreement' | 'order' | 'affiliate_commission' | 'merchant_payout'
+export type ExceptionEntityType =
+  | 'listing'
+  | 'identity_verification'
+  | 'booking'
+  | 'email_delivery'
+  | 'user'
+  | 'dispute'
+  | 'barter_agreement'
+  | 'order'
+  | 'affiliate_commission'
+  | 'merchant_payout'
+  | 'merchant_subscription'
 
 export interface AdminException {
   id: string
@@ -985,6 +996,61 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
       suggestedAction: 'POST /api/internal/payouts/reconcile-missing, or inspect the booking directly',
       resolved: isResolved('merchant_payout_missing_for_completed_booking', 'booking', booking.id),
     })
+  }
+
+  // ------------------------------------------------------------
+  // Unity Phase 1: merchant subscription categories. Read-only
+  // detection only -- nothing here mutates a subscription; every
+  // suggestedAction points at the admin subscription detail page or the
+  // existing admin_correct_merchant_subscription action.
+  // ------------------------------------------------------------
+  const [{ data: overduePendingChanges }, { data: recentBillingAttempts }] = await Promise.all([
+    admin
+      .from('merchant_subscriptions')
+      .select('id, merchant_id, status, pending_plan_id, pending_plan_effective_at')
+      .in('status', ['pending_change', 'cancelled'])
+      .lt('pending_plan_effective_at', threshold),
+    admin
+      .from('merchant_subscription_billing_attempts')
+      .select('merchant_id, status, created_at')
+      .gte('created_at', threshold),
+  ])
+
+  for (const row of overduePendingChanges ?? []) {
+    exceptions.push({
+      id: exceptionId('merchant_subscription_pending_change_overdue', row.id),
+      type: 'merchant_subscription_pending_change_overdue',
+      severity: 'medium',
+      entityType: 'merchant_subscription',
+      entityId: row.merchant_id,
+      summary: `A scheduled plan change to "${row.pending_plan_id}" was due over ${REVIEW_OVERDUE_HOURS}h ago and has not yet been applied -- the lazy sweep may not be running for this merchant`,
+      detectedAt: row.pending_plan_effective_at,
+      suggestedAction: `Review at /admin/subscriptions/${row.merchant_id}, or invoke apply_due_merchant_subscription_changes()`,
+      resolved: isResolved('merchant_subscription_pending_change_overdue', 'merchant_subscription', row.merchant_id),
+    })
+  }
+
+  const billingAttemptsByMerchant = new Map<string, { failed: number; succeeded: number }>()
+  for (const row of recentBillingAttempts ?? []) {
+    const entry = billingAttemptsByMerchant.get(row.merchant_id) ?? { failed: 0, succeeded: 0 }
+    if (row.status === 'failed') entry.failed += 1
+    if (row.status === 'succeeded') entry.succeeded += 1
+    billingAttemptsByMerchant.set(row.merchant_id, entry)
+  }
+  for (const [merchantId, counts] of billingAttemptsByMerchant) {
+    if (counts.failed >= 3 && counts.succeeded === 0) {
+      exceptions.push({
+        id: exceptionId('merchant_subscription_repeated_billing_failures', merchantId),
+        type: 'merchant_subscription_repeated_billing_failures',
+        severity: 'medium',
+        entityType: 'merchant_subscription',
+        entityId: merchantId,
+        summary: `This merchant has had ${counts.failed} failed subscription billing attempts in the last ${REVIEW_OVERDUE_HOURS}h with no success`,
+        detectedAt: now,
+        suggestedAction: `Review at /admin/subscriptions/${merchantId}`,
+        resolved: isResolved('merchant_subscription_repeated_billing_failures', 'merchant_subscription', merchantId),
+      })
+    }
   }
 
   return exceptions.sort((a, b) => (a.resolved === b.resolved ? 0 : a.resolved ? 1 : -1))
