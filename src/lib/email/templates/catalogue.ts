@@ -1117,6 +1117,110 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       testModeNotice: true,
     }),
   },
+
+  // ---------------- MERCHANT SUBSCRIPTIONS (Unity Phase 1) ----------------
+  {
+    id: 'merchant-subscription-upgraded',
+    version: '1',
+    event: 'merchant_subscription.upgrade',
+    requiredVars: ['merchantName', 'planName'],
+    subject: (v) => `You're now on the ${s(v, 'planName')} plan`,
+    build: (v) => ({
+      preheader: 'Your Unity subscription has been upgraded',
+      greeting: `Hi ${s(v, 'merchantName')},`,
+      bodyParagraphs: [`Your Unity merchant account has been upgraded to the ${s(v, 'planName')} plan, effective immediately. Your new rates apply from now on.`],
+      cta: { label: 'View your subscription', path: '/dashboard/merchant/subscription' },
+      testModeNotice: true,
+    }),
+  },
+  {
+    id: 'merchant-subscription-downgrade-scheduled',
+    version: '1',
+    event: 'merchant_subscription.downgrade',
+    requiredVars: ['merchantName', 'planName'],
+    subject: (v) => `Your plan change to ${s(v, 'planName')} is scheduled`,
+    build: (v) => ({
+      preheader: 'Your Unity subscription downgrade is scheduled',
+      greeting: `Hi ${s(v, 'merchantName')},`,
+      bodyParagraphs: [
+        `You've scheduled a downgrade to the ${s(v, 'planName')} plan. You'll keep your current plan's rates and benefits until the start of your next billing period, when the change takes effect.`,
+      ],
+      cta: { label: 'Manage your subscription', path: '/dashboard/merchant/subscription' },
+      testModeNotice: true,
+    }),
+  },
+  {
+    id: 'merchant-subscription-cancellation-scheduled',
+    version: '1',
+    event: 'merchant_subscription.cancellation',
+    requiredVars: ['merchantName'],
+    subject: () => 'Your subscription cancellation is scheduled',
+    build: (v) => ({
+      preheader: 'Your Unity subscription will revert to Starter',
+      greeting: `Hi ${s(v, 'merchantName')},`,
+      bodyParagraphs: [
+        "You've cancelled your paid Unity plan. You'll keep your current plan's rates and benefits until the start of your next billing period, when your account reverts to Starter.",
+      ],
+      cta: { label: 'Manage your subscription', path: '/dashboard/merchant/subscription' },
+      testModeNotice: true,
+    }),
+  },
+  {
+    id: 'merchant-subscription-pending-change-cancelled',
+    version: '1',
+    event: 'merchant_subscription.pending_change_cancelled',
+    requiredVars: ['merchantName'],
+    subject: () => 'Your scheduled plan change has been cancelled',
+    build: (v) => ({
+      preheader: 'Your Unity subscription will stay on your current plan',
+      greeting: `Hi ${s(v, 'merchantName')},`,
+      bodyParagraphs: ['Your scheduled plan change has been cancelled. You will stay on your current plan with no interruption.'],
+      cta: { label: 'View your subscription', path: '/dashboard/merchant/subscription' },
+      testModeNotice: true,
+    }),
+  },
+  {
+    id: 'merchant-subscription-reverted',
+    version: '1',
+    event: 'merchant_subscription.reversion',
+    requiredVars: ['merchantName'],
+    subject: () => 'Your Unity plan has reverted to Starter',
+    build: (v) => ({
+      preheader: 'Your scheduled cancellation has taken effect',
+      greeting: `Hi ${s(v, 'merchantName')},`,
+      bodyParagraphs: ['Your scheduled cancellation has taken effect and your Unity merchant account is now on the Starter plan.'],
+      cta: { label: 'View your subscription', path: '/dashboard/merchant/subscription' },
+      testModeNotice: true,
+    }),
+  },
+  {
+    id: 'merchant-subscription-downgrade-applied',
+    version: '1',
+    event: 'merchant_subscription.downgrade',
+    requiredVars: ['merchantName'],
+    subject: () => 'Your Unity plan change has taken effect',
+    build: (v) => ({
+      preheader: 'Your scheduled downgrade has taken effect',
+      greeting: `Hi ${s(v, 'merchantName')},`,
+      bodyParagraphs: ['Your scheduled plan downgrade has taken effect. Your new rates apply from now on.'],
+      cta: { label: 'View your subscription', path: '/dashboard/merchant/subscription' },
+      testModeNotice: true,
+    }),
+  },
+  {
+    id: 'merchant-subscription-admin-corrected',
+    version: '1',
+    event: 'merchant_subscription.admin_correction',
+    requiredVars: ['merchantName', 'planName'],
+    subject: (v) => `Your Unity plan was updated to ${s(v, 'planName')}`,
+    build: (v) => ({
+      preheader: 'Unity support has updated your subscription plan',
+      greeting: `Hi ${s(v, 'merchantName')},`,
+      bodyParagraphs: [`Unity support has updated your merchant account to the ${s(v, 'planName')} plan. If you have any questions, please contact support.`],
+      cta: { label: 'View your subscription', path: '/dashboard/merchant/subscription' },
+      testModeNotice: true,
+    }),
+  },
 ]
 
 const TEMPLATES_BY_ID = new Map(EMAIL_TEMPLATES.map((t) => [t.id, t]))
