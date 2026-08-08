@@ -4,6 +4,8 @@ import { Plus, Package, DollarSign, Star, ShieldCheck, ArrowRight, Clock, CheckC
 import { getServerUser, MOCK_CURRENT_PROFILE } from '@/lib/data/profiles'
 import { getListingsByMerchant } from '@/lib/data/listings'
 import { IS_MOCK_MODE, MOCK_MY_LISTINGS, MOCK_MERCHANT_BOOKINGS } from '@/lib/mock/data'
+import { getAdminServiceClient } from '@/lib/admin/route-helpers'
+import { getEffectiveMerchantPlan } from '@/lib/subscriptions/effective-plan'
 import type { BookingStatus, ListingStatus } from '@/types'
 
 export const metadata = { title: 'Merchant Dashboard — Unity' }
@@ -42,6 +44,19 @@ export default async function MerchantDashboard() {
 
   const recentBookings = myBookings.slice(0, 3)
   const recentListings = myListings.slice(0, 3)
+
+  let planLabel = 'Starter · Up to 5 listings'
+  if (!IS_MOCK_MODE && profile) {
+    const admin = await getAdminServiceClient()
+    if (admin) {
+      try {
+        const { plan } = await getEffectiveMerchantPlan(admin, profile.id)
+        planLabel = plan.active_listing_limit ? `${plan.display_name} · Up to ${plan.active_listing_limit} listings` : `${plan.display_name} · Unlimited listings`
+      } catch {
+        // Falls back to the Starter default label
+      }
+    }
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -249,13 +264,13 @@ export default async function MerchantDashboard() {
               <p className="text-xs text-[#9B8B85] mt-0.5">Referral commissions</p>
             </div>
           </Link>
-          <Link href="/pricing" className="flex items-center gap-3 p-4 bg-[#8B1A1A] rounded-xl hover:bg-[#7A1616] transition-colors">
+          <Link href="/dashboard/merchant/subscription" className="flex items-center gap-3 p-4 bg-[#8B1A1A] rounded-xl hover:bg-[#7A1616] transition-colors">
             <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
               <Star size={16} className="text-amber-400 fill-amber-400" />
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-white">Upgrade Plan</p>
-              <p className="text-xs text-white/60 mt-0.5">Starter · Up to 5 listings</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-white">Subscription</p>
+              <p className="text-xs text-white/60 mt-0.5">{planLabel}</p>
             </div>
           </Link>
         </div>

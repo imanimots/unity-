@@ -41,6 +41,11 @@ interface OverviewStats {
   merchant_payouts_failed: number
   merchant_payouts_pending_overdue: number
   merchant_payouts_processing_overdue: number
+  merchant_subscriptions_pro: number
+  merchant_subscriptions_elite: number
+  merchant_subscriptions_pending_change: number
+  merchant_subscriptions_cancelled: number
+  merchant_subscriptions_due_for_reversion: number
   generated_at: string
 }
 
@@ -155,6 +160,17 @@ export default async function AdminOverviewPage() {
           <StatCard label="Failed" value={stats.merchant_payouts_failed} />
           <StatCard label="Pending overdue" value={stats.merchant_payouts_pending_overdue} />
           <StatCard label="Processing overdue" value={stats.merchant_payouts_processing_overdue} />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Merchant Subscriptions</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <StatCard label="Pro" value={stats.merchant_subscriptions_pro} />
+          <StatCard label="Elite" value={stats.merchant_subscriptions_elite} />
+          <StatCard label="Pending change" value={stats.merchant_subscriptions_pending_change} />
+          <StatCard label="Cancelled (reverting)" value={stats.merchant_subscriptions_cancelled} />
+          <StatCard label="Due for reversion" value={stats.merchant_subscriptions_due_for_reversion} />
         </div>
       </section>
 
