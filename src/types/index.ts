@@ -636,6 +636,57 @@ export interface AffiliateReferral {
   created_at: string
 }
 
+export type MerchantSubscriptionPlanId = 'starter' | 'pro' | 'elite'
+export type MerchantSubscriptionStatus = 'active' | 'pending_change' | 'cancelled'
+export type MerchantSubscriptionChangeCategory =
+  | 'upgrade' | 'downgrade' | 'cancellation' | 'reversion' | 'admin_correction' | 'pending_change_cancelled'
+export type MerchantSubscriptionActorType = 'merchant' | 'admin' | 'system'
+
+/** Mirrors merchant_subscription_plans -- the one authoritative source for plan commercial terms. Rates are integer basis points, fees are integer cents. Never hardcode these values a second time anywhere else. */
+export interface MerchantSubscriptionPlan {
+  id: MerchantSubscriptionPlanId
+  display_name: string
+  monthly_fee_cents: number
+  currency: string
+  sales_commission_bps: number
+  rental_commission_bps: number
+  barter_commission_bps: number
+  plan_rank: number
+  active_listing_limit: number | null
+  is_active: boolean
+  commercial_version: number
+}
+
+/** Mirrors merchant_subscriptions -- absent for a merchant means Starter, see getEffectiveMerchantPlan(). */
+export interface MerchantSubscriptionRow {
+  id: string
+  merchant_id: string
+  current_plan_id: MerchantSubscriptionPlanId
+  current_plan_effective_at: string
+  pending_plan_id: MerchantSubscriptionPlanId | null
+  pending_plan_effective_at: string | null
+  status: MerchantSubscriptionStatus
+  last_transition_category: MerchantSubscriptionChangeCategory | null
+  created_at: string
+  updated_at: string
+}
+
+export interface MerchantSubscriptionHistoryRow {
+  id: string
+  merchant_id: string
+  previous_plan_id: MerchantSubscriptionPlanId | null
+  new_plan_id: MerchantSubscriptionPlanId
+  requested_at: string
+  effective_at: string
+  actor_type: MerchantSubscriptionActorType
+  actor_id: string | null
+  change_category: MerchantSubscriptionChangeCategory
+  reason: string | null
+  billing_reference: string | null
+  idempotency_key: string | null
+  created_at: string
+}
+
 export const CATEGORIES = [
   { id: 'tech', label: 'Tech & Electronics', icon: '💻' },
   { id: 'outdoor', label: 'Outdoor & Camping', icon: '🏕️' },

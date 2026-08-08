@@ -8,7 +8,16 @@ import { isRetryableEmailError } from './errors'
 const EMAIL_FROM_ADDRESS = process.env.EMAIL_FROM_ADDRESS || 'support@unitytest.co.za'
 const EMAIL_REPLY_TO = process.env.EMAIL_REPLY_TO || undefined
 
-export type RelatedEntityType = 'booking' | 'listing' | 'identity_verification' | 'order' | 'barter_agreement' | 'affiliate_commission' | 'profile' | 'merchant_payout'
+export type RelatedEntityType =
+  | 'booking'
+  | 'listing'
+  | 'identity_verification'
+  | 'order'
+  | 'barter_agreement'
+  | 'affiliate_commission'
+  | 'profile'
+  | 'merchant_payout'
+  | 'merchant_subscription'
 
 export interface SendTemplateRequest {
   eventType: string
