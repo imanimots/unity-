@@ -61,9 +61,42 @@ export async function createMerchantPayout(
 
   const sumBy = (type: string) => (ledgerRows ?? []).filter((r) => r.entry_type === type).reduce((sum, r) => sum + Number(r.amount), 0)
   const rentalCharge = sumBy('rental_charge')
-  const platformFee = sumBy('platform_fee')
   const refunded = sumBy('refund')
-  const payableAmount = round2(rentalCharge - platformFee - refunded)
+
+  // Phase 2 corrective fix: platform_fee must reflect the EFFECTIVE Unity
+  // commission (original snapshot + any lifecycle adjustments, 0 if
+  // voided) -- never the one-time ledger_entries.platform_fee row written
+  // once at qualification, which is never updated by
+  // hold/release/void/create_unity_commission_adjustment. unity_commissions
+  // (+ its append-only adjustments) is the single authoritative source;
+  // the ledger row is a write-once legacy projection, kept only for
+  // display/audit continuity, never trusted for payout arithmetic. This
+  // matters even though createMerchantPayout() only ever runs while
+  // rentalPayment.status === 'captured' (before any refund can exist on
+  // this payment) -- an ADMIN can still hold/void/adjust a commission
+  // directly (e.g. correcting a calculation error) before the booking
+  // completes, with no refund involved at all; reading the stale ledger
+  // row in that case would silently override the admin's own correction.
+  // Falls back to the ledger sum only if no unity_commissions row exists
+  // yet for this payment (pre-Phase-2 legacy data safety).
+  const platformFee = await resolveEffectiveUnityCommission(admin, rentalPayment.id, sumBy('platform_fee'))
+
+  // Phase 2, Step F: the merchant funds the affiliate reward they
+  // themselves enabled on the listing (affiliate_commission_rate is
+  // merchant-set) -- it reduces the merchant's payout, not Unity's own
+  // commission. Excludes only 'voided' rows (an affiliate reward that
+  // was reversed before the merchant was ever paid out is genuinely not
+  // owed); every other status still represents a real obligation the
+  // merchant agreed to when they enabled affiliates.
+  const { data: affiliateCommissionRows } = await admin
+    .from('affiliate_commissions')
+    .select('commission_amount, status')
+    .eq('booking_id', bookingId)
+  const affiliateReward = (affiliateCommissionRows ?? [])
+    .filter((r) => r.status !== 'voided')
+    .reduce((sum, r) => sum + Number(r.commission_amount), 0)
+
+  const payableAmount = round2(rentalCharge - platformFee - affiliateReward - refunded)
 
   if (payableAmount <= 0) {
     throw new OrchestrationError('payout_unavailable', 'No merchant proceeds are available to pay out for this booking')
@@ -88,4 +121,36 @@ export async function createMerchantPayout(
 
 function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
+/**
+ * Phase 2 corrective fix. unity_commissions (+ its append-only
+ * unity_commission_adjustments) is the single authoritative record of
+ * what Unity is actually owed on a payment -- never the write-once
+ * ledger_entries.platform_fee row, which is never updated by any
+ * hold/release/void/adjustment transition. A voided commission is
+ * effectively R0; any other status contributes its original snapshot
+ * amount plus the sum of its adjustments. Falls back to the ledger
+ * figure only when no unity_commissions row exists at all for this
+ * payment (pre-Phase-2 legacy bookings, or a commission that never
+ * qualified) -- never silently treats a missing row as R0 owed.
+ */
+async function resolveEffectiveUnityCommission(
+  admin: OrchestratorContext['admin'],
+  paymentId: string,
+  ledgerFallback: number
+): Promise<number> {
+  const { data: commission } = await admin
+    .from('unity_commissions')
+    .select('id, status, commission_amount')
+    .eq('payment_id', paymentId)
+    .maybeSingle()
+
+  if (!commission) return ledgerFallback
+  if (commission.status === 'voided') return 0
+
+  const { data: adjustments } = await admin.from('unity_commission_adjustments').select('amount').eq('commission_id', commission.id)
+  const adjustmentTotal = (adjustments ?? []).reduce((sum, a) => sum + Number(a.amount), 0)
+
+  return round2(Number(commission.commission_amount) + adjustmentTotal)
 }

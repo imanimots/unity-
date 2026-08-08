@@ -4,6 +4,7 @@ import { prepareOrderFinancials } from './prepare-order-financials'
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../provider-errors'
 import { getPaymentProvider } from '../registry'
 import { qualifySaleAffiliateCommission } from '@/lib/affiliate/qualify'
+import { qualifySaleUnityCommission } from '@/lib/commissions/qualify'
 
 export interface ChargeOrderPaymentResult {
   paymentId: string
@@ -45,8 +46,10 @@ export async function chargeOrderPayment(
     // Step 11 Phase 7: re-attempted on every replay, not just the first
     // capture -- qualify_sale_affiliate_commission() is itself idempotent,
     // and this also covers a prior call that captured the payment but
-    // crashed before reaching qualification.
+    // crashed before reaching qualification. Phase 2: Unity commission
+    // qualification fires the same way, independently.
     await qualifySaleAffiliateCommission(admin, orderId, paymentId)
+    await qualifySaleUnityCommission(admin, orderId, paymentId)
     return { paymentId, status: 'captured', orderStatus: 'paid' }
   }
 
@@ -104,8 +107,10 @@ export async function chargeOrderPayment(
 
     // Step 11 Phase 7: affiliate commission qualification is best-effort
     // and never throws -- a qualification failure must never roll back
-    // or fail the customer's own payment (Part J).
+    // or fail the customer's own payment (Part J). Phase 2: Unity
+    // commission qualification is the same best-effort shape.
     await qualifySaleAffiliateCommission(admin, orderId, paymentId)
+    await qualifySaleUnityCommission(admin, orderId, paymentId)
 
     return { paymentId, status: 'captured', orderStatus: 'paid' }
   } catch (err) {

@@ -5,6 +5,7 @@ import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } f
 import { getPaymentProvider } from '../registry'
 import type { MockScenario } from '../provider'
 import { qualifyRentalPaymentAffiliateCommission } from '@/lib/affiliate/qualify'
+import { qualifyRentalPaymentUnityCommission } from '@/lib/commissions/qualify'
 
 /**
  * The one genuinely multi-step workflow in this pass: it makes up to two
@@ -63,6 +64,7 @@ export async function authorizeBookingFinancials(
     // a retried checkout request). Best-effort, never throws.
     if (cached.rentalPaymentId) {
       await qualifyRentalPaymentAffiliateCommission(admin, bookingId, cached.rentalPaymentId)
+      await qualifyRentalPaymentUnityCommission(admin, bookingId, cached.rentalPaymentId)
     }
     return cached
   }
@@ -109,8 +111,9 @@ async function ensureRentalCharged(
   const { data: payment } = await admin.from('payments').select('status').eq('id', paymentId).maybeSingle()
   if (payment?.status === 'captured') {
     // Step 11 Phase 7: re-attempted on every replay -- see the matching
-    // comment in charge-order-payment.ts.
+    // comment in charge-order-payment.ts. Phase 2: same shape.
     await qualifyRentalPaymentAffiliateCommission(admin, bookingId, paymentId)
+    await qualifyRentalPaymentUnityCommission(admin, bookingId, paymentId)
     return payment.status
   }
 
@@ -150,7 +153,9 @@ async function ensureRentalCharged(
     })
 
     // Step 11 Phase 7: best-effort, never throws -- see charge-order-payment.ts.
+    // Phase 2: Unity commission qualification is the same best-effort shape.
     await qualifyRentalPaymentAffiliateCommission(admin, bookingId, paymentId)
+    await qualifyRentalPaymentUnityCommission(admin, bookingId, paymentId)
 
     return 'captured'
   } catch (err) {

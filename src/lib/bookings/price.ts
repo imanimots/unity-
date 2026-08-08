@@ -72,7 +72,17 @@ export function calculateBookingPrice(input: BookingPriceInput): BookingPriceBre
   }
 
   const depositAmount = input.depositRequired ? round2(input.depositAmount ?? 0) : 0
-  const platformFeeAmount = 0 // not yet defined anywhere in this codebase -- always 0 for now
+  // Deliberately always 0, and must stay that way -- Unity Phase 2's
+  // commission engine (src/lib/commissions/calculate.ts) is
+  // merchant-funded (Rule 1: "the buyer/renter does NOT pay Unity's
+  // commission as an additional percentage"), computed only at
+  // rental_charge capture via qualify_rental_payment_unity_commission(),
+  // and never added to what the renter is quoted or charged here. This
+  // field exists only because renterTotalAmount's formula has a slot
+  // for it; repurposing it to carry Unity's commission would put a
+  // customer-facing Unity commission surcharge directly into checkout,
+  // which Phase 2 explicitly prohibits (Step J).
+  const platformFeeAmount = 0
   const renterTotalAmount = round2(subtotalAmount + depositAmount + platformFeeAmount)
   const merchantProceedsEstimate = round2(subtotalAmount - platformFeeAmount)
 
