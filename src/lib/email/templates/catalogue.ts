@@ -1252,6 +1252,26 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       testModeNotice: true,
     }),
   },
+
+  // ---------------- ESCROW (Phase 3) ----------------
+  // One shared, transaction-type-neutral template -- the recipient
+  // doesn't need different wording for sale/rental/barter, matching
+  // barter-completed/dispute-resolved's own shared-template precedent.
+  // No "TradeSafe" or provider-branded language anywhere -- TradeSafe is
+  // a proposed provider only, not a live integration.
+  {
+    id: 'escrow-transaction-released',
+    version: '1',
+    event: 'escrow_transaction.released',
+    requiredVars: ['recipientName', 'transactionReference'],
+    subject: () => `Funds have been released for your transaction`,
+    build: (v) => ({
+      preheader: 'Held funds have been released',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [`The funds Unity held securely for transaction ${s(v, 'transactionReference')} have now been released.`],
+      cta: { label: 'View your dashboard', path: '/dashboard' },
+    }),
+  },
 ]
 
 const TEMPLATES_BY_ID = new Map(EMAIL_TEMPLATES.map((t) => [t.id, t]))

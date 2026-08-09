@@ -35,6 +35,19 @@ function check(name: string, value: string | undefined, opts: { required: boolea
  * process.env.
  */
 export function validateEnvironment(env: NodeJS.ProcessEnv = process.env): EnvValidationReport {
+  // Phase 3 defense in depth: getEscrowProvider() (src/lib/escrow/
+  // registry.ts) is the real, unconditional runtime guard against
+  // MockEscrowProvider in production -- this startup check exists only
+  // to surface the same unsafe configuration earlier and louder. Reuses
+  // the existing check()'s own `allowed`/`required` parameters (no new
+  // cross-field validation machinery) -- when NODE_ENV=production AND
+  // ESCROW_ENABLED=true, "mock" is removed from ESCROW_PROVIDER's
+  // allowed values and the check becomes required, so this single
+  // unsafe combination alone flips the whole report to FAIL; every
+  // other environment is completely unaffected.
+  const escrowEnabledFlag = (env.ESCROW_ENABLED ?? 'false') === 'true'
+  const escrowUnsafeInProduction = env.NODE_ENV === 'production' && escrowEnabledFlag
+
   const checks: EnvCheck[] = [
     check('NEXT_PUBLIC_SUPABASE_URL', env.NEXT_PUBLIC_SUPABASE_URL, { required: true }),
     check('NEXT_PUBLIC_SUPABASE_ANON_KEY', env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { required: true }),
@@ -51,6 +64,14 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env): EnvVa
     // Optional
     check('SEO_INDEXING_ENABLED', env.SEO_INDEXING_ENABLED ?? 'false', { required: false, allowed: ['false', 'true'], detail: 'must stay "false" until a permanent domain, Search Console, legal approval, and real inventory are in place — see src/lib/seo/config.ts' }),
     check('SEO_MARKETPLACE_INDEXING_ENABLED', env.SEO_MARKETPLACE_INDEXING_ENABLED ?? 'false', { required: false, allowed: ['false', 'true'], detail: 'independent of SEO_INDEXING_ENABLED — must also stay "false" for now' }),
+    check('ESCROW_ENABLED', env.ESCROW_ENABLED ?? 'false', { required: false, allowed: ['false', 'true'], detail: 'Phase 3 — must stay "false" until a real escrow provider is integrated; while false, no escrow transaction is ever created' }),
+    check('ESCROW_PROVIDER', env.ESCROW_PROVIDER ?? 'mock', {
+      required: escrowUnsafeInProduction,
+      allowed: escrowUnsafeInProduction ? [] : ['mock'],
+      detail: escrowUnsafeInProduction
+        ? 'CRITICAL: NODE_ENV=production with ESCROW_ENABLED=true cannot use "mock" — getEscrowProvider() also rejects this unconditionally at runtime (defense in depth), but no real provider is configured'
+        : 'must be "mock" — TradeSafe is a proposed provider only, not yet integrated',
+    }),
     check('ANTHROPIC_API_KEY', env.ANTHROPIC_API_KEY, { required: false, detail: 'AI assistant falls back to a canned response when unset' }),
     check('RESEND_API_KEY', env.RESEND_API_KEY, { required: false, detail: 'only needed when EMAIL_PROVIDER=resend' }),
     check('VOYAGE_API_KEY', env.VOYAGE_API_KEY, { required: false, detail: 'assistant falls back to ILIKE search when unset' }),
