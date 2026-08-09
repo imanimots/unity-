@@ -5,6 +5,7 @@ import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } f
 import { getPaymentProvider } from '../registry'
 import { qualifySaleAffiliateCommission } from '@/lib/affiliate/qualify'
 import { qualifySaleUnityCommission } from '@/lib/commissions/qualify'
+import { createEscrowForPayment, fundEscrowForPayment } from '@/lib/escrow/orchestrator'
 
 export interface ChargeOrderPaymentResult {
   paymentId: string
@@ -41,7 +42,7 @@ export async function chargeOrderPayment(
 
   const { paymentId } = await prepareOrderFinancials(ctx, orderId, idempotencyKey)
 
-  const { data: payment } = await admin.from('payments').select('status, provider_reference').eq('id', paymentId).maybeSingle()
+  const { data: payment } = await admin.from('payments').select('status, provider_reference, amount, currency').eq('id', paymentId).maybeSingle()
   if (payment?.status === 'captured') {
     // Step 11 Phase 7: re-attempted on every replay, not just the first
     // capture -- qualify_sale_affiliate_commission() is itself idempotent,
@@ -50,6 +51,13 @@ export async function chargeOrderPayment(
     // qualification fires the same way, independently.
     await qualifySaleAffiliateCommission(admin, orderId, paymentId)
     await qualifySaleUnityCommission(admin, orderId, paymentId)
+    // Phase 3: best-effort, never blocks -- a no-op unless ESCROW_ENABLED.
+    try {
+      await createEscrowForPayment(admin, { transactionType: 'sale', orderId, paymentId, principalAmount: Number(payment.amount), currency: payment.currency })
+      await fundEscrowForPayment(admin, paymentId)
+    } catch (escrowErr) {
+      console.error('[orders.charge] escrow best-effort step failed', { orderId, paymentId, escrowErr })
+    }
     return { paymentId, status: 'captured', orderStatus: 'paid' }
   }
 
@@ -111,6 +119,16 @@ export async function chargeOrderPayment(
     // commission qualification is the same best-effort shape.
     await qualifySaleAffiliateCommission(admin, orderId, paymentId)
     await qualifySaleUnityCommission(admin, orderId, paymentId)
+
+    // Phase 3: escrow custody is best-effort and additive, same shape as
+    // the commission qualification calls above -- never blocks or fails
+    // the customer's own payment, and is a no-op unless ESCROW_ENABLED.
+    try {
+      await createEscrowForPayment(admin, { transactionType: 'sale', orderId, paymentId, principalAmount: charge.status === 'captured' ? Number(payment?.amount ?? 0) : 0, currency: payment?.currency ?? 'ZAR' })
+      await fundEscrowForPayment(admin, paymentId)
+    } catch (escrowErr) {
+      console.error('[orders.charge] escrow best-effort step failed', { orderId, paymentId, escrowErr })
+    }
 
     return { paymentId, status: 'captured', orderStatus: 'paid' }
   } catch (err) {

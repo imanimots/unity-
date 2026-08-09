@@ -3,6 +3,7 @@ import { OrchestrationError, type OrchestrationErrorCode } from './errors'
 import { checkIdempotentReplay, computeChargeBarterCashAdjustmentHash } from './idempotency'
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../provider-errors'
 import { getPaymentProvider } from '../registry'
+import { createEscrowForPayment, fundEscrowForPayment } from '@/lib/escrow/orchestrator'
 
 export interface ChargeBarterCashAdjustmentResult {
   paymentId: string
@@ -37,7 +38,7 @@ export async function chargeBarterCashAdjustment(
 
   const { data: payment } = await admin
     .from('payments')
-    .select('id, status, provider_reference')
+    .select('id, status, provider_reference, amount, currency')
     .eq('barter_agreement_id', agreementId)
     .eq('payment_type', 'barter_cash_adjustment')
     .eq('renter_id', payerId)
@@ -50,6 +51,13 @@ export async function chargeBarterCashAdjustment(
   // already-captured payment must still succeed even if the agreement
   // has since moved on.
   if (payment.status === 'captured') {
+    // Phase 3: best-effort, never blocks -- a no-op unless ESCROW_ENABLED.
+    try {
+      await createEscrowForPayment(admin, { transactionType: 'barter', barterAgreementId: agreementId, paymentId: payment.id, principalAmount: Number(payment.amount), currency: payment.currency })
+      await fundEscrowForPayment(admin, payment.id)
+    } catch (escrowErr) {
+      console.error('[barter.charge-cash-adjustment] escrow best-effort step failed', { agreementId, paymentId: payment.id, escrowErr })
+    }
     return { paymentId: payment.id, status: 'captured' }
   }
 
@@ -104,6 +112,16 @@ export async function chargeBarterCashAdjustment(
       p_provider_reference: charge.providerReference,
       p_actor_type: 'system',
     })
+
+    // Phase 3: escrow custody is best-effort and additive -- never blocks
+    // or fails the cash-adjustment payment itself, and is a no-op unless
+    // ESCROW_ENABLED.
+    try {
+      await createEscrowForPayment(admin, { transactionType: 'barter', barterAgreementId: agreementId, paymentId: payment.id, principalAmount: Number(payment.amount), currency: payment.currency })
+      await fundEscrowForPayment(admin, payment.id)
+    } catch (escrowErr) {
+      console.error('[barter.charge-cash-adjustment] escrow best-effort step failed', { agreementId, paymentId: payment.id, escrowErr })
+    }
 
     const result: ChargeBarterCashAdjustmentResult = { paymentId: payment.id, status: 'captured' }
 

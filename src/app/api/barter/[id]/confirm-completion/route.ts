@@ -6,6 +6,7 @@ import { mapBarterRpcError } from '@/lib/barter/rpc-errors'
 import { computeConfirmBarterCompletionHash, checkIdempotentReplay } from '@/lib/barter/idempotency'
 import { releaseBarterDeposit } from '@/lib/payments/orchestrator'
 import { notifyBarterParties, notifyBarterParty } from '@/lib/barter/notify'
+import { releaseEscrowForPayment } from '@/lib/escrow/orchestrator'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -97,6 +98,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           await releaseBarterDeposit({ admin }, agreementId, payment.renter_id)
         } catch (releaseErr) {
           console.error('[barter.confirm-completion] deposit release failed', { agreementId, paymentId: payment.id, releaseErr })
+        }
+      }
+
+      // Phase 3: best-effort escrow release for the cash-adjustment
+      // payment (if any) at the agreement's own completion point, never
+      // blocking confirmation. A no-op unless ESCROW_ENABLED and an
+      // escrow transaction actually exists.
+      const { data: cashAdjustmentPayments } = await admin
+        .from('payments')
+        .select('id, merchant_id')
+        .eq('barter_agreement_id', agreementId)
+        .eq('payment_type', 'barter_cash_adjustment')
+        .eq('status', 'captured')
+      for (const payment of cashAdjustmentPayments ?? []) {
+        try {
+          await releaseEscrowForPayment(admin, payment.id, payment.merchant_id, { actorType: 'system', reason: 'barter completed' })
+        } catch (escrowErr) {
+          console.error('[barter.confirm-completion] escrow release failed', { agreementId, paymentId: payment.id, escrowErr })
         }
       }
 

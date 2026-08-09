@@ -7,6 +7,7 @@ import { computeBookingIdOnlyHash, checkIdempotentReplay } from '@/lib/bookings/
 import { sendTemplate, loadBookingEmailContext } from '@/lib/email'
 import { createMerchantPayout } from '@/lib/payments/orchestrator'
 import { notifyMerchantPayoutEvent } from '@/lib/payouts/notify'
+import { releaseEscrowForPayment } from '@/lib/escrow/orchestrator'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -122,6 +123,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     } catch (payoutErr) {
       console.error('[bookings.confirm-return] payout creation failed', { bookingId, payoutErr })
+    }
+
+    // Phase 3: best-effort escrow release at the booking's own completion
+    // point, never blocking return confirmation. A no-op unless
+    // ESCROW_ENABLED and an escrow transaction actually exists.
+    try {
+      const { data: booking } = await admin.from('bookings').select('merchant_id').eq('id', bookingId).maybeSingle()
+      const { data: rentalPayment } = await admin.from('payments').select('id').eq('booking_id', bookingId).eq('payment_type', 'rental_charge').maybeSingle()
+      if (booking && rentalPayment) {
+        await releaseEscrowForPayment(admin, rentalPayment.id, booking.merchant_id, { actorType: 'system', reason: 'booking completed' })
+      }
+    } catch (escrowErr) {
+      console.error('[bookings.confirm-return] escrow release failed', { bookingId, escrowErr })
     }
 
     return NextResponse.json(data)

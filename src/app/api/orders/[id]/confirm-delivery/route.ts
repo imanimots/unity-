@@ -5,6 +5,7 @@ import { orderActionSchema } from '@/lib/orders/validation'
 import { mapOrderRpcError } from '@/lib/orders/rpc-errors'
 import { computeOrderIdOnlyHash, checkIdempotentReplay } from '@/lib/orders/idempotency'
 import { notifyOrderParties } from '@/lib/orders/notify'
+import { releaseEscrowForPayment } from '@/lib/escrow/orchestrator'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -77,6 +78,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       ])
     } catch (emailErr) {
       console.error('[orders.confirm-delivery] email dispatch failed', { orderId, emailErr })
+    }
+
+    // Phase 3: best-effort escrow release at the order's own completion
+    // point, never blocking delivery confirmation. A no-op unless
+    // ESCROW_ENABLED and an escrow transaction actually exists.
+    try {
+      const { data: order } = await admin.from('orders').select('seller_id').eq('id', orderId).maybeSingle()
+      const { data: orderPayment } = await admin.from('payments').select('id').eq('order_id', orderId).eq('payment_type', 'order_payment').maybeSingle()
+      if (order && orderPayment) {
+        await releaseEscrowForPayment(admin, orderPayment.id, order.seller_id, { actorType: 'system', reason: 'order delivered' })
+      }
+    } catch (escrowErr) {
+      console.error('[orders.confirm-delivery] escrow release failed', { orderId, escrowErr })
     }
 
     return NextResponse.json(data)

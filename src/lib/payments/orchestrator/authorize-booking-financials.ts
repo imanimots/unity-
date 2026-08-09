@@ -6,6 +6,7 @@ import { getPaymentProvider } from '../registry'
 import type { MockScenario } from '../provider'
 import { qualifyRentalPaymentAffiliateCommission } from '@/lib/affiliate/qualify'
 import { qualifyRentalPaymentUnityCommission } from '@/lib/commissions/qualify'
+import { createEscrowForPayment, fundEscrowForPayment } from '@/lib/escrow/orchestrator'
 
 /**
  * The one genuinely multi-step workflow in this pass: it makes up to two
@@ -108,12 +109,19 @@ async function ensureRentalCharged(
   paymentId: string,
   testScenario?: MockScenario
 ): Promise<string> {
-  const { data: payment } = await admin.from('payments').select('status').eq('id', paymentId).maybeSingle()
+  const { data: payment } = await admin.from('payments').select('status, amount, currency').eq('id', paymentId).maybeSingle()
   if (payment?.status === 'captured') {
     // Step 11 Phase 7: re-attempted on every replay -- see the matching
     // comment in charge-order-payment.ts. Phase 2: same shape.
     await qualifyRentalPaymentAffiliateCommission(admin, bookingId, paymentId)
     await qualifyRentalPaymentUnityCommission(admin, bookingId, paymentId)
+    // Phase 3: best-effort, never blocks -- a no-op unless ESCROW_ENABLED.
+    try {
+      await createEscrowForPayment(admin, { transactionType: 'rental', bookingId, paymentId, principalAmount: Number(payment.amount), currency: payment.currency })
+      await fundEscrowForPayment(admin, paymentId)
+    } catch (escrowErr) {
+      console.error('[bookings.authorize-financials] escrow best-effort step failed', { bookingId, paymentId, escrowErr })
+    }
     return payment.status
   }
 
@@ -156,6 +164,16 @@ async function ensureRentalCharged(
     // Phase 2: Unity commission qualification is the same best-effort shape.
     await qualifyRentalPaymentAffiliateCommission(admin, bookingId, paymentId)
     await qualifyRentalPaymentUnityCommission(admin, bookingId, paymentId)
+
+    // Phase 3: escrow custody is best-effort and additive -- never blocks
+    // or fails the booking's own financial authorization, and is a no-op
+    // unless ESCROW_ENABLED.
+    try {
+      await createEscrowForPayment(admin, { transactionType: 'rental', bookingId, paymentId, principalAmount: Number(payment?.amount ?? 0), currency: payment?.currency ?? 'ZAR' })
+      await fundEscrowForPayment(admin, paymentId)
+    } catch (escrowErr) {
+      console.error('[bookings.authorize-financials] escrow best-effort step failed', { bookingId, paymentId, escrowErr })
+    }
 
     return 'captured'
   } catch (err) {
