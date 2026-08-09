@@ -51,6 +51,11 @@ interface OverviewStats {
   unity_commissions_earned: number
   unity_commissions_voided: number
   unity_commissions_high_value_sales: number
+  escrow_transactions_pending: number
+  escrow_transactions_funded: number
+  escrow_transactions_released: number
+  escrow_transactions_refunded: number
+  escrow_transactions_failed: number
   generated_at: string
 }
 
@@ -187,6 +192,17 @@ export default async function AdminOverviewPage() {
           <StatCard label="Earned" value={stats.unity_commissions_earned} />
           <StatCard label="Voided" value={stats.unity_commissions_voided} />
           <StatCard label="High-value sales" value={stats.unity_commissions_high_value_sales} />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Secure Transactions (Escrow)</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <StatCard label="Pending" value={stats.escrow_transactions_pending} />
+          <StatCard label="Held" value={stats.escrow_transactions_funded} />
+          <StatCard label="Released" value={stats.escrow_transactions_released} />
+          <StatCard label="Refunded" value={stats.escrow_transactions_refunded} />
+          <StatCard label="Failed" value={stats.escrow_transactions_failed} />
         </div>
       </section>
 
