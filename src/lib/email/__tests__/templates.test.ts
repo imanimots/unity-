@@ -126,6 +126,7 @@ describe('email template catalogue (category: Templates)', () => {
       'merchant_subscription.upgrade', 'merchant_subscription.downgrade', 'merchant_subscription.cancellation',
       'merchant_subscription.pending_change_cancelled', 'merchant_subscription.reversion', 'merchant_subscription.admin_correction',
       'unity_commission.voided', 'unity_commission.adjusted',
+      'escrow_transaction.released',
     ])
     for (const t of EMAIL_TEMPLATES) {
       expect(knownEvents.has(t.event), `unexpected event "${t.event}" on template "${t.id}"`).toBe(true)

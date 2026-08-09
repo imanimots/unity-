@@ -75,4 +75,36 @@ describe('environment validator (category: Environment Validation)', () => {
     const report = validateEnvironment(env)
     expect(report.criticalFailures).toContain('INTERNAL_CRON_SECRET')
   })
+
+  it('10. NODE_ENV=production + ESCROW_ENABLED=true + ESCROW_PROVIDER=mock is a critical failure -- defense in depth alongside getEscrowProvider()\'s own unconditional runtime guard', () => {
+    const env = { ...VALID_ENV, NODE_ENV: 'production', ESCROW_ENABLED: 'true', ESCROW_PROVIDER: 'mock' } as unknown as NodeJS.ProcessEnv
+    const report = validateEnvironment(env)
+    expect(report.ok).toBe(false)
+    expect(report.criticalFailures).toContain('ESCROW_PROVIDER')
+  })
+
+  it('11. NODE_ENV=production + ESCROW_ENABLED=true + ESCROW_PROVIDER unset (defaults to mock) is also a critical failure', () => {
+    const env = { ...VALID_ENV, NODE_ENV: 'production', ESCROW_ENABLED: 'true', ESCROW_PROVIDER: undefined } as unknown as NodeJS.ProcessEnv
+    const report = validateEnvironment(env)
+    expect(report.ok).toBe(false)
+    expect(report.criticalFailures).toContain('ESCROW_PROVIDER')
+  })
+
+  it('12. NODE_ENV=production + ESCROW_ENABLED unset (disabled) never fails, even with ESCROW_PROVIDER=mock configured', () => {
+    const env = { ...VALID_ENV, NODE_ENV: 'production', ESCROW_ENABLED: undefined, ESCROW_PROVIDER: 'mock' } as unknown as NodeJS.ProcessEnv
+    const report = validateEnvironment(env)
+    expect(report.ok).toBe(true)
+  })
+
+  it('13. NODE_ENV=production + ESCROW_ENABLED=false never fails, even with ESCROW_PROVIDER=mock configured', () => {
+    const env = { ...VALID_ENV, NODE_ENV: 'production', ESCROW_ENABLED: 'false', ESCROW_PROVIDER: 'mock' } as unknown as NodeJS.ProcessEnv
+    const report = validateEnvironment(env)
+    expect(report.ok).toBe(true)
+  })
+
+  it('14. NODE_ENV=development + ESCROW_ENABLED=true + ESCROW_PROVIDER=mock never fails', () => {
+    const env = { ...VALID_ENV, NODE_ENV: 'development', ESCROW_ENABLED: 'true', ESCROW_PROVIDER: 'mock' } as unknown as NodeJS.ProcessEnv
+    const report = validateEnvironment(env)
+    expect(report.ok).toBe(true)
+  })
 })
