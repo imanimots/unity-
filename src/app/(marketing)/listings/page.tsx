@@ -1,11 +1,15 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { getListings } from '@/lib/data/listings'
+import { getMarketplaceRequests } from '@/lib/data/marketplace-requests'
 import { resolveEffectiveCountry } from '@/lib/resolve-effective-country'
 import { ListingCard } from '@/components/listings/listing-card'
+import { RequestCard } from '@/components/listings/request-card'
 import { FilterBar } from '@/components/listings/filter-bar'
 import { MarketplaceModeSelectorContainer } from '@/components/listings/marketplace-mode-selector-container'
+import { DirectionToggleContainer } from '@/components/listings/direction-toggle-container'
 import type { ListingFilters } from '@/lib/data/listings'
-import { Search, ArrowLeftRight } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { absoluteUrl, isMarketplaceIndexingEnabled, getMarketplaceRobotsMeta } from '@/lib/seo/config'
 
 const TITLE = 'Browse Listings — Unity'
@@ -32,18 +36,21 @@ interface PageProps {
     sort?: string
     maxPrice?: string
     mode?: string
+    direction?: string
   }>
 }
 
 const MODE_LABELS: Record<string, string> = {
   rent: 'available to rent',
   buy: 'available to buy',
+  barter: 'available to barter',
 }
 
 export default async function ListingsPage({ searchParams }: PageProps) {
   const params = await searchParams
   const mode = params.mode === 'buy' || params.mode === 'barter' ? params.mode : 'rent'
   const isBarter = mode === 'barter'
+  const isLookingFor = params.direction === 'looking-for'
 
   const { countryId } = await resolveEffectiveCountry()
 
@@ -52,16 +59,18 @@ export default async function ListingsPage({ searchParams }: PageProps) {
     category: params.category,
     sort: params.sort as ListingFilters['sort'],
     maxPrice: params.maxPrice ? Number(params.maxPrice) : undefined,
+    // Barter has no listing_type of its own -- any active, unlocked
+    // listing is barter-eligible (getListings() already excludes
+    // barter-locked listings unconditionally), so no type filter is
+    // applied for barter mode, same as before this phase.
     mode: isBarter ? undefined : mode,
     countryId,
   }
 
-  // Bartering has no backing data model yet (see MarketplaceModeSelector's
-  // own comment and the homepage's "Coming soon" Bartering card) — the
-  // toggle is real, but selecting it intentionally shows a coming-soon
-  // state instead of querying listings for a transaction type that
-  // doesn't exist yet.
-  const listings = isBarter ? [] : await getListings(filters)
+  const listings = isLookingFor ? [] : await getListings(filters)
+  const requests = isLookingFor
+    ? await getMarketplaceRequests({ transactionType: mode, category: params.category, query: params.q, countryId, sort: params.sort as 'newest' | 'budget_asc' | 'budget_desc' })
+    : []
 
   return (
     <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen">
@@ -97,8 +106,8 @@ export default async function ListingsPage({ searchParams }: PageProps) {
 
           {/* Result count */}
           <p className="text-[#9B8B85] text-sm mt-4">
-            {isBarter
-              ? 'Bartering is coming soon'
+            {isLookingFor
+              ? `${requests.length} request${requests.length !== 1 ? 's' : ''} looking to ${mode}${params.category ? ` in ${params.category}` : ''}`
               : `${listings.length} item${listings.length !== 1 ? 's' : ''} ${MODE_LABELS[mode]}${params.category ? ` in ${params.category}` : ''}`}
           </p>
         </div>
@@ -106,26 +115,38 @@ export default async function ListingsPage({ searchParams }: PageProps) {
 
       {/* ── FILTER ROW ── */}
       <div className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] bg-[#FAF8F5] dark:bg-[#0F0A0A]">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
+        <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-4 flex flex-wrap items-center justify-between gap-4">
           <FilterBar />
+          <div className="flex items-center gap-3">
+            <DirectionToggleContainer />
+            {isLookingFor && (
+              <Link href="/looking-for/new" className="px-4 py-2 rounded-full text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors">
+                Post a request
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 
       {/* ── MARKETPLACE MODE SELECTOR — drives ?mode=buy|rent|barter above ── */}
       <MarketplaceModeSelectorContainer />
 
-      {/* ── LISTING GRID ── */}
+      {/* ── RESULTS GRID ── */}
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-10 lg:py-14 pb-32">
-        {isBarter ? (
-          <div className="text-center py-24">
-            <ArrowLeftRight size={48} strokeWidth={1.5} className="mx-auto mb-5 text-[#9B8B85]" />
-            <h2 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] mb-3">
-              Bartering is coming soon
-            </h2>
-            <p className="text-[#6B5B55] dark:text-[#9B8B85]">
-              Trading items directly isn&apos;t live yet — check back soon, or browse Buy and Rent in the meantime.
-            </p>
-          </div>
+        {isLookingFor ? (
+          requests.length === 0 ? (
+            <div className="text-center py-24">
+              <p className="text-5xl mb-5">🔍</p>
+              <h2 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] mb-3">No requests found</h2>
+              <p className="text-[#6B5B55] dark:text-[#9B8B85]">Be the first to post what you&apos;re looking for.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-8">
+              {requests.map((r) => (
+                <RequestCard key={r.id} request={r} />
+              ))}
+            </div>
+          )
         ) : listings.length === 0 ? (
           <div className="text-center py-24">
             <p className="text-5xl mb-5">🔍</p>
