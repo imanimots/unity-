@@ -129,6 +129,7 @@ describe('email template catalogue (category: Templates)', () => {
       'unity_commission.voided', 'unity_commission.adjusted',
       'escrow_transaction.released',
       'marketplace_request.offer_received', 'marketplace_request.offer_accepted',
+      'rent_to_buy.agreement_accepted', 'rent_to_buy.first_payment_settled', 'rent_to_buy.defaulted',
     ])
     for (const t of EMAIL_TEMPLATES) {
       expect(knownEvents.has(t.event), `unexpected event "${t.event}" on template "${t.id}"`).toBe(true)

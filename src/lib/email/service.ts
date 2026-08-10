@@ -21,6 +21,7 @@ export type RelatedEntityType =
   | 'unity_commission'
   | 'escrow_transaction'
   | 'marketplace_request'
+  | 'rent_to_buy_agreement'
 
 export interface SendTemplateRequest {
   eventType: string

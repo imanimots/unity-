@@ -118,7 +118,7 @@ export interface DisputeEmailContext {
  * site (e.g. an admin action route only has dispute_id).
  */
 export async function loadDisputeEmailContext(admin: SupabaseClient, disputeId: string): Promise<DisputeEmailContext | null> {
-  const { data: dispute } = await admin.from('disputes').select('id, title, raised_by, booking_id, order_id, barter_agreement_id').eq('id', disputeId).maybeSingle()
+  const { data: dispute } = await admin.from('disputes').select('id, title, raised_by, booking_id, order_id, barter_agreement_id, rent_to_buy_agreement_id').eq('id', disputeId).maybeSingle()
   if (!dispute) return null
 
   let respondentId: string | null = null
@@ -141,6 +141,12 @@ export async function loadDisputeEmailContext(admin: SupabaseClient, disputeId: 
     if (agreement) {
       transactionReference = agreement.agreement_reference ?? dispute.barter_agreement_id.slice(0, 8).toUpperCase()
       respondentId = agreement.party_a_id === dispute.raised_by ? agreement.party_b_id : agreement.party_a_id
+    }
+  } else if (dispute.rent_to_buy_agreement_id) {
+    const { data: agreement } = await admin.from('rent_to_buy_agreements').select('merchant_id, customer_id').eq('id', dispute.rent_to_buy_agreement_id).maybeSingle()
+    if (agreement) {
+      transactionReference = dispute.rent_to_buy_agreement_id.slice(0, 8).toUpperCase()
+      respondentId = agreement.merchant_id === dispute.raised_by ? agreement.customer_id : agreement.merchant_id
     }
   }
 

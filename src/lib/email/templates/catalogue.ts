@@ -1300,6 +1300,53 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       cta: { label: 'View your dashboard', path: '/dashboard' },
     }),
   },
+
+  // ---------------- RENT-TO-BUY (Phase 5) ----------------
+  {
+    id: 'rent-to-buy-agreement-accepted',
+    version: '1',
+    event: 'rent_to_buy.agreement_accepted',
+    requiredVars: ['recipientName', 'listingTitle'],
+    subject: (v) => `Your rent-to-buy agreement for "${s(v, 'listingTitle')}" is ready for the first payment`,
+    build: (v) => ({
+      preheader: 'Rent-to-buy agreement accepted',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [
+        `Your rent-to-buy agreement for "${s(v, 'listingTitle')}" has been accepted. Once the first payment settles, you may take possession of the item -- the merchant remains the owner until the full rent-to-buy amount has been paid.`,
+      ],
+      cta: { label: 'View your agreement', path: '/dashboard' },
+    }),
+  },
+  {
+    id: 'rent-to-buy-possession-eligible',
+    version: '1',
+    event: 'rent_to_buy.first_payment_settled',
+    requiredVars: ['recipientName', 'listingTitle'],
+    subject: (v) => `Your first payment for "${s(v, 'listingTitle')}" has settled`,
+    build: (v) => ({
+      preheader: 'You may now take possession',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [
+        `Your first payment for "${s(v, 'listingTitle')}" has settled. You may now take possession once handover is confirmed. Remember: the merchant remains the owner of the item until the full rent-to-buy amount has been paid.`,
+      ],
+      cta: { label: 'View your agreement', path: '/dashboard' },
+    }),
+  },
+  {
+    id: 'rent-to-buy-defaulted',
+    version: '1',
+    event: 'rent_to_buy.defaulted',
+    requiredVars: ['recipientName', 'listingTitle'],
+    subject: (v) => `Your rent-to-buy agreement for "${s(v, 'listingTitle')}" requires attention`,
+    build: (v) => ({
+      preheader: 'Rent-to-buy purchase path ended',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [
+        `Your rent-to-buy agreement for "${s(v, 'listingTitle')}" has defaulted before the full purchase amount was paid. The purchase path has ended and the item must be returned to the merchant. The arrangement is treated as rental/use for the period you possessed the item.`,
+      ],
+      cta: { label: 'View your agreement', path: '/dashboard' },
+    }),
+  },
 ]
 
 const TEMPLATES_BY_ID = new Map(EMAIL_TEMPLATES.map((t) => [t.id, t]))
