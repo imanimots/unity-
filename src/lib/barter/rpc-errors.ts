@@ -47,6 +47,12 @@ export function mapBarterRpcError(message: string | undefined): { status: number
   if (m.includes('you cannot propose a trade on your own listing')) {
     return { status: 403, error: 'You cannot propose a trade on your own listing.' }
   }
+  if (m.includes('verification_required:counterparty')) {
+    return { status: 403, error: 'This listing is not currently available for a new transaction.' }
+  }
+  if (m.includes('verification_required:self')) {
+    return { status: 403, error: 'You need to complete verification before doing this.' }
+  }
   if (m.includes('barter agreement not found or you are not a party to it')) {
     return { status: 404, error: 'Barter agreement not found.' }
   }

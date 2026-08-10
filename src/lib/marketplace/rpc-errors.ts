@@ -11,6 +11,10 @@ export function mapMarketplaceRpcError(message: string | undefined): { status: n
   if (m.includes('idempotency key already used with a different request')) {
     return { status: 409, error: 'This request was already submitted with different data. Please refresh and try again.' }
   }
+  if (m.includes('verification_required:counterparty')) {
+    return { status: 403, error: 'This listing is not currently available for a new transaction.' }
+  }
+  if (m.includes('verification_required:self')) return { status: 403, error: 'You need to complete verification before doing this.' }
   if (m.includes('verification_required')) return { status: 403, error: 'You need to complete verification before doing this.' }
   if (m.includes('invalid transaction type')) return { status: 422, error: 'Invalid transaction type.' }
   if (m.includes('a title is required')) return { status: 422, error: 'A title is required.' }

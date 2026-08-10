@@ -27,6 +27,12 @@ export function mapBookingRpcError(message: string | undefined): { status: numbe
   if (m.includes('you cannot book your own listing')) {
     return { status: 403, error: 'You cannot book your own listing.' }
   }
+  if (m.includes('verification_required:counterparty')) {
+    return { status: 403, error: 'This listing is not currently available for a new transaction.' }
+  }
+  if (m.includes('verification_required:self')) {
+    return { status: 403, error: 'You need to complete verification before doing this.' }
+  }
   if (m.includes('currently committed to a barter agreement')) {
     return { status: 409, error: 'This listing is currently committed to a barter agreement and cannot be booked.' }
   }

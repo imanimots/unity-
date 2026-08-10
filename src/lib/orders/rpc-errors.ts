@@ -23,6 +23,12 @@ export function mapOrderRpcError(message: string | undefined): { status: number;
   if (m.includes('you cannot buy your own listing')) {
     return { status: 403, error: 'You cannot buy your own listing.' }
   }
+  if (m.includes('verification_required:counterparty')) {
+    return { status: 403, error: 'This listing is not currently available for a new transaction.' }
+  }
+  if (m.includes('verification_required:self')) {
+    return { status: 403, error: 'You need to complete verification before doing this.' }
+  }
   if (m.includes('currently committed to a barter agreement')) {
     return { status: 409, error: 'This listing is currently committed to a barter agreement and cannot be purchased.' }
   }
