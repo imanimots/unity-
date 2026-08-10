@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MarketplaceRequestSummary } from '@/components/listings/request-card'
 
 export interface MarketplaceRequestFilters {
-  transactionType?: 'buy' | 'rent' | 'barter'
+  transactionType?: 'buy' | 'rent' | 'barter' | 'rent_to_buy'
   category?: string
   query?: string
   countryId?: string

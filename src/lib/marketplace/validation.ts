@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { idempotencyKeySchema } from '@/lib/bookings/validation'
 
-const transactionTypeEnum = z.enum(['buy', 'rent', 'barter'] as const)
+const transactionTypeEnum = z.enum(['buy', 'rent', 'barter', 'rent_to_buy'] as const)
 const offerTypeEnum = z.enum(['link_listing', 'private_offer', 'message_only', 'public_listing'] as const)
 
 export const createMarketplaceRequestSchema = z

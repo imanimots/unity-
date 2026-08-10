@@ -3,7 +3,7 @@ import { MapPin, Clock } from 'lucide-react'
 
 export interface MarketplaceRequestSummary {
   id: string
-  transaction_type: 'buy' | 'rent' | 'barter'
+  transaction_type: 'buy' | 'rent' | 'barter' | 'rent_to_buy'
   title: string
   category: string | null
   province: string | null

@@ -2,10 +2,10 @@
 
 import { useId, useRef } from 'react'
 import type { KeyboardEvent } from 'react'
-import { ShoppingBag, Calendar, ArrowLeftRight } from 'lucide-react'
+import { ShoppingBag, Calendar, ArrowLeftRight, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type MarketplaceMode = 'buy' | 'rent' | 'barter'
+export type MarketplaceMode = 'buy' | 'rent' | 'barter' | 'rent_to_buy'
 
 interface MarketplaceModeSelectorProps {
   selectedMode: MarketplaceMode
@@ -17,6 +17,7 @@ const MODES: { id: MarketplaceMode; label: string; icon: typeof ShoppingBag }[] 
   { id: 'buy', label: 'Buy', icon: ShoppingBag },
   { id: 'rent', label: 'Rent', icon: Calendar },
   { id: 'barter', label: 'Barter', icon: ArrowLeftRight },
+  { id: 'rent_to_buy', label: 'Rent-to-Buy', icon: Wallet },
 ]
 
 /**

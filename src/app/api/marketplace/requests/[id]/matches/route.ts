@@ -38,6 +38,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   if (req.transaction_type === 'buy') query = query.in('listing_type', ['sale', 'both'])
   else if (req.transaction_type === 'rent') query = query.in('listing_type', ['rental', 'both'])
   // barter: any active, unlocked listing is eligible regardless of listing_type -- no filter here.
+  // rent_to_buy: eligibility is a separate 1:1 enabled-terms row, not a
+  // listing_type value -- filtered in memory below after fetching, via
+  // an id-set intersection (a listing_type filter here would be wrong,
+  // since RTB terms can exist on a sale/rental/both listing alike).
 
   // categoryMatch
   if (req.category_id) query = query.eq('category_id', req.category_id)
@@ -49,9 +53,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Could not compute matches' }, { status: 500 })
   }
 
-  // budgetCompatibility -- applied in memory (mixed daily_rate/sale_price columns).
-  const priceOf = (l: { daily_rate: number | null; sale_price: number | null }) => l.daily_rate ?? l.sale_price ?? null
-  let results = (candidates ?? []).filter((l) => {
+  let rtbInstallmentByListing: Map<string, number> | null = null
+  if (req.transaction_type === 'rent_to_buy' && (candidates ?? []).length > 0) {
+    const { data: rtbTerms } = await admin.from('rent_to_buy_listing_terms').select('listing_id, installment_amount').eq('enabled', true).in('listing_id', (candidates ?? []).map((c) => c.id))
+    rtbInstallmentByListing = new Map((rtbTerms ?? []).map((t) => [t.listing_id, Number(t.installment_amount)]))
+  }
+
+  // rent_to_buy: only listings with an enabled 1:1 terms row are eligible.
+  let results = (candidates ?? []).filter((l) => req.transaction_type !== 'rent_to_buy' || rtbInstallmentByListing?.has(l.id))
+
+  // budgetCompatibility -- applied in memory (mixed daily_rate/sale_price/rent-to-buy-instalment columns).
+  const priceOf = (l: { id: string; daily_rate: number | null; sale_price: number | null }) =>
+    req.transaction_type === 'rent_to_buy' ? (rtbInstallmentByListing?.get(l.id) ?? null) : (l.daily_rate ?? l.sale_price ?? null)
+  results = results.filter((l) => {
     const price = priceOf(l)
     if (price === null) return true
     if (req.budget_min !== null && price < req.budget_min) return false

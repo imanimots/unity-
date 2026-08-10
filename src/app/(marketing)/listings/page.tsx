@@ -44,11 +44,12 @@ const MODE_LABELS: Record<string, string> = {
   rent: 'available to rent',
   buy: 'available to buy',
   barter: 'available to barter',
+  rent_to_buy: 'available to rent-to-buy',
 }
 
 export default async function ListingsPage({ searchParams }: PageProps) {
   const params = await searchParams
-  const mode = params.mode === 'buy' || params.mode === 'barter' ? params.mode : 'rent'
+  const mode = params.mode === 'buy' || params.mode === 'barter' || params.mode === 'rent_to_buy' ? params.mode : 'rent'
   const isBarter = mode === 'barter'
   const isLookingFor = params.direction === 'looking-for'
 
@@ -62,7 +63,9 @@ export default async function ListingsPage({ searchParams }: PageProps) {
     // Barter has no listing_type of its own -- any active, unlocked
     // listing is barter-eligible (getListings() already excludes
     // barter-locked listings unconditionally), so no type filter is
-    // applied for barter mode, same as before this phase.
+    // applied for barter mode, same as before this phase. rent_to_buy
+    // DOES get its own mode value -- getListings() filters it via the
+    // 1:1 enabled rent_to_buy_listing_terms row, not listing_type.
     mode: isBarter ? undefined : mode,
     countryId,
   }

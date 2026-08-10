@@ -12,8 +12,15 @@ export interface ListingFilters {
   maxPrice?: number
   location?: string
   sort?: 'relevance' | 'price_asc' | 'price_desc' | 'newest' | 'rating'
-  /** Maps the browse-page Buy/Rent toggle to listing_type. 'rent' -> rental|both, 'buy' -> sale|both. Omit for no type filtering. */
-  mode?: 'buy' | 'rent'
+  /**
+   * Maps the browse-page Buy/Rent toggle to listing_type. 'rent' ->
+   * rental|both, 'buy' -> sale|both. 'rent_to_buy' filters to listings
+   * with an enabled 1:1 rent_to_buy_listing_terms row (not a
+   * listing_type value -- RTB terms can sit on a sale/rental/both
+   * listing alike). Omit for no type filtering (barter's own browse
+   * omits mode entirely, matching Phase 4's precedent).
+   */
+  mode?: 'buy' | 'rent' | 'rent_to_buy'
   /**
    * Scopes results to one country (public browse/search only — see
    * resolveEffectiveCountry()). Omit to skip country filtering entirely —
@@ -110,6 +117,13 @@ export async function getListings(filters: ListingFilters = {}): Promise<Listing
   if (filters.mode === 'rent') query = query.in('listing_type', ['rental', 'both'])
   if (filters.mode === 'buy') query = query.in('listing_type', ['sale', 'both'])
   if (filters.countryId) query = query.eq('country_id', filters.countryId)
+
+  if (filters.mode === 'rent_to_buy') {
+    const { data: rtbTerms } = await supabase.from('rent_to_buy_listing_terms').select('listing_id').eq('enabled', true)
+    const rtbListingIds = (rtbTerms ?? []).map((t) => t.listing_id)
+    if (rtbListingIds.length === 0) return []
+    query = query.in('id', rtbListingIds)
+  }
 
   const { data: rawData } = await query
   if (!rawData) return []
