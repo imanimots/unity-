@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, Package, Calendar,
   AlertTriangle, Link2, BookOpen, BarChart3,
   Menu, X, Shield, LogOut, ChevronRight, UserCheck, Mail,
-  Wallet, Inbox, ScrollText, Repeat, ShoppingBag, DollarSign, Banknote, CreditCard, Percent, ShieldCheck,
+  Wallet, Inbox, ScrollText, Repeat, ShoppingBag, DollarSign, Banknote, CreditCard, Percent, ShieldCheck, ClipboardList,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { IS_MOCK_MODE } from '@/lib/mock/data'
@@ -31,6 +31,7 @@ const NAV_ITEMS = [
   { href: '/admin/subscriptions',       label: 'Merchant Subscriptions', icon: CreditCard     },
   { href: '/admin/commissions',         label: 'Unity Commissions',    icon: Percent          },
   { href: '/admin/escrow',              label: 'Secure Transactions',  icon: ShieldCheck      },
+  { href: '/admin/marketplace-requests', label: 'Looking For',         icon: ClipboardList    },
   { href: '/admin/knowledge-base',      label: 'Knowledge Base',       icon: BookOpen         },
   { href: '/admin/email-previews',      label: 'Email Previews',       icon: Mail             },
   { href: '/admin/analytics',           label: 'Analytics',            icon: BarChart3        },
