@@ -1272,6 +1272,34 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       cta: { label: 'View your dashboard', path: '/dashboard' },
     }),
   },
+
+  // ---------------- LOOKING FOR (Phase 4) ----------------
+  {
+    id: 'marketplace-offer-received',
+    version: '1',
+    event: 'marketplace_request.offer_received',
+    requiredVars: ['recipientName', 'requestTitle'],
+    subject: (v) => `You have a new response to "${s(v, 'requestTitle')}"`,
+    build: (v) => ({
+      preheader: 'Someone responded to your request',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [`Your request "${s(v, 'requestTitle')}" received a new response.`],
+      cta: { label: 'View responses', path: '/looking-for' },
+    }),
+  },
+  {
+    id: 'marketplace-offer-accepted',
+    version: '1',
+    event: 'marketplace_request.offer_accepted',
+    requiredVars: ['recipientName', 'requestTitle'],
+    subject: (v) => `Your response to "${s(v, 'requestTitle')}" was accepted`,
+    build: (v) => ({
+      preheader: 'Your response was accepted',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [`Your response to "${s(v, 'requestTitle')}" was accepted. The transaction has been created in your dashboard.`],
+      cta: { label: 'View your dashboard', path: '/dashboard' },
+    }),
+  },
 ]
 
 const TEMPLATES_BY_ID = new Map(EMAIL_TEMPLATES.map((t) => [t.id, t]))
