@@ -15,6 +15,8 @@ describe('mapBarterRpcError', () => {
     ['one or more offered listings are currently committed to another barter agreement', 409],
     ['this listing is not available for barter', 404],
     ['you cannot propose a trade on your own listing', 403],
+    ['verification_required:self', 403],
+    ['verification_required:counterparty', 403],
     ['barter agreement not found or you are not a party to it', 404],
     ['this barter agreement is currently suspended by an administrator', 403],
     ['this offer can no longer be countered', 409],
@@ -50,5 +52,17 @@ describe('mapBarterRpcError', () => {
 
   it('handles an undefined message', () => {
     expect(mapBarterRpcError(undefined)).toEqual({ status: 500, error: 'Could not process your request — please try again' })
+  })
+
+  it('maps a self KYC failure to a 403 telling the caller to verify', () => {
+    const result = mapBarterRpcError('verification_required:self')
+    expect(result.status).toBe(403)
+    expect(result.error).toMatch(/verification/i)
+  })
+
+  it('maps a counterparty KYC failure to a 403 that never reveals it is a KYC issue', () => {
+    const result = mapBarterRpcError('verification_required:counterparty')
+    expect(result.status).toBe(403)
+    expect(result.error).not.toMatch(/verif|kyc|aml|document|rejected/i)
   })
 })

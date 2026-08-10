@@ -11,6 +11,18 @@ describe('mapBookingRpcError', () => {
     expect(mapBookingRpcError('you cannot book your own listing').status).toBe(403)
   })
 
+  it('maps a self KYC failure to a 403 telling the caller to verify', () => {
+    const result = mapBookingRpcError('verification_required:self')
+    expect(result.status).toBe(403)
+    expect(result.error).toMatch(/verification/i)
+  })
+
+  it('maps a counterparty (merchant) KYC failure to a 403 that never reveals it is a KYC issue', () => {
+    const result = mapBookingRpcError('verification_required:counterparty')
+    expect(result.status).toBe(403)
+    expect(result.error).not.toMatch(/verif|kyc|aml|document|rejected/i)
+  })
+
   it('maps a merchant-blocked date range to 409', () => {
     expect(mapBookingRpcError('requested dates fall within a period the merchant has marked unavailable').status).toBe(409)
   })

@@ -8,6 +8,8 @@ describe('mapOrderRpcError', () => {
     ['quantity must be at least 1', 400],
     ['listing not found or not available for purchase', 404],
     ['you cannot buy your own listing', 403],
+    ['verification_required:self', 403],
+    ['verification_required:counterparty', 403],
     ['this listing is currently committed to a barter agreement', 409],
     ['insufficient stock available for the requested quantity', 409],
     ['this order is not awaiting payment', 409],
@@ -32,5 +34,17 @@ describe('mapOrderRpcError', () => {
 
   it('handles an undefined message', () => {
     expect(mapOrderRpcError(undefined)).toEqual({ status: 500, error: 'Could not process your request — please try again' })
+  })
+
+  it('maps a self KYC failure to a 403 telling the caller to verify', () => {
+    const result = mapOrderRpcError('verification_required:self')
+    expect(result.status).toBe(403)
+    expect(result.error).toMatch(/verification/i)
+  })
+
+  it('maps a counterparty (merchant) KYC failure to a 403 that never reveals it is a KYC issue', () => {
+    const result = mapOrderRpcError('verification_required:counterparty')
+    expect(result.status).toBe(403)
+    expect(result.error).not.toMatch(/verif|kyc|aml|document|rejected/i)
   })
 })
