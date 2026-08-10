@@ -58,7 +58,8 @@ export async function POST(request: NextRequest) {
         parsed.data.title,
         parsed.data.reason,
         parsed.data.description,
-        parsed.data.requested_resolution
+        parsed.data.requested_resolution,
+        parsed.data.rent_to_buy_agreement_id
       )
       const replay = await checkIdempotentReplay(admin, requester.userId, 'open_dispute', parsed.data.idempotency_key, hash)
       if (replay.status === 'replay') return NextResponse.json(replay.result, { status: 201 })
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
       p_booking_id: parsed.data.booking_id ?? null,
       p_order_id: parsed.data.order_id ?? null,
       p_barter_agreement_id: parsed.data.barter_agreement_id ?? null,
+      p_rent_to_buy_agreement_id: parsed.data.rent_to_buy_agreement_id ?? null,
       p_title: parsed.data.title,
       p_reason: parsed.data.reason ?? null,
       p_description: parsed.data.description,
@@ -93,8 +95,8 @@ export async function POST(request: NextRequest) {
       // widened in Phase 1) -- every dispute maps 1:1 to exactly one
       // transaction, so dispute emails reference that transaction
       // directly rather than needing yet another schema widening.
-      const relatedEntityType = parsed.data.booking_id ? 'booking' : parsed.data.order_id ? 'order' : 'barter_agreement'
-      const relatedEntityId = parsed.data.booking_id ?? parsed.data.order_id ?? parsed.data.barter_agreement_id!
+      const relatedEntityType = parsed.data.booking_id ? 'booking' : parsed.data.order_id ? 'order' : parsed.data.barter_agreement_id ? 'barter_agreement' : 'rent_to_buy_agreement'
+      const relatedEntityId = parsed.data.booking_id ?? parsed.data.order_id ?? parsed.data.barter_agreement_id ?? parsed.data.rent_to_buy_agreement_id!
       if (ctx) {
         await sendTemplate(admin, {
           eventType: 'dispute.opened',

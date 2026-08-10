@@ -38,6 +38,9 @@ export function mapBarterRpcError(message: string | undefined): { status: number
   if (m.includes('currently committed to another barter agreement')) {
     return { status: 409, error: 'One or more offered listings are currently committed to another barter agreement.' }
   }
+  if (m.includes('currently committed to a rent-to-buy agreement')) {
+    return { status: 409, error: 'One or more offered listings are currently committed to a rent-to-buy agreement.' }
+  }
   if (m.includes('this listing is not available for barter')) {
     return { status: 404, error: 'This listing is not available for barter.' }
   }

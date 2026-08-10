@@ -21,9 +21,10 @@ export function computeOpenDisputeHash(
   title: string,
   reason: string | null | undefined,
   description: string,
-  requestedResolution: string
+  requestedResolution: string,
+  rentToBuyAgreementId?: string | null | undefined
 ): string {
-  return md5(`${bookingId ?? ''}|${orderId ?? ''}|${barterAgreementId ?? ''}|${title}|${reason ?? ''}|${description}|${requestedResolution}`)
+  return md5(`${bookingId ?? ''}|${orderId ?? ''}|${barterAgreementId ?? ''}|${rentToBuyAgreementId ?? ''}|${title}|${reason ?? ''}|${description}|${requestedResolution}`)
 }
 
 export function computeAssignDisputeHash(disputeId: string, assigneeAdminId: string): string {

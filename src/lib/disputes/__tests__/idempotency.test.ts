@@ -15,9 +15,12 @@ const ADMIN_ID = '33333333-3333-3333-8333-333333333333'
 
 describe('computeOpenDisputeHash', () => {
   it('matches the exact md5 Postgres produces for the same inputs', () => {
-    // select md5(booking_id::text || '|' || order_id::text || '|' || barter_agreement_id::text || '|' || title || '|' || reason || '|' || description || '|' || requested_resolution)
+    // select md5(booking_id::text || '|' || order_id::text || '|' || barter_agreement_id::text || '|' || rent_to_buy_agreement_id::text || '|' || title || '|' || reason || '|' || description || '|' || requested_resolution)
+    // Phase 5 widened this formula with a rent_to_buy_agreement_id segment
+    // (see supabase/migrations/20260827000004_rtb_widening.sql's
+    // open_dispute() replacement) -- expected value recomputed to match.
     expect(computeOpenDisputeHash(BOOKING_ID, null, null, 'Item damaged', 'damaged', 'It arrived broken.', 'A refund.')).toBe(
-      'fa617780726fa53421e37b53005d6a6b'
+      '736307fb95f321c7da44359024440485'
     )
   })
 

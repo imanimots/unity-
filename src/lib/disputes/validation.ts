@@ -1,15 +1,16 @@
 import { z } from 'zod'
 import { idempotencyKeySchema } from '@/lib/bookings/validation'
 
-// Exactly one of booking_id/order_id/barter_agreement_id, mirroring
-// disputes_one_transaction_chk. Enforced again here (not just left to
-// the RPC) so a malformed request gets a clean 400 before ever reaching
-// the database.
+// Exactly one of booking_id/order_id/barter_agreement_id/
+// rent_to_buy_agreement_id, mirroring disputes_one_transaction_chk.
+// Enforced again here (not just left to the RPC) so a malformed
+// request gets a clean 400 before ever reaching the database.
 export const openDisputeSchema = z
   .object({
     booking_id: z.string().uuid().optional(),
     order_id: z.string().uuid().optional(),
     barter_agreement_id: z.string().uuid().optional(),
+    rent_to_buy_agreement_id: z.string().uuid().optional(),
     title: z.string().trim().min(1).max(200),
     reason: z.string().trim().max(200).optional(),
     description: z.string().trim().min(1).max(5000),
@@ -17,8 +18,8 @@ export const openDisputeSchema = z
     idempotency_key: idempotencyKeySchema.optional(),
   })
   .refine(
-    (v) => [v.booking_id, v.order_id, v.barter_agreement_id].filter((x) => x !== undefined).length === 1,
-    { message: 'Exactly one of booking_id, order_id, or barter_agreement_id is required' }
+    (v) => [v.booking_id, v.order_id, v.barter_agreement_id, v.rent_to_buy_agreement_id].filter((x) => x !== undefined).length === 1,
+    { message: 'Exactly one of booking_id, order_id, barter_agreement_id, or rent_to_buy_agreement_id is required' }
   )
 
 export const disputeEvidenceRegisterSchema = z.object({
