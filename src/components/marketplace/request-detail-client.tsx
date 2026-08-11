@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ProfileLink } from '@/components/shared/profile-link'
 
 interface Offer {
   id: string
@@ -142,7 +143,8 @@ export function RequestDetailClient({ request, requesterName, requesterVerified,
         </span>
         <h1 className="text-3xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] mb-2">{request.title}</h1>
         <p className="text-sm text-[#9B8B85] mb-4">
-          Posted by {requesterName} {requesterVerified && <span className="text-green-600">· Verified</span>}
+          Posted by <ProfileLink userId={request.requester_id} displayName={requesterName} currentUserId={currentUserId} />{' '}
+          {requesterVerified && <span className="text-green-600">· Verified</span>}
         </p>
         {request.description && <p className="text-[#6B5B55] dark:text-[#9B8B85] mb-4">{request.description}</p>}
         <dl className="grid grid-cols-2 gap-4 text-sm">

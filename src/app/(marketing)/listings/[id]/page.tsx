@@ -12,6 +12,7 @@ import { AffiliateCookieSetter } from '@/components/listings/affiliate-cookie-se
 import { AffiliateButton } from '@/components/listings/affiliate-button'
 import { ProposeTradeButton } from '@/components/barter/propose-trade-button'
 import { getRequestProfile } from '@/lib/supabase/require-admin'
+import { ProfileLink } from '@/components/shared/profile-link'
 import { isListingBarterLocked, getAllBarterLockedListingIds } from '@/lib/barter/listing-lock'
 import { absoluteUrl, isMarketplaceIndexingEnabled, PERMANENT_NOINDEX } from '@/lib/seo/config'
 
@@ -253,10 +254,13 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
-                        {listing.merchant.display_name ?? listing.merchant.full_name}
-                      </span>
-                      {listing.merchant.kyc_status === 'approved' && (
+                      <ProfileLink
+                        userId={listing.merchant.id}
+                        displayName={listing.merchant.display_name ?? listing.merchant.full_name ?? 'Unity Member'}
+                        currentUserId={viewer?.userId ?? null}
+                        className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]"
+                      />
+                      {listing.merchant.is_verified && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded-full">
                           <ShieldCheck size={9} /> KYC Verified
                         </span>
@@ -366,9 +370,12 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                           {review.reviewer?.display_name?.[0]?.toUpperCase() ?? '?'}
                         </div>
                         <div>
-                          <div className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">
-                            {review.reviewer?.display_name ?? 'Anonymous'}
-                          </div>
+                          <ProfileLink
+                            userId={review.reviewer?.id}
+                            displayName={review.reviewer?.display_name ?? review.reviewer?.full_name ?? 'Anonymous'}
+                            currentUserId={viewer?.userId ?? null}
+                            className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]"
+                          />
                           <div className="flex items-center gap-1">
                             {Array.from({ length: 5 }).map((_, i) => (
                               <Star
