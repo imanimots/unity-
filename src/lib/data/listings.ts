@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Listing } from '@/types'
 import {
   MOCK_LISTINGS,
@@ -34,6 +35,42 @@ export interface ListingFilters {
 /** Normalized display price — daily rate for rentals, sale price for sale-only listings. Never both null (see listings_type_pricing_chk). */
 function normalizedPrice(l: Listing): number {
   return l.daily_rate ?? l.sale_price ?? 0
+}
+
+/**
+ * The `merchant`/`reviewer` identity attached to a listing/review is
+ * NEVER read via a `profiles!*_fkey(...)` PostgREST embed and never a
+ * bare `profiles(*)` embed. `profiles` itself is no longer even
+ * directly SELECT-able by anon/authenticated for another user's row
+ * (its RLS is `auth.uid() = id` -- see
+ * supabase/migrations/20260831000001_profiles_privacy_boundary.sql),
+ * and PostgREST embeds are subject to the EMBEDDED table's own RLS as
+ * the querying role, so an embed here would silently return null for
+ * every listing's merchant. Instead, every function below batch-fetches
+ * identities from the `public_profiles` view (id, display_name,
+ * full_name, avatar_url, role, is_verified, unity_score, created_at --
+ * never phone/kyc_status/account_status/affiliate fields) via
+ * `attachMerchantIdentities()`/`attachReviewerIdentities()` and joins
+ * in-memory, matching this codebase's own dominant admin-service
+ * pattern (one base query + a batched related-table query + a Map
+ * join) rather than relying on an embed at all. See
+ * docs/CLICKABLE_PROFILES.md.
+ */
+async function fetchPublicProfilesById(supabase: SupabaseClient, ids: string[]): Promise<Map<string, Record<string, unknown>>> {
+  const uniqueIds = [...new Set(ids)].filter(Boolean)
+  if (uniqueIds.length === 0) return new Map()
+  const { data } = await supabase.from('public_profiles').select('id, display_name, full_name, avatar_url, role, is_verified, unity_score, created_at').in('id', uniqueIds)
+  return new Map(((data ?? []) as { id: string }[]).map((p) => [p.id, p as Record<string, unknown>]))
+}
+
+async function attachMerchantIdentities<T extends { merchant_id: string }>(supabase: SupabaseClient, rows: T[]): Promise<(T & { merchant?: Record<string, unknown> })[]> {
+  const byId = await fetchPublicProfilesById(supabase, rows.map((r) => r.merchant_id))
+  return rows.map((r) => ({ ...r, merchant: byId.get(r.merchant_id) }))
+}
+
+async function attachReviewerIdentities<T extends { reviewer_id: string }>(supabase: SupabaseClient, rows: T[]): Promise<(T & { reviewer?: Record<string, unknown> })[]> {
+  const byId = await fetchPublicProfilesById(supabase, rows.map((r) => r.reviewer_id))
+  return rows.map((r) => ({ ...r, reviewer: byId.get(r.reviewer_id) }))
 }
 
 /**
@@ -106,7 +143,7 @@ export async function getListings(filters: ListingFilters = {}): Promise<Listing
   let query = excludeTestListings(
     supabase
       .from('listings')
-      .select('*, merchant:profiles!listings_merchant_id_fkey(*), media:listing_media(*)')
+      .select('*, media:listing_media(*)')
       .eq('status', 'active')
   )
 
@@ -135,7 +172,8 @@ export async function getListings(filters: ListingFilters = {}): Promise<Listing
   // the Barter Marketplace MVP Implementation Plan, Decision 4.
   const { getAllBarterLockedListingIds } = await import('@/lib/barter/listing-lock')
   const lockedIds = await getAllBarterLockedListingIds()
-  const data = lockedIds.size > 0 ? rawData.filter((l) => !lockedIds.has(l.id)) : rawData
+  const filtered = lockedIds.size > 0 ? rawData.filter((l) => !lockedIds.has(l.id)) : rawData
+  const data = await attachMerchantIdentities(supabase, filtered)
 
   switch (filters.sort) {
     case 'price_asc':
@@ -164,11 +202,13 @@ export async function getListing(id: string): Promise<Listing | null> {
 
   const { data } = await supabase
     .from('listings')
-    .select('*, merchant:profiles!listings_merchant_id_fkey(*), media:listing_media(*)')
+    .select('*, media:listing_media(*)')
     .eq('id', id)
     .single()
 
-  return data
+  if (!data) return null
+  const [withMerchant] = await attachMerchantIdentities(supabase, [data])
+  return withMerchant
 }
 
 export async function getSimilarListings(listing: Listing, limit = 4): Promise<Listing[]> {
@@ -185,14 +225,14 @@ export async function getSimilarListings(listing: Listing, limit = 4): Promise<L
   const { data } = await excludeTestListings(
     supabase
       .from('listings')
-      .select('*, merchant:profiles!listings_merchant_id_fkey(*), media:listing_media(*)')
+      .select('*, media:listing_media(*)')
       .eq('status', 'active')
   )
     .eq('category', listing.category)
     .neq('id', listing.id)
     .limit(limit)
 
-  return data ?? []
+  return data ? attachMerchantIdentities(supabase, data) : []
 }
 
 export function getListingReviews(listingId: string) {
@@ -224,7 +264,7 @@ export async function getListingsByMerchant(merchantId: string, options: { inclu
 
   let query = supabase
     .from('listings')
-    .select('*, merchant:profiles!listings_merchant_id_fkey(*), media:listing_media(*)')
+    .select('*, media:listing_media(*)')
     .eq('merchant_id', merchantId)
     .order('created_at', { ascending: false })
 
@@ -232,7 +272,7 @@ export async function getListingsByMerchant(merchantId: string, options: { inclu
 
   const { data } = await query
 
-  return data ?? []
+  return data ? attachMerchantIdentities(supabase, data) : []
 }
 
 export async function getProfileReviews(revieweeId: string) {
@@ -244,19 +284,13 @@ export async function getProfileReviews(revieweeId: string) {
   const supabase = await createClient()
   if (!supabase) return []
 
-  // `reviews` has two FK relationships to `profiles` (reviewer_id,
-  // reviewee_id), so a bare `profiles(*)` embed is ambiguous to
-  // PostgREST (error PGRST201) -- the same failure class fixed for
-  // `listings` during Unity SEO Pre-Launch Hardening. Qualify with the
-  // exact FK constraint name, confirmed live via PostgREST's own error
-  // hint.
   const { data } = await supabase
     .from('reviews')
-    .select('*, reviewer:profiles!reviews_reviewer_id_fkey(*)')
+    .select('*')
     .eq('reviewee_id', revieweeId)
     .order('created_at', { ascending: false })
 
-  return data ?? []
+  return data ? attachReviewerIdentities(supabase, data) : []
 }
 
 export function getAverageRating(reviews: { rating: number }[]): number {

@@ -33,7 +33,12 @@ export default async function BarterAgreementPage({ params }: PageProps) {
     supabase.from('barter_confirmations').select('*').eq('agreement_id', agreementId),
     // Step 11 Phase 4 -- deposit/cash-adjustment payment rows.
     supabase.from('payments').select('*').eq('barter_agreement_id', agreementId),
-    supabase.from('profiles').select('id, display_name, full_name').in('id', [agreement.party_a_id, agreement.party_b_id]),
+    // public_profiles, not the base `profiles` table -- either party
+    // reading the OTHER party's identity here is a public-identity
+    // read, not a self-read, and the base table's RLS is now
+    // auth.uid() = id only (see
+    // supabase/migrations/20260831000001_profiles_privacy_boundary.sql).
+    supabase.from('public_profiles').select('id, display_name, full_name').in('id', [agreement.party_a_id, agreement.party_b_id]),
   ])
 
   const nameById = new Map((partyProfiles ?? []).map((p) => [p.id, p.display_name || p.full_name || 'Unity user']))

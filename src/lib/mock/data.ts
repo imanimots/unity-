@@ -1,7 +1,7 @@
-import type { Profile, Listing, ListingMedia, Booking, Review } from '@/types'
+import type { Profile, PublicProfileIdentity, Listing, ListingMedia, Booking, Review } from '@/types'
 import { calculateRiskTier } from '@/lib/risk/engine'
 
-export const MOCK_PROFILES: Profile[] = [
+export const MOCK_PROFILES: (Profile & Pick<PublicProfileIdentity, 'is_verified'>)[] = [
   {
     id: 'user-1',
     full_name: 'Thabo Nkosi',
@@ -9,6 +9,7 @@ export const MOCK_PROFILES: Profile[] = [
     phone: '+27 82 123 4567',
     role: 'both',
     kyc_status: 'approved',
+    is_verified: true,
     unity_score: 4.9,
     country_id: 'ZA',
     avatar_url: null,
@@ -27,6 +28,7 @@ export const MOCK_PROFILES: Profile[] = [
     phone: '+27 71 234 5678',
     role: 'merchant',
     kyc_status: 'approved',
+    is_verified: true,
     unity_score: 4.8,
     country_id: 'ZA',
     avatar_url: null,
@@ -45,6 +47,7 @@ export const MOCK_PROFILES: Profile[] = [
     phone: '+27 83 345 6789',
     role: 'merchant',
     kyc_status: 'approved',
+    is_verified: true,
     unity_score: 4.7,
     country_id: 'ZA',
     avatar_url: null,
@@ -63,6 +66,7 @@ export const MOCK_PROFILES: Profile[] = [
     phone: '+27 74 456 7890',
     role: 'both',
     kyc_status: 'approved',
+    is_verified: true,
     unity_score: 5.0,
     country_id: 'ZA',
     avatar_url: null,
@@ -554,7 +558,7 @@ export const MOCK_LISTINGS: Listing[] = RAW_LISTINGS.map((listing) => ({
   risk_tier: calculateRiskTier({
     category: listing.category,
     dailyRate: listing.daily_rate,
-    merchantKycStatus: listing.merchant?.kyc_status ?? 'none',
+    merchantKycStatus: listing.merchant?.is_verified ? 'approved' : 'none',
     merchantUnityScore: listing.merchant?.unity_score ?? 0,
   }),
 }))

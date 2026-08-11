@@ -9,6 +9,14 @@ interface RouteParams {
  * GET /api/orders/[id] -- full order detail for a party. Session client
  * throughout -- RLS ("orders: parties read") is the actual enforcement
  * boundary.
+ *
+ * buyer/seller identity is read from `public_profiles`, never a
+ * `profiles!*_fkey(*)` embed -- that embed previously returned the
+ * FULL profile row (phone, account_status, affiliate_code, etc.) for
+ * BOTH parties, meaning either party could read their counterparty's
+ * private fields simply by opening their own order. Fixed as part of
+ * the Clickable Customer Profiles privacy-boundary corrective pass;
+ * see supabase/migrations/20260831000001_profiles_privacy_boundary.sql.
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { id: orderId } = await params
@@ -29,7 +37,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
-    .select('*, listing:listings(*, media:listing_media(*)), buyer:profiles!orders_buyer_id_fkey(*), seller:profiles!orders_seller_id_fkey(*)')
+    .select('*, listing:listings(*, media:listing_media(*))')
     .eq('id', orderId)
     .maybeSingle()
 
@@ -42,8 +50,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   }
 
+  const { data: parties } = await supabase
+    .from('public_profiles')
+    .select('id, display_name, full_name, avatar_url, role, is_verified, unity_score, created_at')
+    .in('id', [order.buyer_id, order.seller_id])
+  const partyById = new Map((parties ?? []).map((p) => [p.id, p]))
+  const orderWithParties = { ...order, buyer: partyById.get(order.buyer_id), seller: partyById.get(order.seller_id) }
+
   const { data: history } = await supabase.from('order_history').select('*').eq('order_id', orderId).order('created_at', { ascending: true })
   const { data: payment } = await supabase.from('payments').select('status, failure_reason').eq('order_id', orderId).eq('payment_type', 'order_payment').maybeSingle()
 
-  return NextResponse.json({ order, history: history ?? [], payment: payment ?? null })
+  return NextResponse.json({ order: orderWithParties, history: history ?? [], payment: payment ?? null })
 }

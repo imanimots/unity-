@@ -259,7 +259,7 @@ export function BookingFlow({ listing }: { listing: Listing & { daily_rate: numb
               <span className="text-[#6B5B55] dark:text-[#9B8B85]">Merchant</span>
               <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED] flex items-center gap-1">
                 {listing.merchant?.display_name}
-                {listing.merchant?.kyc_status === 'approved' && <ShieldCheck size={13} className="text-green-500" />}
+                {listing.merchant?.is_verified && <ShieldCheck size={13} className="text-green-500" />}
               </span>
             </div>
           </div>
