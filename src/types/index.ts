@@ -81,6 +81,26 @@ export interface Profile {
   created_at: string
 }
 
+/**
+ * The safe, narrow identity shape returned by the `public_profiles`
+ * view (supabase/migrations/20260831000001_profiles_privacy_boundary.sql)
+ * -- never phone/kyc_status(raw)/account_status/affiliate fields/
+ * status_reason/status_changed_at/status_changed_by. Used wherever a
+ * listing/review attaches another user's identity for public display
+ * (Listing.merchant, Review.reviewer) -- as opposed to `Profile`, which
+ * stays reserved for self-reads and trusted service-role/admin reads.
+ */
+export interface PublicProfileIdentity {
+  id: string
+  display_name: string | null
+  full_name: string | null
+  avatar_url: string | null
+  role: UserRole
+  is_verified: boolean
+  unity_score: number
+  created_at: string
+}
+
 export interface Country {
   id: string
   name: string
@@ -175,7 +195,7 @@ export interface Listing {
   // Non-sensitive category-specific display attributes only — see
   // docs/LISTING_SCHEMA.md's promotion rule before adding a key here.
   category_metadata?: Record<string, unknown> | null
-  merchant?: Profile
+  merchant?: PublicProfileIdentity
   media?: ListingMedia[]
 }
 
@@ -598,7 +618,7 @@ export interface Review {
   rating: number
   comment: string | null
   created_at: string
-  reviewer?: Profile
+  reviewer?: PublicProfileIdentity
 }
 
 export interface MessageAttachment {
