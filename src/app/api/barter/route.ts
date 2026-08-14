@@ -64,15 +64,21 @@ export async function POST(request: NextRequest) {
     const admin = createServiceClient(url, serviceKey)
 
     if (parsed.data.idempotency_key) {
-      const hash = computeProposeBarterHash(parsed.data.anchor_listing_id, {
-        partyAListingIds: parsed.data.party_a_listing_ids,
-        partyBListingIds: parsed.data.party_b_listing_ids,
-        cashAdjustmentAmount: parsed.data.cash_adjustment_amount ?? 0,
-        deliveryMethod: parsed.data.delivery_method,
-        depositAmount: parsed.data.deposit_amount,
-        depositPayer: parsed.data.deposit_payer,
-        message: parsed.data.message,
-      })
+      const hash = computeProposeBarterHash(
+        { listingId: parsed.data.anchor_listing_id, skillTaskPostId: parsed.data.anchor_skill_task_post_id },
+        {
+          partyAListingIds: parsed.data.party_a_listing_ids,
+          partyBListingIds: parsed.data.party_b_listing_ids,
+          partyAContributions: parsed.data.party_a_contributions,
+          partyBContributions: parsed.data.party_b_contributions,
+          depositTerms: parsed.data.deposit_terms,
+          cashAdjustmentAmount: parsed.data.cash_adjustment_amount ?? 0,
+          deliveryMethod: parsed.data.delivery_method,
+          depositAmount: parsed.data.deposit_amount,
+          depositPayer: parsed.data.deposit_payer,
+          message: parsed.data.message,
+        }
+      )
       const replay = await checkIdempotentReplay(admin, requester.userId, 'propose_barter', parsed.data.idempotency_key, hash)
       if (replay.status === 'replay') return NextResponse.json(replay.result, { status: 201 })
       if (replay.status === 'conflict') {
@@ -91,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     const { data, error } = await admin.rpc('propose_barter', {
       p_proposer_id: requester.userId,
-      p_anchor_listing_id: parsed.data.anchor_listing_id,
+      p_anchor_listing_id: parsed.data.anchor_listing_id ?? null,
       p_party_a_listing_ids: parsed.data.party_a_listing_ids,
       p_party_b_listing_ids: parsed.data.party_b_listing_ids,
       p_cash_adjustment_amount: parsed.data.cash_adjustment_amount ?? 0,
@@ -106,6 +112,10 @@ export async function POST(request: NextRequest) {
       p_message: parsed.data.message ?? null,
       p_expiry_hours: BARTER_PROPOSAL_EXPIRY_HOURS,
       p_idempotency_key: parsed.data.idempotency_key ?? null,
+      p_anchor_skill_task_post_id: parsed.data.anchor_skill_task_post_id ?? null,
+      p_party_a_contributions: parsed.data.party_a_contributions ?? null,
+      p_party_b_contributions: parsed.data.party_b_contributions ?? null,
+      p_deposit_terms: parsed.data.deposit_terms ?? null,
     })
 
     if (error) {

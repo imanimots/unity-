@@ -29,12 +29,27 @@ interface OfferFieldsForHash {
   depositAmount: number | null | undefined
   depositPayer: string | null | undefined
   message: string | null | undefined
+  // Skills + Tasks under Barter -- best-effort route-level replay
+  // detection only (JSON.stringify, not a byte-exact mirror of
+  // Postgres's own jsonb::text serialization used inside the RPC's
+  // own request_hash). The RPC's own hash remains the sole
+  // authoritative dedup guarantee (zero client write policies means
+  // it's the only possible write path); a mismatch here only means an
+  // identical replay might skip the route-level fast-path cache and
+  // fall through to the RPC, which still correctly returns its own
+  // cached result.
+  partyAContributions?: unknown
+  partyBContributions?: unknown
+  depositTerms?: unknown
 }
 
 function offerFieldsSuffix(fields: OfferFieldsForHash): string {
   return (
     `${pgUuidArrayText(fields.partyAListingIds)}|` +
     `${pgUuidArrayText(fields.partyBListingIds)}|` +
+    `${JSON.stringify(fields.partyAContributions ?? [])}|` +
+    `${JSON.stringify(fields.partyBContributions ?? [])}|` +
+    `${JSON.stringify(fields.depositTerms ?? [])}|` +
     `${fields.cashAdjustmentAmount}|` +
     `${fields.deliveryMethod}|` +
     `${fields.depositAmount ?? ''}|` +
@@ -43,8 +58,8 @@ function offerFieldsSuffix(fields: OfferFieldsForHash): string {
   )
 }
 
-export function computeProposeBarterHash(anchorListingId: string, fields: OfferFieldsForHash): string {
-  return md5(`${anchorListingId}|${offerFieldsSuffix(fields)}`)
+export function computeProposeBarterHash(anchor: { listingId?: string | null; skillTaskPostId?: string | null }, fields: OfferFieldsForHash): string {
+  return md5(`${anchor.listingId ?? ''}|${anchor.skillTaskPostId ?? ''}|${offerFieldsSuffix(fields)}`)
 }
 
 export function computeCounterBarterOfferHash(agreementId: string, fields: OfferFieldsForHash): string {

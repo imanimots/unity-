@@ -80,10 +80,32 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     results = results.filter((l) => !lockedIds.has(l.id))
   }
 
+  // Skills + Tasks under Barter -- for a general (item) barter Looking
+  // For request whose own want-flags indicate skill/task interest,
+  // surface Available Skill/Task posts as additional candidates. This
+  // is purely additive to the item candidate set above -- it never
+  // changes what item listings match, and item requests that don't
+  // want skill/task supply simply get an empty skillTaskMatches array.
+  let skillTaskMatches: Array<{ post_id: string; kind: string; title: string; signals: Record<string, boolean> }> = []
+  if (req.transaction_type === 'barter') {
+    let stQuery = admin
+      .from('barter_skill_task_public_posts')
+      .select('id, kind, title, category_id, delivery_mode')
+      .eq('direction', 'available')
+      .limit(60)
+    if (req.category_id) stQuery = stQuery.eq('category_id', req.category_id)
+    const { data: stCandidates } = await stQuery
+    skillTaskMatches = (stCandidates ?? []).map((p) => ({
+      post_id: p.id, kind: p.kind, title: p.title,
+      signals: { categoryMatch: !!(req.category_id && p.category_id === req.category_id) },
+    }))
+  }
+
   return NextResponse.json({
     matches: results.map((l) => ({
       listing_id: l.id, title: l.title, category: l.category, price: priceOf(l),
       signals: { transactionTypeMatch: true, categoryMatch: !!(req.category_id || req.category), locationMatch: true, budgetCompatibility: true },
     })),
+    skillTaskMatches,
   })
 }

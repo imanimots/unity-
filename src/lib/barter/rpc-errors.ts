@@ -108,5 +108,124 @@ export function mapBarterRpcError(message: string | undefined): { status: number
     return { status: 500, error: 'Could not process your request — please try again' }
   }
 
+  // ── Skills + Tasks under Barter ──
+  if (m.includes('exactly one of an anchor listing or an anchor Skill/Task post')) {
+    return { status: 400, error: 'Provide exactly one anchor — either a listing or a Skill/Task post.' }
+  }
+  if (m.includes('post not found or not owned by caller')) {
+    return { status: 404, error: 'Post not found.' }
+  }
+  if (m.includes('post not found')) {
+    return { status: 404, error: 'Post not found.' }
+  }
+  if (m.includes('this Skill/Task is not currently available for barter')) {
+    return { status: 422, error: 'This Skill/Task is not currently available for barter.' }
+  }
+  if (m.includes('this request is no longer open for offers') || m.includes('the originating request is no longer open')) {
+    return { status: 409, error: 'This request is no longer open for offers.' }
+  }
+  if (m.includes('you cannot propose a trade against your own listing or post')) {
+    return { status: 403, error: 'You cannot propose a trade against your own listing or post.' }
+  }
+  if (m.includes('at least one contribution must be offered')) {
+    return { status: 422, error: 'At least one contribution (item, Skill, or Task) must be offered from each side.' }
+  }
+  if (m.includes('a Looking-For post cannot be used as contribution provenance')) {
+    return { status: 422, error: 'A Looking-For post cannot be offered as a contribution — only reusable Available supply can be offered.' }
+  }
+  if (m.includes('referenced Skill/Task supply is not currently active')) {
+    return { status: 422, error: 'The referenced Skill/Task supply is not currently active.' }
+  }
+  if (m.includes('referenced Skill/Task supply does not belong to the contributing party')) {
+    return { status: 403, error: 'You can only offer Skill/Task supply that belongs to you.' }
+  }
+  if (m.includes('referenced Skill/Task supply kind does not match')) {
+    return { status: 422, error: 'The referenced post’s kind does not match this contribution.' }
+  }
+  if (m.includes('a private/custom contribution requires a title')) {
+    return { status: 422, error: 'A private/custom contribution requires a title.' }
+  }
+  if (m.includes('contribution_weight_percent is required')) {
+    return { status: 422, error: 'A contribution weight is required for every Skill/Task contribution.' }
+  }
+  if (m.includes('at least one milestone is required')) {
+    return { status: 422, error: 'At least one milestone is required per Skill/Task contribution.' }
+  }
+  if (m.includes('milestone weights for a contribution must sum to exactly 100')) {
+    return { status: 422, error: 'Milestone weights for each contribution must add up to exactly 100%.' }
+  }
+  if (m.includes('contribution weights for this party must sum to exactly 100')) {
+    return { status: 422, error: 'A party’s contribution weights must add up to exactly 100%.' }
+  }
+  if (m.includes('cannot combine legacy deposit fields with deposit_terms')) {
+    return { status: 422, error: 'Use either a single deposit or itemised deposit terms, not both.' }
+  }
+  if (m.includes('deposit payer must be a party to the agreement')) {
+    return { status: 403, error: 'A deposit payer must be a party to this agreement.' }
+  }
+  if (m.includes('a milestone_weighted deposit requires a secured Skill/Task contribution')) {
+    return { status: 422, error: 'A milestone-weighted deposit requires the payer to have a Skill/Task contribution in this offer.' }
+  }
+  if (m.includes('your offer must include at least one') || m.includes('your counter-offer must include at least one')) {
+    return { status: 422, error: 'Your offer must include a contribution of the kind requested to satisfy this request.' }
+  }
+  if (m.includes('is no longer available for acceptance')) {
+    return { status: 409, error: 'A Skill/Task supply referenced by this offer is no longer available — it may have been paused, suspended, or archived.' }
+  }
+  if (m.includes('prohibited_content')) {
+    return { status: 422, error: m.split('prohibited_content:')[1]?.trim() || 'This content is not permitted.' }
+  }
+  if (m.includes('active_listing_limit_reached')) {
+    return { status: 403, error: 'Your current plan does not allow another active listing/Skill/Task right now.' }
+  }
+  if (m.includes('only the responsible party may mark this milestone completed')) {
+    return { status: 403, error: 'Only the responsible party can mark this milestone completed.' }
+  }
+  if (m.includes('only the currently active milestone can be completed')) {
+    return { status: 409, error: 'Only the currently active milestone can be completed.' }
+  }
+  if (m.includes('both parties must mutually confirm the date, time, and location')) {
+    return { status: 409, error: 'Both parties must confirm the schedule before this milestone can be completed.' }
+  }
+  if (m.includes('does not belong to the accepted offer')) {
+    return { status: 409, error: 'This milestone is no longer part of the accepted offer.' }
+  }
+  if (m.includes('this milestone is already completed')) {
+    return { status: 409, error: 'This milestone is already completed and its schedule cannot be changed.' }
+  }
+  if (m.includes('milestone not found')) {
+    return { status: 404, error: 'Milestone not found.' }
+  }
+  if (m.includes('you are not a party to this agreement')) {
+    return { status: 403, error: 'You are not a party to this agreement.' }
+  }
+  if (m.includes('this barter agreement has not been completed yet')) {
+    return { status: 409, error: 'This barter agreement has not been completed yet.' }
+  }
+  if (m.includes('rating must be between 1 and 5')) {
+    return { status: 422, error: 'Rating must be between 1 and 5.' }
+  }
+  if (m.includes('a reason is required')) {
+    return { status: 400, error: 'A reason is required.' }
+  }
+  if (m.includes('post has no valid restorable prior status') || m.includes('post is not currently suspended')) {
+    return { status: 409, error: 'This post cannot be restored right now.' }
+  }
+  if (m.includes('post cannot be edited in its current status')) {
+    return { status: 409, error: 'This post cannot be edited in its current status.' }
+  }
+  if (m.includes('invalid_transition')) {
+    return { status: 409, error: 'This action is not allowed for the post’s current status.' }
+  }
+  if (m.includes('you cannot report your own post')) {
+    return { status: 403, error: 'You cannot report your own post.' }
+  }
+  if (m.includes('invalid report reason')) {
+    return { status: 400, error: 'Invalid report reason.' }
+  }
+  if (m.includes('title, description, and delivery mode are required before publishing')) {
+    return { status: 422, error: 'Title, description, and delivery mode are required before publishing.' }
+  }
+
   return { status: 500, error: 'Could not process your request — please try again' }
 }

@@ -63,6 +63,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       const hash = computeCounterBarterOfferHash(agreementId, {
         partyAListingIds: parsed.data.party_a_listing_ids,
         partyBListingIds: parsed.data.party_b_listing_ids,
+        partyAContributions: parsed.data.party_a_contributions,
+        partyBContributions: parsed.data.party_b_contributions,
+        depositTerms: parsed.data.deposit_terms,
         cashAdjustmentAmount: parsed.data.cash_adjustment_amount ?? 0,
         deliveryMethod: parsed.data.delivery_method,
         depositAmount: parsed.data.deposit_amount,
@@ -94,6 +97,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       p_message: parsed.data.message ?? null,
       p_expiry_hours: BARTER_PROPOSAL_EXPIRY_HOURS,
       p_idempotency_key: parsed.data.idempotency_key ?? null,
+      p_party_a_contributions: parsed.data.party_a_contributions ?? null,
+      p_party_b_contributions: parsed.data.party_b_contributions ?? null,
+      p_deposit_terms: parsed.data.deposit_terms ?? null,
     })
 
     if (error) {

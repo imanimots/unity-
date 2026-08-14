@@ -226,6 +226,67 @@ export async function getPublicProfileRequests(profileId: string, { limit = 12, 
   return { requests: (data as PublicProfileRequest[] | null) ?? [], total: count ?? 0 }
 }
 
+export interface PublicProfileSkillTaskPost {
+  id: string
+  kind: 'skill' | 'task'
+  direction: 'available' | 'looking_for'
+  title: string
+  description: string
+  category_id: string | null
+  delivery_mode: 'remote' | 'in_person' | 'either'
+  province: string | null
+  city: string | null
+  wants_item: boolean
+  wants_skill: boolean
+  wants_task: boolean
+  wants_cash_adjustment: boolean
+  created_at: string
+}
+
+/**
+ * Skills + Tasks under Barter -- public profile Skills/Tasks tabs.
+ * Reads ONLY `barter_skill_task_public_posts` (never the base
+ * `barter_skill_task_posts` table) -- the view already bakes in the
+ * D1/R5-2 public-eligibility predicate (active Available, or
+ * active/offers_received Looking For, is_test=false), so an ordinary
+ * stranger viewing this profile can never see a draft/paused/
+ * suspended/matched/closed/archived post through this path. See
+ * supabase/migrations/20260901000002_skills_tasks_barter_posts_schema.sql.
+ */
+async function getPublicProfileSkillTaskPosts(
+  profileId: string,
+  kind: 'skill' | 'task',
+  direction: 'available' | 'looking_for',
+  { limit = 12, offset = 0 }: { limit?: number; offset?: number } = {}
+): Promise<{ posts: PublicProfileSkillTaskPost[]; total: number }> {
+  if (IS_MOCK_MODE) return { posts: [], total: 0 }
+
+  const { createClient } = await import('@/lib/supabase/server')
+  const supabase = await createClient()
+  if (!supabase) return { posts: [], total: 0 }
+
+  const { data, count } = await supabase
+    .from('barter_skill_task_public_posts')
+    .select('id, kind, direction, title, description, category_id, delivery_mode, province, city, wants_item, wants_skill, wants_task, wants_cash_adjustment, created_at', { count: 'exact' })
+    .eq('owner_id', profileId)
+    .eq('kind', kind)
+    .eq('direction', direction)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+
+  return { posts: (data as PublicProfileSkillTaskPost[] | null) ?? [], total: count ?? 0 }
+}
+
+/** Available/Looking-For sub-view for this profile's public Skills tab. */
+export function getPublicProfileSkills(profileId: string, direction: 'available' | 'looking_for', opts?: { limit?: number; offset?: number }) {
+  return getPublicProfileSkillTaskPosts(profileId, 'skill', direction, opts)
+}
+
+/** Available/Looking-For sub-view for this profile's public Tasks tab. */
+export function getPublicProfileTasks(profileId: string, direction: 'available' | 'looking_for', opts?: { limit?: number; offset?: number }) {
+  return getPublicProfileSkillTaskPosts(profileId, 'task', direction, opts)
+}
+
 export interface PublicProfileReview {
   id: string
   rating: number
