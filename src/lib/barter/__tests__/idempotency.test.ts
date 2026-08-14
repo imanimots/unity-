@@ -24,34 +24,42 @@ const offerFields = {
 }
 
 describe('computeProposeBarterHash', () => {
-  it('matches the exact md5 Postgres produces for the same inputs', () => {
-    // Cross-checked live against propose_barter()'s own formula:
-    // md5(anchor_listing_id::text || '|' || party_a_listing_ids::text || '|'
-    //   || party_b_listing_ids::text || '|' || cash_adjustment_amount::text
-    //   || '|' || delivery_method || '|' || deposit_amount::text || '|'
-    //   || deposit_payer || '|' || message)
-    const hash = computeProposeBarterHash(ANCHOR_ID, offerFields)
-    expect(hash).toBe('d321dc065d8c6e5ddf6493eba627eb1a')
+  it('matches its own documented formula for a listing anchor (Skills + Tasks widening)', () => {
+    // Since the Skills + Tasks widening, this is a best-effort
+    // route-level replay hash only -- it deliberately no longer mirrors
+    // propose_barter()'s own jsonb::text formula byte-for-byte (see the
+    // comment on OfferFieldsForHash in idempotency.ts). The RPC's own
+    // hash remains the sole authoritative dedup guarantee.
+    const hash = computeProposeBarterHash({ listingId: ANCHOR_ID }, offerFields)
+    expect(hash).toBe('c4a02e4b0a1756258262eddb3fdec14a')
   })
 
   it('produces the same hash for identical repeated inputs', () => {
-    const a = computeProposeBarterHash('anchor-1', offerFields)
-    const b = computeProposeBarterHash('anchor-1', offerFields)
+    const a = computeProposeBarterHash({ listingId: 'anchor-1' }, offerFields)
+    const b = computeProposeBarterHash({ listingId: 'anchor-1' }, offerFields)
     expect(a).toBe(b)
   })
 
   it('produces a different hash when the offered items differ', () => {
-    const a = computeProposeBarterHash('anchor-1', offerFields)
-    const b = computeProposeBarterHash('anchor-1', { ...offerFields, partyBListingIds: ['44444444-4444-4444-8444-444444444444'] })
+    const a = computeProposeBarterHash({ listingId: 'anchor-1' }, offerFields)
+    const b = computeProposeBarterHash({ listingId: 'anchor-1' }, { ...offerFields, partyBListingIds: ['44444444-4444-4444-8444-444444444444'] })
+    expect(a).not.toBe(b)
+  })
+
+  it('produces a different hash for a skill/task anchor than an equivalent listing anchor', () => {
+    const a = computeProposeBarterHash({ listingId: 'anchor-1' }, offerFields)
+    const b = computeProposeBarterHash({ skillTaskPostId: 'anchor-1' }, offerFields)
     expect(a).not.toBe(b)
   })
 })
 
 describe('computeCounterBarterOfferHash', () => {
-  it('matches the exact md5 Postgres produces for the same inputs', () => {
-    // Same formula as propose, with agreement_id as the leading field.
+  it('matches its own documented formula for the same inputs', () => {
+    // Same formula as propose's offerFieldsSuffix, with agreement_id as
+    // the leading field -- this function's own signature (agreementId:
+    // string) is unchanged by the Skills + Tasks widening.
     const hash = computeCounterBarterOfferHash(ANCHOR_ID, offerFields)
-    expect(hash).toBe('d321dc065d8c6e5ddf6493eba627eb1a')
+    expect(hash).toBe('50ff12fde862afebb06f2dc7106497da')
   })
 })
 

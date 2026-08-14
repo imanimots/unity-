@@ -22,14 +22,20 @@ describe('proposeBarterSchema', () => {
     expect(result.success).toBe(true)
   })
 
-  it('rejects an empty party_a_listing_ids array', () => {
+  // Skills + Tasks under Barter widening: a side may be purely
+  // Skill/Task-based, so an empty listing array is no longer rejected
+  // at the zod layer by itself -- "at least one contribution (item or
+  // Skill/Task) per side" is enforced by the RPC instead (see the
+  // offerFields comment in validation.ts). These two cases now assert
+  // the schema accepts an empty listing array on its own.
+  it('accepts an empty party_a_listing_ids array (Skill/Task contributions may fill that side instead)', () => {
     const result = proposeBarterSchema.safeParse({ ...validBase, party_a_listing_ids: [] })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
-  it('rejects an empty party_b_listing_ids array', () => {
+  it('accepts an empty party_b_listing_ids array (Skill/Task contributions may fill that side instead)', () => {
     const result = proposeBarterSchema.safeParse({ ...validBase, party_b_listing_ids: [] })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
   it('rejects a malformed uuid in the offered-listings array', () => {
