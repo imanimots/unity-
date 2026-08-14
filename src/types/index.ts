@@ -62,6 +62,16 @@ export type BarterDeliveryResponsibility = 'party_a' | 'party_b' | 'shared' | 'e
 export type BarterDepositPayer = 'party_a' | 'party_b' | 'both'
 export type BarterUserAgentCategory = 'mobile' | 'desktop' | 'unknown'
 
+// ── Skills + Tasks under Barter ──
+export type SkillTaskKind = 'skill' | 'task'
+export type SkillTaskDirection = 'available' | 'looking_for'
+export type SkillTaskDeliveryMode = 'remote' | 'in_person' | 'either'
+export type BarterSkillTaskPostStatus =
+  | 'draft' | 'active' | 'offers_received' | 'matched' | 'paused' | 'closed' | 'archived' | 'suspended'
+export type BarterMilestoneStatus = 'pending' | 'active' | 'completed'
+export type BarterContributionKind = 'item' | 'skill' | 'task'
+export type BarterDepositReleaseBasis = 'full_on_completion' | 'milestone_weighted'
+
 export interface Profile {
   id: string
   full_name: string | null
@@ -492,7 +502,10 @@ export interface DisputeEvidence {
 export interface BarterAgreement {
   id: string
   agreement_reference: string
-  anchor_listing_id: string
+  /** Nullable since Skills + Tasks under Barter -- an agreement anchored by a Skill/Task post has this null and source_skill_task_post_id set instead. */
+  anchor_listing_id: string | null
+  /** Skills + Tasks under Barter -- the Looking-For post this agreement originated from, if any. Distinct from a contribution's own skill_task_post_id provenance. */
+  source_skill_task_post_id: string | null
   party_a_id: string
   party_b_id: string
   status: BarterStatus
@@ -543,14 +556,27 @@ export interface BarterOffer {
   media?: BarterOfferMedia[]
 }
 
-/** offered_by identifies which party contributed this listing — validated server-side against listings.merchant_id, never trusted from the client. */
+/**
+ * offered_by identifies which party contributed this item/skill/task --
+ * validated server-side, never trusted from the client. kind='item' rows
+ * are unchanged from before this feature (listing_id required,
+ * skill_task_post_id null); kind IN ('skill','task') rows have
+ * listing_id null and carry a contribution_weight_percent plus a
+ * corresponding BarterContributionDetails/BarterContributionMilestone[]
+ * set. skill_task_post_id is provenance only, never authoritative.
+ */
 export interface BarterOfferItem {
   id: string
   offer_id: string
-  listing_id: string
+  kind: BarterContributionKind
+  listing_id: string | null
+  skill_task_post_id: string | null
+  contribution_weight_percent: number | null
   offered_by: string
   created_at: string
   listing?: Listing
+  contribution_details?: BarterContributionDetails
+  milestones?: BarterContributionMilestone[]
 }
 
 /** Optional evidence photos/videos scoped to a specific offer version — part of the versioned contractual record, distinct from chat. */
@@ -610,9 +636,169 @@ export interface BarterPayment {
   created_at: string
 }
 
+// ============================================================
+// Skills + Tasks under Barter
+// ============================================================
+
+/** Owner-only, full-field row -- read via the base table's owner-read RLS. */
+export interface BarterSkillTaskPost {
+  id: string
+  owner_id: string
+  kind: SkillTaskKind
+  direction: SkillTaskDirection
+  transaction_type: 'barter'
+  status: BarterSkillTaskPostStatus
+  pre_suspend_status: BarterSkillTaskPostStatus | null
+  title: string | null
+  description: string | null
+  category_id: string | null
+  subcategory_id: string | null
+  delivery_mode: SkillTaskDeliveryMode | null
+  province: string | null
+  city: string | null
+  exclusions: string | null
+  materials_arrangement: string | null
+  evidence_expectations: string | null
+  desired_exchange_notes: string | null
+  wants_item: boolean
+  wants_skill: boolean
+  wants_task: boolean
+  wants_cash_adjustment: boolean
+  availability_notes: string | null
+  preferred_start_date: string | null
+  preferred_start_time: string | null
+  deadline: string | null
+  expected_duration_notes: string | null
+  reposted_from_post_id: string | null
+  first_published_at: string | null
+  is_test: boolean
+  created_at: string
+  updated_at: string
+}
+
+/** The public, explicit-column view -- barter_skill_task_public_posts. Never carries pre_suspend_status or any other internal/moderation column. */
+export interface BarterSkillTaskPublicPost {
+  id: string
+  owner_id: string
+  kind: SkillTaskKind
+  direction: SkillTaskDirection
+  title: string
+  description: string
+  category_id: string | null
+  subcategory_id: string | null
+  delivery_mode: SkillTaskDeliveryMode | null
+  province: string | null
+  city: string | null
+  exclusions: string | null
+  materials_arrangement: string | null
+  evidence_expectations: string | null
+  desired_exchange_notes: string | null
+  wants_item: boolean
+  wants_skill: boolean
+  wants_task: boolean
+  wants_cash_adjustment: boolean
+  availability_notes: string | null
+  preferred_start_date: string | null
+  preferred_start_time: string | null
+  deadline: string | null
+  expected_duration_notes: string | null
+  created_at: string
+}
+
+/** Non-binding discovery-time preview only -- never read at offer-acceptance time. */
+export interface BarterSkillTaskPostMilestoneTemplate {
+  id: string
+  post_id: string
+  title: string
+  description: string | null
+  sequence: number
+  weight_percent: number
+  created_at: string
+}
+
+/** Immutable 1:1 snapshot of a skill/task contribution's negotiated scope, taken once at propose/counter time. */
+export interface BarterContributionDetails {
+  offer_item_id: string
+  title: string
+  description: string | null
+  exclusions: string | null
+  materials_arrangement: string | null
+  evidence_expectations: string | null
+  delivery_mode: SkillTaskDeliveryMode | null
+  province: string | null
+  city: string | null
+  availability_notes: string | null
+  preferred_start_date: string | null
+  preferred_start_time: string | null
+  deadline: string | null
+  expected_duration_notes: string | null
+  created_at: string
+}
+
+export interface BarterContributionMilestone {
+  id: string
+  offer_item_id: string
+  title: string
+  description: string | null
+  sequence: number
+  weight_percent: number
+  delivery_mode: SkillTaskDeliveryMode | null
+  scheduled_at: string | null
+  scheduled_city: string | null
+  scheduled_province: string | null
+  schedule_confirmed_by: string[]
+  status: BarterMilestoneStatus
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface BarterMilestoneEvidence {
+  id: string
+  milestone_id: string
+  uploaded_by: string
+  storage_path: string
+  file_type: 'image' | 'pdf' | 'document'
+  display_order: number
+  created_at: string
+}
+
+export interface BarterDepositTerm {
+  id: string
+  offer_id: string
+  payer_id: string
+  amount: number
+  currency: string
+  release_basis: BarterDepositReleaseBasis
+  created_at: string
+}
+
+/** Immutable snapshot of the SOURCE Looking-For request's own public terms, taken once at first propose_barter() against it. Audit context only. */
+export interface BarterSkillTaskSourceSnapshot {
+  agreement_id: string
+  kind: SkillTaskKind
+  title: string
+  description: string | null
+  exclusions: string | null
+  materials_arrangement: string | null
+  evidence_expectations: string | null
+  delivery_mode: SkillTaskDeliveryMode | null
+  province: string | null
+  city: string | null
+  availability_notes: string | null
+  preferred_start_date: string | null
+  preferred_start_time: string | null
+  deadline: string | null
+  expected_duration_notes: string | null
+  desired_exchange_notes: string | null
+  created_at: string
+}
+
 export interface Review {
   id: string
-  booking_id: string
+  booking_id: string | null
+  /** Skills + Tasks under Barter -- the first real review-creation path in this codebase; 3-way exactly-one-of with booking_id/order_id. */
+  barter_agreement_id: string | null
   reviewer_id: string
   reviewee_id: string
   rating: number

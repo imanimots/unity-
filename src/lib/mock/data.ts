@@ -567,6 +567,7 @@ export const MOCK_REVIEWS: (Review & { reviewer: Profile })[] = [
   {
     id: 'review-1',
     booking_id: 'booking-1',
+    barter_agreement_id: null,
     reviewer_id: 'user-1',
     reviewee_id: 'user-2',
     rating: 5,
@@ -577,6 +578,7 @@ export const MOCK_REVIEWS: (Review & { reviewer: Profile })[] = [
   {
     id: 'review-2',
     booking_id: 'booking-2',
+    barter_agreement_id: null,
     reviewer_id: 'user-3',
     reviewee_id: 'user-2',
     rating: 5,
@@ -587,6 +589,7 @@ export const MOCK_REVIEWS: (Review & { reviewer: Profile })[] = [
   {
     id: 'review-3',
     booking_id: 'booking-3',
+    barter_agreement_id: null,
     reviewer_id: 'user-4',
     reviewee_id: 'user-3',
     rating: 4,
@@ -597,6 +600,7 @@ export const MOCK_REVIEWS: (Review & { reviewer: Profile })[] = [
   {
     id: 'review-4',
     booking_id: 'booking-4',
+    barter_agreement_id: null,
     reviewer_id: 'user-1',
     reviewee_id: 'user-4',
     rating: 5,
@@ -607,6 +611,7 @@ export const MOCK_REVIEWS: (Review & { reviewer: Profile })[] = [
   {
     id: 'review-5',
     booking_id: 'booking-5',
+    barter_agreement_id: null,
     reviewer_id: 'user-2',
     reviewee_id: 'user-3',
     rating: 5,
