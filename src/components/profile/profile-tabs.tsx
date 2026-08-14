@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Star } from 'lucide-react'
 import { ProfileLink } from '@/components/shared/profile-link'
-import type { PublicProfileListing, PublicProfileRequest, PublicProfileReview } from '@/lib/data/profiles'
+import type { PublicProfileListing, PublicProfileRequest, PublicProfileReview, PublicProfileSkillTaskPost } from '@/lib/data/profiles'
 
 interface Props {
   profileId: string
@@ -14,11 +14,64 @@ interface Props {
   listingsTotal: number
   requests: PublicProfileRequest[]
   requestsTotal: number
+  skillsAvailable: PublicProfileSkillTaskPost[]
+  skillsAvailableTotal: number
+  skillsLookingFor: PublicProfileSkillTaskPost[]
+  skillsLookingForTotal: number
+  tasksAvailable: PublicProfileSkillTaskPost[]
+  tasksAvailableTotal: number
+  tasksLookingFor: PublicProfileSkillTaskPost[]
+  tasksLookingForTotal: number
   reviews: PublicProfileReview[]
   reviewsTotal: number
 }
 
-type TabKey = 'available' | 'looking-for' | 'reviews'
+type TabKey = 'available' | 'looking-for' | 'skills' | 'tasks' | 'reviews'
+type SubDirection = 'available' | 'looking_for'
+
+function SkillTaskPostGrid({ posts, emptyLabel }: { posts: PublicProfileSkillTaskPost[]; emptyLabel: string }) {
+  if (posts.length === 0) return <EmptyState message={emptyLabel} />
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {posts.map((post) => (
+        <Link
+          key={post.id}
+          href={`/barter/skill-task/${post.id}`}
+          className="p-4 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors"
+        >
+          <div className="text-xs uppercase tracking-[0.08em] text-[#9B8B85] mb-1">
+            {post.kind} · {post.delivery_mode.replace('_', ' ')}
+          </div>
+          <div className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] truncate mb-1">{post.title}</div>
+          {post.description && <p className="text-xs text-[#9B8B85] line-clamp-2">{post.description}</p>}
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+function SubDirectionToggle({ value, onChange, availableCount, lookingForCount }: { value: SubDirection; onChange: (v: SubDirection) => void; availableCount: number; lookingForCount: number }) {
+  const options: { key: SubDirection; label: string; count: number }[] = [
+    { key: 'available', label: 'Available', count: availableCount },
+    { key: 'looking_for', label: 'Looking For', count: lookingForCount },
+  ]
+  return (
+    <div className="inline-flex rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] p-0.5 mb-4">
+      {options.map((o) => (
+        <button
+          key={o.key}
+          type="button"
+          onClick={() => onChange(o.key)}
+          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+            value === o.key ? 'bg-[#8B1A1A] text-white' : 'text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A]'
+          }`}
+        >
+          {o.label} ({o.count})
+        </button>
+      ))}
+    </div>
+  )
+}
 
 function normalizedListingPrice(l: PublicProfileListing): string {
   if (l.daily_rate !== null) return `R${l.daily_rate}/day`
@@ -26,8 +79,27 @@ function normalizedListingPrice(l: PublicProfileListing): string {
   return ''
 }
 
-export function ProfileTabs({ profileId, currentUserId, listings, listingsTotal, requests, requestsTotal, reviews: initialReviews, reviewsTotal }: Props) {
+export function ProfileTabs({
+  profileId,
+  currentUserId,
+  listings,
+  listingsTotal,
+  requests,
+  requestsTotal,
+  skillsAvailable,
+  skillsAvailableTotal,
+  skillsLookingFor,
+  skillsLookingForTotal,
+  tasksAvailable,
+  tasksAvailableTotal,
+  tasksLookingFor,
+  tasksLookingForTotal,
+  reviews: initialReviews,
+  reviewsTotal,
+}: Props) {
   const [tab, setTab] = useState<TabKey>('available')
+  const [skillsDirection, setSkillsDirection] = useState<SubDirection>('available')
+  const [tasksDirection, setTasksDirection] = useState<SubDirection>('available')
   const [reviews, setReviews] = useState(initialReviews)
   const [reviewsOffset, setReviewsOffset] = useState(initialReviews.length)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -35,6 +107,8 @@ export function ProfileTabs({ profileId, currentUserId, listings, listingsTotal,
   const tabs: { key: TabKey; label: string; count: number }[] = [
     { key: 'available', label: 'Available', count: listingsTotal },
     { key: 'looking-for', label: 'Looking For', count: requestsTotal },
+    { key: 'skills', label: 'Skills', count: skillsAvailableTotal + skillsLookingForTotal },
+    { key: 'tasks', label: 'Tasks', count: tasksAvailableTotal + tasksLookingForTotal },
     { key: 'reviews', label: 'Reviews', count: reviewsTotal },
   ]
 
@@ -125,6 +199,26 @@ export function ProfileTabs({ profileId, currentUserId, listings, listingsTotal,
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {tab === 'skills' && (
+        <div role="tabpanel">
+          <SubDirectionToggle value={skillsDirection} onChange={setSkillsDirection} availableCount={skillsAvailableTotal} lookingForCount={skillsLookingForTotal} />
+          <SkillTaskPostGrid
+            posts={skillsDirection === 'available' ? skillsAvailable : skillsLookingFor}
+            emptyLabel={skillsDirection === 'available' ? 'No Skills offered right now.' : 'Not looking for any Skills right now.'}
+          />
+        </div>
+      )}
+
+      {tab === 'tasks' && (
+        <div role="tabpanel">
+          <SubDirectionToggle value={tasksDirection} onChange={setTasksDirection} availableCount={tasksAvailableTotal} lookingForCount={tasksLookingForTotal} />
+          <SkillTaskPostGrid
+            posts={tasksDirection === 'available' ? tasksAvailable : tasksLookingFor}
+            emptyLabel={tasksDirection === 'available' ? 'No Tasks offered right now.' : 'Not looking for any Tasks right now.'}
+          />
         </div>
       )}
 

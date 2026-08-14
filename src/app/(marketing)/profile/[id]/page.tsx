@@ -3,7 +3,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ShieldCheck, Store, Calendar, CheckCircle2, Star } from 'lucide-react'
-import { getPublicProfile, getPublicProfileListings, getPublicProfileRequests, getPublicProfileReviews } from '@/lib/data/profiles'
+import { getPublicProfile, getPublicProfileListings, getPublicProfileRequests, getPublicProfileReviews, getPublicProfileSkills, getPublicProfileTasks } from '@/lib/data/profiles'
 import { getRequestProfile } from '@/lib/supabase/require-admin'
 import { resolveProfileRobots } from '@/lib/profiles/seo'
 import { getMostRecentSharedTransaction } from '@/lib/profiles/messaging'
@@ -51,10 +51,23 @@ export default async function PublicProfilePage({ params }: Props) {
   const { profile } = result
   const isSelf = requester?.userId === profile.id
 
-  const [{ listings, total: listingsTotal }, { requests, total: requestsTotal }, { reviews, total: reviewsTotal }, messageRef] = await Promise.all([
+  const [
+    { listings, total: listingsTotal },
+    { requests, total: requestsTotal },
+    { reviews, total: reviewsTotal },
+    { posts: skillsAvailable, total: skillsAvailableTotal },
+    { posts: skillsLookingFor, total: skillsLookingForTotal },
+    { posts: tasksAvailable, total: tasksAvailableTotal },
+    { posts: tasksLookingFor, total: tasksLookingForTotal },
+    messageRef,
+  ] = await Promise.all([
     getPublicProfileListings(profile.id),
     getPublicProfileRequests(profile.id),
     getPublicProfileReviews(profile.id),
+    getPublicProfileSkills(profile.id, 'available'),
+    getPublicProfileSkills(profile.id, 'looking_for'),
+    getPublicProfileTasks(profile.id, 'available'),
+    getPublicProfileTasks(profile.id, 'looking_for'),
     (async () => {
       if (!requester || isSelf) return null
       const { createClient } = await import('@/lib/supabase/server')
@@ -150,6 +163,14 @@ export default async function PublicProfilePage({ params }: Props) {
           listingsTotal={listingsTotal}
           requests={requests}
           requestsTotal={requestsTotal}
+          skillsAvailable={skillsAvailable}
+          skillsAvailableTotal={skillsAvailableTotal}
+          skillsLookingFor={skillsLookingFor}
+          skillsLookingForTotal={skillsLookingForTotal}
+          tasksAvailable={tasksAvailable}
+          tasksAvailableTotal={tasksAvailableTotal}
+          tasksLookingFor={tasksLookingFor}
+          tasksLookingForTotal={tasksLookingForTotal}
           reviews={reviews}
           reviewsTotal={reviewsTotal}
         />

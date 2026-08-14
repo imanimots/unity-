@@ -8,7 +8,14 @@ import { BarterActions } from './barter-actions'
 import { BarterFinancialStatus } from './barter-financial-status'
 import { BarterTimeline } from './barter-timeline'
 import { CounterOfferDialog } from './counter-offer-dialog'
-import type { BarterAgreement, BarterOffer, BarterOfferItem, BarterHistoryEntry, BarterConfirmation, BarterPayment, Listing } from '@/types'
+import { ContributionMilestonesPanel } from './contribution-milestones-panel'
+import { DepositEligibilityPanel } from './deposit-eligibility-panel'
+import { BarterReviewForm } from './barter-review-form'
+import type { ContributionInput } from './contribution-builder'
+import type {
+  BarterAgreement, BarterOffer, BarterOfferItem, BarterHistoryEntry, BarterConfirmation, BarterPayment, Listing,
+  BarterDepositTerm, BarterMilestoneEvidence, BarterSkillTaskPublicPost,
+} from '@/types'
 
 type OfferWithItems = BarterOffer & { items: (BarterOfferItem & { listing?: Listing })[] }
 
@@ -18,11 +25,34 @@ interface BarterAgreementViewProps {
   history: BarterHistoryEntry[]
   confirmations: BarterConfirmation[]
   payments: BarterPayment[]
+  depositTerms: BarterDepositTerm[]
+  evidenceByMilestone: Record<string, BarterMilestoneEvidence[]>
+  alreadyReviewed: boolean
   partyAName: string
   partyBName: string
   currentUserId: string
   myListings: Listing[]
   theirListings: Listing[]
+  mySkillTaskOptions: BarterSkillTaskPublicPost[]
+  theirSkillTaskOptions: BarterSkillTaskPublicPost[]
+}
+
+function toContributionInput(item: BarterOfferItem): ContributionInput {
+  const d = item.contribution_details
+  return {
+    kind: item.kind === 'item' ? 'skill' : item.kind,
+    skill_task_post_id: item.skill_task_post_id ?? undefined,
+    title: item.skill_task_post_id ? undefined : d?.title,
+    description: item.skill_task_post_id ? undefined : d?.description ?? undefined,
+    delivery_mode: item.skill_task_post_id ? undefined : d?.delivery_mode ?? undefined,
+    province: item.skill_task_post_id ? undefined : d?.province ?? undefined,
+    city: item.skill_task_post_id ? undefined : d?.city ?? undefined,
+    contribution_weight_percent: item.contribution_weight_percent ?? 0,
+    milestones: (item.milestones ?? [])
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence)
+      .map((m) => ({ title: m.title, description: m.description ?? undefined, sequence: m.sequence, weight_percent: m.weight_percent })),
+  }
 }
 
 const DELIVERY_METHOD_LABELS: Record<string, string> = {
@@ -51,17 +81,43 @@ function ItemGrid({ items, emptyLabel }: { items: (BarterOfferItem & { listing?:
   )
 }
 
-export function BarterAgreementView({ agreement, offers, history, confirmations, payments, partyAName, partyBName, currentUserId, myListings, theirListings }: BarterAgreementViewProps) {
+/** Compact preview of this side's Skill/Task contributions inside the current offer -- title, kind, and weight only, never a rand value. */
+function ContributionSummaryList({ items }: { items: BarterOfferItem[] }) {
+  if (items.length === 0) return null
+  return (
+    <div className="mt-2.5 space-y-1.5">
+      {items.map((item) => (
+        <div key={item.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] text-xs">
+          <span className="text-[#1A0A0A] dark:text-[#F5F0ED] truncate">
+            <span className="font-bold uppercase text-[#8B1A1A] mr-1.5">{item.kind === 'skill' ? 'Skill' : 'Task'}</span>
+            {item.contribution_details?.title ?? 'Contribution'}
+          </span>
+          <span className="text-[#9B8B85] shrink-0">{item.contribution_weight_percent}%</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function BarterAgreementView({
+  agreement, offers, history, confirmations, payments, depositTerms, evidenceByMilestone, alreadyReviewed,
+  partyAName, partyBName, currentUserId, myListings, theirListings, mySkillTaskOptions, theirSkillTaskOptions,
+}: BarterAgreementViewProps) {
   const [counterOpen, setCounterOpen] = useState(false)
 
   const currentUserRole: 'party_a' | 'party_b' = agreement.party_a_id === currentUserId ? 'party_a' : 'party_b'
   const otherPartyId = currentUserRole === 'party_a' ? agreement.party_b_id : agreement.party_a_id
+  const otherPartyName = currentUserRole === 'party_a' ? partyBName : partyAName
   const currentOffer = offers.find((o) => o.id === agreement.current_offer_id)
   const isCurrentProposer = currentOffer?.proposed_by === currentUserId
   const acceptedOffer = offers.find((o) => o.id === agreement.accepted_offer_id)
 
-  const myItems = currentOffer?.items.filter((i) => i.offered_by === currentUserId) ?? []
-  const theirItems = currentOffer?.items.filter((i) => i.offered_by === otherPartyId) ?? []
+  const myItems = (currentOffer?.items ?? []).filter((i) => i.offered_by === currentUserId && i.kind === 'item')
+  const theirItems = (currentOffer?.items ?? []).filter((i) => i.offered_by === otherPartyId && i.kind === 'item')
+  const myContributionItems = (currentOffer?.items ?? []).filter((i) => i.offered_by === currentUserId && i.kind !== 'item')
+  const theirContributionItems = (currentOffer?.items ?? []).filter((i) => i.offered_by === otherPartyId && i.kind !== 'item')
+
+  const acceptedSkillTaskItems = (acceptedOffer?.items ?? []).filter((i) => i.kind !== 'item')
 
   return (
     <div className="space-y-8">
@@ -103,10 +159,12 @@ export function BarterAgreementView({ agreement, offers, history, confirmations,
             <div>
               <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-3">Your items</h2>
               <ItemGrid items={myItems} emptyLabel="No items offered on your side." />
+              <ContributionSummaryList items={myContributionItems} />
             </div>
             <div>
               <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-3">Their items</h2>
               <ItemGrid items={theirItems} emptyLabel="No items offered on their side." />
+              <ContributionSummaryList items={theirContributionItems} />
             </div>
           </div>
 
@@ -145,6 +203,42 @@ export function BarterAgreementView({ agreement, offers, history, confirmations,
         </div>
       )}
 
+      {acceptedSkillTaskItems.length > 0 && (
+        <div>
+          <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-3">Skill/Task progress</h2>
+          <div className="space-y-4">
+            {acceptedSkillTaskItems.map((item) => (
+              <ContributionMilestonesPanel
+                key={item.id}
+                agreementId={agreement.id}
+                offerItem={item}
+                currentUserId={currentUserId}
+                partyAId={agreement.party_a_id}
+                partyBId={agreement.party_b_id}
+                partyAName={partyAName}
+                partyBName={partyBName}
+                evidenceByMilestone={evidenceByMilestone}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {agreement.status === 'completed' && (
+        <DepositEligibilityPanel
+          depositTerms={depositTerms}
+          items={acceptedOffer?.items ?? []}
+          partyAId={agreement.party_a_id}
+          partyBId={agreement.party_b_id}
+          partyAName={partyAName}
+          partyBName={partyBName}
+        />
+      )}
+
+      {agreement.status === 'completed' && !alreadyReviewed && (
+        <BarterReviewForm agreementId={agreement.id} revieweeName={otherPartyName} />
+      )}
+
       <BarterTimeline history={history} />
 
       <CounterOfferDialog
@@ -156,8 +250,12 @@ export function BarterAgreementView({ agreement, offers, history, confirmations,
         otherPartyId={otherPartyId}
         myListings={myListings}
         theirListings={theirListings}
-        currentMyItemIds={myItems.map((i) => i.listing_id)}
-        currentTheirItemIds={theirItems.map((i) => i.listing_id)}
+        mySkillTaskOptions={mySkillTaskOptions}
+        theirSkillTaskOptions={theirSkillTaskOptions}
+        currentMyItemIds={myItems.map((i) => i.listing_id).filter((id): id is string => !!id)}
+        currentTheirItemIds={theirItems.map((i) => i.listing_id).filter((id): id is string => !!id)}
+        currentMyContributions={myContributionItems.map(toContributionInput)}
+        currentTheirContributions={theirContributionItems.map(toContributionInput)}
         defaults={
           currentOffer
             ? {

@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { Check, Plus } from 'lucide-react'
-import type { Listing, BarterDeliveryMethod, BarterDeliveryResponsibility, BarterDepositPayer } from '@/types'
+import type { Listing, BarterDeliveryMethod, BarterDeliveryResponsibility, BarterDepositPayer, BarterSkillTaskPublicPost } from '@/types'
+import { ContributionListEditor, contributionsValid, type ContributionInput } from './contribution-builder'
 
 const inputClass =
   'w-full px-3.5 py-2.5 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-sm text-[#1A0A0A] dark:text-[#F5F0ED] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20'
@@ -23,9 +24,19 @@ const DELIVERY_RESPONSIBILITIES: { value: BarterDeliveryResponsibility; label: s
   { value: 'not_applicable', label: 'Not applicable' },
 ]
 
+export interface DepositTermInput {
+  payer_id: string
+  amount: number
+  currency: string
+  release_basis: 'full_on_completion' | 'milestone_weighted'
+}
+
 export interface OfferFormValues {
   party_a_listing_ids: string[]
   party_b_listing_ids: string[]
+  party_a_contributions?: ContributionInput[]
+  party_b_contributions?: ContributionInput[]
+  deposit_terms?: DepositTermInput[]
   cash_adjustment_amount: number
   cash_adjustment_payer?: string
   delivery_method: BarterDeliveryMethod
@@ -47,9 +58,15 @@ interface OfferBuilderFormProps {
   myListings: Listing[]
   /** Active, unlocked listings owned by the other party. */
   theirListings: Listing[]
+  /** The acting user's own currently-Available Skill/Task posts, offerable as contribution provenance. */
+  mySkillTaskOptions?: BarterSkillTaskPublicPost[]
+  /** The other party's currently-Available Skill/Task posts, offerable as contribution provenance on their side. */
+  theirSkillTaskOptions?: BarterSkillTaskPublicPost[]
   /** Pre-selected on first render (propose flow: the anchor listing). */
   initiallySelectedTheirListingIds?: string[]
   initiallySelectedMyListingIds?: string[]
+  initialMyContributions?: ContributionInput[]
+  initialTheirContributions?: ContributionInput[]
   defaults?: Partial<OfferFormValues>
   onSubmit: (values: OfferFormValues) => Promise<void>
   /** Called just before navigating away to create a new listing, so the caller can persist current selections (sessionStorage) across the round-trip. */
@@ -113,8 +130,12 @@ export function OfferBuilderForm({
   otherPartyId,
   myListings,
   theirListings,
+  mySkillTaskOptions = [],
+  theirSkillTaskOptions = [],
   initiallySelectedTheirListingIds = [],
   initiallySelectedMyListingIds = [],
+  initialMyContributions = [],
+  initialTheirContributions = [],
   defaults,
   onSubmit,
   onCreateNewListing,
@@ -124,6 +145,8 @@ export function OfferBuilderForm({
 }: OfferBuilderFormProps) {
   const [selectedMine, setSelectedMine] = useState<Set<string>>(new Set(initiallySelectedMyListingIds))
   const [selectedTheirs, setSelectedTheirs] = useState<Set<string>>(new Set(initiallySelectedTheirListingIds))
+  const [myContributions, setMyContributions] = useState<ContributionInput[]>(initialMyContributions)
+  const [theirContributions, setTheirContributions] = useState<ContributionInput[]>(initialTheirContributions)
   const [cashAmount, setCashAmount] = useState(defaults?.cash_adjustment_amount ?? 0)
   const [cashPayer, setCashPayer] = useState<'me' | 'them' | ''>(
     defaults?.cash_adjustment_payer ? (defaults.cash_adjustment_payer === currentUserId ? 'me' : 'them') : ''
@@ -139,8 +162,19 @@ export function OfferBuilderForm({
   const [depositPayer, setDepositPayer] = useState<'me' | 'them' | 'both' | ''>(
     defaults?.deposit_payer === 'both' ? 'both' : defaults?.deposit_payer ? (defaults.deposit_payer === currentUserRole ? 'me' : 'them') : ''
   )
+  // Advanced per-party deposit terms -- mutually exclusive with the
+  // legacy single deposit above (mirrors depositTermSchema's own
+  // exactly-one-of invariant in src/lib/barter/validation.ts). Only
+  // offered once at least one side has a Skill/Task contribution.
+  const [useAdvancedDeposits, setUseAdvancedDeposits] = useState(false)
+  const [myDepositAmount, setMyDepositAmount] = useState(0)
+  const [myDepositBasis, setMyDepositBasis] = useState<'full_on_completion' | 'milestone_weighted'>('full_on_completion')
+  const [theirDepositAmount, setTheirDepositAmount] = useState(0)
+  const [theirDepositBasis, setTheirDepositBasis] = useState<'full_on_completion' | 'milestone_weighted'>('full_on_completion')
   const [message, setMessage] = useState(defaults?.message ?? '')
   const [validationError, setValidationError] = useState<string | null>(null)
+
+  const hasAnyContribution = myContributions.length > 0 || theirContributions.length > 0
 
   function toggleMine(id: string) {
     setSelectedMine((prev) => {
@@ -166,17 +200,23 @@ export function OfferBuilderForm({
     e.preventDefault()
     setValidationError(null)
 
-    if (selectedMine.size === 0) {
-      setValidationError('Select at least one of your own listings to offer.')
+    if (selectedMine.size === 0 && myContributions.length === 0) {
+      setValidationError('Offer at least one of your own listings or Skill/Task contributions.')
       return
     }
-    if (selectedTheirs.size === 0) {
-      setValidationError('Select at least one listing to request.')
+    if (selectedTheirs.size === 0 && theirContributions.length === 0) {
+      setValidationError('Request at least one listing or Skill/Task contribution.')
+      return
+    }
+    if (!contributionsValid(myContributions) || !contributionsValid(theirContributions)) {
+      setValidationError('Every Skill/Task contribution needs a title, at least one milestone, and weights that add up to 100%.')
       return
     }
 
     const partyAListingIds = currentUserRole === 'party_a' ? Array.from(selectedMine) : Array.from(selectedTheirs)
     const partyBListingIds = currentUserRole === 'party_b' ? Array.from(selectedMine) : Array.from(selectedTheirs)
+    const partyAContributions = currentUserRole === 'party_a' ? myContributions : theirContributions
+    const partyBContributions = currentUserRole === 'party_b' ? myContributions : theirContributions
 
     const resolvedCashPayer = cashAmount > 0 ? (cashPayer === 'me' ? currentUserId : cashPayer === 'them' ? otherPartyId : undefined) : undefined
     if (cashAmount > 0 && !resolvedCashPayer) {
@@ -185,7 +225,7 @@ export function OfferBuilderForm({
     }
 
     let resolvedDepositPayer: BarterDepositPayer | undefined
-    if (depositRequired) {
+    if (!useAdvancedDeposits && depositRequired) {
       if (!depositAmount || depositAmount <= 0) {
         setValidationError('Enter a deposit amount.')
         return
@@ -199,16 +239,27 @@ export function OfferBuilderForm({
       }
     }
 
+    let depositTerms: DepositTermInput[] | undefined
+    if (useAdvancedDeposits) {
+      depositTerms = []
+      if (myDepositAmount > 0) depositTerms.push({ payer_id: currentUserId, amount: myDepositAmount, currency: depositCurrency, release_basis: myDepositBasis })
+      if (theirDepositAmount > 0) depositTerms.push({ payer_id: otherPartyId, amount: theirDepositAmount, currency: depositCurrency, release_basis: theirDepositBasis })
+      if (depositTerms.length === 0) depositTerms = undefined
+    }
+
     await onSubmit({
       party_a_listing_ids: partyAListingIds,
       party_b_listing_ids: partyBListingIds,
+      party_a_contributions: partyAContributions.length ? partyAContributions : undefined,
+      party_b_contributions: partyBContributions.length ? partyBContributions : undefined,
+      deposit_terms: depositTerms,
       cash_adjustment_amount: cashAmount,
       cash_adjustment_payer: resolvedCashPayer,
       delivery_method: deliveryMethod,
       delivery_notes: deliveryNotes || undefined,
       delivery_responsibility: deliveryResponsibility || undefined,
-      deposit_required: depositRequired,
-      deposit_amount: depositRequired ? depositAmount : undefined,
+      deposit_required: useAdvancedDeposits ? false : depositRequired,
+      deposit_amount: !useAdvancedDeposits && depositRequired ? depositAmount : undefined,
       deposit_currency: depositCurrency,
       deposit_payer: resolvedDepositPayer,
       message: message || undefined,
@@ -245,6 +296,20 @@ export function OfferBuilderForm({
           emptyLabel="This party has no other active listings available."
         />
       </div>
+
+      <ContributionListEditor
+        title="Your Skill/Task contributions (optional)"
+        contributions={myContributions}
+        availablePosts={mySkillTaskOptions}
+        onChange={setMyContributions}
+      />
+
+      <ContributionListEditor
+        title="Their Skill/Task contributions (optional)"
+        contributions={theirContributions}
+        availablePosts={theirSkillTaskOptions}
+        onChange={setTheirContributions}
+      />
 
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -306,37 +371,75 @@ export function OfferBuilderForm({
         />
       </div>
 
-      <div className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-3.5 space-y-3">
-        <label className="flex items-center gap-2 text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
-          <input type="checkbox" checked={depositRequired} onChange={(e) => setDepositRequired(e.target.checked)} className="accent-[#8B1A1A]" />
-          Require a deposit
+      {hasAnyContribution && (
+        <label className="flex items-center gap-2 text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <input
+            type="checkbox"
+            checked={useAdvancedDeposits}
+            onChange={(e) => {
+              setUseAdvancedDeposits(e.target.checked)
+              if (e.target.checked) setDepositRequired(false)
+            }}
+            className="accent-[#8B1A1A]"
+          />
+          Use itemised per-party deposits (independent amounts, can release by milestone progress)
         </label>
-        {depositRequired && (
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1 block">Amount</label>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={depositAmount || ''}
-                onChange={(e) => setDepositAmount(Number(e.target.value) || 0)}
-                placeholder="R 0.00"
-                className={inputClass}
-              />
+      )}
+
+      {!useAdvancedDeposits && (
+        <div className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-3.5 space-y-3">
+          <label className="flex items-center gap-2 text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+            <input type="checkbox" checked={depositRequired} onChange={(e) => setDepositRequired(e.target.checked)} className="accent-[#8B1A1A]" />
+            Require a deposit
+          </label>
+          {depositRequired && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1 block">Amount</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={depositAmount || ''}
+                  onChange={(e) => setDepositAmount(Number(e.target.value) || 0)}
+                  placeholder="R 0.00"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1 block">Who pays?</label>
+                <select value={depositPayer} onChange={(e) => setDepositPayer(e.target.value as typeof depositPayer)} className={inputClass}>
+                  <option value="">Select…</option>
+                  <option value="me">I pay</option>
+                  <option value="them">They pay</option>
+                  <option value="both">Both pay (same amount each)</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1 block">Who pays?</label>
-              <select value={depositPayer} onChange={(e) => setDepositPayer(e.target.value as typeof depositPayer)} className={inputClass}>
-                <option value="">Select…</option>
-                <option value="me">I pay</option>
-                <option value="them">They pay</option>
-                <option value="both">Both pay (same amount each)</option>
-              </select>
-            </div>
+          )}
+        </div>
+      )}
+
+      {useAdvancedDeposits && (
+        <div className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#9B8B85]">Your deposit</p>
+            <input type="number" min={0} step="0.01" value={myDepositAmount || ''} onChange={(e) => setMyDepositAmount(Number(e.target.value) || 0)} placeholder="R 0.00" className={inputClass} />
+            <select value={myDepositBasis} onChange={(e) => setMyDepositBasis(e.target.value as typeof myDepositBasis)} className={inputClass}>
+              <option value="full_on_completion">Full amount on completion</option>
+              <option value="milestone_weighted" disabled={myContributions.length === 0}>Released by milestone progress</option>
+            </select>
           </div>
-        )}
-      </div>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#9B8B85]">Their deposit</p>
+            <input type="number" min={0} step="0.01" value={theirDepositAmount || ''} onChange={(e) => setTheirDepositAmount(Number(e.target.value) || 0)} placeholder="R 0.00" className={inputClass} />
+            <select value={theirDepositBasis} onChange={(e) => setTheirDepositBasis(e.target.value as typeof theirDepositBasis)} className={inputClass}>
+              <option value="full_on_completion">Full amount on completion</option>
+              <option value="milestone_weighted" disabled={theirContributions.length === 0}>Released by milestone progress</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       <div>
         <label className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1 block">Message (optional)</label>

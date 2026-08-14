@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { OfferBuilderForm, type OfferFormValues } from './offer-builder-form'
-import type { Listing } from '@/types'
+import type { ContributionInput } from './contribution-builder'
+import type { Listing, BarterSkillTaskPublicPost } from '@/types'
 
 interface CounterOfferDialogProps {
   open: boolean
@@ -15,9 +16,13 @@ interface CounterOfferDialogProps {
   otherPartyId: string
   myListings: Listing[]
   theirListings: Listing[]
+  mySkillTaskOptions?: BarterSkillTaskPublicPost[]
+  theirSkillTaskOptions?: BarterSkillTaskPublicPost[]
   defaults?: Partial<OfferFormValues>
   currentMyItemIds: string[]
   currentTheirItemIds: string[]
+  currentMyContributions?: ContributionInput[]
+  currentTheirContributions?: ContributionInput[]
 }
 
 const draftKey = (agreementId: string) => `barter-counter-draft:${agreementId}`
@@ -42,9 +47,13 @@ export function CounterOfferDialog({
   otherPartyId,
   myListings,
   theirListings,
+  mySkillTaskOptions = [],
+  theirSkillTaskOptions = [],
   defaults,
   currentMyItemIds,
   currentTheirItemIds,
+  currentMyContributions = [],
+  currentTheirContributions = [],
 }: CounterOfferDialogProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -115,8 +124,12 @@ export function CounterOfferDialog({
           otherPartyId={otherPartyId}
           myListings={myListings}
           theirListings={theirListings}
+          mySkillTaskOptions={mySkillTaskOptions}
+          theirSkillTaskOptions={theirSkillTaskOptions}
           initiallySelectedMyListingIds={restored?.mine ?? currentMyItemIds}
           initiallySelectedTheirListingIds={restored?.theirs ?? currentTheirItemIds}
+          initialMyContributions={currentMyContributions}
+          initialTheirContributions={currentTheirContributions}
           defaults={defaults}
           onSubmit={handleSubmit}
           onCreateNewListing={handleCreateNewListing}

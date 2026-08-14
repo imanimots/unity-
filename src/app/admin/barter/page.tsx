@@ -72,7 +72,12 @@ export default function AdminBarterPage() {
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
-      <AdminPageHeader eyebrow="Marketplace" title="Barter trades" />
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <AdminPageHeader eyebrow="Marketplace" title="Barter trades" />
+        <Link href="/admin/barter/skill-task" className={secondaryButtonClass}>
+          Skill/Task reports
+        </Link>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <StatCard label="Total" value={agreements.length} />

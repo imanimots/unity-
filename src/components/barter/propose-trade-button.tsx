@@ -5,15 +5,22 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Repeat } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { OfferBuilderForm, type OfferFormValues } from './offer-builder-form'
-import type { Listing } from '@/types'
+import type { ContributionInput } from './contribution-builder'
+import type { Listing, BarterSkillTaskPublicPost } from '@/types'
 
 interface ProposeTradeButtonProps {
-  anchorListing: Listing
+  /** Exactly one of anchorListing/anchorSkillTaskPost is provided -- mirrors proposeBarterSchema's own "exactly one anchor" invariant. */
+  anchorListing?: Listing
+  anchorSkillTaskPost?: BarterSkillTaskPublicPost
   currentUserId: string
   /** Viewer's own active, unlocked listings. */
   myListings: Listing[]
-  /** The anchor listing owner's active, unlocked listings (includes the anchor itself). */
+  /** The anchor owner's active, unlocked listings (includes the anchor itself, when the anchor is a listing). */
   ownerListings: Listing[]
+  /** The viewer's own currently-Available Skill/Task posts, offerable as contribution provenance. */
+  mySkillTaskOptions?: BarterSkillTaskPublicPost[]
+  /** The anchor owner's currently-Available Skill/Task posts. */
+  ownerSkillTaskOptions?: BarterSkillTaskPublicPost[]
   className?: string
 }
 
@@ -38,11 +45,23 @@ function readDraft(anchorId: string): { mine: string[]; theirs: string[] } | nul
  * unmodified, this component only restores which listings were already
  * chosen when the user returns.
  */
-export function ProposeTradeButton({ anchorListing, currentUserId, myListings, ownerListings, className }: ProposeTradeButtonProps) {
+export function ProposeTradeButton({
+  anchorListing,
+  anchorSkillTaskPost,
+  currentUserId,
+  myListings,
+  ownerListings,
+  mySkillTaskOptions = [],
+  ownerSkillTaskOptions = [],
+  className,
+}: ProposeTradeButtonProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const anchorId = anchorListing?.id ?? anchorSkillTaskPost?.id ?? ''
+  const anchorOwnerId = anchorListing?.merchant_id ?? anchorSkillTaskPost?.owner_id ?? ''
+  const returnPath = anchorListing ? `/listings/${anchorId}` : `/barter/skill-task/${anchorId}`
   const isReturningFromWizard =
-    typeof window !== 'undefined' && searchParams.get('returnTo') === 'barter-propose' && searchParams.get('anchor') === anchorListing.id
+    typeof window !== 'undefined' && searchParams.get('returnTo') === 'barter-propose' && searchParams.get('anchor') === anchorId
 
   // Computed once, at mount, via a lazy useState initializer — the
   // React-compiler-approved way to seed one-time initial state from an
@@ -57,22 +76,22 @@ export function ProposeTradeButton({ anchorListing, currentUserId, myListings, o
   const [open, setOpen] = useState(() => isReturningFromWizard)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [restored] = useState(() => (isReturningFromWizard ? readDraft(anchorListing.id) : null))
+  const [restored] = useState(() => (isReturningFromWizard ? readDraft(anchorId) : null))
 
   useEffect(() => {
     // Pure external-navigation side effect — cleans the return-flow query
     // params off the URL once. No setState here; `open`/`restored` are
     // already correctly seeded above.
     if (isReturningFromWizard) {
-      router.replace(`/listings/${anchorListing.id}`, { scroll: false })
+      router.replace(returnPath, { scroll: false })
     }
     // Only ever run on first mount for this page load.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function handleCreateNewListing(mineIds: string[], theirsIds: string[]) {
-    sessionStorage.setItem(draftKey(anchorListing.id), JSON.stringify({ mine: mineIds, theirs: theirsIds }))
-    router.push(`/dashboard/merchant/listings/new?returnTo=barter-propose&anchor=${anchorListing.id}`)
+    sessionStorage.setItem(draftKey(anchorId), JSON.stringify({ mine: mineIds, theirs: theirsIds }))
+    router.push(`/dashboard/merchant/listings/new?returnTo=barter-propose&anchor=${anchorId}`)
   }
 
   async function handleSubmit(values: OfferFormValues) {
@@ -83,7 +102,8 @@ export function ProposeTradeButton({ anchorListing, currentUserId, myListings, o
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          anchor_listing_id: anchorListing.id,
+          anchor_listing_id: anchorListing?.id,
+          anchor_skill_task_post_id: anchorSkillTaskPost?.id,
           ...values,
           idempotency_key: crypto.randomUUID(),
         }),
@@ -93,7 +113,7 @@ export function ProposeTradeButton({ anchorListing, currentUserId, myListings, o
         setError(data.error ?? 'Could not submit your trade proposal')
         return
       }
-      sessionStorage.removeItem(draftKey(anchorListing.id))
+      sessionStorage.removeItem(draftKey(anchorId))
       setOpen(false)
       router.push(`/dashboard/barter/${data.agreement_id}`)
     } catch {
@@ -102,6 +122,11 @@ export function ProposeTradeButton({ anchorListing, currentUserId, myListings, o
       setSubmitting(false)
     }
   }
+
+  const anchorTitle = anchorListing?.title ?? anchorSkillTaskPost?.title ?? ''
+  const defaultTheirContributions: ContributionInput[] = anchorSkillTaskPost
+    ? [{ kind: anchorSkillTaskPost.kind, skill_task_post_id: anchorSkillTaskPost.id, contribution_weight_percent: 100, milestones: [{ title: 'Completion', sequence: 1, weight_percent: 100 }] }]
+    : []
 
   return (
     <>
@@ -113,23 +138,26 @@ export function ProposeTradeButton({ anchorListing, currentUserId, myListings, o
           'flex items-center justify-center gap-2 w-full py-3 border border-[#8B1A1A] text-[#8B1A1A] font-semibold rounded-xl text-sm hover:bg-[#8B1A1A]/5 transition-colors'
         }
       >
-        <Repeat size={16} /> Propose Trade
+        <Repeat size={16} /> {anchorSkillTaskPost?.direction === 'looking_for' ? 'I can help' : 'Propose Trade'}
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Propose a trade</DialogTitle>
-            <DialogDescription>Offer one or more of your listings in exchange for {anchorListing.title}.</DialogDescription>
+            <DialogDescription>Offer one or more of your listings or Skills/Tasks in exchange for {anchorTitle}.</DialogDescription>
           </DialogHeader>
           <OfferBuilderForm
             currentUserRole="party_b"
             currentUserId={currentUserId}
-            otherPartyId={anchorListing.merchant_id}
+            otherPartyId={anchorOwnerId}
             myListings={myListings}
             theirListings={ownerListings}
-            initiallySelectedTheirListingIds={restored?.theirs ?? [anchorListing.id]}
+            mySkillTaskOptions={mySkillTaskOptions}
+            theirSkillTaskOptions={ownerSkillTaskOptions}
+            initiallySelectedTheirListingIds={restored?.theirs ?? (anchorListing ? [anchorListing.id] : [])}
             initiallySelectedMyListingIds={restored?.mine ?? []}
+            initialTheirContributions={defaultTheirContributions}
             onSubmit={handleSubmit}
             onCreateNewListing={handleCreateNewListing}
             submitLabel="Send trade proposal"

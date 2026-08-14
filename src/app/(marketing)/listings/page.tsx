@@ -2,12 +2,15 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getListings } from '@/lib/data/listings'
 import { getMarketplaceRequests } from '@/lib/data/marketplace-requests'
+import { getSkillTaskPublicPosts } from '@/lib/data/skill-task-posts'
 import { resolveEffectiveCountry } from '@/lib/resolve-effective-country'
 import { ListingCard } from '@/components/listings/listing-card'
 import { RequestCard } from '@/components/listings/request-card'
+import { SkillTaskPostCard } from '@/components/listings/skill-task-post-card'
 import { FilterBar } from '@/components/listings/filter-bar'
 import { MarketplaceModeSelectorContainer } from '@/components/listings/marketplace-mode-selector-container'
 import { DirectionToggleContainer } from '@/components/listings/direction-toggle-container'
+import { KindToggleContainer } from '@/components/listings/kind-toggle-container'
 import type { ListingFilters } from '@/lib/data/listings'
 import { Search } from 'lucide-react'
 import { absoluteUrl, isMarketplaceIndexingEnabled, getMarketplaceRobotsMeta } from '@/lib/seo/config'
@@ -37,6 +40,7 @@ interface PageProps {
     maxPrice?: string
     mode?: string
     direction?: string
+    kind?: string
   }>
 }
 
@@ -52,6 +56,11 @@ export default async function ListingsPage({ searchParams }: PageProps) {
   const mode = params.mode === 'buy' || params.mode === 'barter' || params.mode === 'rent_to_buy' ? params.mode : 'rent'
   const isBarter = mode === 'barter'
   const isLookingFor = params.direction === 'looking-for'
+  // Skills + Tasks under Barter -- kind is only meaningful under
+  // mode=barter (D5's six-cell matrix); any other mode always behaves
+  // as 'item', byte-for-byte unchanged from before this feature.
+  const kind = isBarter && (params.kind === 'skill' || params.kind === 'task') ? params.kind : 'item'
+  const isSkillTask = isBarter && kind !== 'item'
 
   const { countryId } = await resolveEffectiveCountry()
 
@@ -70,9 +79,12 @@ export default async function ListingsPage({ searchParams }: PageProps) {
     countryId,
   }
 
-  const listings = isLookingFor ? [] : await getListings(filters)
-  const requests = isLookingFor
+  const listings = isLookingFor || isSkillTask ? [] : await getListings(filters)
+  const requests = isLookingFor && !isSkillTask
     ? await getMarketplaceRequests({ transactionType: mode, category: params.category, query: params.q, countryId, sort: params.sort as 'newest' | 'budget_asc' | 'budget_desc' })
+    : []
+  const skillTaskPosts = isSkillTask
+    ? await getSkillTaskPublicPosts(kind as 'skill' | 'task', isLookingFor ? 'looking_for' : 'available', { query: params.q })
     : []
 
   return (
@@ -109,7 +121,9 @@ export default async function ListingsPage({ searchParams }: PageProps) {
 
           {/* Result count */}
           <p className="text-[#9B8B85] text-sm mt-4">
-            {isLookingFor
+            {isSkillTask
+              ? `${skillTaskPosts.length} ${kind}${skillTaskPosts.length !== 1 ? 's' : ''} ${isLookingFor ? 'looking for help' : 'available'}`
+              : isLookingFor
               ? `${requests.length} request${requests.length !== 1 ? 's' : ''} looking to ${mode}${params.category ? ` in ${params.category}` : ''}`
               : `${listings.length} item${listings.length !== 1 ? 's' : ''} ${MODE_LABELS[mode]}${params.category ? ` in ${params.category}` : ''}`}
           </p>
@@ -121,10 +135,16 @@ export default async function ListingsPage({ searchParams }: PageProps) {
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-4 flex flex-wrap items-center justify-between gap-4">
           <FilterBar />
           <div className="flex items-center gap-3">
+            {isBarter && <KindToggleContainer />}
             <DirectionToggleContainer />
-            {isLookingFor && (
+            {isLookingFor && !isSkillTask && (
               <Link href="/looking-for/new" className="px-4 py-2 rounded-full text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors">
                 Post a request
+              </Link>
+            )}
+            {isSkillTask && (
+              <Link href="/dashboard/barter/skill-task/new" className="px-4 py-2 rounded-full text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors">
+                Post a {kind}
               </Link>
             )}
           </div>
@@ -136,7 +156,21 @@ export default async function ListingsPage({ searchParams }: PageProps) {
 
       {/* ── RESULTS GRID ── */}
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-10 lg:py-14 pb-32">
-        {isLookingFor ? (
+        {isSkillTask ? (
+          skillTaskPosts.length === 0 ? (
+            <div className="text-center py-24">
+              <p className="text-5xl mb-5">🤝</p>
+              <h2 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] mb-3">No {kind}s found</h2>
+              <p className="text-[#6B5B55] dark:text-[#9B8B85]">Be the first to post {isLookingFor ? 'what you need help with' : 'what you can offer'}.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-8">
+              {skillTaskPosts.map((post) => (
+                <SkillTaskPostCard key={post.id} post={post} />
+              ))}
+            </div>
+          )
+        ) : isLookingFor ? (
           requests.length === 0 ? (
             <div className="text-center py-24">
               <p className="text-5xl mb-5">🔍</p>

@@ -9,7 +9,9 @@ import { BarterStatusBadge } from '@/components/barter/barter-status-badge'
 import { BarterFinancialStatus } from '@/components/barter/barter-financial-status'
 import { BarterTimeline } from '@/components/barter/barter-timeline'
 import { BarterAdminActions } from '@/components/barter/barter-admin-actions'
-import type { BarterAgreement, BarterOffer, BarterHistoryEntry, BarterPayment } from '@/types'
+import { ContributionMilestonesPanel } from '@/components/barter/contribution-milestones-panel'
+import { DepositEligibilityPanel } from '@/components/barter/deposit-eligibility-panel'
+import type { BarterAgreement, BarterOffer, BarterHistoryEntry, BarterPayment, BarterOfferItem, BarterDepositTerm, BarterMilestoneEvidence } from '@/types'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -33,11 +35,14 @@ export default async function AdminBarterDetailPage({ params }: PageProps) {
   const offers = detail.offers as unknown as BarterOffer[]
   const acceptedOffer = offers.find((o) => o.id === agreement.accepted_offer_id)
 
-  const [{ data: profiles }, { data: anchorListing }] = await Promise.all([
+  const [{ data: profiles }, { data: anchorListing }, { data: anchorSkillTaskPost }] = await Promise.all([
     admin.from('profiles').select('id, display_name, full_name').in('id', [agreement.party_a_id, agreement.party_b_id]),
-    admin.from('listings').select('title').eq('id', agreement.anchor_listing_id).maybeSingle(),
+    agreement.anchor_listing_id ? admin.from('listings').select('title').eq('id', agreement.anchor_listing_id).maybeSingle() : Promise.resolve({ data: null }),
+    agreement.source_skill_task_post_id ? admin.from('barter_skill_task_posts').select('title, kind').eq('id', agreement.source_skill_task_post_id).maybeSingle() : Promise.resolve({ data: null }),
   ])
   const nameById = new Map((profiles ?? []).map((p) => [p.id, p.display_name || p.full_name || 'Unity user']))
+  const anchorTitle = anchorListing?.title ?? anchorSkillTaskPost?.title ?? '—'
+  const anchorLabel = anchorListing ? 'Anchor listing' : anchorSkillTaskPost ? `Anchor ${anchorSkillTaskPost.kind === 'skill' ? 'Skill' : 'Task'} post` : 'Anchor'
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -67,8 +72,8 @@ export default async function AdminBarterDetailPage({ params }: PageProps) {
             <span className="text-[#1A0A0A] dark:text-[#F5F0ED]">{nameById.get(agreement.party_b_id) ?? '—'}</span>
           </div>
           <div className="px-4 py-3 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] sm:col-span-2">
-            <span className="text-[#9B8B85] block text-xs uppercase tracking-[0.08em] mb-1">Anchor listing</span>
-            <span className="text-[#1A0A0A] dark:text-[#F5F0ED]">{anchorListing?.title ?? '—'}</span>
+            <span className="text-[#9B8B85] block text-xs uppercase tracking-[0.08em] mb-1">{anchorLabel}</span>
+            <span className="text-[#1A0A0A] dark:text-[#F5F0ED]">{anchorTitle}</span>
           </div>
         </div>
 
@@ -87,6 +92,39 @@ export default async function AdminBarterDetailPage({ params }: PageProps) {
           <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-2">Completion confirmations</h2>
           <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">{detail.confirmations.length} of 2 parties have confirmed completion.</p>
         </div>
+
+        {detail.acceptedSkillTaskItems.length > 0 && (
+          <div>
+            <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-3">Skill/Task progress (read-only)</h2>
+            <div className="space-y-4">
+              {(detail.acceptedSkillTaskItems as unknown as BarterOfferItem[]).map((item) => (
+                <ContributionMilestonesPanel
+                  key={item.id}
+                  agreementId={agreement.id}
+                  offerItem={item}
+                  currentUserId=""
+                  partyAId={agreement.party_a_id}
+                  partyBId={agreement.party_b_id}
+                  partyAName={nameById.get(agreement.party_a_id) ?? 'Party A'}
+                  partyBName={nameById.get(agreement.party_b_id) ?? 'Party B'}
+                  evidenceByMilestone={detail.evidenceByMilestone as unknown as Record<string, BarterMilestoneEvidence[]>}
+                  readOnly
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {agreement.status === 'completed' && (detail.depositTerms as unknown as BarterDepositTerm[]).length > 0 && (
+          <DepositEligibilityPanel
+            depositTerms={detail.depositTerms as unknown as BarterDepositTerm[]}
+            items={detail.acceptedSkillTaskItems as unknown as BarterOfferItem[]}
+            partyAId={agreement.party_a_id}
+            partyBId={agreement.party_b_id}
+            partyAName={nameById.get(agreement.party_a_id) ?? 'Party A'}
+            partyBName={nameById.get(agreement.party_b_id) ?? 'Party B'}
+          />
+        )}
 
         <BarterAdminActions agreementId={agreement.id} status={agreement.status} adminHold={agreement.admin_hold} />
 
