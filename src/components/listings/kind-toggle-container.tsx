@@ -26,6 +26,7 @@ function KindToggleInner() {
       if (next === 'item') params.delete('kind')
       else params.set('kind', next)
       params.delete('page')
+      params.delete('cursor')
       router.push(`${pathname}?${params.toString()}`, { scroll: false })
     },
     [pathname, router, searchParams]

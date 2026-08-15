@@ -37,6 +37,9 @@ function fakeSupabaseClient(fromCalls: string[], selectCalls: string[], rows: Re
       fromCalls.push(table)
       return builder
     },
+    rpc() {
+      return Promise.resolve({ data: [], error: null })
+    },
   }
 }
 
@@ -146,22 +149,40 @@ describe('getProfileReviews relationship handling (category: Listing Detail) —
   })
 })
 
-describe('getListings — country filtering (mock-mode path)', () => {
-  it('returns results when filtered by the country every mock listing actually has', async () => {
-    const all = await getListings({})
-    const filtered = await getListings({ countryId: 'ZA' })
-    expect(filtered.length).toBe(all.length)
-    expect(filtered.every((l) => l.country_id === 'ZA')).toBe(true)
+describe('getListings — country filtering is delegated to the search_listings RPC (category: Search Ranking)', () => {
+  /** Captures the exact args search_listings was called with, and returns zero ranked rows so the function short-circuits before any further `.from()` calls. */
+  function fakeClientCapturingRpcArgs(rpcCalls: Array<[string, unknown]>) {
+    return {
+      from() {
+        return { select() { return this }, eq() { return this }, in() { return this } }
+      },
+      rpc(name: string, args: unknown) {
+        rpcCalls.push([name, args])
+        return Promise.resolve({ data: [], error: null })
+      },
+    }
+  }
+
+  it('passes countryId through to search_listings as p_country_id', async () => {
+    const rpcCalls: Array<[string, unknown]> = []
+    vi.mocked(mockedCreateClient).mockResolvedValue(fakeClientCapturingRpcArgs(rpcCalls) as never)
+    await getListings({ countryId: 'ZA' })
+    expect(rpcCalls).toHaveLength(1)
+    expect(rpcCalls[0][0]).toBe('search_listings')
+    expect((rpcCalls[0][1] as Record<string, unknown>).p_country_id).toBe('ZA')
   })
 
-  it('returns nothing for a country no mock listing belongs to', async () => {
+  it('omitting countryId passes null p_country_id (no country filtering)', async () => {
+    const rpcCalls: Array<[string, unknown]> = []
+    vi.mocked(mockedCreateClient).mockResolvedValue(fakeClientCapturingRpcArgs(rpcCalls) as never)
+    await getListings({})
+    expect((rpcCalls[0][1] as Record<string, unknown>).p_country_id).toBeNull()
+  })
+
+  it('a country with zero eligible rows resolves to an empty list, not an error', async () => {
+    const rpcCalls: Array<[string, unknown]> = []
+    vi.mocked(mockedCreateClient).mockResolvedValue(fakeClientCapturingRpcArgs(rpcCalls) as never)
     const filtered = await getListings({ countryId: 'NG' })
     expect(filtered).toEqual([])
-  })
-
-  it('omitting countryId does not filter by country at all', async () => {
-    const withFilter = await getListings({ countryId: 'ZA' })
-    const withoutFilter = await getListings({})
-    expect(withoutFilter.length).toBe(withFilter.length)
   })
 })

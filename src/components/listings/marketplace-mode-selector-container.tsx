@@ -27,6 +27,7 @@ function MarketplaceModeSelectorInner() {
         params.set('mode', next)
       }
       params.delete('page')
+      params.delete('cursor')
       router.push(`${pathname}?${params.toString()}`, { scroll: false })
     },
     [pathname, router, searchParams]

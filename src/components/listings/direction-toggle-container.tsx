@@ -27,6 +27,7 @@ function DirectionToggleInner() {
       if (next === 'available') params.delete('direction')
       else params.set('direction', next)
       params.delete('page')
+      params.delete('cursor')
       router.push(`${pathname}?${params.toString()}`, { scroll: false })
     },
     [pathname, router, searchParams]

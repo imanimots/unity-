@@ -5,6 +5,7 @@ import {
   MOCK_REVIEWS,
   IS_MOCK_MODE,
 } from '@/lib/mock/data'
+import { normalizeSearchQuery, decodeSearchCursor, encodeSearchCursor, computeSearchContextHash, isCursorValidForContext, resolveDefaultSort, type SearchCursor } from '@/lib/search/cursor'
 
 export interface ListingFilters {
   category?: string
@@ -30,6 +31,27 @@ export interface ListingFilters {
    * country changed.
    */
   countryId?: string
+  /** Opaque cursor from a previous ListingsPage.nextCursor — see src/lib/search/cursor.ts. Ignored (treated as first page) if it doesn't match the current filter context. */
+  cursor?: string
+  /** Defaults to 24. */
+  limit?: number
+}
+
+export interface ListingsPage {
+  items: Listing[]
+  nextCursor: string | null
+}
+
+function listingsSearchContextParams(filters: ListingFilters, resolvedSort: string, normalizedQuery: string | null) {
+  return {
+    query: normalizedQuery,
+    mode: filters.mode ?? null,
+    category: filters.category ?? null,
+    countryId: filters.countryId ?? null,
+    minPrice: filters.minPrice ?? null,
+    maxPrice: filters.maxPrice ?? null,
+    sort: resolvedSort,
+  }
 }
 
 /** Normalized display price — daily rate for rentals, sale price for sale-only listings. Never both null (see listings_type_pricing_chk). */
@@ -86,7 +108,25 @@ export function excludeTestListings<T extends { eq: (column: string, value: unkn
   return query.eq('is_test', false)
 }
 
+/** Convenience wrapper over getListingsPage() for callers that only need the first page (homepage featured grid, tests). */
 export async function getListings(filters: ListingFilters = {}): Promise<Listing[]> {
+  const page = await getListingsPage(filters)
+  return page.items
+}
+
+/**
+ * Real-Supabase path calls the `search_listings` SQL RPC (Search
+ * Ranking MVP) — all filtering/tier-classification/sorting/pagination
+ * happens in Postgres now, not in this function. `sort: 'rating'` is
+ * deliberately NOT routed through the RPC (it has no `rating` sort
+ * option — a genuine review-aware "Top Rated" ranking was judged not
+ * worth building for this phase, see the implementation report) and
+ * keeps the prior legacy full-fetch + in-memory sort-by-unity_score
+ * behavior, used only by the homepage's small "featured" grid, never
+ * paginated. It is intentionally excluded from the public browse
+ * page's selectable sort options.
+ */
+export async function getListingsPage(filters: ListingFilters = {}): Promise<ListingsPage> {
   if (IS_MOCK_MODE) {
     let results = [...MOCK_LISTINGS]
 
@@ -132,63 +172,89 @@ export async function getListings(filters: ListingFilters = {}): Promise<Listing
         break
     }
 
-    return results
+    return { items: results.slice(0, filters.limit ?? 24), nextCursor: null }
   }
 
-  // Real Supabase path (used when env vars are set)
   const { createClient } = await import('@/lib/supabase/server')
   const supabase = await createClient()
-  if (!supabase) return []
+  if (!supabase) return { items: [], nextCursor: null }
 
-  let query = excludeTestListings(
-    supabase
-      .from('listings')
-      .select('*, media:listing_media(*)')
-      .eq('status', 'active')
-  )
-
-  if (filters.category) query = query.eq('category', filters.category)
-  if (filters.query) query = query.ilike('title', `%${filters.query}%`)
-  if (filters.minPrice !== undefined) query = query.gte('daily_rate', filters.minPrice)
-  if (filters.maxPrice !== undefined) query = query.lte('daily_rate', filters.maxPrice)
-  if (filters.mode === 'rent') query = query.in('listing_type', ['rental', 'both'])
-  if (filters.mode === 'buy') query = query.in('listing_type', ['sale', 'both'])
-  if (filters.countryId) query = query.eq('country_id', filters.countryId)
-
-  if (filters.mode === 'rent_to_buy') {
-    const { data: rtbTerms } = await supabase.from('rent_to_buy_listing_terms').select('listing_id').eq('enabled', true)
-    const rtbListingIds = (rtbTerms ?? []).map((t) => t.listing_id)
-    if (rtbListingIds.length === 0) return []
-    query = query.in('id', rtbListingIds)
+  // Legacy path, unchanged from before this phase — 'rating' has no
+  // RPC sort equivalent (see the function doc comment above).
+  if (filters.sort === 'rating') {
+    let query = excludeTestListings(
+      supabase
+        .from('listings')
+        .select('*, media:listing_media(*)')
+        .eq('status', 'active')
+    )
+    if (filters.category) query = query.eq('category', filters.category)
+    if (filters.query) query = query.ilike('title', `%${filters.query}%`)
+    if (filters.minPrice !== undefined) query = query.gte('daily_rate', filters.minPrice)
+    if (filters.maxPrice !== undefined) query = query.lte('daily_rate', filters.maxPrice)
+    if (filters.mode === 'rent') query = query.in('listing_type', ['rental', 'both'])
+    if (filters.mode === 'buy') query = query.in('listing_type', ['sale', 'both'])
+    if (filters.countryId) query = query.eq('country_id', filters.countryId)
+    if (filters.mode === 'rent_to_buy') {
+      const { data: rtbTerms } = await supabase.from('rent_to_buy_listing_terms').select('listing_id').eq('enabled', true)
+      const rtbListingIds = (rtbTerms ?? []).map((t) => t.listing_id)
+      if (rtbListingIds.length === 0) return { items: [], nextCursor: null }
+      query = query.in('id', rtbListingIds)
+    }
+    const { data: rawData } = await query
+    if (!rawData) return { items: [], nextCursor: null }
+    const { getAllBarterLockedListingIds } = await import('@/lib/barter/listing-lock')
+    const lockedIds = await getAllBarterLockedListingIds()
+    const filtered = lockedIds.size > 0 ? rawData.filter((l) => !lockedIds.has(l.id)) : rawData
+    const data = await attachMerchantIdentities(supabase, filtered)
+    data.sort((a, b) => (b.merchant?.unity_score ?? 0) - (a.merchant?.unity_score ?? 0))
+    return { items: data.slice(0, filters.limit ?? 24), nextCursor: null }
   }
 
-  const { data: rawData } = await query
-  if (!rawData) return []
+  const normalizedQuery = normalizeSearchQuery(filters.query)
+  const resolvedSort = resolveDefaultSort(filters.sort, normalizedQuery)
+  const limit = filters.limit ?? 24
+  const contextParams = listingsSearchContextParams(filters, resolvedSort, normalizedQuery)
+  const contextHash = computeSearchContextHash('listings', contextParams)
 
-  // Exclude barter-locked listings from browse — getListing() (single
-  // detail fetch) deliberately does NOT apply this exclusion, so a
-  // locked listing's own page still renders (with a "committed to a
-  // barter" state), it just disappears from search/browse results. See
-  // the Barter Marketplace MVP Implementation Plan, Decision 4.
-  const { getAllBarterLockedListingIds } = await import('@/lib/barter/listing-lock')
-  const lockedIds = await getAllBarterLockedListingIds()
-  const filtered = lockedIds.size > 0 ? rawData.filter((l) => !lockedIds.has(l.id)) : rawData
-  const data = await attachMerchantIdentities(supabase, filtered)
+  const decodedCursor = filters.cursor ? decodeSearchCursor(filters.cursor) : null
+  const cursor: SearchCursor | null = decodedCursor && isCursorValidForContext(decodedCursor, 'listings', contextParams) ? decodedCursor : null
 
-  switch (filters.sort) {
-    case 'price_asc':
-      data.sort((a, b) => normalizedPrice(a) - normalizedPrice(b))
-      break
-    case 'price_desc':
-      data.sort((a, b) => normalizedPrice(b) - normalizedPrice(a))
-      break
-    case 'rating':
-      data.sort((a, b) => (b.merchant?.unity_score ?? 0) - (a.merchant?.unity_score ?? 0))
-      break
-    // 'newest'/'relevance' already match the default query order (created_at desc via no explicit order = insertion order is not guaranteed, but this matches the pre-existing behavior — no sort clause was applied server-side before this change either).
-  }
+  const { data: ranked, error: rpcError } = await supabase.rpc('search_listings', {
+    p_query: normalizedQuery,
+    p_mode: filters.mode ?? null,
+    p_category: filters.category ?? null,
+    p_country_id: filters.countryId ?? null,
+    p_price_min: filters.minPrice ?? null,
+    p_price_max: filters.maxPrice ?? null,
+    p_sort: resolvedSort,
+    p_cursor_tier: cursor?.tier ?? null,
+    p_cursor_score: cursor?.score ?? null,
+    p_cursor_price: cursor?.price ?? null,
+    p_cursor_created_at: cursor?.createdAt ?? null,
+    p_cursor_id: cursor?.id ?? null,
+    p_limit: limit,
+  })
 
-  return data
+  if (rpcError || !ranked || ranked.length === 0) return { items: [], nextCursor: null }
+
+  type RankedRow = { id: string; match_tier: number; match_score: number; price: number | null; created_at: string }
+  const rankedRows = ranked as RankedRow[]
+  const ids = rankedRows.map((r) => r.id)
+
+  const { data: rawData } = await supabase.from('listings').select('*, media:listing_media(*)').in('id', ids)
+  const byId = new Map((rawData ?? []).map((l) => [l.id, l]))
+  const orderedRaw = ids.map((id) => byId.get(id)).filter((l): l is NonNullable<typeof l> => Boolean(l))
+
+  const items = await attachMerchantIdentities(supabase, orderedRaw)
+
+  const last = rankedRows[rankedRows.length - 1]
+  const nextCursor =
+    rankedRows.length === limit
+      ? encodeSearchCursor({ tier: last.match_tier, score: last.match_score, price: last.price, createdAt: last.created_at, id: last.id, contextHash })
+      : null
+
+  return { items, nextCursor }
 }
 
 export async function getListing(id: string): Promise<Listing | null> {

@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { getListings } from '@/lib/data/listings'
-import { getMarketplaceRequests } from '@/lib/data/marketplace-requests'
-import { getSkillTaskPublicPosts } from '@/lib/data/skill-task-posts'
+import { getListingsPage } from '@/lib/data/listings'
+import { getMarketplaceRequestsPage } from '@/lib/data/marketplace-requests'
+import { getSkillTaskPublicPostsPage } from '@/lib/data/skill-task-posts'
 import { resolveEffectiveCountry } from '@/lib/resolve-effective-country'
 import { ListingCard } from '@/components/listings/listing-card'
 import { RequestCard } from '@/components/listings/request-card'
@@ -41,6 +41,7 @@ interface PageProps {
     mode?: string
     direction?: string
     kind?: string
+    cursor?: string
   }>
 }
 
@@ -79,13 +80,34 @@ export default async function ListingsPage({ searchParams }: PageProps) {
     countryId,
   }
 
-  const listings = isLookingFor || isSkillTask ? [] : await getListings(filters)
-  const requests = isLookingFor && !isSkillTask
-    ? await getMarketplaceRequests({ transactionType: mode, category: params.category, query: params.q, countryId, sort: params.sort as 'newest' | 'budget_asc' | 'budget_desc' })
-    : []
-  const skillTaskPosts = isSkillTask
-    ? await getSkillTaskPublicPosts(kind as 'skill' | 'task', isLookingFor ? 'looking_for' : 'available', { query: params.q })
-    : []
+  const listingsPage = isLookingFor || isSkillTask
+    ? { items: [], nextCursor: null }
+    : await getListingsPage({ ...filters, cursor: params.cursor })
+  const requestsPage = isLookingFor && !isSkillTask
+    ? await getMarketplaceRequestsPage({ transactionType: mode, category: params.category, query: params.q, countryId, sort: params.sort as 'newest' | 'budget_asc' | 'budget_desc' | 'relevance', cursor: params.cursor })
+    : { items: [], nextCursor: null }
+  const skillTaskPage = isSkillTask
+    ? await getSkillTaskPublicPostsPage(kind as 'skill' | 'task', isLookingFor ? 'looking_for' : 'available', { query: params.q, sort: params.sort as 'newest' | 'relevance', cursor: params.cursor })
+    : { items: [], nextCursor: null }
+
+  const listings = listingsPage.items
+  const requests = requestsPage.items
+  const skillTaskPosts = skillTaskPage.items
+  const nextCursor = isSkillTask ? skillTaskPage.nextCursor : isLookingFor ? requestsPage.nextCursor : listingsPage.nextCursor
+
+  const nextPageUrl = (() => {
+    if (!nextCursor) return null
+    const usp = new URLSearchParams()
+    if (params.q) usp.set('q', params.q)
+    if (params.category) usp.set('category', params.category)
+    if (params.sort) usp.set('sort', params.sort)
+    if (params.maxPrice) usp.set('maxPrice', params.maxPrice)
+    if (params.mode) usp.set('mode', params.mode)
+    if (params.direction) usp.set('direction', params.direction)
+    if (params.kind) usp.set('kind', params.kind)
+    usp.set('cursor', nextCursor)
+    return `/listings?${usp.toString()}`
+  })()
 
   return (
     <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen">
@@ -133,7 +155,7 @@ export default async function ListingsPage({ searchParams }: PageProps) {
       {/* ── FILTER ROW ── */}
       <div className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] bg-[#FAF8F5] dark:bg-[#0F0A0A]">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-4 flex flex-wrap items-center justify-between gap-4">
-          <FilterBar />
+          <FilterBar entity={isSkillTask ? 'skill_task' : isLookingFor ? 'requests' : 'listings'} />
           <div className="flex items-center gap-3">
             {isBarter && <KindToggleContainer />}
             <DirectionToggleContainer />
@@ -190,15 +212,26 @@ export default async function ListingsPage({ searchParams }: PageProps) {
             <h2 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] mb-3">
               No listings found
             </h2>
-            <p className="text-[#6B5B55] dark:text-[#9B8B85]">
+            <p className="text-[#6B5B55] dark:text-[#9B8B85] mb-6">
               Try adjusting your filters or search terms.
             </p>
+            <Link href={`/looking-for/new${params.q ? `?title=${encodeURIComponent(params.q)}` : ''}`} className="inline-block px-5 py-2.5 rounded-full text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors">
+              Post a &quot;Looking For&quot; request instead
+            </Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-8">
             {listings.map((listing, i) => (
               <ListingCard key={listing.id} listing={listing} priority={i < 4} />
             ))}
+          </div>
+        )}
+
+        {nextPageUrl && (
+          <div className="flex justify-center mt-10">
+            <Link href={nextPageUrl} className="px-6 py-3 rounded-full text-sm font-semibold border border-[#E8E0D8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:border-[#8B1A1A] hover:text-[#8B1A1A] transition-colors">
+              Load more
+            </Link>
           </div>
         )}
       </div>
