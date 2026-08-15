@@ -6,6 +6,7 @@ import {
   IS_MOCK_MODE,
 } from '@/lib/mock/data'
 import { normalizeSearchQuery, decodeSearchCursor, encodeSearchCursor, computeSearchContextHash, isCursorValidForContext, resolveDefaultSort, type SearchCursor } from '@/lib/search/cursor'
+import { getSponsoredListingSlot, spliceSponsoredListing } from '@/lib/advertising/search-insertion'
 
 export interface ListingFilters {
   category?: string
@@ -106,6 +107,39 @@ async function attachReviewerIdentities<T extends { reviewer_id: string }>(supab
  */
 export function excludeTestListings<T extends { eq: (column: string, value: unknown) => T }>(query: T): T {
   return query.eq('is_test', false)
+}
+
+/**
+ * Advertising MVP: splices at most one sponsored listing into an
+ * already-final organic page (never touches p_limit/match_tier/
+ * match_score/cursor -- see src/lib/advertising/search-insertion.ts's
+ * own header comment for the full invariant). A no-op entirely
+ * (returns `items` unchanged) whenever ADVERTISING_ENABLED is not
+ * "true" -- organic search results are then byte-identical to before
+ * this phase, which is exactly what the permanent structural
+ * neutrality regression proves.
+ */
+async function maybeInsertSponsoredListing(supabase: SupabaseClient, items: Listing[], filters: ListingFilters): Promise<Listing[]> {
+  if (items.length === 0) return items
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const slot = await getSponsoredListingSlot(
+    supabase,
+    { mode: filters.mode, category: filters.category, countryId: filters.countryId, query: filters.query },
+    items.map((i) => i.id),
+    user?.id ?? null
+  )
+  if (!slot) return items
+
+  const merged = await spliceSponsoredListing(items, slot, async (listingId) => {
+    const { data } = await supabase.from('listings').select('*, media:listing_media(*)').eq('id', listingId).maybeSingle()
+    if (!data) return null
+    const [withMerchant] = await attachMerchantIdentities(supabase, [data])
+    return withMerchant
+  })
+  return merged as Listing[]
 }
 
 /** Convenience wrapper over getListingsPage() for callers that only need the first page (homepage featured grid, tests). */
@@ -248,13 +282,19 @@ export async function getListingsPage(filters: ListingFilters = {}): Promise<Lis
 
   const items = await attachMerchantIdentities(supabase, orderedRaw)
 
+  // Organic cursor is computed from `rankedRows` (the untouched organic
+  // RPC result) BEFORE any sponsored splice below -- ads never
+  // participate in cursor state, per the Advertising MVP's absolute
+  // organic-search invariant.
   const last = rankedRows[rankedRows.length - 1]
   const nextCursor =
     rankedRows.length === limit
       ? encodeSearchCursor({ tier: last.match_tier, score: last.match_score, price: last.price, createdAt: last.created_at, id: last.id, contextHash })
       : null
 
-  return { items, nextCursor }
+  const finalItems = await maybeInsertSponsoredListing(supabase, items, filters)
+
+  return { items: finalItems, nextCursor }
 }
 
 export async function getListing(id: string): Promise<Listing | null> {

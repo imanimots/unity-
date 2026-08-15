@@ -207,6 +207,14 @@ export interface Listing {
   category_metadata?: Record<string, unknown> | null
   merchant?: PublicProfileIdentity
   media?: ListingMedia[]
+  // Advertising MVP — presentation-layer-only fields, set exclusively by
+  // src/lib/advertising/search-insertion.ts's post-organic-ranking
+  // splice. Never persisted on the listings row itself, never read by
+  // any Search Ranking RPC, unrelated to the pre-existing Affiliate
+  // "promotional_terms"/"campaign_start_date" fields above.
+  sponsored?: true
+  adCampaignId?: string
+  adImpressionId?: string
 }
 
 export interface ListingMedia {

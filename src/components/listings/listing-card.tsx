@@ -34,8 +34,23 @@ export function ListingCard({ listing, priority = false }: ListingCardProps) {
   // src/lib/listings/rating-display.ts) — never fabricate one.
   const rating = deriveListingRatingDisplay({ averageRating: null, reviewCount: 0 })
 
+  // Advertising MVP: fire-and-forget click recording -- never blocks or
+  // delays navigation. Clicks are analytics-only (never billable), so a
+  // failed/slow beacon must never affect the user's click-through.
+  const handleSponsoredClick = () => {
+    if (!listing.sponsored || !listing.adCampaignId) return
+    fetch('/api/advertising/click', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaignId: listing.adCampaignId, impressionId: listing.adImpressionId }),
+      keepalive: true,
+    }).catch(() => {
+      // Analytics-only -- a failed click beacon never blocks the user.
+    })
+  }
+
   return (
-    <Link href={`/listings/${listing.id}`} className="group block">
+    <Link href={`/listings/${listing.id}`} className="group block" onClick={handleSponsoredClick}>
       {/* Image */}
       <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-[#F2EDE8] dark:bg-[#2A1A1A] mb-3">
         {coverImage ? (
@@ -57,6 +72,11 @@ export function ListingCard({ listing, priority = false }: ListingCardProps) {
 
         {/* Badges */}
         <div className="absolute top-3 left-3 flex gap-1.5">
+          {listing.sponsored && (
+            <span className="inline-flex items-center bg-[#1A0A0A]/90 dark:bg-white/90 backdrop-blur-sm rounded-full px-2 py-0.5 text-[11px] font-semibold text-white dark:text-[#1A0A0A] shadow-sm">
+              Sponsored
+            </span>
+          )}
           {listing.ownership_verified && (
             <span className="inline-flex items-center gap-1 bg-white/95 dark:bg-[#1A1010]/95 backdrop-blur-sm rounded-full px-2 py-0.5 text-[11px] font-medium text-[#1A0A0A] dark:text-[#F5F0ED] shadow-sm">
               <ShieldCheck size={10} className="text-green-500" /> Verified
