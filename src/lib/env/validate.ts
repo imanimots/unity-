@@ -48,6 +48,14 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env): EnvVa
   const escrowEnabledFlag = (env.ESCROW_ENABLED ?? 'false') === 'true'
   const escrowUnsafeInProduction = env.NODE_ENV === 'production' && escrowEnabledFlag
 
+  // Advertising MVP: same cross-field pattern as escrow above --
+  // ADVERTISING_BILLING_PROVIDER must never be "mock" in production
+  // while ADVERTISING_ENABLED=true (mirrors getEscrowProvider()'s own
+  // unconditional runtime guard against MockEscrowProvider in
+  // production, applied identically to the mock AdvertisingBillingProvider).
+  const advertisingEnabledFlag = (env.ADVERTISING_ENABLED ?? 'false') === 'true'
+  const advertisingUnsafeInProduction = env.NODE_ENV === 'production' && advertisingEnabledFlag
+
   const checks: EnvCheck[] = [
     check('NEXT_PUBLIC_SUPABASE_URL', env.NEXT_PUBLIC_SUPABASE_URL, { required: true }),
     check('NEXT_PUBLIC_SUPABASE_ANON_KEY', env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { required: true }),
@@ -71,6 +79,14 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env): EnvVa
       detail: escrowUnsafeInProduction
         ? 'CRITICAL: NODE_ENV=production with ESCROW_ENABLED=true cannot use "mock" — getEscrowProvider() also rejects this unconditionally at runtime (defense in depth), but no real provider is configured'
         : 'must be "mock" — TradeSafe is a proposed provider only, not yet integrated',
+    }),
+    check('ADVERTISING_ENABLED', env.ADVERTISING_ENABLED ?? 'false', { required: false, allowed: ['false', 'true'], detail: 'Advertising MVP — must stay "false" until billing, moderation, and QA are verified; while false, no campaign may be created/funded/activated and no ad is ever served' }),
+    check('ADVERTISING_BILLING_PROVIDER', env.ADVERTISING_BILLING_PROVIDER ?? 'mock', {
+      required: advertisingUnsafeInProduction,
+      allowed: advertisingUnsafeInProduction ? [] : ['mock'],
+      detail: advertisingUnsafeInProduction
+        ? 'CRITICAL: NODE_ENV=production with ADVERTISING_ENABLED=true cannot use "mock" — getAdvertisingBillingProvider() also rejects this unconditionally at runtime (defense in depth), but no real provider is configured'
+        : 'must be "mock" — no real advertising payment provider is integrated in this phase',
     }),
     check('ANTHROPIC_API_KEY', env.ANTHROPIC_API_KEY, { required: false, detail: 'AI assistant falls back to a canned response when unset' }),
     check('RESEND_API_KEY', env.RESEND_API_KEY, { required: false, detail: 'only needed when EMAIL_PROVIDER=resend' }),
