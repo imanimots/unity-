@@ -52,7 +52,7 @@ function httpCheck(label, result, assertFn) {
   assertFn(result.text, result.status, result.headers)
 }
 
-const NAMESPACES = ['common','navigation','auth','marketplace','buy','rent','barter','skills','tasks','lookingFor','rtb','advertising','merchant','errors','emails','legal']
+const NAMESPACES = ['common','navigation','auth','marketplace','buy','rent','barter','skills','tasks','lookingFor','rtb','advertising','merchant','errors','emails','legal','personalization']
 const LOCALES = ['en-ZA', 'af-ZA', 'zu-ZA']
 
 function loadMessages(locale, ns) {
@@ -87,7 +87,7 @@ console.log('\n--- DICTIONARIES ---')
   for (const loc of LOCALES) for (const ns of NAMESPACES) {
     if (!existsSync(join(REPO_ROOT, 'src/i18n/messages', loc, `${ns}.json`))) allNamespacesExist = false
   }
-  check('6. all 16 namespaces exist for all 3 locales (48 files)', allNamespacesExist)
+  check('6. all 17 namespaces exist for all 3 locales (51 files)', allNamespacesExist)
 
   let parityOk = true
   const mismatches = []
