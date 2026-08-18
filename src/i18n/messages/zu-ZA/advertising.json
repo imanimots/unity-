@@ -1,0 +1,60 @@
+{
+  "sponsoredLabel": "Kuxhaswe Ngemali",
+  "sponsoredSearchResult": "Umphumela wosesho oxhaswe ngemali",
+  "dashboard": {
+    "title": "Ukukhangisa",
+    "buySponsoredPlacement": "Thenga indawo Exhaswe Ngemali yezinhlu zakho ezifanelekile",
+    "balance": "Ibhalansi Yokukhangisa",
+    "impressions": "Ukubukwa",
+    "clicks": "Ukuchofoza",
+    "ctr": "Izinga Lokuchofoza (CTR)",
+    "backToDashboard": "Emuva ideshibhodi",
+    "loading": "Kuyalayishwa…",
+    "setupNotice": "Setha i-akhawunti yakho yokukhangisa ukuze uqale.",
+    "setupCta": "Setha i-akhawunti yokukhangisa",
+    "balanceNotice": "Kukhonyiwe kumikhankaso engalethiwe ngokugcwele. Kusetshenziswa kabusha kuphela kokukhangisa kwe-Unity kwesikhathi esizayo — akukwazi ukukhishwa njengemali.",
+    "yourCampaigns": "Imikhankaso yakho",
+    "newCampaign": "Umkhankaso omusha",
+    "noCampaigns": "Ayikho imikhankaso okwamanje.",
+    "fixedPrepaidNotice": "Amaphakheji akhokhelwe kusengaphambili anesilinganiso esimile — akukho ukukhokhiswa ngokuchofoza noma ngokubukwa."
+  },
+  "status": {
+    "draft": "Uhlaka",
+    "funded": "Kuxhasiwe",
+    "pendingReview": "Kulindeleke ukubuyekezwa",
+    "active": "Kuyasebenza",
+    "paused": "Kumisiwe",
+    "completed": "Kuqediwe",
+    "cancelled": "Kukhanselwe",
+    "rejected": "Kwenqatshiwe",
+    "suspended": "Kumiswe okwesikhashana"
+  },
+  "create": {
+    "backToAdvertising": "Emuva ekukhangiseni",
+    "heading": "Umkhankaso omusha",
+    "description": "Khetha iphakheji, khetha ukuthi yiluphi uhlu ozolukhangisa, bese usetha usuku lokuphela. Uzoxhasa umkhankaso esinyathelweni esilandelayo.",
+    "loading": "Kuyalayishwa…",
+    "noAdvertiserNotice": "Udinga i-akhawunti yokukhangisa kuqala — buyela emuva bese usetha eyodwa.",
+    "noListingsNotice": "Awukabi nazinhlu ezisebenzayo ozokhangisa okwamanje.",
+    "listingLabel": "Uhlu okuzokhangiswa",
+    "selectListingPlaceholder": "Khetha uhlu…",
+    "packageLabel": "Iphakheji",
+    "placements": {
+      "homepageBanner": "Ibhena Yekhasi Lokuqala",
+      "searchLoadingPopup": "Iphopha-ophu Yokulayisha Kosesho",
+      "promotedDeals": "Izivumelwano Ezikhushuliwe"
+    },
+    "tierSuffix": "izinga",
+    "impressionsSuffix": "ukubukwa",
+    "noPackagesNotice": "Azikho amaphakheji atholakalayo okwamanje.",
+    "tierGuaranteeNotice": "Amazinga aphakeme athola indawo eyisikhathi esiphambili, ebonakala kakhulu — iphakheji iqinisekisa kuphela isabelo sokubukwa esivunyiwe, akusoze kwaqinisekiswa ukuthengiswa noma inani lokuchofoza.",
+    "endDateLabel": "Usuku Lokuphela Komkhankaso",
+    "creating": "Kuyadalwa…",
+    "continueToFunding": "Qhubekela Ekuxhaseni Ngezimali",
+    "errors": {
+      "completeAllFields": "Sicela ugcwalise yonke insimu ngaphambi kokuqhubeka.",
+      "couldNotCreate": "Ayikwazanga ukudala umkhankaso",
+      "generic": "Kukhona okungahambanga kahle — sicela uzame futhi."
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "generic": "Something went wrong. Please try again.",
+  "notFound": "We couldn't find what you were looking for.",
+  "unauthorized": "You need to be logged in to do that.",
+  "forbidden": "You don't have permission to do that.",
+  "network": "Check your connection and try again.",
+  "validation": {
+    "required": "This field is required",
+    "titleTooShort": "Title must be at least 10 characters",
+    "titleTooLong": "Title is too long",
+    "priceMustBePositive": "Amount must be a positive value",
+    "invalidEmail": "Enter a valid email"
+  }
+}

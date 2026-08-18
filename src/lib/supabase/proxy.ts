@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { stripLocalePrefix, withLocalePrefix } from '@/i18n/locales'
 
 const SUPABASE_CONFIGURED =
   !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -16,16 +17,26 @@ const IS_MOCK_MODE = process.env.NEXT_PUBLIC_MOCK_MODE === 'true'
 const PROTECTED_PATHS = ['/dashboard', '/admin']
 const MERCHANT_ONLY_PATHS = ['/dashboard/merchant']
 
-export async function updateSession(request: NextRequest) {
-  const { pathname } = request.nextUrl
+// baseResponse, when provided, is the response next-intl's own middleware
+// already produced for this request (carrying its internal locale rewrite
+// and any NEXT_LOCALE cookie) — this function must layer auth/session
+// handling on top of it rather than constructing a fresh NextResponse, or
+// the locale resolution done upstream would be silently discarded. Never
+// passed for /api or /admin, which are exempt from locale routing entirely
+// (see src/proxy.ts) and behave exactly as before this phase.
+export async function updateSession(request: NextRequest, baseResponse?: NextResponse) {
+  const { pathname: rawPathname } = request.nextUrl
+  const { locale, path: pathname } = stripLocalePrefix(rawPathname)
+
+  const toResponse = () => baseResponse ?? NextResponse.next({ request })
 
   // Mock mode is an explicit, deliberate local-demo state — auth is
   // simulated client-side (see src/hooks/use-auth.ts), so there's no real
   // session cookie for middleware to check here. Let requests through,
   // matching how requireAdmin()/requireAuth() also bypass in mock mode.
-  if (IS_MOCK_MODE) return NextResponse.next({ request })
+  if (IS_MOCK_MODE) return toResponse()
 
-  const isProtected = PROTECTED_PATHS.some((p) => pathname.startsWith(p))
+  const isProtected = PROTECTED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
   // Not mock mode, and Supabase isn't configured: there is no way to
   // authenticate anyone. Protected paths must deny by default rather than
@@ -35,14 +46,14 @@ export async function updateSession(request: NextRequest) {
   if (!SUPABASE_CONFIGURED) {
     if (isProtected) {
       const url = request.nextUrl.clone()
-      url.pathname = '/login'
-      url.searchParams.set('redirectTo', pathname)
+      url.pathname = withLocalePrefix('/login', locale)
+      url.searchParams.set('redirectTo', rawPathname)
       return NextResponse.redirect(url)
     }
-    return NextResponse.next({ request })
+    return toResponse()
   }
 
-  let supabaseResponse = NextResponse.next({ request })
+  let supabaseResponse = toResponse()
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -54,7 +65,7 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({ request })
+          supabaseResponse = toResponse()
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           )
@@ -67,8 +78,8 @@ export async function updateSession(request: NextRequest) {
 
   if (isProtected && !user) {
     const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    url.searchParams.set('redirectTo', pathname)
+    url.pathname = withLocalePrefix('/login', locale)
+    url.searchParams.set('redirectTo', rawPathname)
     return NextResponse.redirect(url)
   }
 
@@ -77,11 +88,19 @@ export async function updateSession(request: NextRequest) {
   // src/app/(dashboard)/dashboard/merchant/layout.tsx re-verify server-side,
   // since middleware role checks can be skipped in edge runtimes or
   // misconfigured matchers and must not be the sole gate.
-  const isMerchantOnly = MERCHANT_ONLY_PATHS.some((p) => pathname.startsWith(p))
-  if (user && (pathname.startsWith('/admin') || isMerchantOnly)) {
+  //
+  // pathname here is already locale-stripped, so '/admin' only ever matches
+  // when locale resolved to the default (en-ZA) via stripLocalePrefix's
+  // fallback — correct, since /admin is never reached through the intl
+  // middleware at all (src/proxy.ts routes it through updateSession()
+  // directly, with no baseResponse, before locale stripping is even
+  // relevant to it).
+  const isMerchantOnly = MERCHANT_ONLY_PATHS.some((p) => p === pathname || pathname.startsWith(`${p}/`))
+  const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/')
+  if (user && (isAdminPath || isMerchantOnly)) {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
 
-    if (pathname.startsWith('/admin') && profile?.role !== 'admin') {
+    if (isAdminPath && profile?.role !== 'admin') {
       const url = request.nextUrl.clone()
       url.pathname = '/'
       return NextResponse.redirect(url)
@@ -89,7 +108,7 @@ export async function updateSession(request: NextRequest) {
 
     if (isMerchantOnly && profile?.role !== 'merchant' && profile?.role !== 'both') {
       const url = request.nextUrl.clone()
-      url.pathname = '/dashboard/renter'
+      url.pathname = withLocalePrefix('/dashboard/renter', locale)
       return NextResponse.redirect(url)
     }
   }

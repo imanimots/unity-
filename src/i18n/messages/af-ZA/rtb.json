@@ -1,0 +1,70 @@
+{
+  "label": "Huur-om-te-Koop",
+  "frequency": {
+    "weekly": "Weekliks",
+    "biweekly": "Twee-weekliks",
+    "monthly": "Maandeliks"
+  },
+  "instalment": "Paaiement",
+  "possessionEligible": "Kwalifiseer om besit te neem",
+  "status": {
+    "pendingMerchantAcceptance": "Wag vir handelaar se aanvaarding",
+    "awaitingFirstPayment": "Wag vir eerste betaling",
+    "active": "Aktief",
+    "defaulted": "In gebreke",
+    "returnRequired": "Teruggawe vereis",
+    "completed": "Voltooi — jy besit hierdie item",
+    "cancelled": "Gekanselleer",
+    "disputed": "In geskil"
+  },
+  "possessionStatus": {
+    "notDelivered": "Nog nie afgelewer nie",
+    "possessionEligible": "Kwalifiseer om besit te neem",
+    "customerInPossession": "In jou besit",
+    "returnRequired": "Teruggawe vereis",
+    "returnInProgress": "Teruggawe in proses",
+    "returnedToMerchant": "Teruggegee aan handelaar",
+    "recovered": "Herwin"
+  },
+  "ownershipStatus": {
+    "merchantOwned": "Die handelaar besit hierdie item",
+    "customerOwned": "Jy besit hierdie item"
+  },
+  "installmentStatus": {
+    "scheduled": "Geskeduleer",
+    "paid": "Betaal",
+    "failed": "Misluk",
+    "waived": "Kwytgeskeld"
+  },
+  "agreementsTitle": "Ooreenkomste",
+  "agreementCount": "{count, plural, one {# ooreenkoms} other {# ooreenkomste}} in totaal",
+  "noAgreements": "Nog geen ooreenkomste nie",
+  "noAgreementsDesc": "Blaai deur huur-om-te-koop-inskrywings om te begin.",
+  "browseListings": "Blaai Deur Inskrywings",
+  "item": "Item",
+  "back": "Terug",
+  "disclosureFirst": "Jy ontvang/gebruik die item na die eerste suksesvolle betaling, maar <strong>die handelaar bly die eienaar totdat die volle huur-om-te-koop-bedrag betaal is.</strong>",
+  "disclosureDefault": "Indien die ooreenkoms in gebreke bly voordat die volle huur-om-te-koop-bedrag betaal is, eindig die aankooppad en moet die item aan die handelaar terugbesorg word. Die reëling word as verhuring/gebruik hanteer vir die besitperiode.",
+  "statusLabel": "Status",
+  "possessionLabel": "Besit",
+  "ownershipLabel": "Eienaarskap",
+  "purchaseProgress": "Aankoopvordering",
+  "securityDeposit": "Sekuriteitsdeposito (nie deel van aankoopprys nie)",
+  "terminated": "Huur-om-te-koop-aankooppad beëindig",
+  "returnRequiredNotice": "Teruggawe van item vereis. Verhuringsversoeningsbeleid wag op besigheidsgoedkeuring — geen heffing is bereken nie.",
+  "paymentSchedule": "Betalingskedule",
+  "actions": {
+    "acceptAgreement": "Aanvaar ooreenkoms",
+    "decline": "Weier",
+    "cancel": "Kanselleer",
+    "payDeposit": "Betaal sekuriteitsdeposito",
+    "payInstallment": "Betaal paaiement #{sequence}",
+    "confirmHandover": "Bevestig oordrag",
+    "payOff": "Betaal oorblywende balans af",
+    "cureDefault": "Herstel gebrekestatus",
+    "requestReturn": "Versoek teruggawe"
+  },
+  "errors": {
+    "generic": "Iets het verkeerd geloop"
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "buyNow": "Koop nou",
+  "orderSummary": "Bestellingopsomming",
+  "status": {
+    "pending": "Wag vir betaling",
+    "paid": "Betaal — wag vir versending",
+    "shipped": "Verskeep",
+    "delivered": "Afgelewer",
+    "disputed": "In geskil",
+    "cancelled": "Gekanselleer"
+  },
+  "buying": "Koop",
+  "selling": "Verkoop",
+  "myPurchases": "My Aankope",
+  "sales": "Verkope",
+  "orderCount": "{count, plural, one {# bestelling} other {# bestellings}} in totaal",
+  "noPurchases": "Nog geen aankope nie",
+  "noPurchasesDesc": "Blaai deur inskrywings te koop en maak jou eerste aankoop.",
+  "browseForSale": "Blaai Deur Te Koop",
+  "noSales": "Nog geen verkope nie",
+  "toShip": "Om te verskeep",
+  "earnedDelivered": "Verdien (afgelewer)",
+  "order": "Bestelling",
+  "placed": "Geplaas {date}",
+  "unitTotal": "{quantity} × {unitPrice} · totaal {total}",
+  "actions": {
+    "payNow": "Betaal nou",
+    "markAsShipped": "Merk as verskeep",
+    "confirmReceived": "Bevestig ontvangs",
+    "cancelOrder": "Kanselleer bestelling",
+    "working": "Werk tans…",
+    "message": "Boodskap",
+    "cancelReasonPrompt": "Rede vir kansellasie (opsioneel):"
+  },
+  "checkout": {
+    "secureCheckout": "Veilige Uitbetaling",
+    "completePayment": "Voltooi betaling",
+    "backToPurchases": "Terug na aankope",
+    "order": "Bestelling",
+    "item": "Item",
+    "seller": "Verkoper",
+    "quantity": "Hoeveelheid",
+    "unitPrice": "Eenheidsprys",
+    "shipping": "Versending",
+    "total": "Totaal",
+    "paymentComplete": "Betaling voltooi",
+    "orderIsPaid": "Bestelling {reference} is betaal.",
+    "testScenarioLabel": "Toetsscenario",
+    "testScenarios": {
+      "success": "Suksesvolle betaling",
+      "declined": "Betaling geweier",
+      "retryable_failure": "Tydelike fout (herhaalbaar)",
+      "terminal_failure": "Finale fout",
+      "timeout": "Verskaffer-tydsverstryking / onsekere reaksie"
+    },
+    "agreeToTerms": "Ek stem in tot die <terms>Betaling- en Depositobeleid</terms> en <refunds>Terugbetalingsbeleid</refunds>, en verstaan dat dit toetsmodus is — geen werklike geld sal gehef word nie.",
+    "payAmount": "Betaal {amount}",
+    "processing": "Verwerk tans…",
+    "networkError": "Netwerkfout — probeer asseblief weer",
+    "couldNotComplete": "Uitbetaling kon nie voltooi word nie"
+  },
+  "buyFlow": {
+    "backToListing": "Terug na inskrywing",
+    "buyNowTitle": "Koop Nou",
+    "each": "{amount} elk",
+    "available": "{count} beskikbaar",
+    "quantity": "Hoeveelheid",
+    "total": "Totaal",
+    "placingOrder": "Plaas bestelling…",
+    "continueToPayment": "Gaan voort na betaling — {amount}",
+    "couldNotPlaceOrder": "Kon nie jou bestelling plaas nie",
+    "networkErrorRetry": "Netwerkfout — probeer asseblief weer"
+  },
+  "saleCard": {
+    "forSale": "Te koop",
+    "soldOut": "Uitverkoop",
+    "available": "{count} beskikbaar",
+    "buyNow": "Koop Nou",
+    "secureCheckoutNotice": "Veilige uitbetaling — toetsmodus, geen werklike geld gehef nie"
+  }
+}

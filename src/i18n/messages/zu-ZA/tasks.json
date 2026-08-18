@@ -1,0 +1,12 @@
+{
+  "label": "Umsebenzi",
+  "description": "Umsebenzi umsebenzi owenzelwa omunye umuntu.",
+  "available": {
+    "badge": "Umsebenzi Otholakalayo",
+    "summary": "Ngingawenza lo msebenzi"
+  },
+  "lookingFor": {
+    "badge": "Umsebenzi Ofunwayo",
+    "summary": "Ngidinga lo msebenzi wenziwe"
+  }
+}

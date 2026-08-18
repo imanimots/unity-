@@ -1,0 +1,14 @@
+{
+  "generic": "Kukhona okungahambanga kahle. Sicela uzame futhi.",
+  "notFound": "Asikutholanga lokho okufunayo.",
+  "unauthorized": "Kudingeka ungene ku-akhawunti ukwenza lokho.",
+  "forbidden": "Awunayo imvume yokwenza lokho.",
+  "network": "Hlola uxhumo lwakho bese uzama futhi.",
+  "validation": {
+    "required": "Le nkambu iyadingeka",
+    "titleTooShort": "Isihloko kufanele sibe okungenani izinhlamvu ezi-10",
+    "titleTooLong": "Isihloko side kakhulu",
+    "priceMustBePositive": "Isamba kufanele sibe inani elingaphezu kuka-0",
+    "invalidEmail": "Faka ikheli le-imeyili elisebenzayo"
+  }
+}

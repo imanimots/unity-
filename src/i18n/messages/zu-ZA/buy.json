@@ -1,0 +1,81 @@
+{
+  "buyNow": "Thenga manje",
+  "orderSummary": "Isifinyezo se-oda",
+  "status": {
+    "pending": "Kulindwe inkokhelo",
+    "paid": "Kukhokhiwe — kulindwe ukuthunyelwa",
+    "shipped": "Kuthunyelwe",
+    "delivered": "Kulethiwe",
+    "disputed": "Kuphikiswa",
+    "cancelled": "Kukhanseliwe"
+  },
+  "buying": "Ukuthenga",
+  "selling": "Ukuthengisa",
+  "myPurchases": "Izinto Engizithengile",
+  "sales": "Ukuthengisa",
+  "orderCount": "{count, plural, one {# i-oda} other {# ama-oda}} sisonke",
+  "noPurchases": "Awukho okuthengiwe okwamanje",
+  "noPurchasesDesc": "Phequlula izinto ezifakwe ukuze uzithengise futhi wenze ukuthenga kwakho kokuqala.",
+  "browseForSale": "Phequlula Ezithengiswayo",
+  "noSales": "Akukho okuthengisiwe okwamanje",
+  "toShip": "Okuzothunyelwa",
+  "earnedDelivered": "Okutholiwe (okulethiwe)",
+  "order": "I-oda",
+  "placed": "Kufakwe {date}",
+  "unitTotal": "{quantity} × {unitPrice} · isamba {total}",
+  "actions": {
+    "payNow": "Khokha manje",
+    "markAsShipped": "Phawula njengokuthunyelwe",
+    "confirmReceived": "Qinisekisa ukutholwa",
+    "cancelOrder": "Khansela i-oda",
+    "working": "Kuyasebenza…",
+    "message": "Umlayezo",
+    "cancelReasonPrompt": "Isizathu sokukhansela (kungakhethwa):"
+  },
+  "checkout": {
+    "secureCheckout": "Ukukhokha Okuphephile",
+    "completePayment": "Qedela inkokhelo",
+    "backToPurchases": "Emuva ekuthengeni",
+    "order": "I-oda",
+    "item": "Into",
+    "seller": "Umthengisi",
+    "quantity": "Inani",
+    "unitPrice": "Inani ngayinye",
+    "shipping": "Ukuthunyelwa",
+    "total": "Isamba",
+    "paymentComplete": "Inkokhelo iqediwe",
+    "orderIsPaid": "I-oda {reference} likhokhiwe.",
+    "testScenarioLabel": "Isimo sokuhlola",
+    "testScenarios": {
+      "success": "Inkokhelo ephumelele",
+      "declined": "Inkokhelo yenqatshiwe",
+      "retryable_failure": "Ukwehluleka kwesikhashana (kungazanywa futhi)",
+      "terminal_failure": "Ukwehluleka okugcinayo",
+      "timeout": "Isikhathi sokulinda somhlinzeki / impendulo engaqinisekile"
+    },
+    "agreeToTerms": "Ngiyavuma <terms>Inqubomgomo Yenkokhelo Nedephozithi</terms> ne-<refunds>Nqubomgomo Yembuyiselo</refunds>, futhi ngiyaqonda ukuthi lena imodi yokuhlola — akukho mali yangempela ezokhokhwa.",
+    "payAmount": "Khokha {amount}",
+    "processing": "Kuyacutshungulwa…",
+    "networkError": "Iphutha lenethiwekhi — sicela uzame futhi",
+    "couldNotComplete": "Ukukhokha akukwazanga ukuqedwa"
+  },
+  "buyFlow": {
+    "backToListing": "Emuva esintweni esifakiwe",
+    "buyNowTitle": "Thenga Manje",
+    "each": "{amount} ngayinye",
+    "available": "{count} kuyatholakala",
+    "quantity": "Inani",
+    "total": "Isamba",
+    "placingOrder": "Kufakwa i-oda…",
+    "continueToPayment": "Qhubeka ekukhokheni — {amount}",
+    "couldNotPlaceOrder": "Asikwazanga ukufaka i-oda lakho",
+    "networkErrorRetry": "Iphutha lenethiwekhi — sicela uzame futhi"
+  },
+  "saleCard": {
+    "forSale": "Kuyathengiswa",
+    "soldOut": "Kudayisiwe konke",
+    "available": "{count} kuyatholakala",
+    "buyNow": "Thenga Manje",
+    "secureCheckoutNotice": "Ukukhokha okuphephile — imodi yokuhlola, akukho mali yangempela ekhokhiwe"
+  }
+}

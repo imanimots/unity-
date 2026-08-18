@@ -1,0 +1,14 @@
+{
+  "generic": "Iets het verkeerd geloop. Probeer asseblief weer.",
+  "notFound": "Ons kon nie vind wat jy soek nie.",
+  "unauthorized": "Jy moet aangemeld wees om dit te doen.",
+  "forbidden": "Jy het nie toestemming om dit te doen nie.",
+  "network": "Kontroleer jou internetverbinding en probeer weer.",
+  "validation": {
+    "required": "Hierdie veld is verpligtend",
+    "titleTooShort": "Titel moet ten minste 10 karakters wees",
+    "titleTooLong": "Titel is te lank",
+    "priceMustBePositive": "Bedrag moet 'n positiewe waarde wees",
+    "invalidEmail": "Voer 'n geldige e-posadres in"
+  }
+}

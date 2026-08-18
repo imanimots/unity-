@@ -1,0 +1,703 @@
+{
+  "dashboard": "Ideshibhodi Yomthengisi",
+  "listAnItem": "Faka Into Ohlwini",
+  "earningsOverview": "Uhlolojikelele Lwemali Etholakele",
+  "pendingRequests": "Izicelo Zokubhukha Ezilindile",
+  "subscription": {
+    "starter": "Isiqalo",
+    "pro": "I-Pro",
+    "elite": "I-Elite"
+  },
+  "commissions": "Amakhomishini",
+  "commissionStatus": {
+    "pending": "Kulindile",
+    "held": "Kubuyekezwa",
+    "earned": "Kuqedwe",
+    "adjusted": "Kulungisiwe",
+    "voided": "Kuchithiwe (kubuyiselwe imali)"
+  },
+  "payouts": "Izinkokhelo",
+  "affiliate": {
+    "acceptAffiliates": "Yamukela Abahlanganyeli",
+    "commissionRate": "Izinga Lekhomishini"
+  },
+  "home": {
+    "welcomeBack": "Siyakwamukela emuva, {name}",
+    "heading": "Ideshibhodi Yomthengisi",
+    "listAnItem": "Faka Into Ohlwini",
+    "kycBanner": {
+      "title": "Qedela i-KYC ukuze ushicilele izinto ohlwini",
+      "message": "Ukuqinisekiswa kobunikazi kuyadingeka ngaphambi kokuba into yakho yokuqala ohlwini iqale ukusebenza.",
+      "cta": "Qinisekisa Manje"
+    },
+    "earnings": {
+      "sectionLabel": "Imali Etholakele",
+      "totalEarned": "Isamba Esitholakele — Ukuqashiswa Okuqediwe",
+      "viewPayouts": "Bona izinkokhelo"
+    },
+    "stats": {
+      "activeListings": "Izinto Ezisebenzayo Ohlwini",
+      "pendingRequests": "Izicelo Ezilindile",
+      "unityScore": "Amaphuzu e-Unity"
+    },
+    "recentBookings": {
+      "sectionLabel": "Ukubhukha Kwakamuva",
+      "heading": "Izicelo Zokubhukha",
+      "viewAll": "Bona konke",
+      "emptyTitle": "Azikho izicelo ezilindile",
+      "emptyDesc": "Dala into ohlwini ukuze uqale ukuthola izicelo zokubhukha.",
+      "createFirst": "Dala Into Yakho Yokuqala Ohlwini",
+      "legacyStatus": {
+        "pending": "Kulindile",
+        "approved": "Kuvunyiwe",
+        "active": "Kuyasebenza",
+        "returned": "Kubuyisiwe",
+        "disputed": "Kuphikisiwe",
+        "cancelled": "Kukhanseliwe"
+      }
+    },
+    "yourListings": {
+      "sectionLabel": "Izinto Zakho Ohlwini",
+      "heading": "Izinto Zami Ohlwini",
+      "manage": "Phatha",
+      "emptyTitle": "Azikho izinto ohlwini okwamanje",
+      "emptyDesc": "Faka into ohlwini futhi uqale ukuzuza kulokho okunakho."
+    },
+    "quickLinks": {
+      "sectionLabel": "Izixhumanisi Ezisheshayo",
+      "payouts": "Izinkokhelo",
+      "payoutsDesc": "Imali etholakele nokukhishwa",
+      "commission": "Ikhomishini ye-Unity",
+      "commissionDesc": "Lokho i-Unity ekukhokhisayo",
+      "affiliates": "Abahlanganyeli",
+      "affiliatesDesc": "Amakhomishini okudlulisela",
+      "subscription": "Ukubhalisela"
+    },
+    "planStarter": "Isiqalo · Kuze kufike ku-5 izinto ohlwini",
+    "planUnlimited": "I-{plan} · Izinto ohlwini ezingenamkhawulo",
+    "planLimited": "I-{plan} · Kuze kufike ku-{count} izinto ohlwini"
+  },
+  "payoutsPage": {
+    "sectionLabel": "Imali Etholakele",
+    "heading": "Izinkokhelo",
+    "back": "Emuva",
+    "totalPaid": "Isamba Esikhokhiwe",
+    "manualNotice": "Kubhalwe ngesandla yi-Unity — akukho msebenzisi ozenzakalelayo oxhunyiwe",
+    "pending": "Kulindile",
+    "processing": "Kuyacutshungulwa",
+    "failed": "Kwehlulekile",
+    "historyLabel": "Umlando Wezinkokhelo",
+    "loading": "Kuyalayishwa…",
+    "emptyTitle": "Azikho izinkokhelo okwamanje",
+    "emptyDesc": "Inkokhelo idalwa ngokuzenzakalela uma ukuqashiswa sekuqediwe.",
+    "defaultTitle": "Inkokhelo yokuqashiswa",
+    "reference": "Inkomba: {reference}",
+    "status": {
+      "pending": "Kulindile",
+      "processing": "Kuyacutshungulwa",
+      "paid": "Kukhokhiwe",
+      "failed": "Kwehlulekile"
+    },
+    "statusExplanations": {
+      "pending": "I-Unity idale irekhodi lakho lenkokhelo. Alikakaqali ukucutshungulwa.",
+      "processing": "I-Unity icutshungula le nkokhelo okwamanje. Akukho msebenzisi wenkokhelo ozenzakalelayo oxhunyiwe okwamanje.",
+      "paid": "I-Unity irekhode le nkokhelo njengekhokhiwe.",
+      "failed": "Le nkokhelo ayikwazanga ukuqedwa. I-Unity izoyibuyekeza noma izame futhi."
+    },
+    "footerNotice": "Izinkokhelo zirekhodwa ngesandla yi-Unity ngenkathi kungekho msebenzisi wenkokhelo ozenzakalelayo oxhunyiwe.",
+    "contactSupport": "Xhumana nosizo"
+  },
+  "affiliateProgram": {
+    "sectionLabel": "Uhlelo Lokudlulisela",
+    "back": "Emuva",
+    "becomeAffiliate": {
+      "heading": "Yiba Umhlanganyeli",
+      "description": "Zuza ikhomishini ekuqashiseni nasekuthengisweni okuqediwe okudlulise kona, kuphela ezintweni ohlwini umthengisi azivumele ngokukhethekile. Ukushintshanisa akusoze kuzuze ikhomishini.",
+      "noApproval": "Akudingeki mvume — yenza isebenze ngokushesha uqale ukuzuza namuhla.",
+      "shareLinks": "Yabelana ngezixhumanisi",
+      "shareLinksDesc": "yanoma yiluphi uhlu oluvumela abahlanganyeli",
+      "earnCommission": "Zuza ikhomishini",
+      "earnCommissionDesc": "ekuthengisweni noma ekuqashiseni okufanelekile okuqediwe",
+      "trackEarnings": "Landelela imali etholakele",
+      "trackEarningsDesc": "ku-dashboard yakho yomhlanganyeli",
+      "activating": "Kuyasetshenziswa…",
+      "cta": "Yiba Umhlanganyeli"
+    },
+    "heading": "Uhlelo Lomhlanganyeli",
+    "yourCode": "Ikhodi Yakho Yomhlanganyeli",
+    "copied": "Kukotshelwe!",
+    "copyCode": "Kopisha Ikhodi",
+    "browseListings": "Phequlula izinto ohlwini",
+    "codeNotice": "Phequlula izinto ohlwini ezivumela abahlanganyeli ngezansi bese ukopisha isixhumanisi sakho sokwabelana — ikhomishini itholwa kuphela ezintweni ohlwini umthengisi aziyivumele, futhi akusoze kwenzeke ekushintshaniseni.",
+    "totalPaid": "Isamba Esikhokhiwe",
+    "inProgress": "Kuyaqhubeka",
+    "commissionsCount": "Amakhomishini",
+    "enabledListings": "Izinto Ohlwini Ezivumela Abahlanganyeli",
+    "loading": "Kuyalayishwa…",
+    "noEnabledListings": "Azikho izinto ohlwini okwamanje ezivumela abahlanganyeli.",
+    "commissionRatePct": "Ikhomishini engu-{rate}%",
+    "copyLink": "Kopisha isixhumanisi",
+    "commissionHistory": "Umlando Wekhomishini",
+    "all": "Konke",
+    "noCommissionsInCategory": "Azikho amakhomishini kulesi sigaba okwamanje.",
+    "table": {
+      "listing": "Into Ohlwini",
+      "type": "Uhlobo",
+      "commission": "Ikhomishini",
+      "status": "Isimo"
+    },
+    "footerNotice": "Amakhomishini acutshungulwa ngokuzenzakalela ngemuva kwesikhathi esifushane sokubuyekeza.",
+    "contactSupport": "Xhumana nosizo",
+    "commissionStatus": {
+      "pending": "Kulindile ukubuyekezwa",
+      "held": "Kubanjiwe",
+      "approved": "Kuvunyiwe",
+      "payout_queued": "Inkokhelo isohlwini lokulinda",
+      "processing": "Inkokhelo iyacutshungulwa",
+      "paid": "Kukhokhiwe",
+      "failed": "Inkokhelo yehlulekile",
+      "voided": "Kuchithiwe",
+      "reversed": "Kuguqulwe"
+    }
+  },
+  "affiliateManagement": {
+    "sectionLabel": "Uhlelo Lokudlulisela",
+    "back": "Emuva",
+    "heading": "Abahlanganyeli",
+    "infoNotice": "Vumela abahlanganyeli ngokwento ngayinye ohlwini ngezansi. Ikhomishini ikhokhiswa kuphela ekuthengisweni noma ezinkokhelweni zokuqashisa ezifanelekile ezaqediwe — akusoze kwenzeke kuzibambiso, izimbuyiselo, noma ukushintshaniswa. Izinkokhelo zabahlanganyeli ziphathwa ngokuzenzakalela yi-Unity egameni lakho.",
+    "attributedCustomers": "Amakhasimende Adluliselwe",
+    "costPaid": "Izindleko Zekhomishini — Ekhokhiwe",
+    "costInProgress": "Izindleko Zekhomishini — Kuyaqhubeka",
+    "loading": "Kuyalayishwa…",
+    "noListings": "Awukabi nazinto ohlwini okwamanje.",
+    "table": {
+      "listing": "Into Ohlwini",
+      "rate": "Izinga",
+      "attributed": "Kudluliselwe",
+      "sales": "Ukuthengisa",
+      "rentals": "Ukuqashisa",
+      "costPaid": "Izindleko ezikhokhiwe",
+      "costPending": "Izindleko ezilindile",
+      "enabled": "Kuvunyelwe"
+    },
+    "enabled": "Kuvunyelwe",
+    "disabled": "Akuvunyelwe",
+    "footerNotice": "Izinga lekhomishini leyunithi ngayinye ohlwini lisethwa kusihleli sohlu.",
+    "learnMore": "Funda kabanzi ngohlelo lwe-Ambassador →",
+    "errorLoad": "Ayikwazanga ukulayisha izinto zakho ohlwini"
+  },
+  "rtbTerms": {
+    "heading": "Imigomo Yokuqasha-Ukuze-Uthenge",
+    "back": "Emuva",
+    "enabledNotice": "Ukuqasha-ukuze-uthenge kuvunyelwe kule nto ohlwini.",
+    "disabledNotice": "Ukuqasha-ukuze-uthenge akukavunyelwa kule nto ohlwini.",
+    "ownershipNotice": "Uhlala ungumnikazi wento kuze kube yilapho ikhasimende likhokhe isamba esigcwele ngezansi.",
+    "loading": "Kuyalayishwa…",
+    "termsSaved": "Imigomo igciniwe.",
+    "totalPurchasePrice": "Intengo ephelele yokuqasha-ukuze-uthenge (ZAR)",
+    "installmentAmount": "Isamba sesitalimenti (ZAR)",
+    "installmentCount": "Inani lezitalimenti",
+    "paymentFrequency": "Ukuphindaphinda kwenkokhelo",
+    "securityDeposit": "Isibambiso sokuphepha (ZAR, kungakhethwa — akusoze sibalwe entengweni)",
+    "allowEarlyPayoff": "Vumela ikhasimende likhokhe imali esele ngaphambi kwesikhathi",
+    "allowCure": "Vumela ikhasimende ukulungisa ukwehluleka nokuqhubeka nesivumelwano",
+    "saveAndEnable": "Gcina bese uyavumela",
+    "saveAsDisabled": "Gcina njengokungavunyelwe",
+    "errors": {
+      "couldNotSave": "Ayikwazanga ukugcina imigomo"
+    }
+  },
+  "pricing": {
+    "sectionLabel": "Amaqhinga Omthengisi",
+    "heading": "Amanani alula, acacile",
+    "subheading": "Akukho mali yenyanga yokuqala. Nyusa noma nini ukuze uthole amazinga aphansi ekhomishini nezinto ohlwini ezingenamkhawulo. Ukushintshaniswa akusoze kube khona ikhomishini, kunoma yiluphi uhlelo.",
+    "currentPlan": "Uhlelo lwakho lwamanje",
+    "free": "Simahla",
+    "perMonth": "/inyanga",
+    "salesCommission": "Ikhomishini engu-{rate} ekuthengisweni",
+    "rentalCommission": "Ikhomishini engu-{rate} ekuqashiseni",
+    "noBarterCommission": "Akukho khomishini ekushintshaniseni",
+    "upToListings": "Kuze kufike ku-{count} izinto ohlwini ezisebenzayo",
+    "unlimitedListings": "Izinto ohlwini ezisebenzayo ezingenamkhawulo",
+    "managePlan": "Phatha uhlelo",
+    "changePlan": "Shintsha uhlelo",
+    "getStarted": "Qala manje",
+    "footerNotice": "Ikhomishini ikhokhiswa kuphela ekuthengisweni nasekuqashiseni okuqediwe. Ukwehliswa nokukhanselwa kusebenza ekuqaleni kwesikhathi sakho sokukhokha esilandelayo; ukunyuswa kusebenza ngokushesha.",
+    "unavailable": "Amanani awatholakali okwamanje."
+  },
+  "ambassadors": {
+    "metaTitle": "Uhlelo Lwe-Ambassador — Unity",
+    "metaDescription": "Zuza ikhomishini ngokudlulisela abaqashi abasha nabathengisi ku-Unity.",
+    "earnWithUnity": "ZUZA NGE-UNITY",
+    "headingLine1": "YIBA",
+    "headingLine2": "I-AMBASSADOR.",
+    "heroDescription": "Dlulisela abathengisi kuplatifomu ye-Unity futhi uzuze ikhomishini kukho konke ukuqashiswa abakuqedayo — inqobo nje uma belokhu behlala nathi.",
+    "joinViaWarp": "Joyina nge-Warp",
+    "noCostNotice": "Akukho zindleko zokujoyina · Izinkokhelo njalo ngenyanga nge-Warp",
+    "stats": {
+      "maxCommission": "Izinga eliphezulu lekhomishini",
+      "payoutSchedule": "Ishejuli yenkokhelo",
+      "payoutScheduleValue": "Njalo ngenyanga",
+      "trackingLabel": "Ukulandelela ezintweni ezidlulisiwe ohlwini",
+      "trackingValue": "Impilo yonke"
+    },
+    "processLabel": "INQUBO",
+    "howItWorksHeading": "Kusebenza kanjani",
+    "steps": {
+      "apply": {
+        "title": "Faka isicelo nge-Warp",
+        "desc": "Bhalisa ngomlingani wethu wokuhlanganyela i-Warp. Azikho izindleko zokuqala, akukho sibopho."
+      },
+      "getLink": {
+        "title": "Thola isixhumanisi sakho",
+        "desc": "Thola isixhumanisi esiyingqayizivele sokudlulisela ongasabelana ngaso noma kuphi — kwezokuxhumana, i-WhatsApp, i-imeyili."
+      },
+      "refer": {
+        "title": "Dlulisela abathengisi",
+        "desc": "Abathengisi ababhalisa ngesixhumanisi sakho futhi bafake izinto ohlwini balandelelwa ngokuzenzakalela."
+      },
+      "earn": {
+        "title": "Zuza ikhomishini",
+        "desc": "Thola iphesenti kukho konke ukuqashiswa okuqediwe okwenziwe ngezinto ohlwini ozidlulisile."
+      }
+    },
+    "commissionStructureLabel": "ISAKHIWO SEKHOMISHINI",
+    "earnMoreHeading": "Zuza kakhulu njengoba ukhula.",
+    "tierBasisNotice": "Izinga lakho lisekelwe kunani labathengisi abasebenzayo obadlulisele. Ukunyuswa kwezinga kwenzeka ngokuzenzakalela.",
+    "mostPopular": "Okuthandwa kakhulu",
+    "activeReferrals": "abadluliseli abasebenzayo",
+    "commissionSuffix": "ikhomishini",
+    "tiers": {
+      "starter": {
+        "name": "Isiqalo",
+        "referrals": "1–4",
+        "commission": "5%",
+        "perks": [
+          "Isixhumanisi sakho siqu sokudlulisela",
+          "Izinkokhelo zekhomishini njalo ngenyanga",
+          "Uphawu lwe-Ambassador kuphrofayela"
+        ]
+      },
+      "growth": {
+        "name": "Ukukhula",
+        "referrals": "5–19",
+        "commission": "8%",
+        "perks": [
+          "Konke okuku-Isiqalo",
+          "Ukusekelwa okuqala kuqala",
+          "Ukufinyelela kusengaphambili ezicini ezintsha",
+          "Isikhwama sebhonasi sekota"
+        ]
+      },
+      "elite": {
+        "name": "I-Elite",
+        "referrals": "20+",
+        "commission": "12%",
+        "perks": [
+          "Konke okuku-Ukukhula",
+          "Umphathi wakho we-akhawunti",
+          "Amathuba okumaketha ndawonye",
+          "Isimemo somhlangano wonyaka"
+        ]
+      }
+    },
+    "requirementsLabel": "IZIDINGO",
+    "eligibilityHeading": "Ukufaneleka",
+    "eligibility": [
+      "Kufanele ube umsebenzisi obhalisiwe we-Unity one-KYC eqinisekisiwe",
+      "Uhlala ezweni lapho i-Unity isebenza khona",
+      "Vuma imigomo yesivumelwano se-Warp",
+      "Awukwazi ukuzidlulisela wena noma abathengisi be-Unity abakhona",
+      "Akukho umlando wokweqa imithetho yeplatifomu noma ukuphikisana"
+    ],
+    "idealForLabel": "KUFANELE",
+    "whoThrivesHeading": "Ngobani abaphumelela",
+    "whoThrives": {
+      "communityBuilders": {
+        "title": "Abakhi bomphakathi",
+        "desc": "Abaphathi be-WhatsApp, abanikazi bamaqembu e-Facebook, abahleli bemicimbi yendawo."
+      },
+      "contentCreators": {
+        "title": "Abadali bokuqukethwe",
+        "desc": "Ababhali bebhulogi, ama-YouTuber, nabathonyi bezokuxhumana kwezindlela zokuphila noma zangaphandle."
+      },
+      "networks": {
+        "title": "Amanethiwekhi",
+        "desc": "Izinhlangano zamabhizinisi, izindawo zokusebenzela ndawonye, noma abahleli bomnotho wasemalokishini."
+      }
+    },
+    "getStartedLabel": "QALA MANJE",
+    "readyHeading": "Ukulungele ukuqala ukuzuza?",
+    "readyDesc": "Izicelo zithatha imizuzu engaphansi kwesi-5. Uma i-Warp isivumile, isixhumanisi sakho sokudlulisela siyasebenza masinyane.",
+    "applyNowViaWarp": "Faka isicelo manje nge-Warp",
+    "alreadyAmbassador": "Usuvele uyi-ambassador? Bona ideshibhodi yakho →"
+  },
+  "skillTaskPosts": {
+    "heading": "Amakhono & Imisebenzi",
+    "newPost": "Ukuthunyelwa okusha",
+    "emptyTitle": "Azikho okuthunyelwa Kwekhono/Umsebenzi okwamanje",
+    "emptyDesc": "Nikeza ikhono, cela usizo ngomsebenzi, noma uthole umuntu ozoshintshaniswa naye.",
+    "untitledDraft": "Uhlaka olungenasihloko",
+    "view": "Bona",
+    "edit": "Hlela",
+    "offers": "Iminikelo",
+    "actions": {
+      "pause": "Misa okwesikhashana",
+      "resume": "Qhubeka",
+      "close": "Vala",
+      "archive": "Faka emlandweni",
+      "repost": "Thumela futhi",
+      "working": "Kuyasetshenziswa…"
+    },
+    "errors": {
+      "actionFailed": "Isenzo sehlulekile",
+      "actionFailedRetry": "Isenzo sehlulekile — sicela uzame futhi"
+    }
+  },
+  "listingCreation": {
+    "heading": "Dala uhlu",
+    "stepProgress": "Isinyathelo {current} kwezingu-{total} — {desc}",
+    "steps": {
+      "type": {
+        "title": "Uhlobo",
+        "desc": "Thengisa, qashisa, noma kokubili"
+      },
+      "basics": {
+        "title": "Okuyisisekelo",
+        "desc": "Isihloko, isigaba nesimo"
+      },
+      "photos": {
+        "title": "Izithombe",
+        "desc": "Okungenani izithombe ezi-3 zento"
+      },
+      "ownership": {
+        "title": "Ubunikazi",
+        "desc": "Ubufakazi bobunikazi"
+      },
+      "pricing": {
+        "title": "Amanani",
+        "desc": "Amazinga, umshuwalensi nokuthunyelwa"
+      },
+      "requirements": {
+        "title": "Izidingo",
+        "desc": "Isibambiso nezimfuneko zomqashi"
+      },
+      "affiliates": {
+        "title": "Abahlanganyeli",
+        "desc": "Uhlelo lokudlulisela"
+      },
+      "review": {
+        "title": "Ukubuyekeza",
+        "desc": "Qinisekisa bese ushicilela"
+      }
+    },
+    "continue": "Qhubeka",
+    "back": "Emuva",
+    "optional": "(kungakhethwa)",
+    "toasts": {
+      "draftSaved": "Uhlaka lugciniwe",
+      "submitted": "Uhlu luthunyelwe ukuze lubuyekezwe"
+    },
+    "type": {
+      "sellLabel": "THENGISA",
+      "sellDesc": "Ukuthenga kwesikhathi esisodwa — umthengi ukhokha kanye bese egcina into.",
+      "rentLabel": "QASHISA",
+      "rentDesc": "Abaqashi bakhokhela isikhathi esithile bese bebuyisela into ngemuva.",
+      "bothLabel": "KOKUBILI",
+      "bothDesc": "Yifake ohlwini yokuqashisa nokuthengisa ngesikhathi esifanayo."
+    },
+    "basics": {
+      "itemTitle": "Isihloko sento",
+      "itemTitlePlaceholder": "isb. I-DJI Mavic 3 Pro Drone + Amasiferi we-ND",
+      "category": "Isigaba",
+      "categorySelectPlaceholder": "Khetha isigaba…",
+      "categoryDetailsHeading": "Imininingwane ye-{category}",
+      "keptPrivateNotice": "Kugcinwa kuyimfihlo — akusoze kuboniswe ohlwini lomphakathi",
+      "condition": "Isimo",
+      "conditionNew": "🆕 Kusha",
+      "conditionLikeNew": "✨ Njengokusha",
+      "conditionGood": "👍 Kuhle",
+      "conditionFair": "👌 Kulungile",
+      "description": "Incazelo",
+      "descriptionPlaceholder": "Chaza into yakho — okufakiwe, isimo sayo, izinto ezengeziwe, nanoma yini umqashi okufanele ayazi…",
+      "charCount": "{count} / izinhlamvu ezingu-50+",
+      "replacementValue": "Inani lokubuyisela (R)",
+      "quantityAvailable": "Inani elitholakalayo",
+      "province": "Isifundazwe",
+      "provincePlaceholder": "isb. Gauteng",
+      "city": "Idolobha",
+      "cityPlaceholder": "isb. Johannesburg",
+      "categoryDetailsRequired": "Sicela ugcwalise yonke imininingwane ye-{category}.",
+      "errors": {
+        "titleTooShort": "Isihloko kufanele sibe okungenani izinhlamvu ezi-10",
+        "categoryRequired": "Sicela ukhethe isigaba",
+        "conditionRequired": "Sicela ukhethe isimo",
+        "descriptionTooShort": "Incazelo kufanele ibe okungenani izinhlamvu ezingu-50",
+        "required": "Kuyadingeka",
+        "replacementValueRequired": "Faka inani lokubuyisela lento"
+      },
+      "genericSelectPlaceholder": "Khetha…"
+    },
+    "photos": {
+      "heading": "Izithombe zento (okungenani ezi-3)",
+      "desc": "Layisha izithombe ezicacile ezivela ezindaweni ezahlukene. Isithombe sokuqala siyisithombe sesembozo — sebenzisa inkinobho yenkanyezi ukuze usishintshe.",
+      "dropzoneTitle": "Chofoza ukuze ulayishe noma udonse futhi uyeke",
+      "dropzoneHint": "I-JPG, PNG, WEBP — kuze kufike ku-10MB ngasinye",
+      "cover": "Isembozo",
+      "makePrimary": "Yenza kube okuyinhloko",
+      "moveEarlier": "Hambisa ngaphambili",
+      "moveLater": "Hambisa ngemuva",
+      "remove": "Susa",
+      "existingPhotoAlt": "Isithombe esikhona {index}",
+      "newPhotoAlt": "Isithombe esisha {index}",
+      "addMore": "Engeza okwengeziwe",
+      "damagePhotoNotice": "Esinye sezithombe ngenhla sikhombisa ngokucacile umonakalo/iziphutha ezachazwa ngaphambili — kuyadingeka njengoba iziphutha zichaziwe.",
+      "errors": {
+        "minPhotos": "Sicela ulayishe okungenani izithombe ezi-3",
+        "damagePhotoRequired": "Isithombe esiseduze somonakalo siyadingeka njengoba iziphutha zichazwe esinyathelweni esidlule"
+      }
+    },
+    "ownership": {
+      "whyHeading": "Kungani sidinga lokhu?",
+      "whyBody": "Ubufakazi bobunikazi buvikela wena nabaqashi. Kubuyekezwa yi-Unity ngaphakathi kwamahora angu-24. Okwamukelekile: irisidi yokuthenga, isithombe senombolo yohlelo, ikhadi lesiqinisekiso, noma ividiyo emfushane yento.",
+      "proofLabel": "Ubufakazi bobunikazi",
+      "existingProofTitle": "Ubufakazi obukhona obulotshiwe",
+      "existingProofDesc": "Chofoza ngezansi ukuze ubushintshe",
+      "replace": "Shintsha",
+      "dropzoneTitle": "Chofoza ukuze ulayishe",
+      "dropzoneHint": "I-JPG, PNG, PDF, MP4 — kuze kufike ku-50MB",
+      "knownDefectsLabel": "Iziphutha noma umonakalo owaziwayo",
+      "knownDefectsLabelHint": "(shiya kungabhaliwe uma kungekho)",
+      "knownDefectsPlaceholder": "Chaza noma yimuphi umonakalo okhona, ukugugeka, noma izingxenye ezingekho okufanele umqashi azazi…",
+      "knownDefectsNotice": "I-Unity ayivumeli ukufihla iziphutha ezaziwayo — izinto ezaziswe zisaqashiswa, ezingaziswanga zisengcupheni yokuphikisana.",
+      "confirmLabel": "Ngiyaqinisekisa ukuthi isimo neziphutha ezichaziwe ziyiqiniso.",
+      "errors": {
+        "proofRequired": "Sicela ulayishe ubufakazi bobunikazi",
+        "confirmRequired": "Sicela uqinisekise ukuthi isimo neziphutha ezichaziwe ziyiqiniso"
+      }
+    },
+    "pricing": {
+      "salePrice": "Intengo yokuthengisa (R)",
+      "dailyRate": "Izinga losuku (R)",
+      "weeklyRate": "Izinga leviki (R)",
+      "minRentalDays": "Ukuqashisa okuncane (izinsuku)",
+      "insurancePerDay": "Umshuwalensi ngosuku (R)",
+      "insuranceHint": "Ukhokhiswa umqashi ngosuku. Shiya kungabhaliwe ukuze weqe.",
+      "whoPaysShipping": "Ubani okhokha ukuthunyelwa?",
+      "shippingRenter": "🧑 Umqashi uyakhokha",
+      "shippingMerchant": "🏪 Ngiyayibhekana (ukuthunyelwa mahhala)",
+      "shippingSplit": "🤝 Yahlukanisa 50/50",
+      "shippingNegotiate": "💬 Xoxisana nomqashi",
+      "availabilityHeading": "Ukutholakala",
+      "availableFrom": "Kutholakala kusukela",
+      "maxRentalDays": "Ukuqashisa okuphezulu (izinsuku)",
+      "minBookingNotice": "Isaziso esincane sokubhukha (izinsuku)",
+      "maxAdvanceBooking": "Ukubhukha kusengaphambili okuphezulu (izinsuku)",
+      "blockedDates": {
+        "heading": "Izinsuku ezivinjelwe",
+        "desc": "Izinsuku lapho le nto ingatholakali khona ukuze ibhukhwe (ukulungiswa, ukusetshenziswa komuntu siqu, njll.).",
+        "reasonPlaceholder": "Isizathu (kungakhethwa)",
+        "addRange": "+ Engeza uhla oluvinjelwe",
+        "errors": {
+          "chooseDates": "Khetha zombili usuku lokuqala nolokugcina",
+          "startBeforeEnd": "Usuku lokuqala kufanele lube ngaphambi kosuku lokugcina",
+          "overlap": "Lolu hla luyagcwelana nohla oluvinjelwe olukhona"
+        }
+      },
+      "errors": {
+        "minRate": "Izinga eliphansi ngu-R10/usuku",
+        "availabilityStartRequired": "Sicela ukhethe usuku lokuqala lokutholakala",
+        "maxLessThanMin": "Isikhathi esiphezulu sokuqashisa asikwazi ukuba ngaphansi kwesincane",
+        "salePriceRequired": "Faka intengo yokuthengisa"
+      }
+    },
+    "requirements": {
+      "infoNotice": "Setha izinga eliphansi labaqashi. Uma umqashi engahlangabezani nezidingo zakho, uzobona umlayezo ocacile ochaza ukuthi kungani ngaphambi kokuba akwazi ukubhukha.",
+      "unityScoreHeading": "Amaphuzu e-Unity aphansi",
+      "unityScoreDesc": "Abaqashi abanamaphuzu la noma ngaphezulu kuphela abangabhukha",
+      "unityScoreNone": "Akukho okuphansi",
+      "unityScoreGood": "3.0+ (Isimo esihle)",
+      "unityScoreTrusted": "3.5+ (Kwethenjwa)",
+      "unityScoreHighlyTrusted": "4.0+ (Kwethenjwa kakhulu)",
+      "unityScoreElite": "4.5+ (I-Elite)",
+      "depositHeading": "Isibambiso sokuphepha",
+      "depositDesc": "Kugunyazwa ekukhokheni bese kukhululwa lapho into ibuya ingonakalanga",
+      "depositAmount": "Isamba sesibambiso (R)",
+      "renterRequirementsHeading": "Izimfuneko zomqashi",
+      "verifiedIdentityRequired": "Ubunikazi obuqinisekisiwe buyadingeka",
+      "kycApprovedRequired": "I-KYC evunyiwe iyadingeka",
+      "minAge": "Iminyaka encane",
+      "drivingLicenceRequired": "Ilayisensi yokushayela iyadingeka",
+      "licenceClassPlaceholder": "isb. Ikhodi B",
+      "additionalRequirements": "Ezinye izidingo",
+      "usageRulesHeading": "Imithetho yokusetshenziswa",
+      "permittedUse": "Ukusetshenziswa okuvunyelwe",
+      "prohibitedUse": "Ukusetshenziswa okungavunyelwe",
+      "geographicRestriction": "Isivimbelo sendawo",
+      "geographicRestrictionPlaceholder": "isb. Kuphela ngaphakathi kwe-Gauteng",
+      "commercialUseAllowed": "Ukusetshenziswa kwezentengiselwano kuyavunyelwa",
+      "subRentalAllowed": "Ukuqashiswa okuphindwayo kuyavunyelwa",
+      "cleaningRequirements": "Izidingo zokuhlanza",
+      "returnConditionRequirements": "Izidingo zesimo sokubuyisela",
+      "additionalRules": "Eminye imithetho",
+      "additionalRulesHint": "(kungakhethwa, kuze kufike ku-2000 izinhlamvu)",
+      "damageInspectionHeading": "Umonakalo & ukuhlolwa",
+      "existingDamageDescription": "Incazelo yomonakalo okhona",
+      "inspectionBeforeHandover": "Ukuhlolwa kuyadingeka ngaphambi kokunikezelwa",
+      "inspectionOnReturn": "Ukuhlolwa kuyadingeka ekubuyiseleni",
+      "missingAccessoryConsequence": "Umphumela wento engeziwe engekho",
+      "lostItemConsequence": "Umphumela wento elahlekile",
+      "riskTierHeading": "Izinga lengozi: {tier}",
+      "riskTierDesc": "Kunikezwa ngokuzenzakalela yi-Risk Engine ye-Unity kusuka esigabeni, entengweni, nesimeni sakho somthengisi — lokhu akukwazi ukushintshwa ngesandla.",
+      "riskOwnershipVerification": "Ukuqinisekiswa kobunikazi kuyadingeka",
+      "riskInspectionVideo": "Ividiyo yokuhlolwa iyadingeka",
+      "riskDepositMandatory": "Isibambiso siyimpoqo ngaphambi kokushicilela",
+      "riskDepositRecommended": "Isibambiso siyanconywa",
+      "riskInsuranceMandatory": "Umshuwalensi uyimpoqo ngaphambi kokushicilela",
+      "riskManualReview": "Kudinga ukubuyekezwa ngesandla yi-Unity ngaphambi kokuba kusebenze",
+      "riskNoRequirements": "Akukho sibambiso noma ukuqinisekiswa kobunikazi okudingekayo",
+      "errors": {
+        "licenceClassRequired": "Ikhilasi lelayisensi liyadingeka lapho ilayisensi yokushayela idingeka"
+      },
+      "riskTierLow": "Ingozi Ephansi",
+      "riskTierMedium": "Ingozi Emaphakathi",
+      "riskTierHigh": "Ingozi Ephezulu"
+    },
+    "affiliates": {
+      "infoNotice": "Uma abahlanganyeli bevunyelwe, amanye amalungu e-Unity angabelana ngohlu lwakho ngesixhumanisi sokudlulisela. Ubakhokhela ikhomishini kuphela ekuqashiseni okuqediwe — akukho zindleko zangaphambili.",
+      "acceptAffiliates": "Yamukela abahlanganyeli",
+      "acceptAffiliatesDesc": "Vumela abanye ukuba badlulisele abaqashi kulolu hlu",
+      "commissionRate": "Izinga lekhomishini (%)",
+      "commissionRatePlaceholder": "isb. 10",
+      "commissionRateHint": "1–50%. Ikhomishini iyasuswa kwimali yakho yokuqashisa ngemuva kokuba ukubhukha sekuqediwe.",
+      "reviewListing": "Buyekeza uhlu"
+    },
+    "review": {
+      "submitNotice": "Ukuthumela kuthumela uhlu lwakho ukuze lubuyekezwe — ngeke lusebenze kuze kube yilapho i-Unity iqinisekisa ukuthi luhlangabezana nezidingo zezinga laso lengozi. Ungagcina njengohlaka bese ubuya noma nini ngaphambi kwalokho.",
+      "rows": {
+        "title": "Isihloko",
+        "category": "Isigaba",
+        "condition": "Isimo",
+        "listingType": "Uhlobo lohlu",
+        "salePrice": "Intengo yokuthengisa",
+        "dailyRate": "Izinga losuku",
+        "weeklyRate": "Izinga leviki",
+        "minDays": "Izinsuku ezincane",
+        "insurance": "Umshuwalensi",
+        "shipping": "Ukuthunyelwa",
+        "minUnityScore": "Amaphuzu e-Unity aphansi",
+        "deposit": "Isibambiso",
+        "riskTier": "Izinga lengozi",
+        "affiliates": "Abahlanganyeli",
+        "photos": "Izithombe",
+        "ownership": "Ubunikazi"
+      },
+      "dash": "—",
+      "notForSale": "Akuthengiswa",
+      "notSet": "Akusethiwe",
+      "none": "Lutho",
+      "noMinimum": "Akukho okuphansi",
+      "no": "Cha",
+      "yesCommission": "Yebo — ikhomishini engu-{rate}%",
+      "onFile": "Kulotshiwe",
+      "daysUnit": "{count} usuku/izinsuku",
+      "photosUploaded": "{count} kulayishiwe",
+      "listingTypeRental": "Ukuqashisa kuphela",
+      "listingTypeSale": "Ukuthengisa kuphela",
+      "listingTypeBoth": "Ukuqashisa nokuthengisa",
+      "shippingRenter": "Umqashi uyakhokha",
+      "shippingMerchantFree": "Mahhala (umthengisi)",
+      "shippingSplit": "Yahlukaniswe 50/50",
+      "shippingNegotiate": "Xoxisana",
+      "declarationsLabel": "Izimemezelo",
+      "fullPolicyText": "Umbhalo wenqubomgomo egcwele:",
+      "rentalTerms": "Imigomo Yokuqashisa",
+      "and": "kanye",
+      "prohibitedItemsPolicy": "Inqubomgomo Yezinto Ezingavunyelwe",
+      "saveAsDraft": "Gcina njengohlaka",
+      "saving": "Kuyagcinwa…",
+      "submitForReview": "Thumela ukuze kubuyekezwe",
+      "submitting": "Kuyathunyelwa…",
+      "acceptAllToSubmit": "Vuma zonke izimemezelo ukuze uthumele",
+      "errors": {
+        "notSignedIn": "Kufanele ungene ukuze ugcine uhlu",
+        "couldNotSave": "Ayikwazanga ukugcina uhlu lwakho",
+        "couldNotSubmit": "Ayikwazanga ukuthumela uhlu lwakho"
+      }
+    }
+  },
+  "subscriptionPage": {
+    "backLabel": "Emuva",
+    "eyebrow": "I-Akhawunti Yomthengisi",
+    "heading": "Ukubhalisela",
+    "loading": "Kuyalayishwa…",
+    "couldNotLoad": "Ayikwazanga ukulayisha ukubhalisela kwakho",
+    "currentPlanLabel": "Uhlelo Lwamanje",
+    "free": "Mahhala",
+    "perMonth": "/ngenyanga",
+    "salesSuffix": "ukuthengisa",
+    "rentalsSuffix": "ukuqasha",
+    "barterSuffix": "ukushintshanisa",
+    "scheduledChange": "Kuhleliwe ukushintsha kube ngu-<b>{plan}</b> ngo-{date}",
+    "working": "Kuyacutshungulwa…",
+    "cancelThisChange": "Khansela lokhu kushintsha",
+    "revertingToStarter": "Kubuyela ku-Starter ngo-{date}",
+    "keepMyPlan": "Gcina uhlelo lwami",
+    "activeListings": "Izinhlu Ezisebenzayo",
+    "limitReached": "Umkhawulo ufinyelelwe — nyusa izinga ukuze wenze okuningi kusebenze",
+    "thisMonthsCost": "Izindleko Zaleli Sonto",
+    "volumeThisMonth": "Ivolumu Kule Nyanga",
+    "savingsNotice": "Ngokususelwa evolumini yale nyanga, ungonga {amount} ngenyanga ohlelweni lwe-{plans}.",
+    "allPlans": "Zonke Izinhlelo",
+    "estimatedPerMonth": "/ngenyanga okulinganiselwe",
+    "upgrade": "Nyusa Izinga",
+    "downgrade": "Yehlisa Izinga",
+    "cheapestForVolume": "Okushibhile kakhulu evolumini yakho",
+    "billingNotice": "Ukunyusa izinga kusebenza ngokushesha. Ukwehlisa izinga nokukhansela kusebenza ekuqaleni kwenkathi yakho yokukhokha elandelayo — ugcina izinzuzo zohlelo lwakho lwamanje kuze kube yileso sikhathi.",
+    "errors": {
+      "networkError": "Iphutha lenethiwekhi — sicela uzame futhi",
+      "somethingWentWrong": "Kukhona okungahambanga kahle"
+    }
+  },
+  "commissionsPage": {
+    "backLabel": "Emuva",
+    "earningsLabel": "Okuzuziwe",
+    "heading": "Ikhomishini Ye-Unity",
+    "totalCommissionLabel": "Isamba Sekhomishini (kusukela ekuqaleni)",
+    "chargedNotice": "Kukhokhiswa wena, umthengisi — akusoze kwengezwa phezu kwalokho ikhasimende lakho elikukhokhayo",
+    "transactionHistoryLabel": "Umlando Wokuthengiselana",
+    "loading": "Kuyalayishwa…",
+    "noCommissionedTransactions": "Azikho ukuthengiselana okunekhomishini okwamanje",
+    "transactionFallbackSale": "ukuthengiselana kokuthengisa",
+    "transactionFallbackRental": "ukuthengiselana kokuqasha",
+    "eligibleAmountLabel": "Inani elifanelekile",
+    "unityCommissionLabel": "Ikhomishini ye-Unity ({rate}%{excess})",
+    "excessSuffix": " + 1.0% ngaphezu kuka-R100,000",
+    "affiliateRewardLabel": "Umklomelo Wokuxhumanisa",
+    "proceedsBasisLabel": "Isisekelo Sengeniso Yakho",
+    "highValueNotice": "Ukuthengisa okunenani eliphezulu: izinga lohlelo elingu-{rate}% lisetshenziswe kokokuqala okungu-R100,000 ({amount}), futhi u-1.0% usetshenziswe kokusele okungu-{remaining}.",
+    "footerNotice": "Ikhomishini ye-Unity nanoma yimuphi umklomelo wokuxhumanisa oyivulile kukhishwa engenisweni yakho siqu — ikhasimende lakho alisoze lakhokha imali eyengeziwe ye-Unity.",
+    "managePlanLink": "Phatha uhlelo lwakho"
+  },
+  "listingsPage": {
+    "backLabel": "Emuva",
+    "eyebrow": "Izinhlu Zakho",
+    "heading": "Izinhlu Zami",
+    "totalCount": "{count, plural, one {uhlu olungu-# sekukonke} other {izinhlu ezingu-# sekukonke}}",
+    "activeLabel": "Kuyasebenza",
+    "pausedLabel": "Kumisiwe",
+    "draftsLabel": "Izinhlaka",
+    "emptyTitle": "Azikho izinhlu okwamanje",
+    "emptyDesc": "Faka ohlwini into oyinikazi bese uqala ukuzuza.",
+    "createFirst": "Dala Uhlu Lwakho Lokuqala",
+    "perDay": "/ngosuku",
+    "viewsCount": "{count, plural, one {ukubukwa okungu-#} other {ukubukwa okungu-#}}",
+    "bookingsCount": "{count, plural, one {ukubhukha okungu-#} other {ukubhukha okungu-#}}",
+    "viewListingTitle": "Buka uhlu",
+    "editAndResubmitTitle": "Hlela bese uthumela kabusha",
+    "continueEditingDraftTitle": "Qhubeka uhlele uhlaka",
+    "editUnavailableTitle": "Ukuhlela uhlu oselulotshiwe akutholakali okwamanje",
+    "pauseListingTitle": "Misa uhlu",
+    "activateListingTitle": "Yenza uhlu lusebenze"
+  }
+}

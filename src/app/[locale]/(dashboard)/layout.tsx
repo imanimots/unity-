@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
-import { redirect } from 'next/navigation'
+import { NextIntlClientProvider } from 'next-intl'
+import { getMessages, getLocale } from 'next-intl/server'
 import { Navbar } from '@/components/shared/navbar'
+import { redirect } from '@/i18n/navigation'
 import { requireAuth } from '@/lib/supabase/require-admin'
 import { PERMANENT_NOINDEX } from '@/lib/seo/config'
 
@@ -20,16 +22,26 @@ export const metadata: Metadata = { robots: PERMANENT_NOINDEX }
 // defense-in-depth, not the primary control. Mirrors src/app/admin/layout.tsx.
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const auth = await requireAuth()
-  if (!auth) redirect('/login')
+  if (!auth) {
+    const locale = await getLocale()
+    redirect({ href: '/login', locale })
+  }
 
+  // Full message set, nested here rather than at the public root (same
+  // principle as the merchant-only subtree's own provider, one level
+  // deeper) -- this covers every authenticated dashboard route (renter,
+  // merchant, barter, disputes, orders, checkout) with zero public-leak
+  // concern, since nothing under (dashboard) is reachable anonymously or
+  // indexed.
+  const messages = await getMessages()
   return (
-    <>
+    <NextIntlClientProvider messages={messages}>
       <Navbar />
       <main className="pt-16 min-h-screen bg-[#FAF8F5] dark:bg-[#0F0A0A]">
         <div className="pt-8 pb-16">
           {children}
         </div>
       </main>
-    </>
+    </NextIntlClientProvider>
   )
 }

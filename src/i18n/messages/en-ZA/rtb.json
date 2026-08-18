@@ -1,0 +1,70 @@
+{
+  "label": "Rent-to-Buy",
+  "frequency": {
+    "weekly": "Weekly",
+    "biweekly": "Biweekly",
+    "monthly": "Monthly"
+  },
+  "instalment": "Instalment",
+  "possessionEligible": "Eligible to take possession",
+  "status": {
+    "pendingMerchantAcceptance": "Awaiting merchant acceptance",
+    "awaitingFirstPayment": "Awaiting first payment",
+    "active": "Active",
+    "defaulted": "Defaulted",
+    "returnRequired": "Return required",
+    "completed": "Completed — you own this item",
+    "cancelled": "Cancelled",
+    "disputed": "Disputed"
+  },
+  "possessionStatus": {
+    "notDelivered": "Not yet delivered",
+    "possessionEligible": "Eligible to take possession",
+    "customerInPossession": "In your possession",
+    "returnRequired": "Return required",
+    "returnInProgress": "Return in progress",
+    "returnedToMerchant": "Returned to merchant",
+    "recovered": "Recovered"
+  },
+  "ownershipStatus": {
+    "merchantOwned": "Merchant owns this item",
+    "customerOwned": "You own this item"
+  },
+  "installmentStatus": {
+    "scheduled": "Scheduled",
+    "paid": "Paid",
+    "failed": "Failed",
+    "waived": "Waived"
+  },
+  "agreementsTitle": "Agreements",
+  "agreementCount": "{count, plural, one {# agreement} other {# agreements}} total",
+  "noAgreements": "No agreements yet",
+  "noAgreementsDesc": "Browse rent-to-buy listings to get started.",
+  "browseListings": "Browse Listings",
+  "item": "Item",
+  "back": "Back",
+  "disclosureFirst": "You receive/use the item after the first successful payment, but <strong>the merchant remains the owner until the full rent-to-buy amount has been paid.</strong>",
+  "disclosureDefault": "If the agreement defaults before the full rent-to-buy amount is paid, the purchase path ends and the item must be returned to the merchant. The arrangement is treated as rental/use for the possession period.",
+  "statusLabel": "Status",
+  "possessionLabel": "Possession",
+  "ownershipLabel": "Ownership",
+  "purchaseProgress": "Purchase progress",
+  "securityDeposit": "Security deposit (not part of purchase price)",
+  "terminated": "RTB purchase path terminated",
+  "returnRequiredNotice": "Item return required. Rental reconciliation policy pending business approval — no charge has been calculated.",
+  "paymentSchedule": "Payment schedule",
+  "actions": {
+    "acceptAgreement": "Accept agreement",
+    "decline": "Decline",
+    "cancel": "Cancel",
+    "payDeposit": "Pay security deposit",
+    "payInstallment": "Pay instalment #{sequence}",
+    "confirmHandover": "Confirm handover",
+    "payOff": "Pay off remaining balance",
+    "cureDefault": "Cure default",
+    "requestReturn": "Request return"
+  },
+  "errors": {
+    "generic": "Something went wrong"
+  }
+}

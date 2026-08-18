@@ -1,0 +1,76 @@
+{
+  "postRequest": "Plaas 'n versoek",
+  "newRequestPage": {
+    "metaTitle": "Plaas 'n Versoek — Unity",
+    "sectionLabel": "Op Soek Na",
+    "headingLine1": "Plaas Wat",
+    "headingLine2": "Jy Nodig Het.",
+    "imLookingTo": "Ek is op soek om te",
+    "title": "Titel",
+    "titlePlaceholder": "bv. Op soek na 'n drukspuit",
+    "description": "Beskrywing",
+    "category": "Kategorie",
+    "city": "Stad",
+    "budgetMin": "Minimum begroting (ZAR)",
+    "budgetMax": "Maksimum begroting (ZAR)",
+    "startDate": "Begindatum",
+    "endDate": "Einddatum",
+    "barterOfferLabel": "Wat kan jy in ruil aanbied?",
+    "posting": "Plaas tans…",
+    "postRequestButton": "Plaas versoek",
+    "errors": {
+      "couldNotCreate": "Kon nie versoek skep nie",
+      "verificationRequired": "Jy moet verifikasie voltooi voordat jy 'n versoek publiseer. Jou versoek is as konsep gestoor.",
+      "couldNotPublish": "Kon nie versoek publiseer nie",
+      "networkError": "Netwerkfout — probeer asseblief weer"
+    }
+  },
+  "offersReceived": "{count, plural, one {# aanbod ontvang} other {# aanbiedinge ontvang}}",
+  "status": {
+    "draft": "Konsep",
+    "active": "Aktief",
+    "offersReceived": "Aanbiedinge ontvang",
+    "matched": "Gepaar",
+    "closed": "Gesluit",
+    "archived": "Geargiveer"
+  },
+  "detail": {
+    "lookingToTransact": "Soek om te {type} · {status}",
+    "postedByPrefix": "Geplaas deur",
+    "verified": "· Geverifieer",
+    "category": "Kategorie",
+    "location": "Ligging",
+    "budget": "Begroting",
+    "dates": "Datums",
+    "expires": "Verval",
+    "respondToRequest": "Reageer op hierdie versoek",
+    "respond": "Reageer",
+    "privateOffer": "Private aanbod",
+    "linkListing": "Koppel 'n notering",
+    "messageOnly": "Net 'n boodskap",
+    "amountPlaceholder": "Bedrag (ZAR)",
+    "messagePlaceholder": "Boodskap",
+    "send": "Stuur",
+    "yourResponse": "Jou reaksie",
+    "statusLabel": "Status: {status}",
+    "withdraw": "Trek terug",
+    "responses": "Reaksies ({count})",
+    "noResponses": "Nog geen reaksies nie.",
+    "accept": "Aanvaar",
+    "decline": "Weier",
+    "couldNotSubmit": "Kon nie aanbod indien nie",
+    "couldNotAccept": "Kon nie aanbod aanvaar nie",
+    "networkError": "Netwerkfout",
+    "offerTypes": {
+      "private_offer": "private aanbod",
+      "link_listing": "gekoppelde notering",
+      "message_only": "slegs boodskap"
+    },
+    "offerStatus": {
+      "pending": "hangende",
+      "accepted": "aanvaar",
+      "declined": "geweier",
+      "withdrawn": "teruggetrek"
+    }
+  }
+}

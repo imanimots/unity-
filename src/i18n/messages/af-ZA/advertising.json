@@ -1,0 +1,60 @@
+{
+  "sponsoredLabel": "Geborg",
+  "sponsoredSearchResult": "Geborgde soekresultaat",
+  "dashboard": {
+    "title": "Advertensies",
+    "buySponsoredPlacement": "Koop Geborgde plasing vir jou kwalifiserende noterings",
+    "balance": "Advertensiesaldo",
+    "impressions": "Vertonings",
+    "clicks": "Klieke",
+    "ctr": "KDK",
+    "backToDashboard": "Terug na kontroleskerm",
+    "loading": "Laai tans…",
+    "setupNotice": "Stel jou advertensierekening op om te begin.",
+    "setupCta": "Stel advertensierekening op",
+    "balanceNotice": "Gekrediteer van onderaflewerde veldtogte. Herbruikbaar slegs vir toekomstige Unity-advertensies — nie as kontant onttrekbaar nie.",
+    "yourCampaigns": "Jou veldtogte",
+    "newCampaign": "Nuwe veldtog",
+    "noCampaigns": "Nog geen veldtogte nie.",
+    "fixedPrepaidNotice": "Vaste vooruitbetaalde pakkette — geen fakturering per klik of per vertoning nie."
+  },
+  "status": {
+    "draft": "Konsep",
+    "funded": "Gefinansier",
+    "pendingReview": "Wag vir hersiening",
+    "active": "Aktief",
+    "paused": "Onderbreek",
+    "completed": "Voltooi",
+    "cancelled": "Gekanselleer",
+    "rejected": "Verwerp",
+    "suspended": "Opgeskort"
+  },
+  "create": {
+    "backToAdvertising": "Terug na advertensies",
+    "heading": "Nuwe veldtog",
+    "description": "Kies 'n pakket, kies watter notering om te bevorder, en stel 'n einddatum. Jy sal die veldtog in die volgende stap befonds.",
+    "loading": "Laai tans…",
+    "noAdvertiserNotice": "Jy het eers 'n advertensierekening nodig — gaan terug en stel een op.",
+    "noListingsNotice": "Jy het nog geen aktiewe noterings om te adverteer nie.",
+    "listingLabel": "Notering om te bevorder",
+    "selectListingPlaceholder": "Kies 'n notering…",
+    "packageLabel": "Pakket",
+    "placements": {
+      "homepageBanner": "Tuisbladbanier",
+      "searchLoadingPopup": "Soek-laai-opspringvenster",
+      "promotedDeals": "Bevorderde aanbiedinge"
+    },
+    "tierSuffix": "vlak",
+    "impressionsSuffix": "vertonings",
+    "noPackagesNotice": "Geen pakkette is tans beskikbaar nie.",
+    "tierGuaranteeNotice": "Hoër vlakke verdien vroeër, meer sigbare plasing — die pakket waarborg slegs die goedgekeurde vertoningstoekenning, nooit 'n gewaarborgde verkoop- of klieketelling nie.",
+    "endDateLabel": "Veldtog-einddatum",
+    "creating": "Skep tans…",
+    "continueToFunding": "Gaan voort na befondsing",
+    "errors": {
+      "completeAllFields": "Voltooi asseblief elke veld voordat jy voortgaan.",
+      "couldNotCreate": "Kon nie veldtog skep nie",
+      "generic": "Iets het verkeerd geloop — probeer asseblief weer."
+    }
+  }
+}

@@ -1,0 +1,703 @@
+{
+  "dashboard": "Handelaar-paneelbord",
+  "listAnItem": "Lys 'n Item",
+  "earningsOverview": "Verdienste-oorsig",
+  "pendingRequests": "Hangende besprekingsversoeke",
+  "subscription": {
+    "starter": "Beginner",
+    "pro": "Pro",
+    "elite": "Elite"
+  },
+  "commissions": "Kommissies",
+  "commissionStatus": {
+    "pending": "Hangende",
+    "held": "Onder hersiening",
+    "earned": "Gefinaliseer",
+    "adjusted": "Aangepas",
+    "voided": "Nietig verklaar (terugbetaal)"
+  },
+  "payouts": "Uitbetalings",
+  "affiliate": {
+    "acceptAffiliates": "Aanvaar Filiale",
+    "commissionRate": "Kommissiekoers"
+  },
+  "home": {
+    "welcomeBack": "Welkom terug, {name}",
+    "heading": "Handelaar-paneelbord",
+    "listAnItem": "Lys 'n Item",
+    "kycBanner": {
+      "title": "Voltooi KYC om lysings te publiseer",
+      "message": "Identiteitsverifikasie word vereis voordat jou eerste lysing lewend gaan.",
+      "cta": "Verifieer Nou"
+    },
+    "earnings": {
+      "sectionLabel": "Verdienste",
+      "totalEarned": "Totaal Verdien — Voltooide Verhurings",
+      "viewPayouts": "Bekyk uitbetalings"
+    },
+    "stats": {
+      "activeListings": "Aktiewe Lysings",
+      "pendingRequests": "Hangende Versoeke",
+      "unityScore": "Unity-telling"
+    },
+    "recentBookings": {
+      "sectionLabel": "Onlangse Besprekings",
+      "heading": "Besprekingsversoeke",
+      "viewAll": "Bekyk almal",
+      "emptyTitle": "Geen hangende versoeke nie",
+      "emptyDesc": "Skep 'n lysing om besprekingsversoeke te begin ontvang.",
+      "createFirst": "Skep Jou Eerste Lysing",
+      "legacyStatus": {
+        "pending": "Hangende",
+        "approved": "Goedgekeur",
+        "active": "Aktief",
+        "returned": "Teruggegee",
+        "disputed": "In Geskil",
+        "cancelled": "Gekanselleer"
+      }
+    },
+    "yourListings": {
+      "sectionLabel": "Jou Lysings",
+      "heading": "My Lysings",
+      "manage": "Bestuur",
+      "emptyTitle": "Nog geen lysings nie",
+      "emptyDesc": "Lys 'n item en begin verdien uit wat jy besit."
+    },
+    "quickLinks": {
+      "sectionLabel": "Vinnige Skakels",
+      "payouts": "Uitbetalings",
+      "payoutsDesc": "Verdienste en onttrekkings",
+      "commission": "Unity-kommissie",
+      "commissionDesc": "Wat Unity jou hef",
+      "affiliates": "Filiale",
+      "affiliatesDesc": "Verwysingskommissies",
+      "subscription": "Intekening"
+    },
+    "planStarter": "Beginner · Tot 5 lysings",
+    "planUnlimited": "{plan} · Onbeperkte lysings",
+    "planLimited": "{plan} · Tot {count} lysings"
+  },
+  "payoutsPage": {
+    "sectionLabel": "Verdienste",
+    "heading": "Uitbetalings",
+    "back": "Terug",
+    "totalPaid": "Totaal Betaal",
+    "manualNotice": "Handmatig deur Unity aangeteken — geen outomatiese verskaffer is gekoppel nie",
+    "pending": "Hangende",
+    "processing": "Word verwerk",
+    "failed": "Misluk",
+    "historyLabel": "Uitbetalingsgeskiedenis",
+    "loading": "Laai tans…",
+    "emptyTitle": "Nog geen uitbetalings nie",
+    "emptyDesc": "'n Uitbetaling word outomaties geskep sodra 'n verhuring voltooi word.",
+    "defaultTitle": "Verhuringsuitbetaling",
+    "reference": "Verwysing: {reference}",
+    "status": {
+      "pending": "Hangende",
+      "processing": "Word verwerk",
+      "paid": "Betaal",
+      "failed": "Misluk"
+    },
+    "statusExplanations": {
+      "pending": "Unity het jou uitbetalingsrekord geskep. Dit het nog nie begin verwerk nie.",
+      "processing": "Unity verwerk tans hierdie uitbetaling. Geen outomatiese uitbetalingsverskaffer is tans gekoppel nie.",
+      "paid": "Unity het hierdie uitbetaling as betaal aangeteken.",
+      "failed": "Hierdie uitbetaling kon nie voltooi word nie. Unity sal dit hersien of weer probeer."
+    },
+    "footerNotice": "Uitbetalings word handmatig deur Unity aangeteken terwyl geen outomatiese uitbetalingsverskaffer gekoppel is nie.",
+    "contactSupport": "Kontak ondersteuning"
+  },
+  "affiliateProgram": {
+    "sectionLabel": "Verwysingsprogram",
+    "back": "Terug",
+    "becomeAffiliate": {
+      "heading": "Word 'n Filiaal",
+      "description": "Verdien kommissie op voltooide verhurings en verkope wat jy verwys, slegs op lysings waarvoor die handelaar dit spesifiek geaktiveer het. Ruilhandeltransaksies verdien nooit kommissie nie.",
+      "noApproval": "Geen goedkeuring nodig nie — aktiveer onmiddellik en begin vandag verdien.",
+      "shareLinks": "Deel skakels",
+      "shareLinksDesc": "vir enige lysing wat filiale aanvaar",
+      "earnCommission": "Verdien kommissie",
+      "earnCommissionDesc": "op voltooide kwalifiserende verkope of verhurings",
+      "trackEarnings": "Volg verdienste",
+      "trackEarningsDesc": "in jou filiaalpaneelbord",
+      "activating": "Aktiveer tans…",
+      "cta": "Word 'n Filiaal"
+    },
+    "heading": "Filiaalprogram",
+    "yourCode": "Jou Filiaalkode",
+    "copied": "Gekopieer!",
+    "copyCode": "Kopieer Kode",
+    "browseListings": "Blaai deur lysings",
+    "codeNotice": "Blaai deur filiaal-geaktiveerde lysings hieronder en kopieer jou deelskakel — kommissie word slegs verdien op lysings wat die handelaar geaktiveer het, en nooit op ruilhandeltransaksies nie.",
+    "totalPaid": "Totaal Betaal",
+    "inProgress": "In Proses",
+    "commissionsCount": "Kommissies",
+    "enabledListings": "Filiaal-geaktiveerde Lysings",
+    "loading": "Laai tans…",
+    "noEnabledListings": "Geen lysings aanvaar tans filiale nie.",
+    "commissionRatePct": "{rate}% kommissie",
+    "copyLink": "Kopieer skakel",
+    "commissionHistory": "Kommissiegeskiedenis",
+    "all": "Almal",
+    "noCommissionsInCategory": "Nog geen kommissies in hierdie kategorie nie.",
+    "table": {
+      "listing": "Lysing",
+      "type": "Tipe",
+      "commission": "Kommissie",
+      "status": "Status"
+    },
+    "footerNotice": "Kommissies word outomaties verwerk na 'n kort hersieningsperiode.",
+    "contactSupport": "Kontak ondersteuning",
+    "commissionStatus": {
+      "pending": "Wag vir hersiening",
+      "held": "Weerhou",
+      "approved": "Goedgekeur",
+      "payout_queued": "Uitbetaling in wagry",
+      "processing": "Uitbetaling word verwerk",
+      "paid": "Betaal",
+      "failed": "Uitbetaling het misluk",
+      "voided": "Nietig verklaar",
+      "reversed": "Omgekeer"
+    }
+  },
+  "affiliateManagement": {
+    "sectionLabel": "Verwysingsprogram",
+    "back": "Terug",
+    "heading": "Filiale",
+    "infoNotice": "Aktiveer filiale per lysing hieronder. Kommissie word slegs gehef op voltooide kwalifiserende verkope of verhuringsbetalings — nooit op deposito's, terugbetalings, of ruilhandeltransaksies nie. Filiaaluitbetalings word outomaties deur Unity namens jou hanteer.",
+    "attributedCustomers": "Toegeskryfde Kliënte",
+    "costPaid": "Kommissiekoste — Betaal",
+    "costInProgress": "Kommissiekoste — In Proses",
+    "loading": "Laai tans…",
+    "noListings": "Jy het nog geen lysings nie.",
+    "table": {
+      "listing": "Lysing",
+      "rate": "Koers",
+      "attributed": "Toegeskryf",
+      "sales": "Verkope",
+      "rentals": "Verhurings",
+      "costPaid": "Koste betaal",
+      "costPending": "Koste hangende",
+      "enabled": "Geaktiveer"
+    },
+    "enabled": "Geaktiveer",
+    "disabled": "Gedeaktiveer",
+    "footerNotice": "Die kommissiekoers vir elke lysing word in die lysing-redigeerder ingestel.",
+    "learnMore": "Leer meer oor die Ambassadeur-program →",
+    "errorLoad": "Kon nie jou lysings laai nie"
+  },
+  "rtbTerms": {
+    "heading": "Huur-om-te-Koop Voorwaardes",
+    "back": "Terug",
+    "enabledNotice": "Huur-om-te-koop is vir hierdie lysing geaktiveer.",
+    "disabledNotice": "Huur-om-te-koop is nog nie vir hierdie lysing geaktiveer nie.",
+    "ownershipNotice": "Jy bly die eienaar van die item totdat die kliënt die volle bedrag hieronder betaal het.",
+    "loading": "Laai tans…",
+    "termsSaved": "Voorwaardes gestoor.",
+    "totalPurchasePrice": "Totale huur-om-te-koop-koopprys (ZAR)",
+    "installmentAmount": "Paaiementbedrag (ZAR)",
+    "installmentCount": "Aantal paaiemente",
+    "paymentFrequency": "Betalingsfrekwensie",
+    "securityDeposit": "Sekuriteitsdeposito (ZAR, opsioneel — tel nooit teenoor die koopprys nie)",
+    "allowEarlyPayoff": "Laat die kliënt toe om die uitstaande balans vroeg af te betaal",
+    "allowCure": "Laat die kliënt toe om 'n wanbetaling reg te stel en die ooreenkoms te hervat",
+    "saveAndEnable": "Stoor en aktiveer",
+    "saveAsDisabled": "Stoor as gedeaktiveer",
+    "errors": {
+      "couldNotSave": "Kon nie voorwaardes stoor nie"
+    }
+  },
+  "pricing": {
+    "sectionLabel": "Handelaarplanne",
+    "heading": "Eenvoudige, deursigtige pryse",
+    "subheading": "Geen maandelikse fooi om te begin nie. Gradeer enige tyd op vir laer kommissiekoerse en onbeperkte lysings. Ruilhandeltransaksies dra nooit kommissie nie, op enige plan.",
+    "currentPlan": "Jou huidige plan",
+    "free": "Gratis",
+    "perMonth": "/maand",
+    "salesCommission": "{rate} kommissie op verkope",
+    "rentalCommission": "{rate} kommissie op verhurings",
+    "noBarterCommission": "Geen kommissie op ruilhandeltransaksies nie",
+    "upToListings": "Tot {count} aktiewe lysings",
+    "unlimitedListings": "Onbeperkte aktiewe lysings",
+    "managePlan": "Bestuur plan",
+    "changePlan": "Verander plan",
+    "getStarted": "Begin nou",
+    "footerNotice": "Kommissie word slegs gehef op voltooide verkope en verhurings. Afgraderings en kansellasies tree in werking aan die begin van jou volgende faktureringstydperk; opgraderings geld onmiddellik.",
+    "unavailable": "Pryse is tydelik nie beskikbaar nie."
+  },
+  "ambassadors": {
+    "metaTitle": "Ambassadeur-program — Unity",
+    "metaDescription": "Verdien kommissie deur nuwe huurders en handelaars na Unity te verwys.",
+    "earnWithUnity": "VERDIEN MET UNITY",
+    "headingLine1": "WORD 'N",
+    "headingLine2": "AMBASSADEUR.",
+    "heroDescription": "Verwys handelaars na die Unity-platform en verdien kommissie op elke verhuring wat hulle voltooi — solank hulle by ons lys.",
+    "joinViaWarp": "Sluit aan via Warp",
+    "noCostNotice": "Geen koste om aan te sluit nie · Maandelikse uitbetalings via Warp",
+    "stats": {
+      "maxCommission": "Maksimum kommissiekoers",
+      "payoutSchedule": "Uitbetalingskedule",
+      "payoutScheduleValue": "Maandeliks",
+      "trackingLabel": "Opsporing op verwysde lysings",
+      "trackingValue": "Leeftyd"
+    },
+    "processLabel": "DIE PROSES",
+    "howItWorksHeading": "Hoe dit werk",
+    "steps": {
+      "apply": {
+        "title": "Doen aansoek via Warp",
+        "desc": "Registreer via ons filiaalvennoot Warp. Geen vooraf-koste, geen verbintenis nie."
+      },
+      "getLink": {
+        "title": "Kry jou skakel",
+        "desc": "Ontvang 'n unieke verwysingskakel wat jy oral kan deel — sosiale media, WhatsApp, e-pos."
+      },
+      "refer": {
+        "title": "Verwys handelaars",
+        "desc": "Handelaars wat via jou skakel registreer en items lys, word outomaties nagespoor."
+      },
+      "earn": {
+        "title": "Verdien kommissie",
+        "desc": "Kry 'n persentasie van elke voltooide verhuring gemaak via lysings wat jy verwys het."
+      }
+    },
+    "commissionStructureLabel": "KOMMISSIESTRUKTUUR",
+    "earnMoreHeading": "Verdien meer soos jy groei.",
+    "tierBasisNotice": "Jou vlak is gebaseer op die totale aktiewe handelaars wat jy verwys het. Opgraderings gebeur outomaties.",
+    "mostPopular": "Mees gewild",
+    "activeReferrals": "aktiewe verwysings",
+    "commissionSuffix": "kommissie",
+    "tiers": {
+      "starter": {
+        "name": "Beginner",
+        "referrals": "1–4",
+        "commission": "5%",
+        "perks": [
+          "Persoonlike verwysingskakel",
+          "Maandelikse kommissie-uitbetalings",
+          "Ambassadeur-kenteken op profiel"
+        ]
+      },
+      "growth": {
+        "name": "Groei",
+        "referrals": "5–19",
+        "commission": "8%",
+        "perks": [
+          "Alles in Beginner",
+          "Prioriteitsondersteuning",
+          "Vroeë toegang tot nuwe funksies",
+          "Kwartaallikse bonuspoel"
+        ]
+      },
+      "elite": {
+        "name": "Elite",
+        "referrals": "20+",
+        "commission": "12%",
+        "perks": [
+          "Alles in Groei",
+          "Toegewyde rekeningbestuurder",
+          "Gesamentlike bemarkingsgeleenthede",
+          "Uitnodiging na jaarlikse aftrek"
+        ]
+      }
+    },
+    "requirementsLabel": "VEREISTES",
+    "eligibilityHeading": "Kwalifikasie",
+    "eligibility": [
+      "Moet 'n geregistreerde Unity-gebruiker met geverifieerde KYC wees",
+      "Gebaseer in 'n land waar Unity werksaam is",
+      "Stem in tot Warp se filiaal-diensvoorwaardes",
+      "Mag nie jouself of bestaande Unity-handelaars verwys nie",
+      "Geen geskiedenis van platformoortredings of geskille nie"
+    ],
+    "idealForLabel": "IDEAAL VIR",
+    "whoThrivesHeading": "Wie floreer",
+    "whoThrives": {
+      "communityBuilders": {
+        "title": "Gemeenskapsbouers",
+        "desc": "WhatsApp-admins, Facebook-groepeienaars, plaaslike geleentheidsorganiseerders."
+      },
+      "contentCreators": {
+        "title": "Inhoudskeppers",
+        "desc": "Bloggers, YouTubers, en sosiale-media-beïnvloeders in lewenstyl- of buitelugnisse."
+      },
+      "networks": {
+        "title": "Netwerke",
+        "desc": "Besigheidsverenigings, mede-werkruimtes, of township-ekonomie-organiseerders."
+      }
+    },
+    "getStartedLabel": "BEGIN NOU",
+    "readyHeading": "Gereed om te begin verdien?",
+    "readyDesc": "Aansoeke neem minder as 5 minute. Sodra Warp jou goedkeur, is jou verwysingskakel dadelik regstreeks.",
+    "applyNowViaWarp": "Doen nou aansoek via Warp",
+    "alreadyAmbassador": "Reeds 'n ambassadeur? Bekyk jou paneelbord →"
+  },
+  "skillTaskPosts": {
+    "heading": "Vaardighede & Take",
+    "newPost": "Nuwe plasing",
+    "emptyTitle": "Nog geen Vaardigheid-/Taakplasings nie",
+    "emptyDesc": "Bied 'n vaardigheid aan, versoek hulp met 'n taak, of vind iemand om mee te ruil.",
+    "untitledDraft": "Naamlose konsep",
+    "view": "Bekyk",
+    "edit": "Redigeer",
+    "offers": "Aanbiedinge",
+    "actions": {
+      "pause": "Onderbreek",
+      "resume": "Hervat",
+      "close": "Sluit",
+      "archive": "Argiveer",
+      "repost": "Plaas weer",
+      "working": "Verwerk tans…"
+    },
+    "errors": {
+      "actionFailed": "Aksie het misluk",
+      "actionFailedRetry": "Aksie het misluk — probeer asseblief weer"
+    }
+  },
+  "listingCreation": {
+    "heading": "Skep 'n lysing",
+    "stepProgress": "Stap {current} van {total} — {desc}",
+    "steps": {
+      "type": {
+        "title": "Tipe",
+        "desc": "Verkoop, verhuur, of beide"
+      },
+      "basics": {
+        "title": "Basiese besonderhede",
+        "desc": "Titel, kategorie & toestand"
+      },
+      "photos": {
+        "title": "Foto's",
+        "desc": "Ten minste 3 itemfoto's"
+      },
+      "ownership": {
+        "title": "Eienaarskap",
+        "desc": "Bewys van eienaarskap"
+      },
+      "pricing": {
+        "title": "Pryse",
+        "desc": "Tariewe, versekering & aflewering"
+      },
+      "requirements": {
+        "title": "Vereistes",
+        "desc": "Deposito & huurdervereistes"
+      },
+      "affiliates": {
+        "title": "Filiale",
+        "desc": "Verwysingsprogram"
+      },
+      "review": {
+        "title": "Hersiening",
+        "desc": "Bevestig & publiseer"
+      }
+    },
+    "continue": "Gaan voort",
+    "back": "Terug",
+    "optional": "(opsioneel)",
+    "toasts": {
+      "draftSaved": "Konsep gestoor",
+      "submitted": "Lysing ingedien vir hersiening"
+    },
+    "type": {
+      "sellLabel": "VERKOOP",
+      "sellDesc": "Eenmalige aankoop — die koper betaal een keer en behou die item.",
+      "rentLabel": "VERHUUR",
+      "rentDesc": "Huurders betaal vir 'n datumreeks en gee die item daarna terug.",
+      "bothLabel": "BEIDE",
+      "bothDesc": "Lys dit gelyktydig vir verhuring en vir verkoop."
+    },
+    "basics": {
+      "itemTitle": "Itemtitel",
+      "itemTitlePlaceholder": "bv. DJI Mavic 3 Pro-dronet + ND-filters",
+      "category": "Kategorie",
+      "categorySelectPlaceholder": "Kies 'n kategorie…",
+      "categoryDetailsHeading": "{category}-besonderhede",
+      "keptPrivateNotice": "Word privaat gehou — nooit op die openbare lysing gewys nie",
+      "condition": "Toestand",
+      "conditionNew": "🆕 Nuut",
+      "conditionLikeNew": "✨ Soos nuut",
+      "conditionGood": "👍 Goed",
+      "conditionFair": "👌 Redelik",
+      "description": "Beskrywing",
+      "descriptionPlaceholder": "Beskryf jou item — wat ingesluit is, sy toestand, enige bykomstighede, en enigiets wat 'n huurder moet weet…",
+      "charCount": "{count} / 50+ karakters",
+      "replacementValue": "Vervangingswaarde (R)",
+      "quantityAvailable": "Beskikbare hoeveelheid",
+      "province": "Provinsie",
+      "provincePlaceholder": "bv. Gauteng",
+      "city": "Stad / dorp",
+      "cityPlaceholder": "bv. Johannesburg",
+      "categoryDetailsRequired": "Vul asseblief al die {category}-besonderhede in.",
+      "errors": {
+        "titleTooShort": "Titel moet ten minste 10 karakters wees",
+        "categoryRequired": "Kies asseblief 'n kategorie",
+        "conditionRequired": "Kies asseblief 'n toestand",
+        "descriptionTooShort": "Beskrywing moet ten minste 50 karakters wees",
+        "required": "Vereis",
+        "replacementValueRequired": "Voer die item se vervangingswaarde in"
+      },
+      "genericSelectPlaceholder": "Kies…"
+    },
+    "photos": {
+      "heading": "Itemfoto's (minimum 3)",
+      "desc": "Laai duidelike foto's uit verskillende hoeke op. Die eerste foto is die dekfoto — gebruik die sterknoppie om dit te verander.",
+      "dropzoneTitle": "Klik om op te laai of sleep en los",
+      "dropzoneHint": "JPG, PNG, WEBP — tot 10MB elk",
+      "cover": "Dekfoto",
+      "makePrimary": "Maak primêr",
+      "moveEarlier": "Skuif vroeër",
+      "moveLater": "Skuif later",
+      "remove": "Verwyder",
+      "existingPhotoAlt": "Bestaande foto {index}",
+      "newPhotoAlt": "Nuwe foto {index}",
+      "addMore": "Voeg meer by",
+      "damagePhotoNotice": "Een van die foto's hierbo wys duidelik die skade/gebreke wat vroeër verklaar is — vereis omdat gebreke verklaar is.",
+      "errors": {
+        "minPhotos": "Laai asseblief ten minste 3 foto's op",
+        "damagePhotoRequired": "'n Skade-nabyfoto word vereis aangesien gebreke in die vorige stap verklaar is"
+      }
+    },
+    "ownership": {
+      "whyHeading": "Waarom benodig ons dit?",
+      "whyBody": "Eienaarskapbewys beskerm beide jou en huurders. Dit word binne 24 uur deur Unity hersien. Aanvaar: aankoopkwitansie, foto van reeksnommer, waarborgkaart, of kort video van die item.",
+      "proofLabel": "Bewys van eienaarskap",
+      "existingProofTitle": "Bestaande bewys op rekord",
+      "existingProofDesc": "Klik hieronder om dit te vervang",
+      "replace": "Vervang",
+      "dropzoneTitle": "Klik om op te laai",
+      "dropzoneHint": "JPG, PNG, PDF, MP4 — tot 50MB",
+      "knownDefectsLabel": "Bekende gebreke of skade",
+      "knownDefectsLabelHint": "(laat leeg indien geen)",
+      "knownDefectsPlaceholder": "Beskryf enige bestaande skade, slytasie, of ontbrekende dele wat 'n huurder moet weet…",
+      "knownDefectsNotice": "Unity laat nie toe dat bekende gebreke weggesteek word nie — bekendgemaakte items word steeds verhuur, onbekendgemaakte items loop die risiko van geskille.",
+      "confirmLabel": "Ek bevestig dat die beskryfde toestand en gebreke akkuraat is.",
+      "errors": {
+        "proofRequired": "Laai asseblief bewys van eienaarskap op",
+        "confirmRequired": "Bevestig asseblief dat die beskryfde toestand en gebreke akkuraat is"
+      }
+    },
+    "pricing": {
+      "salePrice": "Verkoopprys (R)",
+      "dailyRate": "Daaglikse tarief (R)",
+      "weeklyRate": "Weeklikse tarief (R)",
+      "minRentalDays": "Minimum verhuring (dae)",
+      "insurancePerDay": "Versekering per dag (R)",
+      "insuranceHint": "Gehef aan die huurder per dag. Los leeg om oor te slaan.",
+      "whoPaysShipping": "Wie betaal aflewering?",
+      "shippingRenter": "🧑 Huurder betaal",
+      "shippingMerchant": "🏪 Ek dek dit (gratis aflewering)",
+      "shippingSplit": "🤝 Verdeel 50/50",
+      "shippingNegotiate": "💬 Onderhandel met huurder",
+      "availabilityHeading": "Beskikbaarheid",
+      "availableFrom": "Beskikbaar vanaf",
+      "maxRentalDays": "Maksimum verhuring (dae)",
+      "minBookingNotice": "Minimum besprekingskennisgewing (dae)",
+      "maxAdvanceBooking": "Maksimum vooruitbespreking (dae)",
+      "blockedDates": {
+        "heading": "Geblokkeerde datums",
+        "desc": "Datums waarop hierdie item nie bespreek kan word nie (instandhouding, persoonlike gebruik, ens.).",
+        "reasonPlaceholder": "Rede (opsioneel)",
+        "addRange": "+ Voeg geblokkeerde reeks by",
+        "errors": {
+          "chooseDates": "Kies beide 'n begin- en einddatum",
+          "startBeforeEnd": "Begindatum moet voor die einddatum wees",
+          "overlap": "Hierdie reeks oorvleuel 'n bestaande geblokkeerde reeks"
+        }
+      },
+      "errors": {
+        "minRate": "Minimum tarief is R10/dag",
+        "availabilityStartRequired": "Kies asseblief 'n beskikbaarheid-begindatum",
+        "maxLessThanMin": "Maksimum verhuringsduur kan nie minder as die minimum wees nie",
+        "salePriceRequired": "Voer 'n verkoopprys in"
+      }
+    },
+    "requirements": {
+      "infoNotice": "Stel die minimum vereiste vir huurders. As 'n huurder nie aan jou vereistes voldoen nie, sal hulle 'n duidelike boodskap sien wat verduidelik waarom voordat hulle kan bespreek.",
+      "unityScoreHeading": "Minimum Unity-telling",
+      "unityScoreDesc": "Slegs huurders met hierdie telling of hoër kan bespreek",
+      "unityScoreNone": "Geen minimum",
+      "unityScoreGood": "3.0+ (Goeie aansien)",
+      "unityScoreTrusted": "3.5+ (Vertrou)",
+      "unityScoreHighlyTrusted": "4.0+ (Hoogs vertrou)",
+      "unityScoreElite": "4.5+ (Elite)",
+      "depositHeading": "Sekuriteitsdeposito",
+      "depositDesc": "Gemagtig by uitkyk en vrygestel wanneer die item onbeskadig terugkom",
+      "depositAmount": "Depositobedrag (R)",
+      "renterRequirementsHeading": "Huurdervereistes",
+      "verifiedIdentityRequired": "Geverifieerde identiteit vereis",
+      "kycApprovedRequired": "Goedgekeurde KYC vereis",
+      "minAge": "Minimum ouderdom",
+      "drivingLicenceRequired": "Bestuurslisensie vereis",
+      "licenceClassPlaceholder": "bv. Kode B",
+      "additionalRequirements": "Bykomende vereistes",
+      "usageRulesHeading": "Gebruiksreëls",
+      "permittedUse": "Toegelate gebruik",
+      "prohibitedUse": "Verbode gebruik",
+      "geographicRestriction": "Geografiese beperking",
+      "geographicRestrictionPlaceholder": "bv. Slegs binne Gauteng",
+      "commercialUseAllowed": "Kommersiële gebruik toegelaat",
+      "subRentalAllowed": "Subverhuring toegelaat",
+      "cleaningRequirements": "Skoonmaakvereistes",
+      "returnConditionRequirements": "Terugbesorgingstoestandvereistes",
+      "additionalRules": "Bykomende reëls",
+      "additionalRulesHint": "(opsioneel, maks 2000 karakters)",
+      "damageInspectionHeading": "Skade & inspeksie",
+      "existingDamageDescription": "Bestaande skadebeskrywing",
+      "inspectionBeforeHandover": "Inspeksie vereis voor oorhandiging",
+      "inspectionOnReturn": "Inspeksie vereis by teruggawe",
+      "missingAccessoryConsequence": "Gevolg van ontbrekende bykomstigheid",
+      "lostItemConsequence": "Gevolg van verlore item",
+      "riskTierHeading": "Risikovlak: {tier}",
+      "riskTierDesc": "Outomaties toegeken deur Unity se Risiko-enjin op grond van kategorie, prys, en jou handelaarstatus — dit kan nie handmatig verander word nie.",
+      "riskOwnershipVerification": "Eienaarskapverifikasie vereis",
+      "riskInspectionVideo": "Inspeksievideo vereis",
+      "riskDepositMandatory": "Deposito verpligtend voor publisering",
+      "riskDepositRecommended": "Deposito aanbeveel",
+      "riskInsuranceMandatory": "Versekering verpligtend voor publisering",
+      "riskManualReview": "Vereis handmatige hersiening deur Unity voordat dit lewend gaan",
+      "riskNoRequirements": "Geen deposito of eienaarskapverifikasie vereis nie",
+      "errors": {
+        "licenceClassRequired": "Lisensieklas word vereis wanneer 'n bestuurslisensie vereis word"
+      },
+      "riskTierLow": "Lae Risiko",
+      "riskTierMedium": "Matige Risiko",
+      "riskTierHigh": "Hoë Risiko"
+    },
+    "affiliates": {
+      "infoNotice": "Wanneer filiale geaktiveer is, kan ander Unity-lede jou lysing deel met 'n verwysingskakel. Jy betaal hulle slegs kommissie op voltooide verhurings — geen vooraf-koste nie.",
+      "acceptAffiliates": "Aanvaar filiale",
+      "acceptAffiliatesDesc": "Laat toe dat ander huurders na hierdie lysing verwys",
+      "commissionRate": "Kommissiekoers (%)",
+      "commissionRatePlaceholder": "bv. 10",
+      "commissionRateHint": "1–50%. Kommissie word van jou verhuringsfooi afgetrek nadat die bespreking voltooi is.",
+      "reviewListing": "Hersien lysing"
+    },
+    "review": {
+      "submitNotice": "Indiening stuur jou lysing vir hersiening — dit gaan nie lewend totdat Unity bevestig dat dit aan die vereistes vir sy risikovlak voldoen nie. Jy kan as konsep stoor en enige tyd voor dan terugkom.",
+      "rows": {
+        "title": "Titel",
+        "category": "Kategorie",
+        "condition": "Toestand",
+        "listingType": "Lysingtipe",
+        "salePrice": "Verkoopprys",
+        "dailyRate": "Daaglikse tarief",
+        "weeklyRate": "Weeklikse tarief",
+        "minDays": "Min. dae",
+        "insurance": "Versekering",
+        "shipping": "Aflewering",
+        "minUnityScore": "Min. Unity-telling",
+        "deposit": "Deposito",
+        "riskTier": "Risikovlak",
+        "affiliates": "Filiale",
+        "photos": "Foto's",
+        "ownership": "Eienaarskap"
+      },
+      "dash": "—",
+      "notForSale": "Nie te koop nie",
+      "notSet": "Nie gestel nie",
+      "none": "Geen",
+      "noMinimum": "Geen minimum",
+      "no": "Nee",
+      "yesCommission": "Ja — {rate}% kommissie",
+      "onFile": "Op rekord",
+      "daysUnit": "{count} dag(e)",
+      "photosUploaded": "{count} opgelaai",
+      "listingTypeRental": "Slegs verhuur",
+      "listingTypeSale": "Slegs verkoop",
+      "listingTypeBoth": "Verhuur & verkoop",
+      "shippingRenter": "Huurder betaal",
+      "shippingMerchantFree": "Gratis (handelaar)",
+      "shippingSplit": "Verdeel 50/50",
+      "shippingNegotiate": "Onderhandel",
+      "declarationsLabel": "Verklarings",
+      "fullPolicyText": "Volledige beleidsteks:",
+      "rentalTerms": "Huurbepalings",
+      "and": "en",
+      "prohibitedItemsPolicy": "Verbode Items-beleid",
+      "saveAsDraft": "Stoor as konsep",
+      "saving": "Stoor tans…",
+      "submitForReview": "Dien in vir hersiening",
+      "submitting": "Dien tans in…",
+      "acceptAllToSubmit": "Aanvaar alle verklarings om in te dien",
+      "errors": {
+        "notSignedIn": "Jy moet aangemeld wees om 'n lysing te stoor",
+        "couldNotSave": "Kon nie jou lysing stoor nie",
+        "couldNotSubmit": "Kon nie jou lysing indien nie"
+      }
+    }
+  },
+  "subscriptionPage": {
+    "backLabel": "Terug",
+    "eyebrow": "Handelaarrekening",
+    "heading": "Subskripsie",
+    "loading": "Laai tans…",
+    "couldNotLoad": "Kon nie jou subskripsie laai nie",
+    "currentPlanLabel": "Huidige Plan",
+    "free": "Gratis",
+    "perMonth": "/maand",
+    "salesSuffix": "verkope",
+    "rentalsSuffix": "verhurings",
+    "barterSuffix": "ruilhandel",
+    "scheduledChange": "Geskeduleer om te verander na <b>{plan}</b> op {date}",
+    "working": "Verwerk tans…",
+    "cancelThisChange": "Kanselleer hierdie verandering",
+    "revertingToStarter": "Keer terug na Starter op {date}",
+    "keepMyPlan": "Hou my plan",
+    "activeListings": "Aktiewe Noterings",
+    "limitReached": "Perk bereik — gradeer op om meer te aktiveer",
+    "thisMonthsCost": "Hierdie Maand se Koste",
+    "volumeThisMonth": "Volume Hierdie Maand",
+    "savingsNotice": "Gebaseer op hierdie maand se volume, kan jy {amount} per maand bespaar op die {plans} plan.",
+    "allPlans": "Alle Planne",
+    "estimatedPerMonth": "/md geskat",
+    "upgrade": "Gradeer op",
+    "downgrade": "Gradeer af",
+    "cheapestForVolume": "Goedkoopste vir jou volume",
+    "billingNotice": "Opgraderings geld onmiddellik. Afgraderings en kansellasies tree in werking aan die begin van jou volgende faktureringstydperk — jy behou jou huidige plan se voordele tot dan.",
+    "errors": {
+      "networkError": "Netwerkfout — probeer asseblief weer",
+      "somethingWentWrong": "Iets het verkeerd geloop"
+    }
+  },
+  "commissionsPage": {
+    "backLabel": "Terug",
+    "earningsLabel": "Verdienste",
+    "heading": "Unity-kommissie",
+    "totalCommissionLabel": "Totale Kommissie (nog altyd)",
+    "chargedNotice": "Van jou, die handelaar, gehef — nooit bo-op wat jou kliënt betaal nie",
+    "transactionHistoryLabel": "Transaksiegeskiedenis",
+    "loading": "Laai tans…",
+    "noCommissionedTransactions": "Nog geen gekommissieerde transaksies nie",
+    "transactionFallbackSale": "verkooptransaksie",
+    "transactionFallbackRental": "huurtransaksie",
+    "eligibleAmountLabel": "Kwalifiserende bedrag",
+    "unityCommissionLabel": "Unity-kommissie ({rate}%{excess})",
+    "excessSuffix": " + 1.0% bo R100 000",
+    "affiliateRewardLabel": "Verwysingsbeloning",
+    "proceedsBasisLabel": "Jou opbrengsbasis",
+    "highValueNotice": "Hoëwaarde-verkoop: die {rate}%-plankoers is toegepas op die eerste R100 000 ({amount}), en 1.0% is toegepas op die oorblywende {remaining}.",
+    "footerNotice": "Unity-kommissie en enige verwysingsbeloning wat jy geaktiveer het, word van jou eie opbrengs afgetrek — jou kliënt betaal nooit 'n bykomende Unity-fooi nie.",
+    "managePlanLink": "Bestuur jou plan"
+  },
+  "listingsPage": {
+    "backLabel": "Terug",
+    "eyebrow": "Jou Noterings",
+    "heading": "My Noterings",
+    "totalCount": "{count, plural, one {# notering in totaal} other {# noterings in totaal}}",
+    "activeLabel": "Aktief",
+    "pausedLabel": "Onderbreek",
+    "draftsLabel": "Konsepte",
+    "emptyTitle": "Nog geen noterings nie",
+    "emptyDesc": "Lys iets wat jy besit en begin verdien.",
+    "createFirst": "Skep Jou Eerste Notering",
+    "perDay": "/dag",
+    "viewsCount": "{count, plural, one {# besigtiging} other {# besigtigings}}",
+    "bookingsCount": "{count, plural, one {# bespreking} other {# besprekings}}",
+    "viewListingTitle": "Bekyk notering",
+    "editAndResubmitTitle": "Wysig en dien weer in",
+    "continueEditingDraftTitle": "Gaan voort om konsep te wysig",
+    "editUnavailableTitle": "Om 'n ingediende notering te wysig is nog nie beskikbaar nie",
+    "pauseListingTitle": "Onderbreek notering",
+    "activateListingTitle": "Aktiveer notering"
+  }
+}

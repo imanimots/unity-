@@ -1,0 +1,76 @@
+{
+  "postRequest": "Thumela isicelo",
+  "newRequestPage": {
+    "metaTitle": "Thumela Isicelo — Unity",
+    "sectionLabel": "Ukufuna",
+    "headingLine1": "Thumela Lokho",
+    "headingLine2": "Okudingayo.",
+    "imLookingTo": "Ngifuna uku-",
+    "title": "Isihloko",
+    "titlePlaceholder": "isb. Ngifuna umshini wokugeza ngamandla",
+    "description": "Incazelo",
+    "category": "Isigaba",
+    "city": "Idolobha",
+    "budgetMin": "Isabelomali esincane (ZAR)",
+    "budgetMax": "Isabelomali esikhulu (ZAR)",
+    "startDate": "Usuku lokuqala",
+    "endDate": "Usuku lokugcina",
+    "barterOfferLabel": "Yini ongayinikela ekushintshaniseni?",
+    "posting": "Kuyathunyelwa…",
+    "postRequestButton": "Thumela isicelo",
+    "errors": {
+      "couldNotCreate": "Ayikwazanga ukudala isicelo",
+      "verificationRequired": "Kudingeka uqedele ukuqinisekiswa ngaphambi kokushicilela isicelo. Isicelo sakho sigcinwe njengohlaka.",
+      "couldNotPublish": "Ayikwazanga ukushicilela isicelo",
+      "networkError": "Iphutha lenethiwekhi — sicela uzame futhi"
+    }
+  },
+  "offersReceived": "{count, plural, one {umnikelo o-# otholiwe} other {iminikelo engu-# etholiwe}}",
+  "status": {
+    "draft": "Uhlaka",
+    "active": "Kuyasebenza",
+    "offersReceived": "Iminikelo etholiwe",
+    "matched": "Kufaniswe",
+    "closed": "Kuvaliwe",
+    "archived": "Kubekiwe"
+  },
+  "detail": {
+    "lookingToTransact": "Ufuna uku-{type} · {status}",
+    "postedByPrefix": "Kuthunyelwe ngu",
+    "verified": "· Kuqinisekisiwe",
+    "category": "Isigaba",
+    "location": "Indawo",
+    "budget": "Isabelomali",
+    "dates": "Izinsuku",
+    "expires": "Kuphelelwa yisikhathi",
+    "respondToRequest": "Phendula lesi sicelo",
+    "respond": "Phendula",
+    "privateOffer": "Umnikelo womuntu siqu",
+    "linkListing": "Xhuma into efakiwe",
+    "messageOnly": "Umlayezo kuphela",
+    "amountPlaceholder": "Inani (ZAR)",
+    "messagePlaceholder": "Umlayezo",
+    "send": "Thumela",
+    "yourResponse": "Impendulo yakho",
+    "statusLabel": "Isimo: {status}",
+    "withdraw": "Hoxisa",
+    "responses": "Izimpendulo ({count})",
+    "noResponses": "Azikho izimpendulo okwamanje.",
+    "accept": "Yamukela",
+    "decline": "Yenqaba",
+    "couldNotSubmit": "Asikwazanga ukuthumela umnikelo",
+    "couldNotAccept": "Asikwazanga ukwamukela umnikelo",
+    "networkError": "Iphutha lenethiwekhi",
+    "offerTypes": {
+      "private_offer": "umnikelo womuntu siqu",
+      "link_listing": "into exhunyiwe efakiwe",
+      "message_only": "umlayezo kuphela"
+    },
+    "offerStatus": {
+      "pending": "kulindiwe",
+      "accepted": "kwamukelwe",
+      "declined": "kwenqatshiwe",
+      "withdrawn": "kuhoxisiwe"
+    }
+  }
+}

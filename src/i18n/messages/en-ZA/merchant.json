@@ -1,0 +1,703 @@
+{
+  "dashboard": "Merchant Dashboard",
+  "listAnItem": "List an Item",
+  "earningsOverview": "Earnings overview",
+  "pendingRequests": "Pending booking requests",
+  "subscription": {
+    "starter": "Starter",
+    "pro": "Pro",
+    "elite": "Elite"
+  },
+  "commissions": "Commissions",
+  "commissionStatus": {
+    "pending": "Pending",
+    "held": "Under review",
+    "earned": "Finalized",
+    "adjusted": "Adjusted",
+    "voided": "Voided (refunded)"
+  },
+  "payouts": "Payouts",
+  "affiliate": {
+    "acceptAffiliates": "Accept Affiliates",
+    "commissionRate": "Commission rate"
+  },
+  "home": {
+    "welcomeBack": "Welcome back, {name}",
+    "heading": "Merchant Dashboard",
+    "listAnItem": "List an Item",
+    "kycBanner": {
+      "title": "Complete KYC to publish listings",
+      "message": "Identity verification is required before your first listing goes live.",
+      "cta": "Verify Now"
+    },
+    "earnings": {
+      "sectionLabel": "Earnings",
+      "totalEarned": "Total Earned — Completed Rentals",
+      "viewPayouts": "View payouts"
+    },
+    "stats": {
+      "activeListings": "Active Listings",
+      "pendingRequests": "Pending Requests",
+      "unityScore": "Unity Score"
+    },
+    "recentBookings": {
+      "sectionLabel": "Recent Bookings",
+      "heading": "Booking Requests",
+      "viewAll": "View all",
+      "emptyTitle": "No pending requests",
+      "emptyDesc": "Create a listing to start receiving booking requests.",
+      "createFirst": "Create Your First Listing",
+      "legacyStatus": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "active": "Active",
+        "returned": "Returned",
+        "disputed": "Disputed",
+        "cancelled": "Cancelled"
+      }
+    },
+    "yourListings": {
+      "sectionLabel": "Your Listings",
+      "heading": "My Listings",
+      "manage": "Manage",
+      "emptyTitle": "No listings yet",
+      "emptyDesc": "List an item and start earning from what you own."
+    },
+    "quickLinks": {
+      "sectionLabel": "Quick Links",
+      "payouts": "Payouts",
+      "payoutsDesc": "Earnings & withdrawals",
+      "commission": "Unity Commission",
+      "commissionDesc": "What Unity charges you",
+      "affiliates": "Affiliates",
+      "affiliatesDesc": "Referral commissions",
+      "subscription": "Subscription"
+    },
+    "planStarter": "Starter · Up to 5 listings",
+    "planUnlimited": "{plan} · Unlimited listings",
+    "planLimited": "{plan} · Up to {count} listings"
+  },
+  "payoutsPage": {
+    "sectionLabel": "Earnings",
+    "heading": "Payouts",
+    "back": "Back",
+    "totalPaid": "Total Paid",
+    "manualNotice": "Manually recorded by Unity — no automated provider is connected",
+    "pending": "Pending",
+    "processing": "Processing",
+    "failed": "Failed",
+    "historyLabel": "Payout History",
+    "loading": "Loading…",
+    "emptyTitle": "No payouts yet",
+    "emptyDesc": "A payout is created automatically once a rental completes.",
+    "defaultTitle": "Rental payout",
+    "reference": "Reference: {reference}",
+    "status": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "paid": "Paid",
+      "failed": "Failed"
+    },
+    "statusExplanations": {
+      "pending": "Unity has created your payout record. It has not started processing yet.",
+      "processing": "Unity is processing this payout. No automated payout provider is currently connected.",
+      "paid": "Unity recorded this payout as paid.",
+      "failed": "This payout could not be completed. Unity will review or retry it."
+    },
+    "footerNotice": "Payouts are recorded manually by Unity while no automated payout provider is connected.",
+    "contactSupport": "Contact support"
+  },
+  "affiliateProgram": {
+    "sectionLabel": "Referral Program",
+    "back": "Back",
+    "becomeAffiliate": {
+      "heading": "Become an Affiliate",
+      "description": "Earn commission on completed rentals and sales you refer, only on listings the merchant has specifically enabled. Barter trades never earn commission.",
+      "noApproval": "No approval needed — activate instantly and start earning today.",
+      "shareLinks": "Share links",
+      "shareLinksDesc": "for any listing that accepts affiliates",
+      "earnCommission": "Earn commission",
+      "earnCommissionDesc": "on completed eligible sales or rentals",
+      "trackEarnings": "Track earnings",
+      "trackEarningsDesc": "in your affiliate dashboard",
+      "activating": "Activating…",
+      "cta": "Become an Affiliate"
+    },
+    "heading": "Affiliate Program",
+    "yourCode": "Your Affiliate Code",
+    "copied": "Copied!",
+    "copyCode": "Copy Code",
+    "browseListings": "Browse listings",
+    "codeNotice": "Browse affiliate-enabled listings below and copy your share link — commission is only earned on listings the merchant has enabled, and never on barter trades.",
+    "totalPaid": "Total Paid",
+    "inProgress": "In Progress",
+    "commissionsCount": "Commissions",
+    "enabledListings": "Affiliate-Enabled Listings",
+    "loading": "Loading…",
+    "noEnabledListings": "No listings currently accept affiliates.",
+    "commissionRatePct": "{rate}% commission",
+    "copyLink": "Copy link",
+    "commissionHistory": "Commission History",
+    "all": "All",
+    "noCommissionsInCategory": "No commissions in this category yet.",
+    "table": {
+      "listing": "Listing",
+      "type": "Type",
+      "commission": "Commission",
+      "status": "Status"
+    },
+    "footerNotice": "Commissions are processed automatically after a short review period.",
+    "contactSupport": "Contact support",
+    "commissionStatus": {
+      "pending": "Pending review",
+      "held": "Held",
+      "approved": "Approved",
+      "payout_queued": "Payout queued",
+      "processing": "Processing payout",
+      "paid": "Paid",
+      "failed": "Payout failed",
+      "voided": "Voided",
+      "reversed": "Reversed"
+    }
+  },
+  "affiliateManagement": {
+    "sectionLabel": "Referral Program",
+    "back": "Back",
+    "heading": "Affiliates",
+    "infoNotice": "Enable affiliates per listing below. Commission is only charged on completed eligible sales or rental payments — never on deposits, refunds, or barter trades. Affiliate payouts are handled automatically by Unity on your behalf.",
+    "attributedCustomers": "Attributed Customers",
+    "costPaid": "Commission Cost — Paid",
+    "costInProgress": "Commission Cost — In Progress",
+    "loading": "Loading…",
+    "noListings": "You have no listings yet.",
+    "table": {
+      "listing": "Listing",
+      "rate": "Rate",
+      "attributed": "Attributed",
+      "sales": "Sales",
+      "rentals": "Rentals",
+      "costPaid": "Cost paid",
+      "costPending": "Cost pending",
+      "enabled": "Enabled"
+    },
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "footerNotice": "The commission rate for each listing is set in the listing editor.",
+    "learnMore": "Learn more about the Ambassador program →",
+    "errorLoad": "Could not load your listings"
+  },
+  "rtbTerms": {
+    "heading": "Rent-to-Buy Terms",
+    "back": "Back",
+    "enabledNotice": "Rent-to-buy is enabled for this listing.",
+    "disabledNotice": "Rent-to-buy is not yet enabled for this listing.",
+    "ownershipNotice": "You remain the owner of the item until the customer has paid the full amount below.",
+    "loading": "Loading…",
+    "termsSaved": "Terms saved.",
+    "totalPurchasePrice": "Total rent-to-buy purchase price (ZAR)",
+    "installmentAmount": "Instalment amount (ZAR)",
+    "installmentCount": "Number of instalments",
+    "paymentFrequency": "Payment frequency",
+    "securityDeposit": "Security deposit (ZAR, optional — never counts toward the purchase price)",
+    "allowEarlyPayoff": "Allow the customer to pay off the remaining balance early",
+    "allowCure": "Allow the customer to cure a default and resume the agreement",
+    "saveAndEnable": "Save and enable",
+    "saveAsDisabled": "Save as disabled",
+    "errors": {
+      "couldNotSave": "Could not save terms"
+    }
+  },
+  "pricing": {
+    "sectionLabel": "Merchant Plans",
+    "heading": "Simple, transparent pricing",
+    "subheading": "No monthly fee to get started. Upgrade any time for lower commission rates and unlimited listings. Barter trades never carry a commission, on any plan.",
+    "currentPlan": "Your current plan",
+    "free": "Free",
+    "perMonth": "/month",
+    "salesCommission": "{rate} commission on sales",
+    "rentalCommission": "{rate} commission on rentals",
+    "noBarterCommission": "No commission on barter trades",
+    "upToListings": "Up to {count} active listings",
+    "unlimitedListings": "Unlimited active listings",
+    "managePlan": "Manage plan",
+    "changePlan": "Change plan",
+    "getStarted": "Get started",
+    "footerNotice": "Commission is charged only on completed sales and rentals. Downgrades and cancellations take effect at the start of your next billing period; upgrades apply immediately.",
+    "unavailable": "Pricing is temporarily unavailable."
+  },
+  "ambassadors": {
+    "metaTitle": "Ambassador Program — Unity",
+    "metaDescription": "Earn commission referring new renters and merchants to Unity.",
+    "earnWithUnity": "EARN WITH UNITY",
+    "headingLine1": "BECOME AN",
+    "headingLine2": "AMBASSADOR.",
+    "heroDescription": "Refer merchants to the Unity platform and earn commission on every rental they complete — for as long as they list with us.",
+    "joinViaWarp": "Join via Warp",
+    "noCostNotice": "No cost to join · Payouts monthly via Warp",
+    "stats": {
+      "maxCommission": "Max commission rate",
+      "payoutSchedule": "Payout schedule",
+      "payoutScheduleValue": "Monthly",
+      "trackingLabel": "Tracking on referred listings",
+      "trackingValue": "Lifetime"
+    },
+    "processLabel": "THE PROCESS",
+    "howItWorksHeading": "How it works",
+    "steps": {
+      "apply": {
+        "title": "Apply via Warp",
+        "desc": "Sign up through our affiliate partner Warp. No upfront cost, no commitment."
+      },
+      "getLink": {
+        "title": "Get your link",
+        "desc": "Receive a unique referral link you can share anywhere — social, WhatsApp, email."
+      },
+      "refer": {
+        "title": "Refer merchants",
+        "desc": "Merchants who sign up through your link and list items are tracked automatically."
+      },
+      "earn": {
+        "title": "Earn commission",
+        "desc": "Get a percentage of every completed rental made via listings you referred."
+      }
+    },
+    "commissionStructureLabel": "COMMISSION STRUCTURE",
+    "earnMoreHeading": "Earn more as you grow.",
+    "tierBasisNotice": "Your tier is based on total active merchants you've referred. Upgrades happen automatically.",
+    "mostPopular": "Most popular",
+    "activeReferrals": "active referrals",
+    "commissionSuffix": "commission",
+    "tiers": {
+      "starter": {
+        "name": "Starter",
+        "referrals": "1–4",
+        "commission": "5%",
+        "perks": [
+          "Personal referral link",
+          "Monthly commission payouts",
+          "Ambassador badge on profile"
+        ]
+      },
+      "growth": {
+        "name": "Growth",
+        "referrals": "5–19",
+        "commission": "8%",
+        "perks": [
+          "Everything in Starter",
+          "Priority support",
+          "Early access to new features",
+          "Quarterly bonus pool"
+        ]
+      },
+      "elite": {
+        "name": "Elite",
+        "referrals": "20+",
+        "commission": "12%",
+        "perks": [
+          "Everything in Growth",
+          "Dedicated account manager",
+          "Co-marketing opportunities",
+          "Annual retreat invite"
+        ]
+      }
+    },
+    "requirementsLabel": "REQUIREMENTS",
+    "eligibilityHeading": "Eligibility",
+    "eligibility": [
+      "Must be a registered Unity user with verified KYC",
+      "Based in a country where Unity operates",
+      "Agree to Warp affiliate terms of service",
+      "Must not refer yourself or existing Unity merchants",
+      "No history of platform violations or disputes"
+    ],
+    "idealForLabel": "IDEAL FOR",
+    "whoThrivesHeading": "Who thrives",
+    "whoThrives": {
+      "communityBuilders": {
+        "title": "Community builders",
+        "desc": "WhatsApp admins, Facebook group owners, local event organisers."
+      },
+      "contentCreators": {
+        "title": "Content creators",
+        "desc": "Bloggers, YouTubers, and social influencers in lifestyle or outdoor niches."
+      },
+      "networks": {
+        "title": "Networks",
+        "desc": "Business associations, co-working spaces, or township economy organisers."
+      }
+    },
+    "getStartedLabel": "GET STARTED",
+    "readyHeading": "Ready to start earning?",
+    "readyDesc": "Applications take under 5 minutes. Once approved by Warp, your referral link is live immediately.",
+    "applyNowViaWarp": "Apply now via Warp",
+    "alreadyAmbassador": "Already an ambassador? View your dashboard →"
+  },
+  "skillTaskPosts": {
+    "heading": "Skills & Tasks",
+    "newPost": "New post",
+    "emptyTitle": "No Skill/Task posts yet",
+    "emptyDesc": "Offer a skill, request help with a task, or find someone to trade with.",
+    "untitledDraft": "Untitled draft",
+    "view": "View",
+    "edit": "Edit",
+    "offers": "Offers",
+    "actions": {
+      "pause": "Pause",
+      "resume": "Resume",
+      "close": "Close",
+      "archive": "Archive",
+      "repost": "Repost",
+      "working": "Working…"
+    },
+    "errors": {
+      "actionFailed": "Action failed",
+      "actionFailedRetry": "Action failed — please try again"
+    }
+  },
+  "listingCreation": {
+    "heading": "Create a listing",
+    "stepProgress": "Step {current} of {total} — {desc}",
+    "steps": {
+      "type": {
+        "title": "Type",
+        "desc": "Sell, rent, or both"
+      },
+      "basics": {
+        "title": "Basics",
+        "desc": "Title, category & condition"
+      },
+      "photos": {
+        "title": "Photos",
+        "desc": "At least 3 item photos"
+      },
+      "ownership": {
+        "title": "Ownership",
+        "desc": "Proof of ownership"
+      },
+      "pricing": {
+        "title": "Pricing",
+        "desc": "Rates, insurance & shipping"
+      },
+      "requirements": {
+        "title": "Requirements",
+        "desc": "Deposit & renter criteria"
+      },
+      "affiliates": {
+        "title": "Affiliates",
+        "desc": "Referral program"
+      },
+      "review": {
+        "title": "Review",
+        "desc": "Confirm & publish"
+      }
+    },
+    "continue": "Continue",
+    "back": "Back",
+    "optional": "(optional)",
+    "toasts": {
+      "draftSaved": "Draft saved",
+      "submitted": "Listing submitted for review"
+    },
+    "type": {
+      "sellLabel": "SELL",
+      "sellDesc": "One-time purchase — the buyer pays once and keeps the item.",
+      "rentLabel": "RENT",
+      "rentDesc": "Renters pay for a date range and return the item afterwards.",
+      "bothLabel": "BOTH",
+      "bothDesc": "List it for rent and for sale at the same time."
+    },
+    "basics": {
+      "itemTitle": "Item title",
+      "itemTitlePlaceholder": "e.g. DJI Mavic 3 Pro Drone + ND Filters",
+      "category": "Category",
+      "categorySelectPlaceholder": "Select a category…",
+      "categoryDetailsHeading": "{category} details",
+      "keptPrivateNotice": "Kept private — never shown on the public listing",
+      "condition": "Condition",
+      "conditionNew": "🆕 New",
+      "conditionLikeNew": "✨ Like new",
+      "conditionGood": "👍 Good",
+      "conditionFair": "👌 Fair",
+      "description": "Description",
+      "descriptionPlaceholder": "Describe your item — what's included, its condition, any accessories, and anything a renter should know…",
+      "charCount": "{count} / 50+ chars",
+      "replacementValue": "Replacement value (R)",
+      "quantityAvailable": "Quantity available",
+      "province": "Province",
+      "provincePlaceholder": "e.g. Gauteng",
+      "city": "City / town",
+      "cityPlaceholder": "e.g. Johannesburg",
+      "categoryDetailsRequired": "Please fill in all {category} details.",
+      "errors": {
+        "titleTooShort": "Title must be at least 10 characters",
+        "categoryRequired": "Please select a category",
+        "conditionRequired": "Please select a condition",
+        "descriptionTooShort": "Description must be at least 50 characters",
+        "required": "Required",
+        "replacementValueRequired": "Enter the item's replacement value"
+      },
+      "genericSelectPlaceholder": "Select…"
+    },
+    "photos": {
+      "heading": "Item photos (minimum 3)",
+      "desc": "Upload clear photos from different angles. The first photo is the cover image — use the star button to change it.",
+      "dropzoneTitle": "Click to upload or drag & drop",
+      "dropzoneHint": "JPG, PNG, WEBP — up to 10MB each",
+      "cover": "Cover",
+      "makePrimary": "Make primary",
+      "moveEarlier": "Move earlier",
+      "moveLater": "Move later",
+      "remove": "Remove",
+      "existingPhotoAlt": "Existing photo {index}",
+      "newPhotoAlt": "New photo {index}",
+      "addMore": "Add more",
+      "damagePhotoNotice": "One of the photos above clearly shows the damage/defects described earlier — required since defects were declared.",
+      "errors": {
+        "minPhotos": "Please upload at least 3 photos",
+        "damagePhotoRequired": "A damage close-up photo is required since defects were declared in the previous step"
+      }
+    },
+    "ownership": {
+      "whyHeading": "Why do we need this?",
+      "whyBody": "Ownership proof protects both you and renters. It's reviewed by Unity within 24 hours. Accepted: purchase receipt, serial number photo, warranty card, or short video of the item.",
+      "proofLabel": "Proof of ownership",
+      "existingProofTitle": "Existing proof on file",
+      "existingProofDesc": "Click below to replace it",
+      "replace": "Replace",
+      "dropzoneTitle": "Click to upload",
+      "dropzoneHint": "JPG, PNG, PDF, MP4 — up to 50MB",
+      "knownDefectsLabel": "Known defects or damage",
+      "knownDefectsLabelHint": "(leave blank if none)",
+      "knownDefectsPlaceholder": "Describe any existing damage, wear, or missing parts a renter should know about…",
+      "knownDefectsNotice": "Unity does not allow hiding known defects — disclosed items still rent, undisclosed ones risk disputes.",
+      "confirmLabel": "I confirm that the condition and defects described are accurate.",
+      "errors": {
+        "proofRequired": "Please upload proof of ownership",
+        "confirmRequired": "Please confirm the condition and defects described are accurate"
+      }
+    },
+    "pricing": {
+      "salePrice": "Sale price (R)",
+      "dailyRate": "Daily rate (R)",
+      "weeklyRate": "Weekly rate (R)",
+      "minRentalDays": "Minimum rental (days)",
+      "insurancePerDay": "Insurance per day (R)",
+      "insuranceHint": "Charged to the renter per day. Leave blank to skip.",
+      "whoPaysShipping": "Who pays shipping?",
+      "shippingRenter": "🧑 Renter pays",
+      "shippingMerchant": "🏪 I cover it (free shipping)",
+      "shippingSplit": "🤝 Split 50/50",
+      "shippingNegotiate": "💬 Negotiate with renter",
+      "availabilityHeading": "Availability",
+      "availableFrom": "Available from",
+      "maxRentalDays": "Maximum rental (days)",
+      "minBookingNotice": "Minimum booking notice (days)",
+      "maxAdvanceBooking": "Maximum advance booking (days)",
+      "blockedDates": {
+        "heading": "Blocked dates",
+        "desc": "Dates this item is unavailable to book (maintenance, personal use, etc.).",
+        "reasonPlaceholder": "Reason (optional)",
+        "addRange": "+ Add blocked range",
+        "errors": {
+          "chooseDates": "Choose both a start and end date",
+          "startBeforeEnd": "Start date must be before the end date",
+          "overlap": "This range overlaps an existing blocked range"
+        }
+      },
+      "errors": {
+        "minRate": "Minimum rate is R10/day",
+        "availabilityStartRequired": "Please choose an availability start date",
+        "maxLessThanMin": "Maximum rental duration cannot be less than the minimum",
+        "salePriceRequired": "Enter a sale price"
+      }
+    },
+    "requirements": {
+      "infoNotice": "Set the minimum bar for renters. If a renter doesn't meet your requirements, they'll see a clear message explaining why before they can book.",
+      "unityScoreHeading": "Minimum Unity Score",
+      "unityScoreDesc": "Only renters with this score or above can book",
+      "unityScoreNone": "No minimum",
+      "unityScoreGood": "3.0+ (Good standing)",
+      "unityScoreTrusted": "3.5+ (Trusted)",
+      "unityScoreHighlyTrusted": "4.0+ (Highly trusted)",
+      "unityScoreElite": "4.5+ (Elite)",
+      "depositHeading": "Security deposit",
+      "depositDesc": "Authorized at checkout and released when the item comes back undamaged",
+      "depositAmount": "Deposit amount (R)",
+      "renterRequirementsHeading": "Renter requirements",
+      "verifiedIdentityRequired": "Verified identity required",
+      "kycApprovedRequired": "Approved KYC required",
+      "minAge": "Minimum age",
+      "drivingLicenceRequired": "Driving licence required",
+      "licenceClassPlaceholder": "e.g. Code B",
+      "additionalRequirements": "Additional requirements",
+      "usageRulesHeading": "Usage rules",
+      "permittedUse": "Permitted use",
+      "prohibitedUse": "Prohibited use",
+      "geographicRestriction": "Geographic restriction",
+      "geographicRestrictionPlaceholder": "e.g. Within Gauteng only",
+      "commercialUseAllowed": "Commercial use allowed",
+      "subRentalAllowed": "Sub-rental allowed",
+      "cleaningRequirements": "Cleaning requirements",
+      "returnConditionRequirements": "Return condition requirements",
+      "additionalRules": "Additional rules",
+      "additionalRulesHint": "(optional, max 2000 characters)",
+      "damageInspectionHeading": "Damage & inspection",
+      "existingDamageDescription": "Existing damage description",
+      "inspectionBeforeHandover": "Inspection required before handover",
+      "inspectionOnReturn": "Inspection required on return",
+      "missingAccessoryConsequence": "Missing accessory consequence",
+      "lostItemConsequence": "Lost item consequence",
+      "riskTierHeading": "Risk tier: {tier}",
+      "riskTierDesc": "Assigned automatically by Unity's Risk Engine from category, price, and your merchant standing — this can't be changed manually.",
+      "riskOwnershipVerification": "Ownership verification required",
+      "riskInspectionVideo": "Inspection video required",
+      "riskDepositMandatory": "Deposit mandatory before publishing",
+      "riskDepositRecommended": "Deposit recommended",
+      "riskInsuranceMandatory": "Insurance mandatory before publishing",
+      "riskManualReview": "Requires manual review by Unity before going live",
+      "riskNoRequirements": "No deposit or ownership verification required",
+      "errors": {
+        "licenceClassRequired": "Licence class is required when a driving licence is required"
+      },
+      "riskTierLow": "Low Risk",
+      "riskTierMedium": "Medium Risk",
+      "riskTierHigh": "High Risk"
+    },
+    "affiliates": {
+      "infoNotice": "When affiliates are enabled, other Unity members can share your listing with a referral link. You pay them a commission only on completed rentals — no upfront cost.",
+      "acceptAffiliates": "Accept affiliates",
+      "acceptAffiliatesDesc": "Allow others to refer renters to this listing",
+      "commissionRate": "Commission rate (%)",
+      "commissionRatePlaceholder": "e.g. 10",
+      "commissionRateHint": "1–50%. Commission is deducted from your rental fee after the booking is completed.",
+      "reviewListing": "Review listing"
+    },
+    "review": {
+      "submitNotice": "Submitting sends your listing for review — it won't go live until Unity confirms it meets the requirements for its risk tier. You can save as a draft and come back any time before then.",
+      "rows": {
+        "title": "Title",
+        "category": "Category",
+        "condition": "Condition",
+        "listingType": "Listing type",
+        "salePrice": "Sale price",
+        "dailyRate": "Daily rate",
+        "weeklyRate": "Weekly rate",
+        "minDays": "Min days",
+        "insurance": "Insurance",
+        "shipping": "Shipping",
+        "minUnityScore": "Min Unity Score",
+        "deposit": "Deposit",
+        "riskTier": "Risk tier",
+        "affiliates": "Affiliates",
+        "photos": "Photos",
+        "ownership": "Ownership"
+      },
+      "dash": "—",
+      "notForSale": "Not for sale",
+      "notSet": "Not set",
+      "none": "None",
+      "noMinimum": "No minimum",
+      "no": "No",
+      "yesCommission": "Yes — {rate}% commission",
+      "onFile": "On file",
+      "daysUnit": "{count} day(s)",
+      "photosUploaded": "{count} uploaded",
+      "listingTypeRental": "Rent only",
+      "listingTypeSale": "Sell only",
+      "listingTypeBoth": "Rent & sell",
+      "shippingRenter": "Renter pays",
+      "shippingMerchantFree": "Free (merchant)",
+      "shippingSplit": "Split 50/50",
+      "shippingNegotiate": "Negotiate",
+      "declarationsLabel": "Declarations",
+      "fullPolicyText": "Full policy text:",
+      "rentalTerms": "Rental Terms",
+      "and": "and",
+      "prohibitedItemsPolicy": "Prohibited Items Policy",
+      "saveAsDraft": "Save as draft",
+      "saving": "Saving…",
+      "submitForReview": "Submit for review",
+      "submitting": "Submitting…",
+      "acceptAllToSubmit": "Accept all declarations to submit",
+      "errors": {
+        "notSignedIn": "You must be signed in to save a listing",
+        "couldNotSave": "Could not save your listing",
+        "couldNotSubmit": "Could not submit your listing"
+      }
+    }
+  },
+  "subscriptionPage": {
+    "backLabel": "Back",
+    "eyebrow": "Merchant Account",
+    "heading": "Subscription",
+    "loading": "Loading…",
+    "couldNotLoad": "Could not load your subscription",
+    "currentPlanLabel": "Current Plan",
+    "free": "Free",
+    "perMonth": "/month",
+    "salesSuffix": "sales",
+    "rentalsSuffix": "rentals",
+    "barterSuffix": "barter",
+    "scheduledChange": "Scheduled to change to <b>{plan}</b> on {date}",
+    "working": "Working…",
+    "cancelThisChange": "Cancel this change",
+    "revertingToStarter": "Reverting to Starter on {date}",
+    "keepMyPlan": "Keep my plan",
+    "activeListings": "Active Listings",
+    "limitReached": "Limit reached — upgrade to activate more",
+    "thisMonthsCost": "This Month's Cost",
+    "volumeThisMonth": "Volume This Month",
+    "savingsNotice": "Based on this month's volume, you could save {amount} per month on the {plans} plan.",
+    "allPlans": "All Plans",
+    "estimatedPerMonth": "/mo estimated",
+    "upgrade": "Upgrade",
+    "downgrade": "Downgrade",
+    "cheapestForVolume": "Cheapest for your volume",
+    "billingNotice": "Upgrades apply immediately. Downgrades and cancellations take effect at the start of your next billing period — you keep your current plan's benefits until then.",
+    "errors": {
+      "networkError": "Network error — please try again",
+      "somethingWentWrong": "Something went wrong"
+    }
+  },
+  "commissionsPage": {
+    "backLabel": "Back",
+    "earningsLabel": "Earnings",
+    "heading": "Unity Commission",
+    "totalCommissionLabel": "Total Commission (all-time)",
+    "chargedNotice": "Charged to you, the merchant — never added on top of what your customer pays",
+    "transactionHistoryLabel": "Transaction History",
+    "loading": "Loading…",
+    "noCommissionedTransactions": "No commissioned transactions yet",
+    "transactionFallbackSale": "sale transaction",
+    "transactionFallbackRental": "rental transaction",
+    "eligibleAmountLabel": "Eligible amount",
+    "unityCommissionLabel": "Unity commission ({rate}%{excess})",
+    "excessSuffix": " + 1.0% above R100,000",
+    "affiliateRewardLabel": "Affiliate reward",
+    "proceedsBasisLabel": "Your proceeds basis",
+    "highValueNotice": "High-value sale: the {rate}% plan rate applied to the first R100,000 ({amount}), and 1.0% applied to the remaining {remaining}.",
+    "footerNotice": "Unity commission and any affiliate reward you've enabled are deducted from your own proceeds — your customer never pays an added Unity fee.",
+    "managePlanLink": "Manage your plan"
+  },
+  "listingsPage": {
+    "backLabel": "Back",
+    "eyebrow": "Your Listings",
+    "heading": "My Listings",
+    "totalCount": "{count, plural, one {# listing total} other {# listings total}}",
+    "activeLabel": "Active",
+    "pausedLabel": "Paused",
+    "draftsLabel": "Drafts",
+    "emptyTitle": "No listings yet",
+    "emptyDesc": "List something you own and start earning.",
+    "createFirst": "Create Your First Listing",
+    "perDay": "/day",
+    "viewsCount": "{count, plural, one {# view} other {# views}}",
+    "bookingsCount": "{count, plural, one {# booking} other {# bookings}}",
+    "viewListingTitle": "View listing",
+    "editAndResubmitTitle": "Edit and resubmit",
+    "continueEditingDraftTitle": "Continue editing draft",
+    "editUnavailableTitle": "Editing a submitted listing isn't available yet",
+    "pauseListingTitle": "Pause listing",
+    "activateListingTitle": "Activate listing"
+  }
+}

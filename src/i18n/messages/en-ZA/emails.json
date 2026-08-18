@@ -1,0 +1,9 @@
+{
+  "footer": {
+    "automatedNotice": "This is an automated message from Unity.",
+    "terms": "Terms",
+    "privacy": "Privacy",
+    "contact": "Contact"
+  },
+  "greeting": "Hi {name},"
+}

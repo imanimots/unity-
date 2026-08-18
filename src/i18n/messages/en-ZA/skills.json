@@ -1,0 +1,12 @@
+{
+  "label": "Skill",
+  "description": "A Skill is something a person can teach someone else.",
+  "available": {
+    "badge": "Available Skill",
+    "summary": "I can teach this"
+  },
+  "lookingFor": {
+    "badge": "Looking For Skill",
+    "summary": "I want to learn this"
+  }
+}

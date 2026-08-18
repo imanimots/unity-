@@ -1,0 +1,12 @@
+{
+  "label": "Vaardigheid",
+  "description": "'n Vaardigheid is iets wat een persoon vir 'n ander kan leer.",
+  "available": {
+    "badge": "Beskikbare Vaardigheid",
+    "summary": "Ek kan dit onderrig"
+  },
+  "lookingFor": {
+    "badge": "Op Soek Na Vaardigheid",
+    "summary": "Ek wil dit graag leer"
+  }
+}

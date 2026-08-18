@@ -1,0 +1,70 @@
+{
+  "label": "Ukuqasha-ukuze-uthenge",
+  "frequency": {
+    "weekly": "Njalo ngeviki",
+    "biweekly": "Emavikini amabili",
+    "monthly": "Njalo ngenyanga"
+  },
+  "instalment": "Isavenga",
+  "possessionEligible": "Ufanelekile ukuthatha into",
+  "status": {
+    "pendingMerchantAcceptance": "Kulindwe ukwamukelwa ngumthengisi",
+    "awaitingFirstPayment": "Kulindwe inkokhelo yokuqala",
+    "active": "Kuyasebenza",
+    "defaulted": "Kwehlulekile",
+    "returnRequired": "Kudingeka ukubuyiselwa",
+    "completed": "Kuqediwe — uyinikazi wale nto",
+    "cancelled": "Kukhanseliwe",
+    "disputed": "Kuphikiswa"
+  },
+  "possessionStatus": {
+    "notDelivered": "Ayikakalethwa",
+    "possessionEligible": "Ufanelekile ukuthatha into",
+    "customerInPossession": "Isesandleni sakho",
+    "returnRequired": "Kudingeka ukubuyiselwa",
+    "returnInProgress": "Ukubuyiselwa kuyaqhubeka",
+    "returnedToMerchant": "Ibuyiselwe kumthengisi",
+    "recovered": "Itholwe kabusha"
+  },
+  "ownershipStatus": {
+    "merchantOwned": "Umthengisi uyinikazi yale nto",
+    "customerOwned": "Uyinikazi yale nto"
+  },
+  "installmentStatus": {
+    "scheduled": "Kuhleliwe",
+    "paid": "Kukhokhiwe",
+    "failed": "Kwehlulekile",
+    "waived": "Kuxolelwe"
+  },
+  "agreementsTitle": "Izivumelwano",
+  "agreementCount": "{count, plural, one {# isivumelwano} other {# izivumelwano}} sisonke",
+  "noAgreements": "Azikho izivumelwano okwamanje",
+  "noAgreementsDesc": "Phequlula izinto ezifakwe ngokuqasha-ukuze-uthenge ukuze uqale.",
+  "browseListings": "Phequlula Izinto Ezifakiwe",
+  "item": "Into",
+  "back": "Emuva",
+  "disclosureFirst": "Uthola/usebenzisa into ngemuva kwenkokhelo yokuqala ephumelele, kepha <strong>umthengisi uhlala engumnikazi kuze kube inani lokuqasha-ukuze-uthenge eliphelele likhokhiwe.</strong>",
+  "disclosureDefault": "Uma isivumelwano sehluleka ngaphambi kokuthi inani lokuqasha-ukuze-uthenge eliphelele likhokhwe, indlela yokuthenga iyaphela futhi into kufanele ibuyiselwe kumthengisi. Isivumelwano siphathwa njengokuqasha/ukusetshenziswa ngesikhathi sokuba nayo into.",
+  "statusLabel": "Isimo",
+  "possessionLabel": "Ukuba nayo",
+  "ownershipLabel": "Ubunikazi",
+  "purchaseProgress": "Inqubekelaphambili yokuthenga",
+  "securityDeposit": "Idiphozithi yesibambiso (ayiyona ingxenye yenani lokuthenga)",
+  "terminated": "Indlela yokuthenga yokuqasha-ukuze-uthenge iphelile",
+  "returnRequiredNotice": "Kudingeka ukubuyiselwa kwento. Inqubomgomo yokuvumelanisa ukuqasha ilinde ukugunyazwa kwebhizinisi — akukho mali ebaliwe.",
+  "paymentSchedule": "Ishejuli yezinkokhelo",
+  "actions": {
+    "acceptAgreement": "Yamukela isivumelwano",
+    "decline": "Yenqaba",
+    "cancel": "Khansela",
+    "payDeposit": "Khokha idiphozithi yesibambiso",
+    "payInstallment": "Khokha isavenga #{sequence}",
+    "confirmHandover": "Qinisekisa ukudluliselwa",
+    "payOff": "Khokha ibhalansi eseleyo",
+    "cureDefault": "Lungisa ukwehluleka",
+    "requestReturn": "Cela ukubuyiselwa"
+  },
+  "errors": {
+    "generic": "Kukhona okungahambanga kahle"
+  }
+}

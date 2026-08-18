@@ -1,0 +1,60 @@
+{
+  "sponsoredLabel": "Sponsored",
+  "sponsoredSearchResult": "Sponsored search result",
+  "dashboard": {
+    "title": "Advertising",
+    "buySponsoredPlacement": "Buy Sponsored placement for your eligible listings",
+    "balance": "Advertising balance",
+    "impressions": "Impressions",
+    "clicks": "Clicks",
+    "ctr": "CTR",
+    "backToDashboard": "Back to dashboard",
+    "loading": "Loading…",
+    "setupNotice": "Set up your advertising account to get started.",
+    "setupCta": "Set up advertising account",
+    "balanceNotice": "Credited from underdelivered campaigns. Reusable for future Unity advertising only — not withdrawable as cash.",
+    "yourCampaigns": "Your campaigns",
+    "newCampaign": "New campaign",
+    "noCampaigns": "No campaigns yet.",
+    "fixedPrepaidNotice": "Fixed prepaid packages — no per-click or per-impression billing."
+  },
+  "status": {
+    "draft": "Draft",
+    "funded": "Funded",
+    "pendingReview": "Pending review",
+    "active": "Active",
+    "paused": "Paused",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "rejected": "Rejected",
+    "suspended": "Suspended"
+  },
+  "create": {
+    "backToAdvertising": "Back to advertising",
+    "heading": "New campaign",
+    "description": "Choose a package, pick which listing to promote, and set an end date. You'll fund the campaign on the next step.",
+    "loading": "Loading…",
+    "noAdvertiserNotice": "You need an advertising account first — go back and set one up.",
+    "noListingsNotice": "You don't have any active listings to advertise yet.",
+    "listingLabel": "Listing to promote",
+    "selectListingPlaceholder": "Select a listing…",
+    "packageLabel": "Package",
+    "placements": {
+      "homepageBanner": "Homepage banner",
+      "searchLoadingPopup": "Search loading popup",
+      "promotedDeals": "Promoted deals"
+    },
+    "tierSuffix": "tier",
+    "impressionsSuffix": "impressions",
+    "noPackagesNotice": "No packages are available right now.",
+    "tierGuaranteeNotice": "Higher tiers earn earlier, more visible placement — package guarantees only the approved impression allocation, never a guaranteed sale or click count.",
+    "endDateLabel": "Campaign end date",
+    "creating": "Creating…",
+    "continueToFunding": "Continue to funding",
+    "errors": {
+      "completeAllFields": "Please complete every field before continuing.",
+      "couldNotCreate": "Could not create campaign",
+      "generic": "Something went wrong — please try again."
+    }
+  }
+}

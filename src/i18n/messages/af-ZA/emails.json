@@ -1,0 +1,9 @@
+{
+  "footer": {
+    "automatedNotice": "Hierdie is 'n outomatiese boodskap van Unity.",
+    "terms": "Bepalings",
+    "privacy": "Privaatheid",
+    "contact": "Kontak"
+  },
+  "greeting": "Hallo {name},"
+}

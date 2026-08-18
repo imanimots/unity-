@@ -1,4 +1,7 @@
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
+
+const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
   images: {
@@ -27,7 +30,10 @@ const nextConfig: NextConfig = {
   // /dashboard and /admin (which also carries its own `robots` metadata,
   // see their layout.tsx files) and is the ONLY way to communicate
   // noindex on /api, which returns JSON and has no <head> to put a meta
-  // tag in.
+  // tag in. /dashboard is now reachable under locale prefixes too (i18n
+  // Phase 2) -- /af/dashboard and /zu/dashboard get the identical header;
+  // /admin is never locale-prefixed (stays English-only, outside the
+  // [locale] segment), so it needs only its original unprefixed rule.
   async headers() {
     return [
       {
@@ -39,6 +45,14 @@ const nextConfig: NextConfig = {
         headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
       },
       {
+        source: '/af/dashboard/:path*',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      },
+      {
+        source: '/zu/dashboard/:path*',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      },
+      {
         source: '/admin/:path*',
         headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
       },
@@ -46,4 +60,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

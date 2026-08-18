@@ -1,0 +1,81 @@
+{
+  "buyNow": "Buy now",
+  "orderSummary": "Order summary",
+  "status": {
+    "pending": "Awaiting payment",
+    "paid": "Paid — awaiting shipment",
+    "shipped": "Shipped",
+    "delivered": "Delivered",
+    "disputed": "Disputed",
+    "cancelled": "Cancelled"
+  },
+  "buying": "Buying",
+  "selling": "Selling",
+  "myPurchases": "My Purchases",
+  "sales": "Sales",
+  "orderCount": "{count, plural, one {# order} other {# orders}} total",
+  "noPurchases": "No purchases yet",
+  "noPurchasesDesc": "Browse listings for sale and make your first purchase.",
+  "browseForSale": "Browse For Sale",
+  "noSales": "No sales yet",
+  "toShip": "To ship",
+  "earnedDelivered": "Earned (delivered)",
+  "order": "Order",
+  "placed": "Placed {date}",
+  "unitTotal": "{quantity} × {unitPrice} · total {total}",
+  "actions": {
+    "payNow": "Pay now",
+    "markAsShipped": "Mark as shipped",
+    "confirmReceived": "Confirm received",
+    "cancelOrder": "Cancel order",
+    "working": "Working…",
+    "message": "Message",
+    "cancelReasonPrompt": "Reason for cancelling (optional):"
+  },
+  "checkout": {
+    "secureCheckout": "Secure Checkout",
+    "completePayment": "Complete payment",
+    "backToPurchases": "Back to purchases",
+    "order": "Order",
+    "item": "Item",
+    "seller": "Seller",
+    "quantity": "Quantity",
+    "unitPrice": "Unit price",
+    "shipping": "Shipping",
+    "total": "Total",
+    "paymentComplete": "Payment complete",
+    "orderIsPaid": "Order {reference} is paid.",
+    "testScenarioLabel": "Test scenario",
+    "testScenarios": {
+      "success": "Successful payment",
+      "declined": "Payment declined",
+      "retryable_failure": "Temporary failure (retryable)",
+      "terminal_failure": "Terminal failure",
+      "timeout": "Provider timeout / uncertain response"
+    },
+    "agreeToTerms": "I agree to the <terms>Payment and Deposit Policy</terms> and <refunds>Refund Policy</refunds>, and understand this is test mode — no real money will be charged.",
+    "payAmount": "Pay {amount}",
+    "processing": "Processing…",
+    "networkError": "Network error — please try again",
+    "couldNotComplete": "Checkout could not be completed"
+  },
+  "buyFlow": {
+    "backToListing": "Back to listing",
+    "buyNowTitle": "Buy Now",
+    "each": "{amount} each",
+    "available": "{count} available",
+    "quantity": "Quantity",
+    "total": "Total",
+    "placingOrder": "Placing order…",
+    "continueToPayment": "Continue to payment — {amount}",
+    "couldNotPlaceOrder": "Could not place your order",
+    "networkErrorRetry": "Network error — please try again"
+  },
+  "saleCard": {
+    "forSale": "For sale",
+    "soldOut": "Sold out",
+    "available": "{count} available",
+    "buyNow": "Buy Now",
+    "secureCheckoutNotice": "Secure checkout — test mode, no real money charged"
+  }
+}

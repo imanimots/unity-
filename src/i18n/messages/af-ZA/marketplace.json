@@ -1,0 +1,118 @@
+{
+  "searchPlaceholder": "Soek noterings…",
+  "category": "Kategorie",
+  "sort": {
+    "label": "Sorteer",
+    "relevance": "Relevansie",
+    "priceLow": "Prys: laag na hoog",
+    "priceHigh": "Prys: hoog na laag",
+    "newest": "Nuutste"
+  },
+  "priceRange": "Prysgrense",
+  "mode": {
+    "rent": "Huur",
+    "buy": "Koop",
+    "barter": "Ruil",
+    "rentToBuy": "Huur-om-te-Koop"
+  },
+  "direction": {
+    "available": "Beskikbaar",
+    "lookingFor": "Op Soek Na"
+  },
+  "kind": {
+    "item": "Item",
+    "skill": "Vaardigheid",
+    "task": "Taak"
+  },
+  "deliveryMode": {
+    "remote": "Afstand",
+    "inPerson": "In persoon",
+    "either": "Afstand of in persoon"
+  },
+  "listingStatus": {
+    "active": "Aktief",
+    "paused": "Onderbreek",
+    "draft": "Konsep",
+    "pending": "Hangende",
+    "rented": "Verhuur",
+    "suspended": "Opgeskort",
+    "changesRequired": "Veranderinge Vereis",
+    "rejectedEditResubmit": "Verwerp — Wysig & Dien Weer In",
+    "submittedAwaitingReview": "Ingedien — Wag vir Hersiening",
+    "approvedOwnershipUnderReview": "Goedgekeur — Eienaarskap Word Hersien",
+    "approvedPendingActivation": "Goedgekeur — Wag vir Aktivering"
+  },
+  "browseLabel": "Blaai Deur Noterings",
+  "postKind": "Plaas 'n {kind}",
+  "findWhatYouNeed": "Vind Wat Jy Nodig Het.",
+  "searchTools": "Soek gereedskap, kameras, kampeertoerusting…",
+  "noRequestsFound": "Geen versoeke gevind nie",
+  "beFirstRequest": "Wees die eerste om te plaas wat jy soek.",
+  "postRequestInstead": "Plaas eerder 'n \"Op Soek Na\"-versoek",
+  "tryAdjusting": "Probeer jou filters of soekterme aanpas.",
+  "noListingsFound": "Geen noterings gevind nie",
+  "beFirstSkillTask": {
+    "available": "Wees die eerste om te plaas wat jy kan aanbied.",
+    "lookingFor": "Wees die eerste om te plaas waarmee jy hulp nodig het."
+  },
+  "noResults": "Geen noterings pas by jou filters nie.",
+  "priceLabel": "R{amount}",
+  "perDay": "per dag",
+  "detail": {
+    "backToListings": "Terug na noterings",
+    "condition": {
+      "new": "Nuut",
+      "like_new": "Soos nuut",
+      "good": "Goed",
+      "fair": "Redelik"
+    },
+    "ownershipVerified": "Eienaarskap geverifieer",
+    "reviewCount": "{count, plural, one {# resensie} other {# resensies}}",
+    "aboutThisItem": "Oor hierdie item",
+    "renterRequirements": "Huurdervereistes",
+    "riskTierItem": "{tier}-item",
+    "riskTierDesc": "Outomaties toegewys deur Unity gebaseer op itemwaarde, kategorie, en handelaarstatus.",
+    "unityScoreRequired": "Unity-telling {score}+ vereis",
+    "unityScoreDesc": "Jou Unity-telling moet {score} of hoër wees om hierdie item te bespreek.",
+    "securityDeposit": "{amount} sekuriteitsdeposito",
+    "securityDepositDesc": "Gemagtig by uitbetaling en vrygestel wanneer die item onbeskadig terugkom. Sien die Betaling- en Depositobeleid.",
+    "ownershipVerificationRequired": "Eienaarskapverifikasie vereis",
+    "ownershipVerificationDesc": "Hierdie item se risikovlak vereis dat Unity die handelaar se bewys van eienaarskap verifieer voordat dit verhuur kan word.",
+    "insuranceRequired": "Versekering vereis",
+    "insuranceRequiredDesc": "Hoërisiko-items moet versekeringsdekking vir die huurperiode dra.",
+    "listedBy": "Genoteer deur",
+    "kycVerified": "KYC Geverifieer",
+    "unityScoreLabel": "Unity-telling",
+    "memberSince": "Lid sedert {date}",
+    "rentalDetails": "Huurbesonderhede",
+    "dailyRate": "Daaglikse tarief",
+    "weeklyRate": "Weeklikse tarief",
+    "minimumRental": "Minimum huur",
+    "days": "{count, plural, one {# dag} other {# dae}}",
+    "insurance": "Versekering",
+    "perDayAmount": "{amount}/dag",
+    "shipping": "Versending",
+    "saleDetails": "Verkoopsbesonderhede",
+    "price": "Prys",
+    "quantityAvailable": "Hoeveelheid beskikbaar",
+    "shippingLabels": {
+      "renter": "Betaal deur huurder",
+      "merchant": "Gratis — handelaar dek versending",
+      "split": "Verdeel 50/50 tussen huurder en handelaar",
+      "negotiate": "Onderhandel met handelaar"
+    },
+    "secureCheckout": "Veilige uitbetaling",
+    "secureCheckoutDesc": "Toetsmodus — betalings word gesimuleer tydens Unity se openbare toets",
+    "reviewedListing": "Hersiene notering",
+    "reviewedListingDesc": "Eienaarskapdokumente nagegaan",
+    "reviewedMerchant": "Hersiene handelaar",
+    "reviewedMerchantDesc": "Gegradeer deur die Unity-gemeenskap",
+    "reviews": "Resensies",
+    "committedToTrade": "Toegewy aan 'n ruiltransaksie",
+    "committedToTradeDesc": "Hierdie item is tans deel van 'n aanvaarde ruiltransaksie en is nie beskikbaar om te bespreek, koop, of ruil nie.",
+    "bookNow": "Bespreek Nou — {amount}/dag",
+    "buyNow": "Koop Nou — {amount}",
+    "youMightAlsoLike": "Jy sal dalk ook hou van",
+    "similarListings": "Soortgelyke Noterings"
+  }
+}

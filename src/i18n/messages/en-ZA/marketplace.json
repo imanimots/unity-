@@ -1,0 +1,118 @@
+{
+  "searchPlaceholder": "Search listings…",
+  "category": "Category",
+  "sort": {
+    "label": "Sort",
+    "relevance": "Relevance",
+    "priceLow": "Price: low to high",
+    "priceHigh": "Price: high to low",
+    "newest": "Newest"
+  },
+  "priceRange": "Price range",
+  "mode": {
+    "rent": "Rent",
+    "buy": "Buy",
+    "barter": "Barter",
+    "rentToBuy": "Rent-to-Buy"
+  },
+  "direction": {
+    "available": "Available",
+    "lookingFor": "Looking For"
+  },
+  "kind": {
+    "item": "Item",
+    "skill": "Skill",
+    "task": "Task"
+  },
+  "deliveryMode": {
+    "remote": "Remote",
+    "inPerson": "In person",
+    "either": "Remote or in person"
+  },
+  "listingStatus": {
+    "active": "Active",
+    "paused": "Paused",
+    "draft": "Draft",
+    "pending": "Pending",
+    "rented": "Rented",
+    "suspended": "Suspended",
+    "changesRequired": "Changes Required",
+    "rejectedEditResubmit": "Rejected — Edit & Resubmit",
+    "submittedAwaitingReview": "Submitted — Awaiting Review",
+    "approvedOwnershipUnderReview": "Approved — Ownership Under Review",
+    "approvedPendingActivation": "Approved — Pending Activation"
+  },
+  "browseLabel": "Browse Listings",
+  "postKind": "Post a {kind}",
+  "findWhatYouNeed": "Find What You Need.",
+  "searchTools": "Search tools, cameras, camping gear…",
+  "noRequestsFound": "No requests found",
+  "beFirstRequest": "Be the first to post what you're looking for.",
+  "postRequestInstead": "Post a \"Looking For\" request instead",
+  "tryAdjusting": "Try adjusting your filters or search terms.",
+  "noListingsFound": "No listings found",
+  "beFirstSkillTask": {
+    "available": "Be the first to post what you can offer.",
+    "lookingFor": "Be the first to post what you need help with."
+  },
+  "noResults": "No listings match your filters.",
+  "priceLabel": "R{amount}",
+  "perDay": "per day",
+  "detail": {
+    "backToListings": "Back to listings",
+    "condition": {
+      "new": "New",
+      "like_new": "Like new",
+      "good": "Good",
+      "fair": "Fair"
+    },
+    "ownershipVerified": "Ownership verified",
+    "reviewCount": "{count, plural, one {# review} other {# reviews}}",
+    "aboutThisItem": "About this item",
+    "renterRequirements": "Renter Requirements",
+    "riskTierItem": "{tier} item",
+    "riskTierDesc": "Assigned automatically by Unity based on item value, category, and merchant standing.",
+    "unityScoreRequired": "Unity Score {score}+ required",
+    "unityScoreDesc": "Your Unity Score must be {score} or above to book this item.",
+    "securityDeposit": "{amount} security deposit",
+    "securityDepositDesc": "Authorized at checkout and released when the item comes back undamaged. See the Payment & Deposit Policy.",
+    "ownershipVerificationRequired": "Ownership verification required",
+    "ownershipVerificationDesc": "This item's risk tier requires Unity to verify the merchant's proof of ownership before it can be rented.",
+    "insuranceRequired": "Insurance required",
+    "insuranceRequiredDesc": "High risk items must carry insurance cover for the rental period.",
+    "listedBy": "Listed by",
+    "kycVerified": "KYC Verified",
+    "unityScoreLabel": "Unity Score",
+    "memberSince": "Member since {date}",
+    "rentalDetails": "Rental Details",
+    "dailyRate": "Daily rate",
+    "weeklyRate": "Weekly rate",
+    "minimumRental": "Minimum rental",
+    "days": "{count, plural, one {# day} other {# days}}",
+    "insurance": "Insurance",
+    "perDayAmount": "{amount}/day",
+    "shipping": "Shipping",
+    "saleDetails": "Sale Details",
+    "price": "Price",
+    "quantityAvailable": "Quantity available",
+    "shippingLabels": {
+      "renter": "Paid by renter",
+      "merchant": "Free — merchant covers shipping",
+      "split": "Split 50/50 between renter and merchant",
+      "negotiate": "Negotiate with merchant"
+    },
+    "secureCheckout": "Secure checkout",
+    "secureCheckoutDesc": "Test mode — payments are simulated during Unity's public test",
+    "reviewedListing": "Reviewed listing",
+    "reviewedListingDesc": "Ownership documents checked",
+    "reviewedMerchant": "Reviewed merchant",
+    "reviewedMerchantDesc": "Rated by the Unity community",
+    "reviews": "Reviews",
+    "committedToTrade": "Committed to a barter trade",
+    "committedToTradeDesc": "This item is currently part of an accepted trade and isn't available to book, buy, or trade for.",
+    "bookNow": "Book Now — {amount}/day",
+    "buyNow": "Buy Now — {amount}",
+    "youMightAlsoLike": "You might also like",
+    "similarListings": "Similar Listings"
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "postRequest": "Post a request",
+  "newRequestPage": {
+    "metaTitle": "Post a Request — Unity",
+    "sectionLabel": "Looking For",
+    "headingLine1": "Post What",
+    "headingLine2": "You Need.",
+    "imLookingTo": "I'm looking to",
+    "title": "Title",
+    "titlePlaceholder": "e.g. Looking for a pressure washer",
+    "description": "Description",
+    "category": "Category",
+    "city": "City",
+    "budgetMin": "Budget min (ZAR)",
+    "budgetMax": "Budget max (ZAR)",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "barterOfferLabel": "What can you offer in return?",
+    "posting": "Posting…",
+    "postRequestButton": "Post request",
+    "errors": {
+      "couldNotCreate": "Could not create request",
+      "verificationRequired": "You need to complete verification before publishing a request. Your request was saved as a draft.",
+      "couldNotPublish": "Could not publish request",
+      "networkError": "Network error — please try again"
+    }
+  },
+  "offersReceived": "{count, plural, one {# offer received} other {# offers received}}",
+  "status": {
+    "draft": "Draft",
+    "active": "Active",
+    "offersReceived": "Offers received",
+    "matched": "Matched",
+    "closed": "Closed",
+    "archived": "Archived"
+  },
+  "detail": {
+    "lookingToTransact": "Looking to {type} · {status}",
+    "postedByPrefix": "Posted by",
+    "verified": "· Verified",
+    "category": "Category",
+    "location": "Location",
+    "budget": "Budget",
+    "dates": "Dates",
+    "expires": "Expires",
+    "respondToRequest": "Respond to this request",
+    "respond": "Respond",
+    "privateOffer": "Private offer",
+    "linkListing": "Link a listing",
+    "messageOnly": "Just message",
+    "amountPlaceholder": "Amount (ZAR)",
+    "messagePlaceholder": "Message",
+    "send": "Send",
+    "yourResponse": "Your response",
+    "statusLabel": "Status: {status}",
+    "withdraw": "Withdraw",
+    "responses": "Responses ({count})",
+    "noResponses": "No responses yet.",
+    "accept": "Accept",
+    "decline": "Decline",
+    "couldNotSubmit": "Could not submit offer",
+    "couldNotAccept": "Could not accept offer",
+    "networkError": "Network error",
+    "offerTypes": {
+      "private_offer": "private offer",
+      "link_listing": "link listing",
+      "message_only": "message only"
+    },
+    "offerStatus": {
+      "pending": "pending",
+      "accepted": "accepted",
+      "declined": "declined",
+      "withdrawn": "withdrawn"
+    }
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "searchPlaceholder": "Sesha izinhlu…",
+  "category": "Isigaba",
+  "sort": {
+    "label": "Hlunga ngokulandelana",
+    "relevance": "Ukufaneleka",
+    "priceLow": "Intengo: ephansi kuya ephezulu",
+    "priceHigh": "Intengo: ephezulu kuya ephansi",
+    "newest": "Okusha kakhulu"
+  },
+  "priceRange": "Ibanga lentengo",
+  "mode": {
+    "rent": "Qasha",
+    "buy": "Thenga",
+    "barter": "Shintshanisa",
+    "rentToBuy": "Qasha-Uze-Uthenge"
+  },
+  "direction": {
+    "available": "Kuyatholakala",
+    "lookingFor": "Kufunwa"
+  },
+  "kind": {
+    "item": "Into",
+    "skill": "Ikhono",
+    "task": "Umsebenzi"
+  },
+  "deliveryMode": {
+    "remote": "Bucwadi",
+    "inPerson": "Ngokoqobo",
+    "either": "Bucwadi noma ngokoqobo"
+  },
+  "listingStatus": {
+    "active": "Kuyasebenza",
+    "paused": "Kumisiwe",
+    "draft": "Uhlaka",
+    "pending": "Kulindile",
+    "rented": "Kuqashiwe",
+    "suspended": "Kumiswe okwesikhashana",
+    "changesRequired": "Kudingeka Ushintsho",
+    "rejectedEditResubmit": "Kwenqatshiwe — Hlela Bese Uthumela Futhi",
+    "submittedAwaitingReview": "Kuthunyelwe — Kulindeleke Ukubuyekezwa",
+    "approvedOwnershipUnderReview": "Kuvunyiwe — Ubunikazi Buyabuyekezwa",
+    "approvedPendingActivation": "Kuvunyiwe — Kulindeleke Ukwenziwa Kusebenze"
+  },
+  "browseLabel": "Phequlula Izinhlu",
+  "postKind": "Thumela i-{kind}",
+  "findWhatYouNeed": "Thola Lokho Okudingayo.",
+  "searchTools": "Sesha amathuluzi, amakhamera, izinto zokukhempa…",
+  "noRequestsFound": "Azikho izicelo ezitholakele",
+  "beFirstRequest": "Yiba ngowokuqala ukuthumela lokho okufunayo.",
+  "postRequestInstead": "Kunalokho, thumela isicelo \"Esifunwayo\"",
+  "tryAdjusting": "Zama ukulungisa izihlungi zakho noma amagama okusesha.",
+  "noListingsFound": "Azikho izinhlu ezitholakele",
+  "beFirstSkillTask": {
+    "available": "Yiba ngowokuqala ukuthumela lokho ongakunikela.",
+    "lookingFor": "Yiba ngowokuqala ukuthumela lokho odinga usizo ngakho."
+  },
+  "noResults": "Azikho izinhlu ezihambisana nezihlungi zakho.",
+  "priceLabel": "R{amount}",
+  "perDay": "ngosuku",
+  "detail": {
+    "backToListings": "Emuva ezinhlwini",
+    "condition": {
+      "new": "Kusha",
+      "like_new": "Njengokusha",
+      "good": "Kuhle",
+      "fair": "Kulungile"
+    },
+    "ownershipVerified": "Ubunikazi buqinisekisiwe",
+    "reviewCount": "{count, plural, one {ukubuyekeza okungu-#} other {ukubuyekeza okungu-#}}",
+    "aboutThisItem": "Mayelana nale nto",
+    "renterRequirements": "Izimfuneko Zomqashi",
+    "riskTierItem": "Into e-{tier}",
+    "riskTierDesc": "Kwabelwe ngokuzenzakalela yi-Unity ngokusekelwe enanini lento, isigaba, nesimo somthengisi.",
+    "unityScoreRequired": "Kudingeka Isilinganiso se-Unity esingu-{score}+",
+    "unityScoreDesc": "Isilinganiso sakho se-Unity kufanele sibe ngu-{score} noma ngaphezulu ukuze ubhukhe le nto.",
+    "securityDeposit": "Idiphozithi yesibambiso engu-{amount}",
+    "securityDepositDesc": "Kugunyazwa ekukhokheni futhi kukhishwe uma into ibuya ingenamonakalo. Bheka Inqubomgomo Yenkokhelo Nedephozithi.",
+    "ownershipVerificationRequired": "Kudingeka ukuqinisekiswa kobunikazi",
+    "ownershipVerificationDesc": "Izinga lengozi lale nto lidinga ukuthi i-Unity iqinisekise ubufakazi bomthengisi bobunikazi ngaphambi kokuthi kuqashwe.",
+    "insuranceRequired": "Kudingeka umshuwalense",
+    "insuranceRequiredDesc": "Izinto ezinengozi enkulu kufanele zibe nesibopho somshuwalense ngesikhathi sokuqasha.",
+    "listedBy": "Kufakwe",
+    "kycVerified": "I-KYC Iqinisekisiwe",
+    "unityScoreLabel": "Isilinganiso se-Unity",
+    "memberSince": "Ilungu kusukela {date}",
+    "rentalDetails": "Imininingwane Yokuqasha",
+    "dailyRate": "Inani losuku",
+    "weeklyRate": "Inani leviki",
+    "minimumRental": "Ukuqasha okuyisicaba",
+    "days": "{count, plural, one {# usuku} other {# izinsuku}}",
+    "insurance": "Umshuwalense",
+    "perDayAmount": "{amount}/usuku",
+    "shipping": "Ukuthunyelwa",
+    "saleDetails": "Imininingwane Yokuthengisa",
+    "price": "Intengo",
+    "quantityAvailable": "Inani elitholakalayo",
+    "shippingLabels": {
+      "renter": "Kukhokhwa umqashi",
+      "merchant": "Mahhala — umthengisi ukhokhela ukuthunyelwa",
+      "split": "Kwahlukaniswa u-50/50 phakathi komqashi nomthengisi",
+      "negotiate": "Xoxisana nomthengisi"
+    },
+    "secureCheckout": "Ukukhokha okuphephile",
+    "secureCheckoutDesc": "Imodi yokuhlola — izinkokhelo zilingiswa ngesikhathi sokuhlola komphakathi kwe-Unity",
+    "reviewedListing": "Into efakiwe ebuyekeziwe",
+    "reviewedListingDesc": "Amadokhumenti obunikazi ahloliwe",
+    "reviewedMerchant": "Umthengisi obuyekeziwe",
+    "reviewedMerchantDesc": "Ulinganiswe umphakathi we-Unity",
+    "reviews": "Ukubuyekezwa",
+    "committedToTrade": "Kuzibophezele ekushintshaneni",
+    "committedToTradeDesc": "Le nto njengamanje iyingxenye yokushintshana okwamukelwe futhi ayitholakali ukubhukha, ukuthenga, noma ukushintshaniswa ngayo.",
+    "bookNow": "Bhukha Manje — {amount}/usuku",
+    "buyNow": "Thenga Manje — {amount}",
+    "youMightAlsoLike": "Ungase uthande futhi",
+    "similarListings": "Izinto Ezifanayo Ezifakiwe"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "label": "Taak",
+  "description": "'n Taak is werk wat vir iemand anders gedoen word.",
+  "available": {
+    "badge": "Beskikbare Taak",
+    "summary": "Ek kan hierdie werk doen"
+  },
+  "lookingFor": {
+    "badge": "Op Soek Na Taak",
+    "summary": "Ek benodig hierdie werk"
+  }
+}

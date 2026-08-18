@@ -1,0 +1,12 @@
+{
+  "label": "Ikhono",
+  "description": "Ikhono yinto umuntu angayifundisa omunye umuntu.",
+  "available": {
+    "badge": "Ikhono Elitholakalayo",
+    "summary": "Ngingakufundisa lokhu"
+  },
+  "lookingFor": {
+    "badge": "Ikhono Elifunwayo",
+    "summary": "Ngifuna ukufunda lokhu"
+  }
+}

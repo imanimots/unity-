@@ -1,0 +1,12 @@
+{
+  "label": "Task",
+  "description": "A Task is work performed for someone.",
+  "available": {
+    "badge": "Available Task",
+    "summary": "I can do this work"
+  },
+  "lookingFor": {
+    "badge": "Looking For Task",
+    "summary": "I need this work done"
+  }
+}
