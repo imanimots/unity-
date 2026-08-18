@@ -9,6 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/client'
 import { Eye, EyeOff } from 'lucide-react'
+import { hasUnmergedAnonymousHistory, buildAnonymousViewRecords, markAnonymousHistoryMerged } from '@/lib/personalization/anonymous'
 
 function LoginForm() {
   const t = useTranslations('auth.login')
@@ -50,6 +51,34 @@ function LoginForm() {
       setError(t('errors.invalidCredentials'))
       setLoading(false)
       return
+    }
+
+    // Section 40/41: merge the anonymous browser's local view buffer into
+    // the just-authenticated account, exactly once per sign-in in this
+    // browser. Best-effort -- never blocks navigation, and the server
+    // route itself no-ops safely if personalization is disabled or
+    // unprovisioned.
+    if (hasUnmergedAnonymousHistory()) {
+      try {
+        const events = buildAnonymousViewRecords().map((v) => ({
+          entityType: v.entityType,
+          entityId: v.entityId,
+          mode: v.mode,
+          category: v.category,
+          kind: v.kind,
+          province: v.province,
+          city: v.city,
+        }))
+        await fetch('/api/personalization/merge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ events }),
+        })
+      } catch {
+        // Never block sign-in on this.
+      } finally {
+        markAnonymousHistoryMerged()
+      }
     }
 
     router.push(redirectTo)
