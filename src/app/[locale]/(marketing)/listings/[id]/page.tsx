@@ -20,6 +20,9 @@ import { isListingBarterLocked, getAllBarterLockedListingIds } from '@/lib/barte
 import { absoluteUrl, isMarketplaceIndexingEnabled, PERMANENT_NOINDEX } from '@/lib/seo/config'
 import { formatDate, formatMoneyFromRands } from '@/lib/i18n/format'
 import type { Locale } from '@/i18n/locales'
+import { isPersonalizationEnabled } from '@/lib/personalization/config'
+import { RecordListingView } from '@/components/personalization/record-listing-view'
+import type { PersonalizationMode } from '@/lib/personalization/types'
 
 const CITY_BY_MERCHANT: Record<string, string> = {
   'user-1': 'Johannesburg', 'user-2': 'Sandton',
@@ -112,9 +115,23 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
   const messages = await getMessages()
   const scoped = { rent: { bookingCard: messages.rent.bookingCard } }
 
+  const personalizationMode: PersonalizationMode | null =
+    listing.listing_type === 'sale' ? 'buy' : listing.listing_type === 'rental' ? 'rent' : null
+
   return (
     <NextIntlClientProvider messages={scoped}>
     <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen">
+      {isPersonalizationEnabled() && (
+        <RecordListingView
+          personalizationEnabled
+          isSignedIn={Boolean(viewer)}
+          listingId={listing.id}
+          mode={personalizationMode}
+          category={listing.category}
+          province={listing.province ?? null}
+          city={listing.city ?? null}
+        />
+      )}
       {/* Set affiliate tracking cookie if ?ref= is present */}
       {affiliateRef && <AffiliateCookieSetter affiliateRef={affiliateRef} />}
 

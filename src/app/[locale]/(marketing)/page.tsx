@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Image from 'next/image'
-import { getTranslations, getLocale } from 'next-intl/server'
+import { NextIntlClientProvider } from 'next-intl'
+import { getTranslations, getLocale, getMessages } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
 import { ArrowRight, ShieldCheck, Star, CheckCircle, ShoppingBag, ArrowLeftRight } from 'lucide-react'
 import { getListings } from '@/lib/data/listings'
@@ -8,6 +9,9 @@ import { resolveEffectiveCountry } from '@/lib/resolve-effective-country'
 import { ListingCard } from '@/components/listings/listing-card'
 import { absoluteUrl, isIndexingEnabled } from '@/lib/seo/config'
 import type { Locale } from '@/i18n/locales'
+import { getRequestProfile } from '@/lib/supabase/require-admin'
+import { isPersonalizationEnabled } from '@/lib/personalization/config'
+import { RecommendationModule } from '@/components/personalization/recommendation-module'
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = (await getLocale()) as Locale
@@ -31,6 +35,21 @@ export default async function HomePage() {
   const tCommon = await getTranslations('common')
   const t = await getTranslations('common.home')
   const verifiedLabel = tCommon('verified')
+  const personalizationEnabled = isPersonalizationEnabled()
+  const viewer = personalizationEnabled ? await getRequestProfile() : null
+
+  // Narrow scoped provider (same public-dictionary-leak-prevention
+  // principle used throughout this codebase) -- only what
+  // <RecommendationModule> actually needs client-side, never the full
+  // dictionary tree.
+  const messages = personalizationEnabled ? await getMessages() : null
+  const personalizationScoped = messages
+    ? {
+        personalization: { modules: messages.personalization.modules, reasons: messages.personalization.reasons },
+        common: { categories: messages.common.categories },
+        marketplace: { mode: messages.marketplace.mode },
+      }
+    : null
 
   const marqueeText = t('marquee')
 
@@ -203,6 +222,18 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ─── PERSONALIZATION MODULES (Section 30/31) ────────────────
+          Client-only islands -- render nothing when there's no
+          meaningful signal (cold start / feature disabled / no
+          history), never a fabricated "Recommended for you". Continue
+          Browsing first per the documented module-ordering rule. */}
+      {personalizationEnabled && personalizationScoped && (
+        <NextIntlClientProvider messages={personalizationScoped}>
+          <RecommendationModule module="continue_browsing" isSignedIn={Boolean(viewer)} />
+          <RecommendationModule module="recommended_for_you" isSignedIn={Boolean(viewer)} />
+        </NextIntlClientProvider>
+      )}
 
       {/* ─── 4. HOW IT WORKS ─────────────────────────────────────── */}
       <section id="how-it-works" className="bg-white py-[120px] max-lg:py-20 scroll-mt-16">

@@ -81,6 +81,7 @@ export const PAGE_COVERAGE_MANIFEST: PageCoverageEntry[] = [
   { path: '(dashboard)/dashboard/merchant/orders/page.tsx', status: 'wired' },
   { path: '(dashboard)/dashboard/merchant/page.tsx', status: 'wired' },
   { path: '(dashboard)/dashboard/merchant/payouts/page.tsx', status: 'wired' },
+  { path: '(dashboard)/dashboard/personalization/page.tsx', status: 'wired' },
 
   // ---------------- MARKETING (public) ----------------
   // Gap-closure pass: genuinely wired now (common.home dictionary section,

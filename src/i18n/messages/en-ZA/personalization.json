@@ -1,0 +1,65 @@
+{
+  "settings": {
+    "heading": "Personalization",
+    "description": "Unity uses your recent marketplace activity and saved preferences to tailor what you see. Search results and Sponsored listings are never affected by this.",
+    "enabledLabel": "Personalized discovery",
+    "enabledOn": "On",
+    "enabledOff": "Off",
+    "disabledNotice": "Personalization is off. You'll see the same generic discovery as everyone else. Search still works normally.",
+    "interestsHeading": "Interests",
+    "modesLabel": "I'm interested in",
+    "modeBuy": "Buying",
+    "modeRent": "Renting",
+    "modeBarter": "Bartering",
+    "categoriesLabel": "Categories",
+    "barterKindsLabel": "Barter interests",
+    "kindItem": "Physical items",
+    "kindSkill": "Skills",
+    "kindTask": "Tasks",
+    "lookingForLabel": "Show me Looking For discovery",
+    "rtbLabel": "Show me Rent-to-Buy discovery",
+    "locationHeading": "Location",
+    "provinceLabel": "Province",
+    "cityLabel": "City",
+    "provincePlaceholder": "e.g. Gauteng",
+    "cityPlaceholder": "e.g. Cape Town",
+    "activityHeading": "Activity",
+    "clearHistoryButton": "Clear personalization history",
+    "clearHistoryDesc": "Removes your recent-view history. Your orders, bookings, barter trades and reviews are never affected.",
+    "clearHistoryConfirmTitle": "Clear personalization history?",
+    "clearHistoryConfirmDesc": "This resets your recently-viewed activity used for recommendations. Your explicit interests above stay saved. This can't be undone.",
+    "clearHistoryConfirm": "Clear history",
+    "clearHistorySuccess": "Your personalization history has been cleared.",
+    "saveButton": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "errors": {
+      "couldNotLoad": "Could not load your personalization settings",
+      "couldNotSave": "Could not save your personalization settings",
+      "couldNotClear": "Could not clear your personalization history",
+      "notProvisioned": "Personalization isn't available yet"
+    },
+    "cancelButton": "Cancel"
+  },
+  "modules": {
+    "continueBrowsing": "Continue Browsing",
+    "recommendedForYou": "Recommended for You",
+    "becauseYouViewed": "Because You Viewed",
+    "nearYourArea": "Near Your Selected Area",
+    "basedOnInterests": "Based on Your Interests",
+    "basedOnRecentBrowsing": "Based on Recent Browsing"
+  },
+  "reasons": {
+    "recentlyViewed": "Because you viewed {category}",
+    "preferredCategory": "More in {category}",
+    "preferredMode": "Based on your interest in {mode}",
+    "preferredKind": "Matches your interests",
+    "completedSimilar": "Similar to your past activity",
+    "locationMatch": "Available in {city}",
+    "newest": "New on Unity"
+  },
+  "emptyState": {
+    "noHistory": "Browse a few items and we'll start tailoring this page for you.",
+    "clearLocalHistory": "Clear recent activity"
+  }
+}

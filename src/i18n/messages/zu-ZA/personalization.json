@@ -1,0 +1,65 @@
+{
+  "settings": {
+    "heading": "Ukuguqulelwa Komuntu Ngamunye",
+    "description": "I-Unity isebenzisa umsebenzi wakho wakamuva wasemakethe kanye nezinto ozikhethile ukuze ilungisele lokho okubonayo. Imiphumela Yosesho kanye Nezinhlu Ezixhaswe Ngemali azisoze zathinteka yilokhu.",
+    "enabledLabel": "Ukutholakala Okuguqulelwe Wena",
+    "enabledOn": "Kuvuliwe",
+    "enabledOff": "Kuvaliwe",
+    "disabledNotice": "Ukuguqulelwa komuntu ngamunye kuvaliwe. Uzobona ukutholakala okufanayo njengawo wonke umuntu. Usesho lusasebenza ngokwejwayelekile.",
+    "interestsHeading": "Izintshisekelo",
+    "modesLabel": "Ngithanda",
+    "modeBuy": "Ukuthenga",
+    "modeRent": "Ukuqasha",
+    "modeBarter": "Ukushintshanisa",
+    "categoriesLabel": "Izigaba",
+    "barterKindsLabel": "Izintshisekelo Zokushintshanisa",
+    "kindItem": "Izinto eziphathekayo",
+    "kindSkill": "Amakhono",
+    "kindTask": "Imisebenzi",
+    "lookingForLabel": "Ngikhombise Ukutholakala Kokufunayo",
+    "rtbLabel": "Ngikhombise Ukutholakala Kokuqasha-Ukuze-Uthenge",
+    "locationHeading": "Indawo",
+    "provinceLabel": "Isifundazwe",
+    "cityLabel": "Idolobha",
+    "provincePlaceholder": "isb. Gauteng",
+    "cityPlaceholder": "isb. Cape Town",
+    "activityHeading": "Umsebenzi",
+    "clearHistoryButton": "Susa umlando wokuguqulelwa komuntu ngamunye",
+    "clearHistoryDesc": "Kususa umlando wakho wokubukwa kwakamuva. Ama-oda akho, ukubhukha, ukushintshanisa nokubuyekezwa akusoze kwathinteka.",
+    "clearHistoryConfirmTitle": "Susa umlando wokuguqulelwa komuntu ngamunye?",
+    "clearHistoryConfirmDesc": "Lokhu kusetha kabusha umsebenzi wakho wakamuva obukiwe osetshenziswa ukwenza iziphakamiso. Izintshisekelo zakho ezisobala ngenhla zisala zilondoloziwe. Lokhu akukwazi ukuhlehliswa.",
+    "clearHistoryConfirm": "Susa umlando",
+    "clearHistorySuccess": "Umlando wakho wokuguqulelwa komuntu ngamunye ususiwe.",
+    "saveButton": "Londoloza",
+    "saving": "Kuyalondolozwa…",
+    "saved": "Kulondoloziwe",
+    "errors": {
+      "couldNotLoad": "Ayikwazanga ukulayisha izilungiselelo zakho zokuguqulelwa komuntu ngamunye",
+      "couldNotSave": "Ayikwazanga ukulondoloza izilungiselelo zakho zokuguqulelwa komuntu ngamunye",
+      "couldNotClear": "Ayikwazanga ukususa umlando wakho wokuguqulelwa komuntu ngamunye",
+      "notProvisioned": "Ukuguqulelwa komuntu ngamunye akukatholakali okwamanje"
+    },
+    "cancelButton": "Khansela"
+  },
+  "modules": {
+    "continueBrowsing": "Qhubeka Uphequlula",
+    "recommendedForYou": "Okuncomelwe Wena",
+    "becauseYouViewed": "Ngoba Ubuke",
+    "nearYourArea": "Eduze Nendawo Oyikhethile",
+    "basedOnInterests": "Ngokususelwa Ezintshisekelweni Zakho",
+    "basedOnRecentBrowsing": "Ngokususelwa Ekuphequluleni Kwakamuva"
+  },
+  "reasons": {
+    "recentlyViewed": "Ngoba ubuke i-{category}",
+    "preferredCategory": "Okuningi ku-{category}",
+    "preferredMode": "Ngokususelwa entshisekelweni yakho ku-{mode}",
+    "preferredKind": "Kufaniswa nezintshisekelo zakho",
+    "completedSimilar": "Kufana nomsebenzi wakho wangaphambilini",
+    "locationMatch": "Kuyatholakala e-{city}",
+    "newest": "Okusha ku-Unity"
+  },
+  "emptyState": {
+    "noHistory": "Phequlula izinto ezimbalwa futhi sizoqala ukulungisela leli khasi lakho.",
+    "clearLocalHistory": "Susa umsebenzi wakamuva"
+  }
+}

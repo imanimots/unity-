@@ -1,0 +1,65 @@
+{
+  "settings": {
+    "heading": "Personalisering",
+    "description": "Unity gebruik jou onlangse markplekaktiwiteit en gestoorde voorkeure om aan te pas wat jy sien. Soekresultate en Geborgde noterings word nooit hierdeur geraak nie.",
+    "enabledLabel": "Gepersonaliseerde ontdekking",
+    "enabledOn": "Aan",
+    "enabledOff": "Af",
+    "disabledNotice": "Personalisering is af. Jy sal dieselfde algemene ontdekking sien as almal anders. Soek werk steeds normaalweg.",
+    "interestsHeading": "Belangstellings",
+    "modesLabel": "Ek is geïnteresseerd in",
+    "modeBuy": "Koop",
+    "modeRent": "Huur",
+    "modeBarter": "Ruilhandel",
+    "categoriesLabel": "Kategorieë",
+    "barterKindsLabel": "Ruilhandel-belangstellings",
+    "kindItem": "Fisiese items",
+    "kindSkill": "Vaardighede",
+    "kindTask": "Take",
+    "lookingForLabel": "Wys my Op Soek Na-ontdekking",
+    "rtbLabel": "Wys my Huur-tot-Koop-ontdekking",
+    "locationHeading": "Ligging",
+    "provinceLabel": "Provinsie",
+    "cityLabel": "Stad",
+    "provincePlaceholder": "bv. Gauteng",
+    "cityPlaceholder": "bv. Kaapstad",
+    "activityHeading": "Aktiwiteit",
+    "clearHistoryButton": "Verwyder personaliseringsgeskiedenis",
+    "clearHistoryDesc": "Verwyder jou onlangse-besigtiging-geskiedenis. Jou bestellings, besprekings, ruilhandel-transaksies en resensies word nooit geraak nie.",
+    "clearHistoryConfirmTitle": "Verwyder personaliseringsgeskiedenis?",
+    "clearHistoryConfirmDesc": "Dit stel jou onlangs-besigtigde aktiwiteit wat vir aanbevelings gebruik word, terug. Jou eksplisiete belangstellings hierbo bly gestoor. Dit kan nie ongedaan gemaak word nie.",
+    "clearHistoryConfirm": "Verwyder geskiedenis",
+    "clearHistorySuccess": "Jou personaliseringsgeskiedenis is verwyder.",
+    "saveButton": "Stoor",
+    "saving": "Stoor tans…",
+    "saved": "Gestoor",
+    "errors": {
+      "couldNotLoad": "Kon nie jou personaliseringsinstellings laai nie",
+      "couldNotSave": "Kon nie jou personaliseringsinstellings stoor nie",
+      "couldNotClear": "Kon nie jou personaliseringsgeskiedenis verwyder nie",
+      "notProvisioned": "Personalisering is nog nie beskikbaar nie"
+    },
+    "cancelButton": "Kanselleer"
+  },
+  "modules": {
+    "continueBrowsing": "Gaan Voort Om Te Blaai",
+    "recommendedForYou": "Aanbeveel Vir Jou",
+    "becauseYouViewed": "Omdat Jy Gekyk Het Na",
+    "nearYourArea": "Naby Jou Gekose Area",
+    "basedOnInterests": "Gebaseer Op Jou Belangstellings",
+    "basedOnRecentBrowsing": "Gebaseer Op Onlangse Blaai-aktiwiteit"
+  },
+  "reasons": {
+    "recentlyViewed": "Omdat jy {category} gekyk het",
+    "preferredCategory": "Meer in {category}",
+    "preferredMode": "Gebaseer op jou belangstelling in {mode}",
+    "preferredKind": "Pas by jou belangstellings",
+    "completedSimilar": "Soortgelyk aan jou vorige aktiwiteit",
+    "locationMatch": "Beskikbaar in {city}",
+    "newest": "Nuut op Unity"
+  },
+  "emptyState": {
+    "noHistory": "Blaai deur 'n paar items en ons sal hierdie bladsy vir jou begin aanpas.",
+    "clearLocalHistory": "Verwyder onlangse aktiwiteit"
+  }
+}

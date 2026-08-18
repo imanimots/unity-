@@ -5,6 +5,8 @@ import { Search, Heart, MessageCircle, Star, ShieldCheck, ArrowRight, Package, C
 import { getServerUser, MOCK_CURRENT_PROFILE } from '@/lib/data/profiles'
 import { IS_MOCK_MODE, MOCK_RENTER_BOOKINGS } from '@/lib/mock/data'
 import type { BookingStatus } from '@/types'
+import { isPersonalizationEnabled } from '@/lib/personalization/config'
+import { RecommendationModule } from '@/components/personalization/recommendation-module'
 
 const STATUS_DOT: Record<BookingStatus, string> = {
   pending:   'bg-amber-400',
@@ -154,6 +156,16 @@ export default async function RenterDashboard() {
           )}
         </div>
       </div>
+
+      {/* Personalized discovery (Section 35) -- the (dashboard) layout
+          already provides the full message tree client-side, so no
+          extra scoped provider is needed here. */}
+      {isPersonalizationEnabled() && (
+        <div className="mb-12 -mx-4 sm:-mx-6 lg:-mx-8">
+          <RecommendationModule module="continue_browsing" isSignedIn />
+          <RecommendationModule module="recommended_for_you" isSignedIn />
+        </div>
+      )}
 
       {/* Quick actions */}
       <div className="mb-12">

@@ -8,13 +8,20 @@ import {
   Sun, Moon, Menu, X, Home, Search,
   MessageCircle, User, ChevronDown, LogOut,
   Package, Calendar, ExternalLink, Link2,
-  ShoppingBag, Store, Repeat, AlertTriangle,
+  ShoppingBag, Store, Repeat, AlertTriangle, Sparkles,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { CountrySelector } from '@/components/shared/country-selector'
 import { LanguageSelector } from '@/components/shared/language-selector'
 
-export function Navbar() {
+interface NavbarProps {
+  /** Server-resolved PERSONALIZATION_ENABLED state (never
+   * NEXT_PUBLIC_-derived -- see src/lib/personalization/config.ts).
+   * Defaults false so this component never assumes the flag is on. */
+  personalizationEnabled?: boolean
+}
+
+export function Navbar({ personalizationEnabled = false }: NavbarProps) {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -128,6 +135,12 @@ export function Navbar() {
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
                         <Link2 size={14} className="text-[#9B8B85]" /> {t('affiliate')}
                       </Link>
+                      {personalizationEnabled && (
+                        <Link href="/dashboard/personalization" onClick={() => setProfileOpen(false)}
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                          <Sparkles size={14} className="text-[#9B8B85]" /> {t('personalization')}
+                        </Link>
+                      )}
                       {process.env.NEXT_PUBLIC_WARP_AFFILIATE_URL && (
                         <a href={process.env.NEXT_PUBLIC_WARP_AFFILIATE_URL} target="_blank" rel="noopener noreferrer"
                           className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
