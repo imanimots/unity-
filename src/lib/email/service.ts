@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getEmailProvider } from './registry'
 import { renderTemplate, getEmailTemplate, TemplateValidationError, type TemplateVars } from './templates/catalogue'
 import { computeEmailIdempotencyKey } from './idempotency'
-import { resolveUserEmail } from './resolve-recipient'
+import { resolveUserEmail, resolveRecipientLocale } from './resolve-recipient'
 import { isRetryableEmailError } from './errors'
 
 const EMAIL_FROM_ADDRESS = process.env.EMAIL_FROM_ADDRESS || 'support@unitytest.co.za'
@@ -64,6 +64,9 @@ export async function sendTemplate(admin: SupabaseClient, req: SendTemplateReque
   const idempotencyKey = computeEmailIdempotencyKey(req.eventType, req.relatedEntityId, req.recipientUserId, templateVersion, req.occurrenceKey ?? '')
 
   const email = await resolveUserEmail(admin, req.recipientUserId)
+  // Snapshot only -- deliberately NOT part of idempotencyKey's inputs above,
+  // so a later preference change can never duplicate an already-sent email.
+  const resolvedLocale = await resolveRecipientLocale(admin, req.recipientUserId)
 
   const { data: inserted, error: insertError } = await admin
     .from('email_deliveries')
@@ -77,6 +80,7 @@ export async function sendTemplate(admin: SupabaseClient, req: SendTemplateReque
       related_entity_id: req.relatedEntityId,
       template_vars: req.vars,
       idempotency_key: idempotencyKey,
+      resolved_locale: resolvedLocale,
       status: 'pending',
     })
     .select('id')
@@ -104,7 +108,7 @@ export async function sendTemplate(admin: SupabaseClient, req: SendTemplateReque
 
   let rendered
   try {
-    rendered = renderTemplate(req.templateId, req.vars)
+    rendered = renderTemplate(req.templateId, req.vars, resolvedLocale)
   } catch (err) {
     const message = err instanceof TemplateValidationError ? err.message : 'template render error'
     console.error('[email.service] template validation failed', { templateId: req.templateId, message })
