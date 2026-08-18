@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/i18n/navigation'
+import { useTranslations } from 'next-intl'
 import { AlertTriangle } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 
@@ -18,8 +19,9 @@ interface OpenDisputeDialogProps {
  * with their own transactionType/transactionId rather than three
  * near-duplicate dialogs.
  */
-export function OpenDisputeDialog({ transactionType, transactionId, className, triggerLabel = 'Raise a dispute' }: OpenDisputeDialogProps) {
+export function OpenDisputeDialog({ transactionType, transactionId, className, triggerLabel }: OpenDisputeDialogProps) {
   const router = useRouter()
+  const t = useTranslations('common.disputes')
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -49,13 +51,13 @@ export function OpenDisputeDialog({ transactionType, transactionId, className, t
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Could not open your dispute')
+        setError(data.error ?? t('couldNotOpen'))
         return
       }
       setOpen(false)
       router.push(`/dashboard/disputes/${data.dispute_id}`)
     } catch {
-      setError('Could not open your dispute — please try again')
+      setError(t('couldNotOpenRetry'))
     } finally {
       setSubmitting(false)
     }
@@ -71,20 +73,20 @@ export function OpenDisputeDialog({ transactionType, transactionId, className, t
           'flex items-center justify-center gap-2 w-full py-3 border border-[#8B1A1A] text-[#8B1A1A] font-semibold rounded-xl text-sm hover:bg-[#8B1A1A]/5 transition-colors'
         }
       >
-        <AlertTriangle size={16} /> {triggerLabel}
+        <AlertTriangle size={16} /> {triggerLabel ?? t('raiseDispute')}
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Raise a dispute</DialogTitle>
-            <DialogDescription>An admin will review this and reach out to both parties.</DialogDescription>
+            <DialogTitle>{t('raiseDispute')}</DialogTitle>
+            <DialogDescription>{t('adminWillReview')}</DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="dispute-title" className="block text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] mb-1.5">
-                Title
+                {t('titleLabel')}
               </label>
               <input
                 id="dispute-title"
@@ -94,13 +96,13 @@ export function OpenDisputeDialog({ transactionType, transactionId, className, t
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30"
-                placeholder="A short summary of the issue"
+                placeholder={t('titlePlaceholder')}
               />
             </div>
 
             <div>
               <label htmlFor="dispute-description" className="block text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] mb-1.5">
-                Description
+                {t('descriptionLabel')}
               </label>
               <textarea
                 id="dispute-description"
@@ -110,13 +112,13 @@ export function OpenDisputeDialog({ transactionType, transactionId, className, t
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30"
-                placeholder="What happened?"
+                placeholder={t('descriptionPlaceholder')}
               />
             </div>
 
             <div>
               <label htmlFor="dispute-resolution" className="block text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] mb-1.5">
-                What resolution are you looking for?
+                {t('resolutionLabel')}
               </label>
               <textarea
                 id="dispute-resolution"
@@ -136,7 +138,7 @@ export function OpenDisputeDialog({ transactionType, transactionId, className, t
               disabled={submitting}
               className="w-full py-3 bg-[#8B1A1A] text-white font-semibold rounded-xl text-sm hover:bg-[#6B1414] transition-colors disabled:opacity-50"
             >
-              {submitting ? 'Submitting…' : 'Submit dispute'}
+              {submitting ? t('submitting') : t('submitDispute')}
             </button>
           </form>
         </DialogContent>

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { useRouter } from '@/i18n/navigation'
 import { Plus, Trash2 } from 'lucide-react'
 import { CATEGORIES } from '@/types'
 import type { BarterSkillTaskPost, BarterSkillTaskPostMilestoneTemplate, SkillTaskKind, SkillTaskDirection, SkillTaskDeliveryMode } from '@/types'
@@ -44,6 +45,11 @@ interface SkillTaskPostFormProps {
  */
 export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, initialCategorySlug }: SkillTaskPostFormProps) {
   const router = useRouter()
+  const t = useTranslations('barter.postForm')
+  const tSkills = useTranslations('skills')
+  const tTasks = useTranslations('tasks')
+  const tMarketplace = useTranslations('marketplace.direction')
+  const tCategories = useTranslations('common.categories')
   const locked = !!initialPost?.first_published_at
 
   const [postId, setPostId] = useState<string | undefined>(initialPost?.id)
@@ -154,7 +160,7 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
         })
         const data = await res.json()
         if (!res.ok) {
-          setError(data.error ?? 'Could not save your changes')
+          setError(data.error ?? t('errors.couldNotSaveChanges'))
           return null
         }
         setSaved(true)
@@ -163,7 +169,7 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
       }
 
       if (!title.trim() || !description.trim()) {
-        setError('Title and description are required.')
+        setError(t('errors.titleDescRequired'))
         return null
       }
 
@@ -174,14 +180,14 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Could not save your draft')
+        setError(data.error ?? t('errors.couldNotSaveDraft'))
         return null
       }
       setPostId(data.post_id)
       setSaved(true)
       return data.post_id as string
     } catch {
-      setError('Could not save — please try again')
+      setError(t('errors.couldNotSaveRetry'))
       return null
     } finally {
       setSaving(false)
@@ -190,7 +196,7 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
 
   async function handlePublish() {
     if (!milestonesValid) {
-      setError('Milestone weights must add up to exactly 100% before publishing.')
+      setError(t('errors.milestoneWeightsInvalid'))
       return
     }
     setPublishing(true)
@@ -206,12 +212,12 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Could not publish this post')
+        setError(data.error ?? t('errors.couldNotPublish'))
         return
       }
       router.push('/dashboard/barter/skill-task')
     } catch {
-      setError('Could not publish — please try again')
+      setError(t('errors.couldNotPublishRetry'))
     } finally {
       setPublishing(false)
     }
@@ -221,7 +227,7 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className={labelClass}>Kind</label>
+          <label className={labelClass}>{t('kindLabel')}</label>
           <div className="flex gap-2">
             {(['skill', 'task'] as const).map((k) => (
               <button
@@ -233,13 +239,13 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
                   kind === k ? 'bg-[#8B1A1A] text-white border-[#8B1A1A]' : 'border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED]'
                 }`}
               >
-                {k === 'skill' ? 'Skill' : 'Task'}
+                {k === 'skill' ? tSkills('label') : tTasks('label')}
               </button>
             ))}
           </div>
         </div>
         <div>
-          <label className={labelClass}>Direction</label>
+          <label className={labelClass}>{t('directionLabel')}</label>
           <div className="flex gap-2">
             {(['available', 'looking_for'] as const).map((d) => (
               <button
@@ -251,124 +257,124 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
                   direction === d ? 'bg-[#8B1A1A] text-white border-[#8B1A1A]' : 'border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED]'
                 }`}
               >
-                {d === 'available' ? 'Available' : 'Looking For'}
+                {d === 'available' ? tMarketplace('available') : tMarketplace('lookingFor')}
               </button>
             ))}
           </div>
         </div>
       </div>
-      {locked && <p className="text-xs text-[#9B8B85]">Kind and direction can no longer change — this post has already been published.</p>}
+      {locked && <p className="text-xs text-[#9B8B85]">{t('lockedNotice')}</p>}
 
       <div>
-        <label className={labelClass}>Title</label>
-        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Weekend furniture assembly help" className={inputClass} />
+        <label className={labelClass}>{t('titleLabel')}</label>
+        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('titlePlaceholder')} className={inputClass} />
       </div>
 
       <div>
-        <label className={labelClass}>Description</label>
+        <label className={labelClass}>{t('descriptionLabel')}</label>
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className={`${inputClass} resize-none`} />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className={labelClass}>Category</label>
+          <label className={labelClass}>{t('categoryLabel')}</label>
           <select value={categorySlug} onChange={(e) => setCategorySlug(e.target.value)} disabled={locked} className={`${inputClass} disabled:opacity-50`}>
-            <option value="">Select…</option>
+            <option value="">{t('categorySelectPlaceholder')}</option>
             {CATEGORIES.map((c) => (
-              <option key={c.id} value={c.id}>{c.label}</option>
+              <option key={c.id} value={c.id}>{tCategories(c.id)}</option>
             ))}
           </select>
         </div>
         <div>
-          <label className={labelClass}>Delivery mode</label>
+          <label className={labelClass}>{t('deliveryModeLabel')}</label>
           <select value={deliveryMode} onChange={(e) => setDeliveryMode(e.target.value as SkillTaskDeliveryMode)} className={inputClass}>
-            <option value="remote">Remote</option>
-            <option value="in_person">In person</option>
-            <option value="either">Either</option>
+            <option value="remote">{t('deliveryRemote')}</option>
+            <option value="in_person">{t('deliveryInPerson')}</option>
+            <option value="either">{t('deliveryEither')}</option>
           </select>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className={labelClass}>Province</label>
-          <input type="text" value={province} onChange={(e) => setProvince(e.target.value)} placeholder="e.g. Gauteng" className={inputClass} />
+          <label className={labelClass}>{t('provinceLabel')}</label>
+          <input type="text" value={province} onChange={(e) => setProvince(e.target.value)} placeholder={t('provincePlaceholder')} className={inputClass} />
         </div>
         <div>
-          <label className={labelClass}>City</label>
-          <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Johannesburg" className={inputClass} />
+          <label className={labelClass}>{t('cityLabel')}</label>
+          <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder={t('cityPlaceholder')} className={inputClass} />
         </div>
       </div>
-      <p className="text-xs text-[#9B8B85] -mt-3">City/province only — an exact address is never collected here.</p>
+      <p className="text-xs text-[#9B8B85] -mt-3">{t('locationPrivacyNotice')}</p>
 
       <div>
-        <label className={labelClass}>Exclusions (optional)</label>
-        <textarea value={exclusions} onChange={(e) => setExclusions(e.target.value)} rows={2} placeholder="What's not included…" className={`${inputClass} resize-none`} />
+        <label className={labelClass}>{t('exclusionsLabel')}</label>
+        <textarea value={exclusions} onChange={(e) => setExclusions(e.target.value)} rows={2} placeholder={t('exclusionsPlaceholder')} className={`${inputClass} resize-none`} />
       </div>
       <div>
-        <label className={labelClass}>Materials arrangement (optional)</label>
+        <label className={labelClass}>{t('materialsLabel')}</label>
         <textarea value={materialsArrangement} onChange={(e) => setMaterialsArrangement(e.target.value)} rows={2} className={`${inputClass} resize-none`} />
       </div>
       <div>
-        <label className={labelClass}>Evidence expectations (optional)</label>
+        <label className={labelClass}>{t('evidenceLabel')}</label>
         <textarea value={evidenceExpectations} onChange={(e) => setEvidenceExpectations(e.target.value)} rows={2} className={`${inputClass} resize-none`} />
       </div>
       <div>
-        <label className={labelClass}>Desired exchange notes (optional)</label>
-        <textarea value={desiredExchangeNotes} onChange={(e) => setDesiredExchangeNotes(e.target.value)} rows={2} placeholder="What you'd like in return…" className={`${inputClass} resize-none`} />
+        <label className={labelClass}>{t('desiredExchangeLabel')}</label>
+        <textarea value={desiredExchangeNotes} onChange={(e) => setDesiredExchangeNotes(e.target.value)} rows={2} placeholder={t('desiredExchangePlaceholder')} className={`${inputClass} resize-none`} />
       </div>
 
       <div className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-3.5 space-y-2">
-        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">What would satisfy this? (matching signals)</p>
+        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('matchingSignalsHeading')}</p>
         <div className="grid grid-cols-2 gap-2">
           <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
-            <input type="checkbox" checked={wantsItem} disabled={locked} onChange={(e) => setWantsItem(e.target.checked)} className="accent-[#8B1A1A]" /> An item
+            <input type="checkbox" checked={wantsItem} disabled={locked} onChange={(e) => setWantsItem(e.target.checked)} className="accent-[#8B1A1A]" /> {t('wantsItem')}
           </label>
           <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
-            <input type="checkbox" checked={wantsSkill} disabled={locked} onChange={(e) => setWantsSkill(e.target.checked)} className="accent-[#8B1A1A]" /> A skill
+            <input type="checkbox" checked={wantsSkill} disabled={locked} onChange={(e) => setWantsSkill(e.target.checked)} className="accent-[#8B1A1A]" /> {t('wantsSkill')}
           </label>
           <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
-            <input type="checkbox" checked={wantsTask} disabled={locked} onChange={(e) => setWantsTask(e.target.checked)} className="accent-[#8B1A1A]" /> A task
+            <input type="checkbox" checked={wantsTask} disabled={locked} onChange={(e) => setWantsTask(e.target.checked)} className="accent-[#8B1A1A]" /> {t('wantsTask')}
           </label>
           <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
-            <input type="checkbox" checked={wantsCashAdjustment} disabled={locked} onChange={(e) => setWantsCashAdjustment(e.target.checked)} className="accent-[#8B1A1A]" /> Cash top-up
+            <input type="checkbox" checked={wantsCashAdjustment} disabled={locked} onChange={(e) => setWantsCashAdjustment(e.target.checked)} className="accent-[#8B1A1A]" /> {t('wantsCash')}
           </label>
         </div>
-        {locked && <p className="text-xs text-[#9B8B85]">These signals can no longer change after publishing.</p>}
+        {locked && <p className="text-xs text-[#9B8B85]">{t('signalsLockedNotice')}</p>}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className={labelClass}>Preferred start date (optional)</label>
+          <label className={labelClass}>{t('preferredStartDateLabel')}</label>
           <input type="date" value={preferredStartDate} onChange={(e) => setPreferredStartDate(e.target.value)} className={inputClass} />
         </div>
         <div>
-          <label className={labelClass}>Preferred start time (optional)</label>
+          <label className={labelClass}>{t('preferredStartTimeLabel')}</label>
           <input type="time" value={preferredStartTime} onChange={(e) => setPreferredStartTime(e.target.value)} className={inputClass} />
         </div>
         <div>
-          <label className={labelClass}>Deadline (optional)</label>
+          <label className={labelClass}>{t('deadlineLabel')}</label>
           <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className={inputClass} />
         </div>
         <div>
-          <label className={labelClass}>Expected duration notes (optional)</label>
-          <input type="text" value={expectedDurationNotes} onChange={(e) => setExpectedDurationNotes(e.target.value)} placeholder="e.g. About 3 hours" className={inputClass} />
+          <label className={labelClass}>{t('durationNotesLabel')}</label>
+          <input type="text" value={expectedDurationNotes} onChange={(e) => setExpectedDurationNotes(e.target.value)} placeholder={t('durationNotesPlaceholder')} className={inputClass} />
         </div>
       </div>
       <div>
-        <label className={labelClass}>Availability notes (optional)</label>
+        <label className={labelClass}>{t('availabilityNotesLabel')}</label>
         <textarea value={availabilityNotes} onChange={(e) => setAvailabilityNotes(e.target.value)} rows={2} className={`${inputClass} resize-none`} />
       </div>
 
       <div className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-3.5 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Milestone preview (optional)</p>
-            <p className="text-xs text-[#9B8B85]">Discovery-time preview only — not binding. The real milestones are set when an offer is made.</p>
+            <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('milestonesHeading')}</p>
+            <p className="text-xs text-[#9B8B85]">{t('milestonesDesc')}</p>
           </div>
           {!locked && (
             <button type="button" onClick={addMilestone} className="flex items-center gap-1 text-xs font-medium text-[#8B1A1A] hover:underline shrink-0">
-              <Plus size={13} /> Add
+              <Plus size={13} /> {t('addMilestone')}
             </button>
           )}
         </div>
@@ -380,7 +386,7 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
               value={m.title}
               disabled={locked}
               onChange={(e) => updateMilestone(i, { title: e.target.value })}
-              placeholder={`Milestone ${m.sequence} title`}
+              placeholder={t('milestoneTitlePlaceholder', { sequence: m.sequence })}
               className={`${inputClass} disabled:opacity-50`}
             />
             <input
@@ -388,7 +394,7 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
               value={m.description}
               disabled={locked}
               onChange={(e) => updateMilestone(i, { description: e.target.value })}
-              placeholder="Description (optional)"
+              placeholder={t('milestoneDescPlaceholder')}
               className={`${inputClass} disabled:opacity-50`}
             />
             <input
@@ -398,7 +404,7 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
               value={m.weight_percent || ''}
               disabled={locked}
               onChange={(e) => updateMilestone(i, { weight_percent: Number(e.target.value) || 0 })}
-              placeholder="%"
+              placeholder={t('milestoneWeightPlaceholder')}
               className={`${inputClass} disabled:opacity-50`}
             />
             {!locked && (
@@ -411,13 +417,13 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
 
         {milestones.length > 0 && (
           <p className={`text-xs font-medium ${milestonesValid ? 'text-[#6B5B55] dark:text-[#9B8B85]' : 'text-red-600'}`}>
-            Weights total {milestoneWeightSum}% — must equal exactly 100% before publishing.
+            {t('milestoneWeightSum', { sum: milestoneWeightSum })}
           </p>
         )}
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {saved && !error && <p className="text-sm text-green-600 dark:text-green-400">Saved.</p>}
+      {saved && !error && <p className="text-sm text-green-600 dark:text-green-400">{t('saved')}</p>}
 
       <div className="flex flex-wrap gap-3">
         <button
@@ -426,7 +432,7 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
           disabled={saving || publishing}
           className="px-5 py-2.5 rounded-xl border border-[#8B1A1A] text-[#8B1A1A] font-semibold text-sm hover:bg-[#8B1A1A]/5 transition-colors disabled:opacity-50"
         >
-          {saving ? 'Saving…' : locked ? 'Save changes' : 'Save draft'}
+          {saving ? t('saving') : locked ? t('saveChanges') : t('saveDraft')}
         </button>
         {!locked && (
           <button
@@ -435,7 +441,7 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
             disabled={saving || publishing}
             className="px-5 py-2.5 rounded-xl bg-[#8B1A1A] text-white font-semibold text-sm hover:bg-[#7A1616] transition-colors disabled:opacity-50"
           >
-            {publishing ? 'Publishing…' : 'Publish'}
+            {publishing ? t('publishing') : t('publish')}
           </button>
         )}
       </div>

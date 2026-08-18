@@ -1,9 +1,12 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/i18n/navigation'
+import { useTranslations, useLocale } from 'next-intl'
 import { Camera, Upload, X, CheckCircle, Clock, Info } from 'lucide-react'
 import { toast } from 'sonner'
+import { formatDate, formatDateTime } from '@/lib/i18n/format'
+import type { Locale } from '@/i18n/locales'
 
 interface UploadedFile {
   file: File
@@ -20,6 +23,8 @@ interface MediaUploadProps {
 
 export function MediaUpload({ bookingId, stage, listingTitle, backHref }: MediaUploadProps) {
   const router = useRouter()
+  const t = useTranslations('rent.media')
+  const locale = useLocale() as Locale
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploads, setUploads] = useState<UploadedFile[]>([])
   const [submitting, setSubmitting] = useState(false)
@@ -34,10 +39,10 @@ export function MediaUpload({ bookingId, stage, listingTitle, backHref }: MediaU
       .map((file) => ({
         file,
         preview: URL.createObjectURL(file),
-        timestamp: new Date().toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }),
+        timestamp: formatDateTime(new Date(), locale),
       }))
     setUploads((prev) => [...prev, ...newUploads])
-  }, [])
+  }, [locale])
 
   const remove = (i: number) => {
     URL.revokeObjectURL(uploads[i].preview)
@@ -50,7 +55,7 @@ export function MediaUpload({ bookingId, stage, listingTitle, backHref }: MediaU
     await new Promise((r) => setTimeout(r, 1200))
     setSubmitting(false)
     setSubmitted(true)
-    toast.success(`${isPre ? 'Pre-rental' : 'Post-rental'} photos uploaded and timestamped.`)
+    toast.success(t('uploadedToast', { stage: isPre ? t('preRental') : t('postRental') }))
     setTimeout(() => router.push(backHref), 1800)
   }
 
@@ -60,10 +65,9 @@ export function MediaUpload({ bookingId, stage, listingTitle, backHref }: MediaU
         <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
           <CheckCircle size={32} className="text-green-500" />
         </div>
-        <h2 className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] mb-2">Media uploaded!</h2>
+        <h2 className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] mb-2">{t('uploadedHeading')}</h2>
         <p className="text-sm text-[#9B8B85]">
-          {uploads.length} file{uploads.length !== 1 ? 's' : ''} timestamped and stored securely.
-          Redirecting…
+          {t('uploadedDesc', { count: uploads.length })}
         </p>
       </div>
     )
@@ -79,12 +83,12 @@ export function MediaUpload({ bookingId, stage, listingTitle, backHref }: MediaU
               ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
               : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
           }`}>
-            {isPre ? 'Pre-rental' : 'Post-rental'}
+            {isPre ? t('preRental') : t('postRental')}
           </span>
-          <span>Booking #{bookingId.slice(-6).toUpperCase()}</span>
+          <span>{t('bookingNumber', { ref: bookingId.slice(-6).toUpperCase() })}</span>
         </div>
         <h1 className="text-2xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED]">
-          {isPre ? 'Document item condition' : 'Confirm item return'}
+          {isPre ? t('documentCondition') : t('confirmReturn')}
         </h1>
         <p className="text-sm text-[#9B8B85] mt-1 line-clamp-1">{listingTitle}</p>
       </div>
@@ -97,16 +101,14 @@ export function MediaUpload({ bookingId, stage, listingTitle, backHref }: MediaU
       }`}>
         <Info size={15} className={isPre ? 'text-blue-500 shrink-0 mt-0.5' : 'text-amber-500 shrink-0 mt-0.5'} />
         <p className={`text-sm ${isPre ? 'text-blue-700 dark:text-blue-300' : 'text-amber-700 dark:text-amber-300'}`}>
-          {isPre
-            ? "Photograph the item from all angles BEFORE you accept it. This protects your deposit if there's a pre-existing damage dispute."
-            : 'Photograph the item from all angles BEFORE handing it back. This confirms its condition at return and triggers deposit release.'}
+          {isPre ? t('preInfo') : t('postInfo')}
         </p>
       </div>
 
       {/* Timestamp notice */}
       <div className="flex items-center gap-2 text-xs text-[#9B8B85] mb-4">
         <Clock size={12} />
-        <span>All uploads are automatically timestamped with {new Date().toLocaleDateString('en-ZA', { dateStyle: 'medium' })}</span>
+        <span>{t('timestampNotice', { date: formatDate(new Date(), locale) })}</span>
       </div>
 
       {/* Upload zone */}
@@ -119,8 +121,8 @@ export function MediaUpload({ bookingId, stage, listingTitle, backHref }: MediaU
         <div className="w-12 h-12 rounded-full bg-[#F2EDE8] dark:bg-[#2A1A1A] flex items-center justify-center mx-auto mb-3">
           <Camera size={22} className="text-[#9B8B85]" />
         </div>
-        <p className="text-sm font-medium text-[#6B5B55] dark:text-[#9B8B85]">Click to add photos or video</p>
-        <p className="text-xs text-[#9B8B85] mt-1">JPG, PNG, MP4 — drag &amp; drop supported</p>
+        <p className="text-sm font-medium text-[#6B5B55] dark:text-[#9B8B85]">{t('clickToAdd')}</p>
+        <p className="text-xs text-[#9B8B85] mt-1">{t('dragDropHint')}</p>
         <input
           ref={inputRef}
           type="file"
@@ -135,7 +137,7 @@ export function MediaUpload({ bookingId, stage, listingTitle, backHref }: MediaU
       {uploads.length > 0 && (
         <div className="mb-6">
           <p className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] mb-3">
-            {uploads.length} file{uploads.length !== 1 ? 's' : ''} ready
+            {t('filesReady', { count: uploads.length })}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {uploads.map((u, i) => (
@@ -171,7 +173,7 @@ export function MediaUpload({ bookingId, stage, listingTitle, backHref }: MediaU
           onClick={() => router.push(backHref)}
           className="flex-1 py-3 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] font-medium rounded-xl hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors text-sm"
         >
-          Cancel
+          {t('cancel')}
         </button>
         <button
           onClick={submit}
@@ -179,9 +181,9 @@ export function MediaUpload({ bookingId, stage, listingTitle, backHref }: MediaU
           className="flex-[2] py-3 bg-[#8B1A1A] text-white font-semibold rounded-xl hover:bg-[#7A1616] disabled:opacity-40 transition-colors flex items-center justify-center gap-2 text-sm"
         >
           {submitting ? (
-            <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploading…</>
+            <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {t('uploading')}</>
           ) : (
-            <><CheckCircle size={15} /> Submit {uploads.length > 0 ? `${uploads.length} file${uploads.length !== 1 ? 's' : ''}` : 'media'}</>
+            <><CheckCircle size={15} /> {uploads.length > 0 ? t('submitFiles', { count: uploads.length }) : t('submitMedia')}</>
           )}
         </button>
       </div>

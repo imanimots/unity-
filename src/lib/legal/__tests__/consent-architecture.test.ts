@@ -6,13 +6,13 @@ const REPO_ROOT = join(__dirname, '../../../..')
 
 describe('consent capture wiring (category: Consent)', () => {
   it('23. registration records terms/privacy/popia acceptance after signup', () => {
-    const content = readFileSync(join(REPO_ROOT, 'src/app/(auth)/register/page.tsx'), 'utf-8')
+    const content = readFileSync(join(REPO_ROOT, 'src/app/[locale]/(auth)/register/page.tsx'), 'utf-8')
     expect(content).toMatch(/\/api\/legal\/accept/)
     expect(content).toMatch(/context:\s*'registration'/)
   })
 
   it('24. booking request records rental-terms/cancellations/delivery-and-handover acceptance, and the button is gated on an explicit (unchecked-by-default) checkbox', () => {
-    const content = readFileSync(join(REPO_ROOT, 'src/app/(marketing)/listings/[id]/book/booking-flow.tsx'), 'utf-8')
+    const content = readFileSync(join(REPO_ROOT, 'src/app/[locale]/(marketing)/listings/[id]/book/booking-flow.tsx'), 'utf-8')
     expect(content).toMatch(/\/api\/legal\/accept/)
     expect(content).toMatch(/context:\s*'booking_request'/)
     expect(content).toMatch(/useState\(false\)/) // agreedToTerms starts false -- not preselected
@@ -21,7 +21,7 @@ describe('consent capture wiring (category: Consent)', () => {
 
   it('25. checkout records payments-and-deposits/refunds acceptance, gated on an explicit checkbox', () => {
     const content = readFileSync(
-      join(REPO_ROOT, 'src/app/(dashboard)/dashboard/renter/bookings/[id]/checkout/checkout-flow.tsx'),
+      join(REPO_ROOT, 'src/app/[locale]/(dashboard)/dashboard/renter/bookings/[id]/checkout/checkout-flow.tsx'),
       'utf-8'
     )
     expect(content).toMatch(/\/api\/legal\/accept/)
@@ -30,7 +30,7 @@ describe('consent capture wiring (category: Consent)', () => {
   })
 
   it('26. verification submission records popia/verification-and-trust acceptance, gated on an explicit checkbox', () => {
-    const content = readFileSync(join(REPO_ROOT, 'src/app/(auth)/verify/kyc-flow.tsx'), 'utf-8')
+    const content = readFileSync(join(REPO_ROOT, 'src/app/[locale]/(auth)/verify/kyc-flow.tsx'), 'utf-8')
     expect(content).toMatch(/\/api\/legal\/accept/)
     expect(content).toMatch(/context:\s*'verification'/)
     expect(content).toMatch(/agreedToVerificationTerms/)
@@ -38,7 +38,7 @@ describe('consent capture wiring (category: Consent)', () => {
 
   it('27. listing submission reuses the existing declaration mechanism, not a new one', () => {
     const content = readFileSync(
-      join(REPO_ROOT, 'src/app/(dashboard)/dashboard/merchant/listings/new/create-listing-flow.tsx'),
+      join(REPO_ROOT, 'src/app/[locale]/(dashboard)/dashboard/merchant/listings/new/create-listing-flow.tsx'),
       'utf-8'
     )
     expect(content).toMatch(/DECLARATION_CATALOGUE/)

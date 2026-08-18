@@ -8,6 +8,36 @@ import type { Message, MessageAttachment } from '@/types'
 
 type ThreadType = 'booking' | 'order' | 'barter'
 
+export interface ChatThreadLabels {
+  loadingMessages: string
+  noMessagesYet: string
+  messageBlocked: string
+  contentPolicyViolation: string
+  keepContactInfoOff: string
+  failedRetry: string
+  sending: string
+  attachmentUploadFailed: string
+  couldNotSend: string
+  couldNotSendRetry: string
+  messagePlaceholder: string
+  attachmentFallbackName: string
+}
+
+const DEFAULT_LABELS: ChatThreadLabels = {
+  loadingMessages: 'Loading messages…',
+  noMessagesYet: 'No messages yet.',
+  messageBlocked: 'Message blocked',
+  contentPolicyViolation: 'Content policy violation',
+  keepContactInfoOff: 'Keep all contact info off Unity.',
+  failedRetry: 'Failed — retry',
+  sending: 'Sending…',
+  attachmentUploadFailed: 'Message sent, but the attachment could not be uploaded.',
+  couldNotSend: 'Could not send this message',
+  couldNotSendRetry: 'Could not send this message — please try again',
+  messagePlaceholder: 'Type a message…',
+  attachmentFallbackName: 'attachment',
+}
+
 interface ChatThreadProps {
   transactionType: ThreadType
   transactionId: string
@@ -20,6 +50,17 @@ interface ChatThreadProps {
   variant?: 'full' | 'embedded'
   /** True only for the admin dispute detail page -- routes history reads through the audited GET /api/admin/messages instead of GET /api/messages, so every admin view of a thread is logged (admin_message_access_log). Implies canSend=false at the call site; never used to send. */
   useAdminEndpoint?: boolean
+  /**
+   * Rendered both inside [locale] (the /chat page and the dashboard dispute
+   * detail view) and inside admin/orders/[id]/page.tsx and the admin
+   * dispute detail page, neither of which has a NextIntlClientProvider --
+   * so this takes server-resolved label overrides rather than calling
+   * useTranslations() directly. Admin call sites omit both `labels` and
+   * `locale` and keep the English/en-ZA defaults unchanged.
+   */
+  labels?: ChatThreadLabels
+  /** Locale for date/time separators only -- admin call sites omit this and keep the fixed en-ZA formatting below. */
+  locale?: string
 }
 
 interface ThreadMessage extends Message {
@@ -31,16 +72,16 @@ interface ThreadMessage extends Message {
 const PARAM_BY_TYPE: Record<ThreadType, string> = { booking: 'booking_id', order: 'order_id', barter: 'barter_agreement_id' }
 const HEARTBEAT_INTERVAL_MS = 25_000
 
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false })
+function formatTime(iso: string, locale: string) {
+  return new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
-function dateSep(iso: string) {
-  return new Date(iso).toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long' })
+function dateSep(iso: string, locale: string) {
+  return new Date(iso).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
-function AttachmentChip({ attachment }: { attachment: MessageAttachment }) {
-  const filename = attachment.storage_path.split('/').pop() ?? 'attachment'
+function AttachmentChip({ attachment, fallbackName }: { attachment: MessageAttachment; fallbackName: string }) {
+  const filename = attachment.storage_path.split('/').pop() ?? fallbackName
   const Icon = attachment.file_type === 'image' ? ImageIcon : FileText
   return (
     <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1 rounded-lg bg-black/10 text-xs">
@@ -55,7 +96,7 @@ function AttachmentChip({ attachment }: { attachment: MessageAttachment }) {
  * real /chat page and the dispute detail view alike. No BookingChat/
  * OrderChat/DisputeChat/BarterChat variants.
  */
-export function ChatThread({ transactionType, transactionId, currentUserId, canSend, disputeId, variant = 'full', useAdminEndpoint = false }: ChatThreadProps) {
+export function ChatThread({ transactionType, transactionId, currentUserId, canSend, disputeId, variant = 'full', useAdminEndpoint = false, labels = DEFAULT_LABELS, locale = 'en-ZA' }: ChatThreadProps) {
   const [messages, setMessages] = useState<ThreadMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [historyLoaded, setHistoryLoaded] = useState(false)
@@ -175,7 +216,7 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
     const data = await res.json()
     if (!res.ok) {
       setMessages((prev) => prev.map((m) => (m._tempId === tempId ? { ...m, _pending: false, _failed: true } : m)))
-      setSendError(data.error ?? 'Could not send this message')
+      setSendError(data.error ?? labels.couldNotSend)
       return
     }
 
@@ -194,7 +235,7 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
           prev.map((m) => (m.id === data.id ? { ...m, attachments: [...(m.attachments ?? []), { file_type: fileType, storage_path: path } as MessageAttachment] } : m))
         )
       } catch {
-        setFileError('Message sent, but the attachment could not be uploaded.')
+        setFileError(labels.attachmentUploadFailed)
       }
     }
   }
@@ -237,7 +278,7 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
       await postMessage(content, tempId, file)
     } catch {
       setMessages((prev) => prev.map((m) => (m._tempId === tempId ? { ...m, _pending: false, _failed: true } : m)))
-      setSendError('Could not send this message — please try again')
+      setSendError(labels.couldNotSendRetry)
     } finally {
       setSending(false)
     }
@@ -272,7 +313,7 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
 
   const groups: { date: string; items: ThreadMessage[] }[] = []
   for (const msg of messages) {
-    const d = dateSep(msg.created_at)
+    const d = dateSep(msg.created_at, locale)
     const last = groups[groups.length - 1]
     if (!last || last.date !== d) groups.push({ date: d, items: [msg] })
     else last.items.push(msg)
@@ -284,9 +325,9 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
     <div className={`flex flex-col ${containerHeight}`}>
       <div className={`flex-1 overflow-y-auto ${variant === 'embedded' ? 'space-y-3 py-2' : 'px-5 py-5 space-y-4 bg-[#FAF8F5] dark:bg-[#0F0A0A]'}`}>
         {loading ? (
-          <p className="text-sm text-[#9B8B85] text-center py-8">Loading messages…</p>
+          <p className="text-sm text-[#9B8B85] text-center py-8">{labels.loadingMessages}</p>
         ) : messages.length === 0 ? (
-          <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] text-center py-8">No messages yet.</p>
+          <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] text-center py-8">{labels.noMessagesYet}</p>
         ) : (
           groups.map(({ date, items }) => (
             <div key={date}>
@@ -306,8 +347,8 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
                         <div className="flex items-start gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-600 dark:text-red-400 max-w-xs">
                           <ShieldAlert size={13} className="shrink-0 mt-0.5" />
                           <div>
-                            <p className="font-semibold">Message blocked</p>
-                            <p>{msg.filter_reason ?? 'Content policy violation'}. Keep all contact info off Unity.</p>
+                            <p className="font-semibold">{labels.messageBlocked}</p>
+                            <p>{msg.filter_reason ?? labels.contentPolicyViolation}. {labels.keepContactInfoOff}</p>
                           </div>
                         </div>
                       </div>
@@ -325,17 +366,17 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
                         >
                           {msg.content}
                           {(msg.attachments ?? []).map((a, i) => (
-                            <AttachmentChip key={a.id ?? i} attachment={a} />
+                            <AttachmentChip key={a.id ?? i} attachment={a} fallbackName={labels.attachmentFallbackName} />
                           ))}
                         </div>
                         <div className={`flex items-center gap-1.5 mt-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
                           {msg._failed ? (
                             // eslint-disable-next-line react-hooks/refs -- handleRetry only ever runs from this click handler, never during render
                             <button onClick={() => handleRetry(msg)} className="flex items-center gap-1 text-[10px] text-red-500 hover:underline">
-                              <RotateCw size={10} /> Failed — retry
+                              <RotateCw size={10} /> {labels.failedRetry}
                             </button>
                           ) : (
-                            <span className="text-[10px] text-[#9B8B85]">{msg._pending ? 'Sending…' : formatTime(msg.created_at)}</span>
+                            <span className="text-[10px] text-[#9B8B85]">{msg._pending ? labels.sending : formatTime(msg.created_at, locale)}</span>
                           )}
                         </div>
                       </div>
@@ -376,7 +417,7 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
                   handleSend()
                 }
               }}
-              placeholder="Type a message…"
+              placeholder={labels.messagePlaceholder}
               rows={1}
               maxLength={2000}
               className="flex-1 resize-none px-4 py-2.5 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-[#FAF8F5] dark:bg-[#0F0A0A] text-sm text-[#1A0A0A] dark:text-[#F5F0ED] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20 transition-colors max-h-28"

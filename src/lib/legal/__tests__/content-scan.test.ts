@@ -41,11 +41,11 @@ const FORBIDDEN_AFFIRMATIVE_CLAIMS: RegExp[] = [
 ]
 
 const MARKETING_AND_APP_DIRS = [
-  join(REPO_ROOT, 'src/app/(marketing)'),
-  join(REPO_ROOT, 'src/app/(dashboard)'),
-  join(REPO_ROOT, 'src/app/(auth)'),
+  join(REPO_ROOT, 'src/app/[locale]/(marketing)'),
+  join(REPO_ROOT, 'src/app/[locale]/(dashboard)'),
+  join(REPO_ROOT, 'src/app/[locale]/(auth)'),
   join(REPO_ROOT, 'src/app/admin'),
-  join(REPO_ROOT, 'src/app/layout.tsx'),
+  join(REPO_ROOT, 'src/app/[locale]/layout.tsx'),
   join(REPO_ROOT, 'src/components'),
   join(REPO_ROOT, 'src/lib/assistant'),
   join(REPO_ROOT, 'src/lib/mock'),
@@ -108,14 +108,14 @@ describe('content scan: every legal page is marked draft in its own rendered bad
 
   it('14. every legal page route file exists', () => {
     for (const slug of LEGAL_PAGE_DIR_NAMES) {
-      const path = join(REPO_ROOT, `src/app/(marketing)/${slug}/page.tsx`)
+      const path = join(REPO_ROOT, `src/app/[locale]/(marketing)/${slug}/page.tsx`)
       expect(() => readFileSync(path, 'utf-8'), slug).not.toThrow()
     }
   })
 
   it('15. every legal page renders via LegalPageLayout, which shows the draft badge sourced from the registry', () => {
     for (const slug of LEGAL_PAGE_DIR_NAMES) {
-      const path = join(REPO_ROOT, `src/app/(marketing)/${slug}/page.tsx`)
+      const path = join(REPO_ROOT, `src/app/[locale]/(marketing)/${slug}/page.tsx`)
       const content = readFileSync(path, 'utf-8')
       expect(content, slug).toMatch(/LegalPageLayout/)
       expect(content, slug).toMatch(/getLegalDocument\('.+'\)/)
@@ -124,7 +124,7 @@ describe('content scan: every legal page is marked draft in its own rendered bad
 
   it('16. every legal page sets a canonical route in its metadata', () => {
     for (const slug of LEGAL_PAGE_DIR_NAMES) {
-      const path = join(REPO_ROOT, `src/app/(marketing)/${slug}/page.tsx`)
+      const path = join(REPO_ROOT, `src/app/[locale]/(marketing)/${slug}/page.tsx`)
       const content = readFileSync(path, 'utf-8')
       expect(content, slug).toMatch(/alternates:\s*{\s*canonical:/)
     }

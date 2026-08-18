@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useRouter, Link } from '@/i18n/navigation'
+import { useTranslations } from 'next-intl'
 import { Check, X, Play, PackageCheck, Ban, CreditCard, MessageCircle } from 'lucide-react'
 import type { BookingLifecycleStatus } from '@/lib/bookings/status-labels'
 import { OpenDisputeDialog } from '@/components/disputes/open-dispute-dialog'
@@ -27,14 +27,14 @@ interface Props {
 
 type ActionKind = 'accept' | 'reject' | 'cancel' | 'start' | 'return' | 'confirm-return' | 'checkout'
 
-const ACTION_LABELS: Record<ActionKind, { label: string; icon: typeof Check; classes: string; promptReason?: boolean }> = {
-  accept: { label: 'Accept', icon: Check, classes: 'bg-green-600 hover:bg-green-700 text-white' },
-  reject: { label: 'Decline', icon: X, classes: 'border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A]', promptReason: true },
-  cancel: { label: 'Cancel booking', icon: Ban, classes: 'border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A]', promptReason: true },
-  start: { label: 'Start rental', icon: Play, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
-  return: { label: 'Initiate return', icon: PackageCheck, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
-  'confirm-return': { label: 'Confirm return', icon: Check, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
-  checkout: { label: 'Checkout & pay', icon: CreditCard, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
+const ACTION_META: Record<ActionKind, { labelKey: string; icon: typeof Check; classes: string; promptReason?: boolean }> = {
+  accept: { labelKey: 'accept', icon: Check, classes: 'bg-green-600 hover:bg-green-700 text-white' },
+  reject: { labelKey: 'decline', icon: X, classes: 'border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A]', promptReason: true },
+  cancel: { labelKey: 'cancelBooking', icon: Ban, classes: 'border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A]', promptReason: true },
+  start: { labelKey: 'startRental', icon: Play, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
+  return: { labelKey: 'initiateReturn', icon: PackageCheck, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
+  'confirm-return': { labelKey: 'confirmReturn', icon: Check, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
+  checkout: { labelKey: 'checkoutAndPay', icon: CreditCard, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
 }
 
 /**
@@ -67,6 +67,8 @@ function availableActions(status: BookingLifecycleStatus, role: 'renter' | 'merc
 
 export function BookingActions({ bookingId, status, role, financiallyReady = false }: Props) {
   const router = useRouter()
+  const t = useTranslations('rent')
+  const tErrors = useTranslations('errors')
   const [pending, setPending] = useState<ActionKind | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -74,10 +76,10 @@ export function BookingActions({ bookingId, status, role, financiallyReady = fal
   const showDispute = DISPUTABLE_STATUSES.includes(status)
 
   async function run(action: ActionKind) {
-    const meta = ACTION_LABELS[action]
+    const meta = ACTION_META[action]
     let reason: string | null = null
     if (meta.promptReason) {
-      reason = window.prompt(action === 'reject' ? 'Reason for declining (optional):' : 'Reason for cancelling (optional):')
+      reason = window.prompt(action === 'reject' ? t('actions.declineReasonPrompt') : t('actions.cancelReasonPrompt'))
       if (reason === null) return // user hit cancel on the prompt itself
     }
 
@@ -95,12 +97,12 @@ export function BookingActions({ bookingId, status, role, financiallyReady = fal
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Something went wrong')
+        setError(data.error ?? tErrors('generic'))
         return
       }
       router.refresh()
     } catch {
-      setError('Network error — please try again')
+      setError(tErrors('network'))
     } finally {
       setPending(null)
     }
@@ -110,8 +112,9 @@ export function BookingActions({ bookingId, status, role, financiallyReady = fal
     <div className="mt-4 pt-4 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
       <div className="flex flex-wrap gap-2">
         {actions.map((action) => {
-          const meta = ACTION_LABELS[action]
+          const meta = ACTION_META[action]
           const Icon = meta.icon
+          const label = t(`actions.${meta.labelKey}`)
 
           if (action === 'checkout') {
             return (
@@ -120,7 +123,7 @@ export function BookingActions({ bookingId, status, role, financiallyReady = fal
                 href={`/dashboard/renter/bookings/${bookingId}/checkout`}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] rounded-lg transition-colors ${meta.classes}`}
               >
-                <Icon size={13} /> {meta.label}
+                <Icon size={13} /> {label}
               </Link>
             )
           }
@@ -132,7 +135,7 @@ export function BookingActions({ bookingId, status, role, financiallyReady = fal
               disabled={pending !== null}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] rounded-lg transition-colors disabled:opacity-50 ${meta.classes}`}
             >
-              <Icon size={13} /> {pending === action ? 'Working…' : meta.label}
+              <Icon size={13} /> {pending === action ? t('actions.working') : label}
             </button>
           )
         })}
@@ -143,12 +146,13 @@ export function BookingActions({ bookingId, status, role, financiallyReady = fal
           href={`/chat?booking=${bookingId}`}
           className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#6B5B55] dark:text-[#9B8B85] hover:underline"
         >
-          <MessageCircle size={13} /> Message
+          <MessageCircle size={13} /> {t('actions.message')}
         </Link>
         {showDispute && (
           <OpenDisputeDialog
             transactionType="booking"
             transactionId={bookingId}
+            triggerLabel={t('actions.raiseDispute')}
             className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#8B1A1A] hover:underline"
           />
         )}

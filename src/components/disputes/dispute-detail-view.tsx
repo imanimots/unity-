@@ -3,7 +3,20 @@ import { DisputeEvidencePanel } from './dispute-evidence-panel'
 import { ChatThread } from '@/components/messaging/chat-thread'
 import { DisputeTimeline } from './dispute-timeline'
 import { getDisputeOutcomeLabel } from '@/lib/disputes/status-labels'
+import type { Locale } from '@/i18n/locales'
 import type { Dispute, DisputeEvidence, DisputeHistoryEntry } from '@/types'
+
+interface DisputeDetailViewLabels {
+  statusLabel: string
+  requestedResolution: string
+  outcome: string
+  outcomeLabel: string
+  messages: string
+  evidencePanel: React.ComponentProps<typeof DisputeEvidencePanel>['labels']
+  timeline: React.ComponentProps<typeof DisputeTimeline>['labels']
+  chatThread?: React.ComponentProps<typeof ChatThread>['labels']
+  locale?: Locale
+}
 
 interface DisputeDetailViewProps {
   dispute: Dispute
@@ -22,6 +35,14 @@ interface DisputeDetailViewProps {
   viewerRole: 'participant' | 'admin'
   /** Extra content rendered above the timeline — the admin action buttons on the admin page, nothing on the participant page. */
   adminActions?: React.ReactNode
+  /**
+   * Server-resolved translated strings -- this component is shared with
+   * admin/disputes/[id]/page.tsx, which has no NextIntlClientProvider at
+   * all (admin stays English-only/unprefixed). The [locale] dashboard
+   * page computes this via getTranslations() and passes it down; the
+   * admin page omits it and keeps the English literals below.
+   */
+  labels?: DisputeDetailViewLabels
 }
 
 const TERMINAL_STATUSES = ['resolved', 'closed', 'cancelled']
@@ -36,7 +57,7 @@ const TERMINAL_STATUSES = ['resolved', 'closed', 'cancelled']
  * id but land in the same conversation the transaction's own chat
  * shows (see src/lib/messaging/service.ts).
  */
-export function DisputeDetailView({ dispute, history, evidence, currentUserId, viewerRole, adminActions }: DisputeDetailViewProps) {
+export function DisputeDetailView({ dispute, history, evidence, currentUserId, viewerRole, adminActions, labels }: DisputeDetailViewProps) {
   const isActive = !TERMINAL_STATUSES.includes(dispute.status) && viewerRole === 'participant'
   const transactionType = dispute.booking_id ? 'booking' : dispute.order_id ? 'order' : 'barter'
   const transactionId = dispute.booking_id ?? dispute.order_id ?? dispute.barter_agreement_id ?? ''
@@ -46,30 +67,30 @@ export function DisputeDetailView({ dispute, history, evidence, currentUserId, v
       <div>
         <div className="flex items-center gap-3 mb-2">
           <h1 className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED]">{dispute.title}</h1>
-          <DisputeStatusBadge status={dispute.status} />
+          <DisputeStatusBadge status={dispute.status} label={labels?.statusLabel} />
         </div>
         <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-pre-wrap">{dispute.description}</p>
       </div>
 
       <div>
-        <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-2">Requested resolution</h2>
+        <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-2">{labels?.requestedResolution ?? 'Requested resolution'}</h2>
         <p className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED] whitespace-pre-wrap">{dispute.requested_resolution}</p>
       </div>
 
       {dispute.status === 'resolved' || dispute.status === 'closed' ? (
         <div>
-          <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-2">Outcome</h2>
-          <p className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">{dispute.outcome ? getDisputeOutcomeLabel(dispute.outcome) : '—'}</p>
+          <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-2">{labels?.outcome ?? 'Outcome'}</h2>
+          <p className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">{dispute.outcome ? (labels?.outcomeLabel ?? getDisputeOutcomeLabel(dispute.outcome)) : '—'}</p>
           {dispute.resolution_notes && <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mt-1 whitespace-pre-wrap">{dispute.resolution_notes}</p>}
         </div>
       ) : null}
 
       {adminActions}
 
-      <DisputeEvidencePanel disputeId={dispute.id} currentUserId={currentUserId} evidence={evidence} canUpload={isActive} />
+      <DisputeEvidencePanel disputeId={dispute.id} currentUserId={currentUserId} evidence={evidence} canUpload={isActive} labels={labels?.evidencePanel} />
 
       <div>
-        <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-4">Messages</h2>
+        <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-4">{labels?.messages ?? 'Messages'}</h2>
         <ChatThread
           transactionType={transactionType}
           transactionId={transactionId}
@@ -78,10 +99,12 @@ export function DisputeDetailView({ dispute, history, evidence, currentUserId, v
           disputeId={dispute.id}
           variant="embedded"
           useAdminEndpoint={viewerRole === 'admin'}
+          labels={labels?.chatThread}
+          locale={labels?.locale}
         />
       </div>
 
-      <DisputeTimeline history={history} />
+      <DisputeTimeline history={history} labels={labels?.timeline} />
     </div>
   )
 }

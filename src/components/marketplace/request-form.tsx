@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { useRouter } from '@/i18n/navigation'
 
 type TransactionType = 'buy' | 'rent' | 'barter'
 
@@ -15,6 +16,8 @@ type TransactionType = 'buy' | 'rent' | 'barter'
  */
 export function RequestForm() {
   const router = useRouter()
+  const t = useTranslations('lookingFor.newRequestPage')
+  const tMode = useTranslations('marketplace.mode')
   const [transactionType, setTransactionType] = useState<TransactionType>('buy')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -52,7 +55,7 @@ export function RequestForm() {
       })
       const created = await createRes.json()
       if (!createRes.ok) {
-        setError(created.error ?? 'Could not create request')
+        setError(created.error ?? t('errors.couldNotCreate'))
         return
       }
 
@@ -60,16 +63,16 @@ export function RequestForm() {
       const published = await publishRes.json()
       if (!publishRes.ok) {
         if (published.error?.includes('verification')) {
-          setError('You need to complete verification before publishing a request. Your request was saved as a draft.')
+          setError(t('errors.verificationRequired'))
         } else {
-          setError(published.error ?? 'Could not publish request')
+          setError(published.error ?? t('errors.couldNotPublish'))
         }
         return
       }
 
       router.push(`/looking-for/${created.request_id}`)
     } catch {
-      setError('Network error — please try again')
+      setError(t('errors.networkError'))
     } finally {
       setSubmitting(false)
     }
@@ -80,38 +83,38 @@ export function RequestForm() {
   return (
     <form onSubmit={handleSubmit} className="max-w-xl space-y-5">
       <div>
-        <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">I&apos;m looking to</label>
+        <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('imLookingTo')}</label>
         <div className="flex gap-2">
-          {(['buy', 'rent', 'barter'] as const).map((t) => (
+          {(['buy', 'rent', 'barter'] as const).map((opt) => (
             <button
-              key={t}
+              key={opt}
               type="button"
-              onClick={() => setTransactionType(t)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold capitalize transition-colors ${transactionType === t ? 'bg-[#8B1A1A] text-white' : 'bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]'}`}
+              onClick={() => setTransactionType(opt)}
+              className={`px-4 py-2 rounded-full text-sm font-semibold capitalize transition-colors ${transactionType === opt ? 'bg-[#8B1A1A] text-white' : 'bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]'}`}
             >
-              {t}
+              {tMode(opt)}
             </button>
           ))}
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">Title</label>
-        <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Looking for a pressure washer" className={inputClass} />
+        <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('title')}</label>
+        <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('titlePlaceholder')} className={inputClass} />
       </div>
 
       <div>
-        <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">Description</label>
+        <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('description')}</label>
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className={`${inputClass} h-auto py-3`} />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">Category</label>
+          <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('category')}</label>
           <input value={category} onChange={(e) => setCategory(e.target.value)} className={inputClass} />
         </div>
         <div>
-          <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">City</label>
+          <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('city')}</label>
           <input value={city} onChange={(e) => setCity(e.target.value)} className={inputClass} />
         </div>
       </div>
@@ -119,11 +122,11 @@ export function RequestForm() {
       {transactionType !== 'barter' && (
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">Budget min (ZAR)</label>
+            <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('budgetMin')}</label>
             <input type="number" min={0} value={budgetMin} onChange={(e) => setBudgetMin(e.target.value)} className={inputClass} />
           </div>
           <div>
-            <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">Budget max (ZAR)</label>
+            <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('budgetMax')}</label>
             <input type="number" min={0} value={budgetMax} onChange={(e) => setBudgetMax(e.target.value)} className={inputClass} />
           </div>
         </div>
@@ -132,11 +135,11 @@ export function RequestForm() {
       {transactionType === 'rent' && (
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">Start date</label>
+            <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('startDate')}</label>
             <input required type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />
           </div>
           <div>
-            <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">End date</label>
+            <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('endDate')}</label>
             <input required type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputClass} />
           </div>
         </div>
@@ -144,7 +147,7 @@ export function RequestForm() {
 
       {transactionType === 'barter' && (
         <div>
-          <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">What can you offer in return?</label>
+          <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('barterOfferLabel')}</label>
           <textarea value={barterOfferDescription} onChange={(e) => setBarterOfferDescription(e.target.value)} rows={3} className={`${inputClass} h-auto py-3`} />
         </div>
       )}
@@ -152,7 +155,7 @@ export function RequestForm() {
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <button type="submit" disabled={submitting} className="px-6 py-3 rounded-full font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors disabled:opacity-50">
-        {submitting ? 'Posting…' : 'Post request'}
+        {submitting ? t('posting') : t('postRequestButton')}
       </button>
     </form>
   )

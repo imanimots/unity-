@@ -20,12 +20,20 @@ function randomId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
 }
 
-export function validateMilestoneEvidenceFile(file: File): string | null {
+export type MilestoneEvidenceValidationError = 'unsupported_type' | 'too_large'
+
+/**
+ * Returns a stable error identity, not display text -- the caller (a
+ * Client Component with access to next-intl or a server-resolved label
+ * bag) maps this to a localized message. Keeps this pure-logic file free
+ * of any UI-language concern.
+ */
+export function validateMilestoneEvidenceFile(file: File): MilestoneEvidenceValidationError | null {
   if (!(ALLOWED_MILESTONE_EVIDENCE_MIME_TYPES as readonly string[]).includes(file.type)) {
-    return 'Unsupported file type — use JPG, PNG, WEBP, or PDF.'
+    return 'unsupported_type'
   }
   if (file.size > MAX_MILESTONE_EVIDENCE_SIZE_BYTES) {
-    return `File is too large — maximum ${MAX_MILESTONE_EVIDENCE_SIZE_BYTES / 1024 / 1024}MB.`
+    return 'too_large'
   }
   return null
 }

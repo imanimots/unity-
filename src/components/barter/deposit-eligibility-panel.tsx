@@ -1,5 +1,12 @@
 import type { BarterDepositTerm, BarterOfferItem } from '@/types'
 
+interface DepositEligibilityPanelLabels {
+  title: string
+  thisParty: string
+  eligibleText: (amount: string) => string
+  percentText: (percent: number, totalAmount: string) => string
+}
+
 interface DepositEligibilityPanelProps {
   depositTerms: BarterDepositTerm[]
   items: BarterOfferItem[]
@@ -7,6 +14,13 @@ interface DepositEligibilityPanelProps {
   partyBId: string
   partyAName: string
   partyBName: string
+  /**
+   * Rendered both inside [locale] (via BarterAgreementView) AND directly
+   * by admin/barter/[id]/page.tsx, which has no NextIntlClientProvider at
+   * all. Server-resolved label overrides instead of useTranslations() --
+   * admin call sites omit this and keep the English literals below.
+   */
+  labels?: DepositEligibilityPanelLabels
 }
 
 /**
@@ -23,14 +37,14 @@ interface DepositEligibilityPanelProps {
  * panel is a transparency/audit display of how the milestone-weighted
  * amount was earned, never a claim that anything further is pending.
  */
-export function DepositEligibilityPanel({ depositTerms, items, partyAId, partyBId, partyAName, partyBName }: DepositEligibilityPanelProps) {
+export function DepositEligibilityPanel({ depositTerms, items, partyAId, partyBId, partyAName, partyBName, labels }: DepositEligibilityPanelProps) {
   const milestoneWeighted = depositTerms.filter((d) => d.release_basis === 'milestone_weighted')
   if (milestoneWeighted.length === 0) return null
 
   function nameFor(payerId: string) {
     if (payerId === partyAId) return partyAName
     if (payerId === partyBId) return partyBName
-    return 'This party'
+    return labels?.thisParty ?? 'This party'
   }
 
   function eligiblePercentFor(payerId: string): number {
@@ -48,7 +62,7 @@ export function DepositEligibilityPanel({ depositTerms, items, partyAId, partyBI
 
   return (
     <div>
-      <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-3">Deposit eligibility</h2>
+      <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-3">{labels?.title ?? 'Deposit eligibility'}</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {milestoneWeighted.map((term) => {
           const percent = eligiblePercentFor(term.payer_id)
@@ -57,9 +71,11 @@ export function DepositEligibilityPanel({ depositTerms, items, partyAId, partyBI
             <div key={term.id} className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-4 bg-white dark:bg-[#1A1010]">
               <p className="text-xs text-[#9B8B85] mb-1">{nameFor(term.payer_id)}&apos;s deposit</p>
               <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
-                R{amount.toFixed(2)} of your deposit is now eligible for release
+                {labels ? labels.eligibleText(`R${amount.toFixed(2)}`) : `R${amount.toFixed(2)} of your deposit is now eligible for release`}
               </p>
-              <p className="text-xs text-[#9B8B85] mt-1">{percent}% of milestone-weighted obligations completed · total deposit R{term.amount.toFixed(2)}</p>
+              <p className="text-xs text-[#9B8B85] mt-1">
+                {labels ? labels.percentText(percent, `R${term.amount.toFixed(2)}`) : `${percent}% of milestone-weighted obligations completed · total deposit R${term.amount.toFixed(2)}`}
+              </p>
             </div>
           )
         })}

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/i18n/navigation'
+import { useTranslations } from 'next-intl'
 
 interface Props {
   agreementId: string
@@ -28,6 +29,7 @@ export function RentToBuyAgreementActions({
   cureAllowed, earlyPayoffAllowed, securityDepositAmount, nextUnpaidSequence,
 }: Props) {
   const router = useRouter()
+  const t = useTranslations('rtb')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -38,7 +40,7 @@ export function RentToBuyAgreementActions({
       await callAction(path, body)
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+      setError(err instanceof Error ? err.message : t('errors.generic'))
     } finally {
       setBusy(null)
     }
@@ -55,32 +57,32 @@ export function RentToBuyAgreementActions({
       <div className="flex flex-wrap gap-3">
         {isMerchant && status === 'pending_merchant_acceptance' && (
           <>
-            <button className={primary} disabled={busy !== null} onClick={() => run('accept', `${base}/accept`)}>Accept agreement</button>
-            <button className={secondary} disabled={busy !== null} onClick={() => run('decline', `${base}/decline`)}>Decline</button>
+            <button className={primary} disabled={busy !== null} onClick={() => run('accept', `${base}/accept`)}>{t('actions.acceptAgreement')}</button>
+            <button className={secondary} disabled={busy !== null} onClick={() => run('decline', `${base}/decline`)}>{t('actions.decline')}</button>
           </>
         )}
         {(isMerchant || isCustomer) && (status === 'pending_merchant_acceptance' || status === 'awaiting_first_payment') && (
-          <button className={secondary} disabled={busy !== null} onClick={() => run('cancel', `${base}/cancel`)}>Cancel</button>
+          <button className={secondary} disabled={busy !== null} onClick={() => run('cancel', `${base}/cancel`)}>{t('actions.cancel')}</button>
         )}
         {isCustomer && securityDepositAmount && (
-          <button className={secondary} disabled={busy !== null} onClick={() => run('deposit', `${base}/pay-deposit`, { test_scenario: 'success' })}>Pay security deposit</button>
+          <button className={secondary} disabled={busy !== null} onClick={() => run('deposit', `${base}/pay-deposit`, { test_scenario: 'success' })}>{t('actions.payDeposit')}</button>
         )}
         {isCustomer && (status === 'awaiting_first_payment' || status === 'active') && nextUnpaidSequence && (
           <button className={primary} disabled={busy !== null} onClick={() => run('installment', `${base}/pay-installment`, { sequence: nextUnpaidSequence, test_scenario: 'success' })}>
-            Pay instalment #{nextUnpaidSequence}
+            {t('actions.payInstallment', { sequence: nextUnpaidSequence })}
           </button>
         )}
         {(isMerchant || isCustomer) && possessionStatus === 'possession_eligible' && (
-          <button className={primary} disabled={busy !== null} onClick={() => run('possession', `${base}/confirm-possession`)}>Confirm handover</button>
+          <button className={primary} disabled={busy !== null} onClick={() => run('possession', `${base}/confirm-possession`)}>{t('actions.confirmHandover')}</button>
         )}
         {isCustomer && earlyPayoffAllowed && status === 'active' && (
-          <button className={secondary} disabled={busy !== null} onClick={() => run('payoff', `${base}/payoff`, { test_scenario: 'success' })}>Pay off remaining balance</button>
+          <button className={secondary} disabled={busy !== null} onClick={() => run('payoff', `${base}/payoff`, { test_scenario: 'success' })}>{t('actions.payOff')}</button>
         )}
         {(isMerchant || isCustomer) && cureAllowed && status === 'defaulted' && ownershipStatus === 'merchant_owned' && (
-          <button className={secondary} disabled={busy !== null} onClick={() => run('cure', `${base}/cure`)}>Cure default</button>
+          <button className={secondary} disabled={busy !== null} onClick={() => run('cure', `${base}/cure`)}>{t('actions.cureDefault')}</button>
         )}
         {(isMerchant || isCustomer) && (possessionStatus === 'customer_in_possession' || possessionStatus === 'return_required') && (
-          <button className={secondary} disabled={busy !== null} onClick={() => run('return', `${base}/request-return`)}>Request return</button>
+          <button className={secondary} disabled={busy !== null} onClick={() => run('return', `${base}/request-return`)}>{t('actions.requestReturn')}</button>
         )}
       </div>
     </div>

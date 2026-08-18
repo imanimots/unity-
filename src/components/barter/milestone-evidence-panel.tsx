@@ -6,12 +6,31 @@ import { FileText, Image as ImageIcon, Upload } from 'lucide-react'
 import { validateMilestoneEvidenceFile, uploadMilestoneEvidence } from '@/lib/barter/skill-task-evidence'
 import type { BarterMilestoneEvidence } from '@/types'
 
+export interface MilestoneEvidencePanelLabels {
+  title: string
+  noEvidence: string
+  disclaimer: string
+  uploadEvidence: string
+  uploading: string
+  couldNotRegister: string
+  couldNotUpload: string
+  errorUnsupportedType: string
+  errorTooLarge: string
+}
+
 interface MilestoneEvidencePanelProps {
   agreementId: string
   milestoneId: string
   currentUserId: string
   evidence: BarterMilestoneEvidence[]
   canUpload: boolean
+  /**
+   * Rendered transitively inside admin/barter/[id]/page.tsx (via
+   * ContributionMilestonesPanel), which has no NextIntlClientProvider at
+   * all -- server-resolved label overrides instead of useTranslations().
+   * Admin call sites omit this and keep the English literals below.
+   */
+  labels?: MilestoneEvidencePanelLabels
 }
 
 /**
@@ -20,7 +39,7 @@ interface MilestoneEvidencePanelProps {
  * Shows the required evidence-disclaimer copy verbatim above the
  * upload control.
  */
-export function MilestoneEvidencePanel({ agreementId, milestoneId, currentUserId, evidence, canUpload }: MilestoneEvidencePanelProps) {
+export function MilestoneEvidencePanel({ agreementId, milestoneId, currentUserId, evidence, canUpload, labels }: MilestoneEvidencePanelProps) {
   const router = useRouter()
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -32,7 +51,11 @@ export function MilestoneEvidencePanel({ agreementId, milestoneId, currentUserId
 
     const validationError = validateMilestoneEvidenceFile(file)
     if (validationError) {
-      setError(validationError)
+      setError(
+        validationError === 'unsupported_type'
+          ? (labels?.errorUnsupportedType ?? 'Unsupported file type — use JPG, PNG, WEBP, or PDF.')
+          : (labels?.errorTooLarge ?? 'File is too large.')
+      )
       return
     }
 
@@ -47,12 +70,12 @@ export function MilestoneEvidencePanel({ agreementId, milestoneId, currentUserId
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Could not register this evidence file')
+        setError(data.error ?? labels?.couldNotRegister ?? 'Could not register this evidence file')
         return
       }
       router.refresh()
     } catch {
-      setError('Could not upload this file — please try again')
+      setError(labels?.couldNotUpload ?? 'Could not upload this file — please try again')
     } finally {
       setUploading(false)
     }
@@ -60,10 +83,10 @@ export function MilestoneEvidencePanel({ agreementId, milestoneId, currentUserId
 
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#9B8B85] mb-2">Evidence</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#9B8B85] mb-2">{labels?.title ?? 'Evidence'}</p>
 
       {evidence.length === 0 ? (
-        <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mb-2">No evidence uploaded yet.</p>
+        <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mb-2">{labels?.noEvidence ?? 'No evidence uploaded yet.'}</p>
       ) : (
         <ul className="space-y-1.5 mb-2">
           {evidence.map((item) => (
@@ -78,11 +101,11 @@ export function MilestoneEvidencePanel({ agreementId, milestoneId, currentUserId
       {canUpload && (
         <>
           <p className="text-[11px] text-[#9B8B85] mb-1.5">
-            Only upload evidence that&apos;s genuinely relevant to this milestone. Evidence is visible to both parties and Unity admins, and cannot be deleted once uploaded.
+            {labels?.disclaimer ?? "Only upload evidence that's genuinely relevant to this milestone. Evidence is visible to both parties and Unity admins, and cannot be deleted once uploaded."}
           </p>
           <label className="flex items-center justify-center gap-2 py-2 border border-dashed border-[#E8E0D8] dark:border-[#2A1A1A] rounded-lg text-xs text-[#6B5B55] dark:text-[#9B8B85] cursor-pointer hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors">
             <Upload size={13} />
-            {uploading ? 'Uploading…' : 'Upload evidence (image or PDF)'}
+            {uploading ? (labels?.uploading ?? 'Uploading…') : (labels?.uploadEvidence ?? 'Upload evidence (image or PDF)')}
             <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={handleFileSelected} disabled={uploading} />
           </label>
         </>

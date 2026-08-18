@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl'
 import { CheckCircle2, XCircle, Circle } from 'lucide-react'
 import type { PaymentStatus } from '@/lib/checkout/financial-readiness'
 
@@ -39,10 +40,11 @@ interface Props {
  * (e.g. "card declined"), never a raw provider error or internal code.
  */
 export function PaymentAttemptSummary({ rentalPaymentStatus, rentalFailureReason, depositRequired, depositPaymentStatus, depositFailureReason }: Props) {
+  const t = useTranslations('rent.checkout')
   return (
     <div className="space-y-3">
-      <Step label="Rental payment" status={rentalPaymentStatus} targetStatus="captured" failureReason={rentalFailureReason} />
-      {depositRequired && <Step label="Deposit authorization" status={depositPaymentStatus} targetStatus="authorised" failureReason={depositFailureReason} />}
+      <Step label={t('rentalPayment')} status={rentalPaymentStatus} targetStatus="captured" failureReason={rentalFailureReason} />
+      {depositRequired && <Step label={t('depositAuthorization')} status={depositPaymentStatus} targetStatus="authorised" failureReason={depositFailureReason} />}
     </div>
   )
 }

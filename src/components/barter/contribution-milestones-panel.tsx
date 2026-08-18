@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Clock, Circle, CalendarClock } from 'lucide-react'
-import { MilestoneEvidencePanel } from './milestone-evidence-panel'
+import { MilestoneEvidencePanel, type MilestoneEvidencePanelLabels } from './milestone-evidence-panel'
 import type { BarterOfferItem, BarterMilestoneEvidence } from '@/types'
 
 const inputClass =
@@ -13,6 +13,37 @@ const STATUS_META: Record<string, { label: string; classes: string; icon: typeof
   pending: { label: 'Pending', classes: 'text-[#9B8B85]', icon: Circle },
   active: { label: 'Active', classes: 'text-[#8B1A1A]', icon: Clock },
   completed: { label: 'Completed', classes: 'text-green-600 dark:text-green-400', icon: Check },
+}
+
+interface ScheduleLabels {
+  inPersonSchedule: string
+  noScheduleYet: string
+  confirmThisSchedule: string
+  confirming: string
+  proposeSchedule: string
+  proposing: string
+  proposeDateTimeLocation: string
+  cityPlaceholder: string
+  provincePlaceholder: string
+  allFieldsRequired: string
+  couldNotPropose: string
+  couldNotProposeRetry: string
+  couldNotConfirm: string
+  couldNotConfirmRetry: string
+}
+
+interface ContributionMilestonesPanelLabels {
+  status: Record<'pending' | 'active' | 'completed', string>
+  contributionPercent: (percent: number) => string
+  contribution: string
+  skill: string
+  task: string
+  markComplete: string
+  marking: string
+  couldNotMarkComplete: string
+  couldNotMarkCompleteRetry: string
+  schedule: ScheduleLabels
+  evidence: MilestoneEvidencePanelLabels
 }
 
 interface ContributionMilestonesPanelProps {
@@ -25,6 +56,14 @@ interface ContributionMilestonesPanelProps {
   partyBName: string
   evidenceByMilestone: Record<string, BarterMilestoneEvidence[]>
   readOnly?: boolean
+  /**
+   * Rendered both inside [locale] (via BarterAgreementView) AND directly
+   * by admin/barter/[id]/page.tsx, which has no NextIntlClientProvider at
+   * all. Server-resolved label overrides instead of useTranslations() --
+   * admin call sites omit this and keep the English literals throughout
+   * this file.
+   */
+  labels?: ContributionMilestonesPanelLabels
 }
 
 function ScheduleWidget({
@@ -40,6 +79,7 @@ function ScheduleWidget({
   partyAName,
   partyBName,
   readOnly,
+  labels,
 }: {
   agreementId: string
   milestoneId: string
@@ -53,6 +93,7 @@ function ScheduleWidget({
   partyAName: string
   partyBName: string
   readOnly?: boolean
+  labels?: ScheduleLabels
 }) {
   const router = useRouter()
   const [proposing, setProposing] = useState(false)
@@ -68,7 +109,7 @@ function ScheduleWidget({
 
   async function submitSchedule() {
     if (!date || !time || !city.trim() || !province.trim()) {
-      setError('Date, time, city, and province are all required.')
+      setError(labels?.allFieldsRequired ?? 'Date, time, city, and province are all required.')
       return
     }
     setBusy(true)
@@ -86,13 +127,13 @@ function ScheduleWidget({
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Could not propose a schedule')
+        setError(data.error ?? labels?.couldNotPropose ?? 'Could not propose a schedule')
         return
       }
       setProposing(false)
       router.refresh()
     } catch {
-      setError('Could not propose a schedule — please try again')
+      setError(labels?.couldNotProposeRetry ?? 'Could not propose a schedule — please try again')
     } finally {
       setBusy(false)
     }
@@ -109,12 +150,12 @@ function ScheduleWidget({
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Could not confirm the schedule')
+        setError(data.error ?? labels?.couldNotConfirm ?? 'Could not confirm the schedule')
         return
       }
       router.refresh()
     } catch {
-      setError('Could not confirm the schedule — please try again')
+      setError(labels?.couldNotConfirmRetry ?? 'Could not confirm the schedule — please try again')
     } finally {
       setBusy(false)
     }
@@ -123,7 +164,7 @@ function ScheduleWidget({
   return (
     <div className="rounded-lg bg-[#FAF8F5] dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] p-2.5 space-y-2">
       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#9B8B85] flex items-center gap-1.5">
-        <CalendarClock size={12} /> In-person schedule
+        <CalendarClock size={12} /> {labels?.inPersonSchedule ?? 'In-person schedule'}
       </p>
       {hasSchedule ? (
         <div className="text-xs text-[#1A0A0A] dark:text-[#F5F0ED] space-y-1">
@@ -140,12 +181,12 @@ function ScheduleWidget({
           </div>
           {!readOnly && !iHaveConfirmed && (
             <button onClick={confirmSchedule} disabled={busy} className="mt-1 px-3 py-1.5 rounded-lg bg-[#8B1A1A] text-white text-xs font-semibold hover:bg-[#7A1616] transition-colors disabled:opacity-50">
-              {busy ? 'Confirming…' : 'Confirm this schedule'}
+              {busy ? (labels?.confirming ?? 'Confirming…') : (labels?.confirmThisSchedule ?? 'Confirm this schedule')}
             </button>
           )}
         </div>
       ) : (
-        <p className="text-xs text-[#9B8B85]">No schedule proposed yet.</p>
+        <p className="text-xs text-[#9B8B85]">{labels?.noScheduleYet ?? 'No schedule proposed yet.'}</p>
       )}
 
       {!readOnly && !hasSchedule && (
@@ -154,15 +195,15 @@ function ScheduleWidget({
             <div className="grid grid-cols-2 gap-2">
               <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
               <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={inputClass} />
-              <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className={inputClass} />
-              <input type="text" value={province} onChange={(e) => setProvince(e.target.value)} placeholder="Province" className={inputClass} />
+              <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder={labels?.cityPlaceholder ?? 'City'} className={inputClass} />
+              <input type="text" value={province} onChange={(e) => setProvince(e.target.value)} placeholder={labels?.provincePlaceholder ?? 'Province'} className={inputClass} />
               <button onClick={submitSchedule} disabled={busy} className="col-span-2 px-3 py-1.5 rounded-lg bg-[#8B1A1A] text-white text-xs font-semibold hover:bg-[#7A1616] transition-colors disabled:opacity-50">
-                {busy ? 'Proposing…' : 'Propose schedule'}
+                {busy ? (labels?.proposing ?? 'Proposing…') : (labels?.proposeSchedule ?? 'Propose schedule')}
               </button>
             </div>
           ) : (
             <button onClick={() => setProposing(true)} className="px-3 py-1.5 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] text-xs font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
-              Propose a date, time &amp; location
+              {labels?.proposeDateTimeLocation ?? 'Propose a date, time & location'}
             </button>
           )}
         </>
@@ -183,6 +224,7 @@ export function ContributionMilestonesPanel({
   partyBName,
   evidenceByMilestone,
   readOnly,
+  labels,
 }: ContributionMilestonesPanelProps) {
   const router = useRouter()
   const [completing, setCompleting] = useState(false)
@@ -203,12 +245,12 @@ export function ContributionMilestonesPanel({
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Could not mark this milestone complete')
+        setError(data.error ?? labels?.couldNotMarkComplete ?? 'Could not mark this milestone complete')
         return
       }
       router.refresh()
     } catch {
-      setError('Could not mark this milestone complete — please try again')
+      setError(labels?.couldNotMarkCompleteRetry ?? 'Could not mark this milestone complete — please try again')
     } finally {
       setCompleting(false)
     }
@@ -217,16 +259,21 @@ export function ContributionMilestonesPanel({
   return (
     <div className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-4 space-y-3">
       <div>
-        <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#8B1A1A]">{offerItem.kind === 'skill' ? 'Skill' : 'Task'}</p>
-        <h3 className="font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{details?.title ?? 'Contribution'}</h3>
+        <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#8B1A1A]">
+          {offerItem.kind === 'skill' ? (labels?.skill ?? 'Skill') : (labels?.task ?? 'Task')}
+        </p>
+        <h3 className="font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{details?.title ?? labels?.contribution ?? 'Contribution'}</h3>
         {details?.description && <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mt-0.5">{details.description}</p>}
-        <p className="text-xs text-[#9B8B85] mt-1">{offerItem.contribution_weight_percent}% of this side&apos;s contribution</p>
+        <p className="text-xs text-[#9B8B85] mt-1">
+          {labels ? labels.contributionPercent(offerItem.contribution_weight_percent ?? 0) : `${offerItem.contribution_weight_percent}% of this side's contribution`}
+        </p>
       </div>
 
       <div className="space-y-2">
         {milestones.map((m) => {
           const meta = STATUS_META[m.status]
           const Icon = meta.icon
+          const statusLabel = labels?.status[m.status as 'pending' | 'active' | 'completed'] ?? meta.label
           return (
             <div key={m.id} className="rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
@@ -237,7 +284,7 @@ export function ContributionMilestonesPanel({
                   </span>
                   <span className="text-xs text-[#9B8B85]">({m.weight_percent}%)</span>
                 </div>
-                <span className={`text-[10px] font-bold uppercase tracking-[0.06em] shrink-0 ${meta.classes}`}>{meta.label}</span>
+                <span className={`text-[10px] font-bold uppercase tracking-[0.06em] shrink-0 ${meta.classes}`}>{statusLabel}</span>
               </div>
               {m.description && <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85]">{m.description}</p>}
 
@@ -257,6 +304,7 @@ export function ContributionMilestonesPanel({
                       partyAName={partyAName}
                       partyBName={partyBName}
                       readOnly={readOnly}
+                      labels={labels?.schedule}
                     />
                   )}
                   <MilestoneEvidencePanel
@@ -265,6 +313,7 @@ export function ContributionMilestonesPanel({
                     currentUserId={currentUserId}
                     evidence={evidenceByMilestone[m.id] ?? []}
                     canUpload={!readOnly}
+                    labels={labels?.evidence}
                   />
                   {!readOnly && isPerformer && (
                     <button
@@ -272,14 +321,14 @@ export function ContributionMilestonesPanel({
                       disabled={completing}
                       className="px-3 py-1.5 rounded-lg bg-[#8B1A1A] text-white text-xs font-semibold hover:bg-[#7A1616] transition-colors disabled:opacity-50"
                     >
-                      {completing ? 'Marking…' : 'Mark complete'}
+                      {completing ? (labels?.marking ?? 'Marking…') : (labels?.markComplete ?? 'Mark complete')}
                     </button>
                   )}
                 </div>
               )}
 
               {m.status === 'completed' && (evidenceByMilestone[m.id]?.length ?? 0) > 0 && (
-                <MilestoneEvidencePanel agreementId={agreementId} milestoneId={m.id} currentUserId={currentUserId} evidence={evidenceByMilestone[m.id] ?? []} canUpload={false} />
+                <MilestoneEvidencePanel agreementId={agreementId} milestoneId={m.id} currentUserId={currentUserId} evidence={evidenceByMilestone[m.id] ?? []} canUpload={false} labels={labels?.evidence} />
               )}
             </div>
           )

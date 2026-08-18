@@ -28,22 +28,36 @@ function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-export function BarterTimeline({ history }: { history: BarterHistoryEntry[] }) {
+interface BarterTimelineLabels {
+  title: string
+  events: Partial<Record<string, string>>
+  actors: Partial<Record<BarterHistoryEntry['actor_role'], string>>
+  formatDateTime?: (iso: string) => string
+}
+
+/**
+ * Rendered both inside [locale] (via BarterAgreementView) AND directly by
+ * admin/barter/[id]/page.tsx, which has no NextIntlClientProvider at all.
+ * Server-resolved label overrides instead of useTranslations() -- admin
+ * call sites omit `labels` and keep the English literals above.
+ */
+export function BarterTimeline({ history, labels }: { history: BarterHistoryEntry[]; labels?: BarterTimelineLabels }) {
   if (history.length === 0) return null
+  const fmt = labels?.formatDateTime ?? formatDateTime
 
   return (
     <div>
-      <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-4">Timeline</h2>
+      <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-4">{labels?.title ?? 'Timeline'}</h2>
       <ol className="space-y-4">
         {history.map((entry) => (
           <li key={entry.id} className="flex gap-3">
             <div className="w-1.5 h-1.5 rounded-full bg-[#8B1A1A] mt-2 shrink-0" />
             <div>
               <p className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">
-                {EVENT_LABELS[entry.event_type] ?? entry.event_type}
+                {labels?.events[entry.event_type] ?? EVENT_LABELS[entry.event_type] ?? entry.event_type}
               </p>
               <p className="text-xs text-[#9B8B85]">
-                {ACTOR_LABELS[entry.actor_role]} · {formatDateTime(entry.created_at)}
+                {labels?.actors[entry.actor_role] ?? ACTOR_LABELS[entry.actor_role]} · {fmt(entry.created_at)}
               </p>
             </div>
           </li>

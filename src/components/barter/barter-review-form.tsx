@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/i18n/navigation'
+import { useTranslations } from 'next-intl'
 import { Star } from 'lucide-react'
 
 interface BarterReviewFormProps {
@@ -16,6 +17,7 @@ interface BarterReviewFormProps {
  */
 export function BarterReviewForm({ agreementId, revieweeName }: BarterReviewFormProps) {
   const router = useRouter()
+  const t = useTranslations('barter.review')
   const [rating, setRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
   const [comment, setComment] = useState('')
@@ -25,7 +27,7 @@ export function BarterReviewForm({ agreementId, revieweeName }: BarterReviewForm
 
   async function handleSubmit() {
     if (rating < 1) {
-      setError('Choose a star rating.')
+      setError(t('chooseRating'))
       return
     }
     setSubmitting(true)
@@ -38,25 +40,25 @@ export function BarterReviewForm({ agreementId, revieweeName }: BarterReviewForm
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Could not submit your review')
+        setError(data.error ?? t('couldNotSubmit'))
         return
       }
       setSubmitted(true)
       router.refresh()
     } catch {
-      setError('Could not submit your review — please try again')
+      setError(t('couldNotSubmitRetry'))
     } finally {
       setSubmitting(false)
     }
   }
 
   if (submitted) {
-    return <p className="text-sm text-green-600 dark:text-green-400">Thanks — your review has been submitted.</p>
+    return <p className="text-sm text-green-600 dark:text-green-400">{t('thanksSubmitted')}</p>
   }
 
   return (
     <div className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-4 space-y-3">
-      <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85]">Leave a review for {revieweeName} (optional)</h2>
+      <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85]">{t('leaveReviewFor', { name: revieweeName })}</h2>
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((n) => (
           <button key={n} type="button" onMouseEnter={() => setHoverRating(n)} onMouseLeave={() => setHoverRating(0)} onClick={() => setRating(n)} aria-label={`${n} star${n > 1 ? 's' : ''}`}>
@@ -68,7 +70,7 @@ export function BarterReviewForm({ agreementId, revieweeName }: BarterReviewForm
         value={comment}
         onChange={(e) => setComment(e.target.value)}
         rows={3}
-        placeholder="Say a bit about the trade (optional)…"
+        placeholder={t('commentPlaceholder')}
         className="w-full px-3.5 py-2.5 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-sm text-[#1A0A0A] dark:text-[#F5F0ED] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20 resize-none"
       />
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -78,7 +80,7 @@ export function BarterReviewForm({ agreementId, revieweeName }: BarterReviewForm
         disabled={submitting}
         className="px-5 py-2.5 rounded-xl bg-[#8B1A1A] text-white font-semibold text-sm hover:bg-[#7A1616] transition-colors disabled:opacity-50"
       >
-        {submitting ? 'Submitting…' : 'Submit review'}
+        {submitting ? t('submitting') : t('submitReview')}
       </button>
     </div>
   )

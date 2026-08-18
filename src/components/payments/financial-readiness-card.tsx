@@ -1,9 +1,19 @@
+import { useTranslations } from 'next-intl'
 import { CheckCircle2, Clock, AlertTriangle, XCircle, CreditCard, CalendarX } from 'lucide-react'
-import {
-  FINANCIAL_READINESS_RENTER_COPY,
-  FINANCIAL_READINESS_MERCHANT_COPY,
-  type FinancialReadinessState,
-} from '@/lib/checkout/financial-readiness'
+import type { FinancialReadinessState } from '@/lib/checkout/financial-readiness'
+
+const READINESS_KEYS: Record<FinancialReadinessState, string> = {
+  not_prepared: 'notPrepared',
+  awaiting_payment: 'awaitingPayment',
+  processing: 'processing',
+  payment_failed_retryable: 'paymentFailedRetryable',
+  payment_failed_terminal: 'paymentFailedTerminal',
+  deposit_failed_retryable: 'depositFailedRetryable',
+  deposit_failed_terminal: 'depositFailedTerminal',
+  financially_ready: 'financiallyReady',
+  no_payment_required: 'noPaymentRequired',
+  expired_unpaid: 'expiredUnpaid',
+}
 
 const ICONS: Record<FinancialReadinessState, typeof CheckCircle2> = {
   not_prepared: Clock,
@@ -39,7 +49,10 @@ interface Props {
 
 /** Provider-neutral -- renders purely from the derived FinancialReadinessState, never imports a provider. */
 export function FinancialReadinessCard({ readiness, audience, children }: Props) {
-  const copy = (audience === 'renter' ? FINANCIAL_READINESS_RENTER_COPY : FINANCIAL_READINESS_MERCHANT_COPY)[readiness]
+  const t = useTranslations('rent.financialReadiness')
+  const key = READINESS_KEYS[readiness]
+  const label = t(`${audience}.${key}`)
+  const description = t(`${audience}.${key}Desc`)
   const Icon = ICONS[readiness]
   const tone = TONE[readiness]
 
@@ -48,8 +61,8 @@ export function FinancialReadinessCard({ readiness, audience, children }: Props)
       <div className="flex items-start gap-3">
         <Icon size={20} className={`shrink-0 mt-0.5 ${tone}`} />
         <div className="min-w-0">
-          <p className={`text-sm font-semibold ${tone}`}>{copy.label}</p>
-          {copy.description && <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-1">{copy.description}</p>}
+          <p className={`text-sm font-semibold ${tone}`}>{label}</p>
+          {description && <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-1">{description}</p>}
         </div>
       </div>
       {children && <div className="mt-4 pt-4 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">{children}</div>}

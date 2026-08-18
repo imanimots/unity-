@@ -1,18 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { useRouter } from '@/i18n/navigation'
 import type { BarterSkillTaskPostStatus, SkillTaskDirection } from '@/types'
 
 type Action = 'pause' | 'resume' | 'close' | 'archive' | 'repost'
-
-const ACTION_LABELS: Record<Action, string> = {
-  pause: 'Pause',
-  resume: 'Resume',
-  close: 'Close',
-  archive: 'Archive',
-  repost: 'Repost',
-}
 
 function availableActions(status: BarterSkillTaskPostStatus, direction: SkillTaskDirection): Action[] {
   const actions: Action[] = []
@@ -29,6 +22,7 @@ function availableActions(status: BarterSkillTaskPostStatus, direction: SkillTas
 
 export function SkillTaskPostActions({ postId, status, direction }: { postId: string; status: BarterSkillTaskPostStatus; direction: SkillTaskDirection }) {
   const router = useRouter()
+  const t = useTranslations('merchant.skillTaskPosts')
   const [pending, setPending] = useState<Action | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -46,7 +40,7 @@ export function SkillTaskPostActions({ postId, status, direction }: { postId: st
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Action failed')
+        setError(data.error ?? t('errors.actionFailed'))
         return
       }
       if (action === 'repost' && data?.post_id) {
@@ -55,7 +49,7 @@ export function SkillTaskPostActions({ postId, status, direction }: { postId: st
       }
       router.refresh()
     } catch {
-      setError('Action failed — please try again')
+      setError(t('errors.actionFailedRetry'))
     } finally {
       setPending(null)
     }
@@ -71,7 +65,7 @@ export function SkillTaskPostActions({ postId, status, direction }: { postId: st
             disabled={pending !== null}
             className="px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors disabled:opacity-50"
           >
-            {pending === action ? 'Working…' : ACTION_LABELS[action]}
+            {pending === action ? t('actions.working') : t(`actions.${action}`)}
           </button>
         ))}
       </div>

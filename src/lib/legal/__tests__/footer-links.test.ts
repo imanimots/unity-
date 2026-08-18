@@ -16,25 +16,35 @@ const ROUTE_GROUPS = ['(marketing)', '(auth)', '(dashboard)']
 function resolveRouteFile(href: string): string | null {
   if (href.startsWith('http') || href.startsWith('mailto:') || href === '#') return null
   const [pathPart] = href.split('#')
-  if (pathPart === '' || pathPart === '/') return join(REPO_ROOT, 'src/app/(marketing)/page.tsx')
+  if (pathPart === '' || pathPart === '/') return join(REPO_ROOT, 'src/app/[locale]/(marketing)/page.tsx')
   const [routePath] = pathPart.slice(1).split('?')
   for (const group of ROUTE_GROUPS) {
-    const candidate = join(REPO_ROOT, `src/app/${group}/${routePath}/page.tsx`)
+    const candidate = join(REPO_ROOT, `src/app/[locale]/${group}/${routePath}/page.tsx`)
     if (existsSync(candidate)) return candidate
   }
   // None of the known groups had it -- report the most likely (marketing) path so the failure message is still useful.
-  return join(REPO_ROOT, `src/app/(marketing)/${routePath}/page.tsx`)
+  return join(REPO_ROOT, `src/app/[locale]/(marketing)/${routePath}/page.tsx`)
 }
 
 describe('footer links (category: Links)', () => {
   const content = readFileSync(FOOTER_PATH, 'utf-8')
   const hrefs = extractHrefs(content)
 
+  // Footer.tsx is now internationalized (i18n Phase 2) -- it renders
+  // t('footer.platform')/t('footer.trust')/t('footer.legal')/
+  // t('footer.support') rather than literal English strings, so the
+  // dictionary is the actual source of truth for the group labels now,
+  // not the component source.
   it('17. the footer has at least one link in each required group (Platform, Trust, Legal, Support)', () => {
-    expect(content).toMatch(/Platform/)
-    expect(content).toMatch(/>Trust</)
-    expect(content).toMatch(/>Legal</)
-    expect(content).toMatch(/>Support</)
+    expect(content).toMatch(/t\('footer\.platform'\)/)
+    expect(content).toMatch(/t\('footer\.trust'\)/)
+    expect(content).toMatch(/t\('footer\.legal'\)/)
+    expect(content).toMatch(/t\('footer\.support'\)/)
+    const enNavigation = JSON.parse(readFileSync(join(REPO_ROOT, 'src/i18n/messages/en-ZA/navigation.json'), 'utf-8'))
+    expect(enNavigation.footer.platform).toBeTruthy()
+    expect(enNavigation.footer.trust).toBeTruthy()
+    expect(enNavigation.footer.legal).toBeTruthy()
+    expect(enNavigation.footer.support).toBeTruthy()
   })
 
   it('18. every internal footer link resolves to an existing page file (no placeholder route)', () => {

@@ -1,7 +1,7 @@
 'use client'
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { Link, usePathname } from '@/i18n/navigation'
 import { useTheme } from 'next-themes'
 import { useState, useEffect } from 'react'
 import {
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { CountrySelector } from '@/components/shared/country-selector'
+import { LanguageSelector } from '@/components/shared/language-selector'
 
 export function Navbar() {
   const { theme, setTheme } = useTheme()
@@ -20,14 +21,15 @@ export function Navbar() {
   const [profileOpen, setProfileOpen] = useState(false)
   const { user, profile, signOut } = useAuth()
   const pathname = usePathname()
+  const t = useTranslations('navigation')
 
   useEffect(() => setMounted(true), [])
 
   const navLinks = [
-    { href: '/', label: 'Home' },
-    { href: '/listings', label: 'Browse' },
-    { href: '/#how-it-works', label: 'How It Works' },
-    { href: '/chat', label: 'Chat' },
+    { href: '/', label: t('home') },
+    { href: '/listings', label: t('browse') },
+    { href: '/#how-it-works', label: t('howItWorks') },
+    { href: '/chat', label: t('chat') },
   ]
 
   const isActive = (href: string) => pathname === href
@@ -68,11 +70,14 @@ export function Navbar() {
                 <button
                   onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                   className="p-2 rounded-lg text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors"
-                  aria-label="Toggle dark mode"
+                  aria-label={t('toggleDarkMode')}
                 >
                   {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
                 </button>
               )}
+
+              {/* Language selector */}
+              <LanguageSelector />
 
               {/* Country selector */}
               <CountrySelector />
@@ -97,42 +102,42 @@ export function Navbar() {
                     <div className="absolute right-0 top-full mt-1.5 w-52 bg-white dark:bg-[#1A1010] rounded-xl shadow-lg border border-[#F2EDE8] dark:border-[#2A1A1A] py-1 z-50">
                       <Link href="/dashboard/renter" onClick={() => setProfileOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
-                        <Calendar size={14} className="text-[#9B8B85]" /> Bookings
+                        <Calendar size={14} className="text-[#9B8B85]" /> {t('bookings')}
                       </Link>
                       <Link href="/dashboard/merchant" onClick={() => setProfileOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
-                        <Package size={14} className="text-[#9B8B85]" /> My Listings
+                        <Package size={14} className="text-[#9B8B85]" /> {t('myListings')}
                       </Link>
                       <Link href="/dashboard/orders" onClick={() => setProfileOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
-                        <ShoppingBag size={14} className="text-[#9B8B85]" /> My Purchases
+                        <ShoppingBag size={14} className="text-[#9B8B85]" /> {t('myPurchases')}
                       </Link>
                       <Link href="/dashboard/merchant/orders" onClick={() => setProfileOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
-                        <Store size={14} className="text-[#9B8B85]" /> My Sales
+                        <Store size={14} className="text-[#9B8B85]" /> {t('mySales')}
                       </Link>
                       <Link href="/dashboard/barter" onClick={() => setProfileOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
-                        <Repeat size={14} className="text-[#9B8B85]" /> My Trades
+                        <Repeat size={14} className="text-[#9B8B85]" /> {t('myTrades')}
                       </Link>
                       <Link href="/dashboard/disputes" onClick={() => setProfileOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
-                        <AlertTriangle size={14} className="text-[#9B8B85]" /> My Disputes
+                        <AlertTriangle size={14} className="text-[#9B8B85]" /> {t('myDisputes')}
                       </Link>
                       <Link href="/dashboard/affiliate" onClick={() => setProfileOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
-                        <Link2 size={14} className="text-[#9B8B85]" /> Affiliate
+                        <Link2 size={14} className="text-[#9B8B85]" /> {t('affiliate')}
                       </Link>
                       {process.env.NEXT_PUBLIC_WARP_AFFILIATE_URL && (
                         <a href={process.env.NEXT_PUBLIC_WARP_AFFILIATE_URL} target="_blank" rel="noopener noreferrer"
                           className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
-                          <ExternalLink size={14} className="text-[#9B8B85]" /> Ambassador Program
+                          <ExternalLink size={14} className="text-[#9B8B85]" /> {t('ambassadorProgram')}
                         </a>
                       )}
                       <div className="border-t border-[#F2EDE8] dark:border-[#2A1A1A] mt-1 pt-1">
                         <button onClick={() => { setProfileOpen(false); signOut() }}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
-                          <LogOut size={14} /> Sign out
+                          <LogOut size={14} /> {t('signOut')}
                         </button>
                       </div>
                     </div>
@@ -142,11 +147,11 @@ export function Navbar() {
                 <div className="hidden md:flex items-center gap-2">
                   <Link href="/login"
                     className="px-4 py-2 text-sm font-medium uppercase tracking-[0.05em] text-[#1A0A0A] dark:text-[#F5F0ED] border border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] rounded-lg transition-colors">
-                    Log In
+                    {t('login')}
                   </Link>
                   <Link href="/register"
                     className="px-4 py-2 text-sm font-medium uppercase tracking-[0.05em] bg-[#8B1A1A] text-white hover:bg-[#7A1616] rounded-lg transition-colors">
-                    Sign Up
+                    {t('register')}
                   </Link>
                 </div>
               )}
@@ -184,17 +189,17 @@ export function Navbar() {
                 onClick={() => { setMobileOpen(false); signOut() }}
                 className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] mt-2 transition-colors"
               >
-                Sign out
+                {t('signOut')}
               </button>
             ) : (
               <div className="flex gap-2 pt-2">
                 <Link href="/login" onClick={() => setMobileOpen(false)}
                   className="flex-1 text-center px-4 py-2.5 text-sm font-medium uppercase tracking-[0.05em] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors">
-                  Log In
+                  {t('login')}
                 </Link>
                 <Link href="/register" onClick={() => setMobileOpen(false)}
                   className="flex-1 text-center px-4 py-2.5 text-sm font-medium uppercase tracking-[0.05em] bg-[#8B1A1A] text-white hover:bg-[#7A1616] rounded-lg transition-colors">
-                  Sign Up
+                  {t('register')}
                 </Link>
               </div>
             )}
@@ -206,10 +211,10 @@ export function Navbar() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-[#0F0A0A]/95 backdrop-blur-sm border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
         <div className="grid grid-cols-4 h-16">
           {[
-            { href: '/', icon: Home, label: 'Home' },
-            { href: '/listings', icon: Search, label: 'Browse' },
-            { href: '/chat', icon: MessageCircle, label: 'Chat' },
-            { href: user ? '/dashboard/renter' : '/login', icon: User, label: 'Profile' },
+            { href: '/', icon: Home, label: t('home') },
+            { href: '/listings', icon: Search, label: t('browse') },
+            { href: '/chat', icon: MessageCircle, label: t('chat') },
+            { href: user ? '/dashboard/renter' : '/login', icon: User, label: t('profile') },
           ].map(({ href, icon: Icon, label }) => (
             <Link
               key={href}

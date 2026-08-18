@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useRouter } from '@/i18n/navigation'
+import { useTranslations } from 'next-intl'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { OfferBuilderForm, type OfferFormValues } from './offer-builder-form'
 import type { ContributionInput } from './contribution-builder'
@@ -57,6 +59,7 @@ export function CounterOfferDialog({
 }: CounterOfferDialogProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const t = useTranslations('barter.counterOfferDialog')
   const isReturningFromWizard =
     typeof window !== 'undefined' &&
     searchParams.get('returnTo') === 'barter-propose' &&
@@ -98,14 +101,14 @@ export function CounterOfferDialog({
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Could not submit your counter-offer')
+        setError(data.error ?? t('couldNotSubmit'))
         return
       }
       sessionStorage.removeItem(draftKey(agreementId))
       onOpenChange(false)
       router.refresh()
     } catch {
-      setError('Could not submit your counter-offer — please try again')
+      setError(t('couldNotSubmitRetry'))
     } finally {
       setSubmitting(false)
     }
@@ -115,8 +118,8 @@ export function CounterOfferDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Counter this offer</DialogTitle>
-          <DialogDescription>Adjust the items, cash, delivery, or deposit terms and send a new offer.</DialogDescription>
+          <DialogTitle>{t('title')}</DialogTitle>
+          <DialogDescription>{t('description')}</DialogDescription>
         </DialogHeader>
         <OfferBuilderForm
           currentUserRole={currentUserRole}
@@ -133,7 +136,7 @@ export function CounterOfferDialog({
           defaults={defaults}
           onSubmit={handleSubmit}
           onCreateNewListing={handleCreateNewListing}
-          submitLabel="Send counter-offer"
+          submitLabel={t('sendCounterOffer')}
           submitting={submitting}
           error={error}
         />

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useRouter, Link } from '@/i18n/navigation'
+import { useTranslations } from 'next-intl'
 import { Truck, PackageCheck, Ban, CreditCard, MessageCircle } from 'lucide-react'
 import type { OrderStatus } from '@/types'
 import { OpenDisputeDialog } from '@/components/disputes/open-dispute-dialog'
@@ -18,11 +18,11 @@ interface Props {
 
 type ActionKind = 'checkout' | 'ship' | 'confirm-delivery' | 'cancel'
 
-const ACTION_META: Record<ActionKind, { label: string; icon: typeof Truck; classes: string; promptReason?: boolean }> = {
-  checkout: { label: 'Pay now', icon: CreditCard, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
-  ship: { label: 'Mark as shipped', icon: Truck, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
-  'confirm-delivery': { label: 'Confirm received', icon: PackageCheck, classes: 'bg-green-600 hover:bg-green-700 text-white' },
-  cancel: { label: 'Cancel order', icon: Ban, classes: 'border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A]', promptReason: true },
+const ACTION_META: Record<ActionKind, { labelKey: string; icon: typeof Truck; classes: string; promptReason?: boolean }> = {
+  checkout: { labelKey: 'payNow', icon: CreditCard, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
+  ship: { labelKey: 'markAsShipped', icon: Truck, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
+  'confirm-delivery': { labelKey: 'confirmReceived', icon: PackageCheck, classes: 'bg-green-600 hover:bg-green-700 text-white' },
+  cancel: { labelKey: 'cancelOrder', icon: Ban, classes: 'border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A]', promptReason: true },
 }
 
 /**
@@ -45,6 +45,9 @@ function availableActions(status: OrderStatus, role: 'buyer' | 'seller'): Action
 
 export function OrderActions({ orderId, status, role }: Props) {
   const router = useRouter()
+  const t = useTranslations('buy.actions')
+  const tErrors = useTranslations('errors')
+  const tDisputes = useTranslations('common.disputes')
   const [pending, setPending] = useState<ActionKind | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -55,7 +58,7 @@ export function OrderActions({ orderId, status, role }: Props) {
     const meta = ACTION_META[action]
     let reason: string | null = null
     if (meta.promptReason) {
-      reason = window.prompt('Reason for cancelling (optional):')
+      reason = window.prompt(t('cancelReasonPrompt'))
       if (reason === null) return
     }
 
@@ -72,12 +75,12 @@ export function OrderActions({ orderId, status, role }: Props) {
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Something went wrong')
+        setError(data.error ?? tErrors('generic'))
         return
       }
       router.refresh()
     } catch {
-      setError('Network error — please try again')
+      setError(tErrors('network'))
     } finally {
       setPending(null)
     }
@@ -89,6 +92,7 @@ export function OrderActions({ orderId, status, role }: Props) {
         {actions.map((action) => {
           const meta = ACTION_META[action]
           const Icon = meta.icon
+          const label = t(meta.labelKey)
           if (action === 'checkout') {
             return (
               <Link
@@ -96,7 +100,7 @@ export function OrderActions({ orderId, status, role }: Props) {
                 href={`/dashboard/orders/${orderId}/checkout`}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] rounded-lg transition-colors ${meta.classes}`}
               >
-                <Icon size={13} /> {meta.label}
+                <Icon size={13} /> {label}
               </Link>
             )
           }
@@ -107,7 +111,7 @@ export function OrderActions({ orderId, status, role }: Props) {
               disabled={pending !== null}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] rounded-lg transition-colors disabled:opacity-50 ${meta.classes}`}
             >
-              <Icon size={13} /> {pending === action ? 'Working…' : meta.label}
+              <Icon size={13} /> {pending === action ? t('working') : label}
             </button>
           )
         })}
@@ -118,12 +122,13 @@ export function OrderActions({ orderId, status, role }: Props) {
           href={`/chat?order=${orderId}`}
           className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#6B5B55] dark:text-[#9B8B85] hover:underline"
         >
-          <MessageCircle size={13} /> Message
+          <MessageCircle size={13} /> {t('message')}
         </Link>
         {showDispute && (
           <OpenDisputeDialog
             transactionType="order"
             transactionId={orderId}
+            triggerLabel={tDisputes('raiseDispute')}
             className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#8B1A1A] hover:underline"
           />
         )}

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useRouter, Link } from '@/i18n/navigation'
+import { useTranslations } from 'next-intl'
 import { Check, X, Repeat, Ban, MessageCircle, CreditCard, PackageCheck, Truck, PartyPopper } from 'lucide-react'
 import type { BarterStatus } from '@/types'
 import { OpenDisputeDialog } from '@/components/disputes/open-dispute-dialog'
@@ -48,17 +48,17 @@ interface Props {
 type SimpleAction = 'accept' | 'reject' | 'cancel'
 type ActionKind = SimpleAction | 'counter' | 'pay-deposit' | 'pay-cash-adjustment' | 'mark-preparing' | 'mark-in-transit' | 'mark-ready' | 'confirm-completion'
 
-const ACTION_META: Record<ActionKind, { label: string; icon: typeof Check; classes: string; promptReason?: boolean }> = {
-  accept: { label: 'Accept', icon: Check, classes: 'bg-green-600 hover:bg-green-700 text-white' },
-  counter: { label: 'Counter', icon: Repeat, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
-  reject: { label: 'Decline', icon: X, classes: 'border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A]', promptReason: true },
-  cancel: { label: 'Cancel trade', icon: Ban, classes: 'border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A]', promptReason: true },
-  'pay-deposit': { label: 'Pay deposit', icon: CreditCard, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
-  'pay-cash-adjustment': { label: 'Pay cash adjustment', icon: CreditCard, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
-  'mark-preparing': { label: 'Start preparing', icon: PackageCheck, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
-  'mark-in-transit': { label: 'Mark as shipped', icon: Truck, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
-  'mark-ready': { label: 'Ready to exchange', icon: PackageCheck, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
-  'confirm-completion': { label: 'Confirm completion', icon: PartyPopper, classes: 'bg-green-600 hover:bg-green-700 text-white' },
+const ACTION_META: Record<ActionKind, { labelKey: string; icon: typeof Check; classes: string; promptReason?: boolean }> = {
+  accept: { labelKey: 'accept', icon: Check, classes: 'bg-green-600 hover:bg-green-700 text-white' },
+  counter: { labelKey: 'counter', icon: Repeat, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
+  reject: { labelKey: 'decline', icon: X, classes: 'border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A]', promptReason: true },
+  cancel: { labelKey: 'cancelTrade', icon: Ban, classes: 'border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A]', promptReason: true },
+  'pay-deposit': { labelKey: 'payDeposit', icon: CreditCard, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
+  'pay-cash-adjustment': { labelKey: 'payCashAdjustment', icon: CreditCard, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
+  'mark-preparing': { labelKey: 'startPreparing', icon: PackageCheck, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
+  'mark-in-transit': { labelKey: 'markAsShipped', icon: Truck, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
+  'mark-ready': { labelKey: 'readyToExchange', icon: PackageCheck, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
+  'confirm-completion': { labelKey: 'confirmCompletion', icon: PartyPopper, classes: 'bg-green-600 hover:bg-green-700 text-white' },
 }
 
 const ACTION_ROUTE: Partial<Record<ActionKind, (id: string) => string>> = {
@@ -155,6 +155,9 @@ function depositRequirementsFor(offer: AcceptedOfferFields, partyAId: string, pa
 
 export function BarterActions({ agreementId, status, isCurrentProposer, onCounterClick, currentUserId, partyAId, partyBId, acceptedOffer, payments, confirmations }: Props) {
   const router = useRouter()
+  const t = useTranslations('barter.actions')
+  const tErrors = useTranslations('errors')
+  const tDisputes = useTranslations('common.disputes')
   const [pending, setPending] = useState<ActionKind | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -166,7 +169,7 @@ export function BarterActions({ agreementId, status, isCurrentProposer, onCounte
     const meta = ACTION_META[action]
     let reason: string | null = null
     if (meta.promptReason) {
-      reason = window.prompt(action === 'reject' ? 'Reason for declining (optional):' : 'Reason for cancelling (optional):')
+      reason = window.prompt(action === 'reject' ? t('declineReasonPrompt') : t('cancelReasonPrompt'))
       if (reason === null) return
     }
 
@@ -186,12 +189,12 @@ export function BarterActions({ agreementId, status, isCurrentProposer, onCounte
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Something went wrong')
+        setError(data.error ?? tErrors('generic'))
         return
       }
       router.refresh()
     } catch {
-      setError('Network error — please try again')
+      setError(tErrors('network'))
     } finally {
       setPending(null)
     }
@@ -203,6 +206,7 @@ export function BarterActions({ agreementId, status, isCurrentProposer, onCounte
         {actions.map((action) => {
           const meta = ACTION_META[action]
           const Icon = meta.icon
+          const label = t(meta.labelKey)
           if (action === 'counter') {
             return (
               <button
@@ -210,7 +214,7 @@ export function BarterActions({ agreementId, status, isCurrentProposer, onCounte
                 onClick={onCounterClick}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] rounded-lg transition-colors ${meta.classes}`}
               >
-                <Icon size={13} /> {meta.label}
+                <Icon size={13} /> {label}
               </button>
             )
           }
@@ -221,7 +225,7 @@ export function BarterActions({ agreementId, status, isCurrentProposer, onCounte
               disabled={pending !== null}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] rounded-lg transition-colors disabled:opacity-50 ${meta.classes}`}
             >
-              <Icon size={13} /> {pending === action ? 'Working…' : meta.label}
+              <Icon size={13} /> {pending === action ? t('working') : label}
             </button>
           )
         })}
@@ -232,12 +236,13 @@ export function BarterActions({ agreementId, status, isCurrentProposer, onCounte
           href={`/chat?barter=${agreementId}`}
           className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#6B5B55] dark:text-[#9B8B85] hover:underline"
         >
-          <MessageCircle size={13} /> Message
+          <MessageCircle size={13} /> {t('message')}
         </Link>
         {showDispute && (
           <OpenDisputeDialog
             transactionType="barter"
             transactionId={agreementId}
+            triggerLabel={tDisputes('raiseDispute')}
             className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#8B1A1A] hover:underline"
           />
         )}

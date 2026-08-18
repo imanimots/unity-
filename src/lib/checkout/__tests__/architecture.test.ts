@@ -8,10 +8,10 @@ const CHECKOUT_ROUTE_FILES = [
   join(REPO_ROOT, 'src/app/api/bookings/[id]/financial-status/route.ts'),
 ]
 const CHECKOUT_UI_FILES = [
-  join(REPO_ROOT, 'src/app/(dashboard)/dashboard/renter/bookings/[id]/checkout/page.tsx'),
-  join(REPO_ROOT, 'src/app/(dashboard)/dashboard/renter/bookings/[id]/checkout/checkout-flow.tsx'),
-  join(REPO_ROOT, 'src/app/(dashboard)/dashboard/renter/bookings/page.tsx'),
-  join(REPO_ROOT, 'src/app/(dashboard)/dashboard/merchant/bookings/page.tsx'),
+  join(REPO_ROOT, 'src/app/[locale]/(dashboard)/dashboard/renter/bookings/[id]/checkout/page.tsx'),
+  join(REPO_ROOT, 'src/app/[locale]/(dashboard)/dashboard/renter/bookings/[id]/checkout/checkout-flow.tsx'),
+  join(REPO_ROOT, 'src/app/[locale]/(dashboard)/dashboard/renter/bookings/page.tsx'),
+  join(REPO_ROOT, 'src/app/[locale]/(dashboard)/dashboard/merchant/bookings/page.tsx'),
 ]
 const PAYMENT_COMPONENT_DIR = join(REPO_ROOT, 'src/components/payments')
 const CHECKOUT_LIB_DIR = join(REPO_ROOT, 'src/lib/checkout')
