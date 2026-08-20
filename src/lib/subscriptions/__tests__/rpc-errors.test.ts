@@ -15,7 +15,7 @@ describe('mapSubscriptionRpcError (category: Security)', () => {
     expect(mapSubscriptionRpcError('a successful billing reference is required to upgrade').status).toBe(402)
     expect(mapSubscriptionRpcError('no pending plan change to cancel').status).toBe(404)
     expect(mapSubscriptionRpcError('a reason is required for an administrative correction').status).toBe(400)
-    expect(mapSubscriptionRpcError('active_listing_limit_reached: the starter plan allows up to 5 active listings').status).toBe(422)
+    expect(mapSubscriptionRpcError('active_publication_limit_reached: the starter plan allows up to 5 active published entities').status).toBe(422)
     expect(mapSubscriptionRpcError('idempotency key already used with a different request').status).toBe(409)
     expect(mapSubscriptionRpcError('not authenticated').status).toBe(401)
   })

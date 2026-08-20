@@ -71,7 +71,9 @@
       "commissionDesc": "Lokho i-Unity ekukhokhisayo",
       "affiliates": "Abahlanganyeli",
       "affiliatesDesc": "Amakhomishini okudlulisela",
-      "subscription": "Ukubhalisela"
+      "subscription": "Ukubhalisela",
+      "tools": "Amathuluzi Omthengisi",
+      "toolsDesc": "Imininingwane yesidingo, umsizi we-AI, i-CSV, intengo yeqoqo nokunye"
     },
     "planStarter": "Isiqalo · Kuze kufike ku-5 izinto ohlwini",
     "planUnlimited": "I-{plan} · Izinto ohlwini ezingenamkhawulo",
@@ -223,7 +225,21 @@
     "changePlan": "Shintsha uhlelo",
     "getStarted": "Qala manje",
     "footerNotice": "Ikhomishini ikhokhiswa kuphela ekuthengisweni nasekuqashiseni okuqediwe. Ukwehliswa nokukhanselwa kusebenza ekuqaleni kwesikhathi sakho sokukhokha esilandelayo; ukunyuswa kusebenza ngokushesha.",
-    "unavailable": "Amanani awatholakali okwamanje."
+    "unavailable": "Amanani awatholakali okwamanje.",
+    "upToPublished": "Kuze kufike ku-{count} izinto ezishicilelwe ezisebenzayo",
+    "unlimitedPublished": "Izinto ezishicilelwe ezingenamkhawulo ezisebenzayo",
+    "adDiscount": "Isaphulelo esingu-{rate} kuKukhangisa",
+    "affiliateAccess": "Ukufinyelela kuhlelo lokuhlanganyela",
+    "analyticsBasic": "Ukuhlaziywa okuyisisekelo komthengisi",
+    "analyticsFull": "Ukuhlaziywa okuphelele komthengisi",
+    "demandInsights": "Imininingwane yesidingo semakethe",
+    "listingAssistant": "Umsizi we-AI wokubhala izinto nemibiko",
+    "analyticsAssistant": "Umsizi we-AI wokuhlaziya nezimo ezintsha",
+    "advancedTools": "Amathuluzi eqoqo, ukuphindaphinda nokukhipha i-CSV",
+    "supportPriority": "Ukusekelwa komthengisi okubalulekile",
+    "supportHighest": "Ukusekelwa komthengisi okubaluleke kakhulu",
+    "businessName": "Ukuboniswa kwegama lebhizinisi emphakathini",
+    "eliteBadge": "Uphawu lwe-Elite kuphrofayela nasezintweni ezishicilelwe"
   },
   "ambassadors": {
     "metaTitle": "Uhlelo Lwe-Ambassador — Unity",
@@ -657,6 +673,62 @@
     "errors": {
       "networkError": "Iphutha lenethiwekhi — sicela uzame futhi",
       "somethingWentWrong": "Kukhona okungahambanga kahle"
+    },
+    "downgradeFlow": {
+      "title": "Shintsha uhlelo lwakho",
+      "stepLabel": "Isinyathelo {current} kwe-{total}",
+      "cancelAction": "Khansela",
+      "backAction": "Emuva",
+      "continueAction": "Qhubeka",
+      "confirmAction": "Qinisekisa ushintsho lohlelo",
+      "working": "Kuyasebenza…",
+      "genericError": "Kukhona okungahambanga kahle — sicela uzame futhi.",
+      "compareIntro": "Ukusuka ku-{from} uye ku-{to} kushintsha okulandelayo. Sicela uhlole futhi umake into ngayinye ukuze uqhubeke.",
+      "changes": {
+        "publicationLimit": "Umkhawulo wakho wokushicilela osebenzayo uzoba mncane — ezinye izinto zakho ezishicilelwe kungenzeka kudingeke zivalwe.",
+        "saleCommission": "Izinga lakho lekhomishini ekuthengisweni lizokhuphuka.",
+        "rentalCommission": "Izinga lakho lekhomishini ekuqashiseni lizokhuphuka.",
+        "advertisingDiscount": "Isaphulelo sakho sokuKhangisa sizoncishiswa noma sisuswe.",
+        "affiliate": "Ngeke usakwazi ukuvula ukuhlanganyela okusha kokuhlanganyela. Amarekhodi akho angaphambili ayagcinwa.",
+        "analytics": "Uzosuka ekuhlaziyweni okuphelele uye ekuhlaziyweni okuyisisekelo.",
+        "demandInsights": "Uzolahlekelwa ukufinyelela emininingwaneni yesidingo semakethe.",
+        "listingAssistant": "Uzolahlekelwa ukufinyelela kumsizi we-AI wokubhala.",
+        "analyticsAssistant": "Uzolahlekelwa ukufinyelela kumsizi we-AI wokuhlaziya.",
+        "advancedTools": "Uzolahlekelwa ukufinyelela emathuluzini eqoqo, ukuphindaphinda ne-CSV.",
+        "support": "Ukubalulekile kokusekelwa kwakho kuzoncishiswa.",
+        "businessName": "Ukuboniswa kwegama lebhizinisi lakho emphakathini kuzosuswa — igama lakho lomphakathi lizobuyela egameni lakho lomuntu siqu.",
+        "eliteBadge": "Uphawu lwakho lwe-Elite luzosuswa kuphrofayela nasezintweni ezishicilelwe."
+      },
+      "keepSetIntro": "Uhlelo lwakho oluqondiwe luvumela ukuze kufike ku-{limit} izinto ezisebenzayo, kodwa manje unezinto ezingu-{count}. Khetha ezizohlala zisebenza — ezinye zizovalwa ngokuphepha (azisoze zisuswe).",
+      "keepSetSelected": "{selected} kwe-{limit} okukhethiwe",
+      "reasonLabel": "Kungani ushintsha uhlelo lwakho?",
+      "reasonCategories": {
+        "too_expensive": "Kubiza kakhulu",
+        "not_using_features": "Angizisebenzisi izici ezengeziwe",
+        "switching_platform": "Ngishintshela kwenye inkundla",
+        "business_paused": "Ibhizinisi lami limisiwe okwesikhashana",
+        "other": "Okunye"
+      },
+      "reasonTextPlaceholder": "Sitshele okwengeziwe (akudingekile)",
+      "confirmSummary": "Usuzoya ku-{plan}.",
+      "confirmEffective": "Lolu shintsho luqala ekupheleni kwesikhathi sakho samanje sokukhokha. Uzogcina zonke izinzuzo zohlelo lwamanje kuze kube yileso sikhathi.",
+      "confirmKeepSet": "Izinto ezingu-{count} owazikhethile zizohlala zisebenza."
+    },
+    "resolveFrozen": {
+      "title": "Kudingeka isenzo: khetha okuzohlala kusebenza",
+      "description": "Uhlelo lwakho lushintshile kodwa izinto zakho ezisebenzayo zedlula umkhawulo omusha ka-{limit}. Khetha ezizohlala zisebenza — ezinye zizomiswa ngokuphepha (azisoze zisuswe). Akukho okuzoshicilelwa noma kwenziwe kusebenze kuze kuxazululwe lokhu.",
+      "selected": "{selected} kwe-{limit} okukhethiwe",
+      "genericError": "Kukhona okungahambanga kahle — sicela uzame futhi.",
+      "working": "Kuyasebenza…",
+      "confirmAction": "Qinisekisa ukukhetha"
+    },
+    "businessName": {
+      "title": "Uphawu lwebhizinisi le-Elite",
+      "description": "Kuboniswa emphakathini esikhundleni segama lakho lomuntu siqu ({fallback}) ngenkathi ukubhalisa kwakho kwe-Elite kusebenza.",
+      "placeholder": "Igama lebhizinisi lakho",
+      "working": "Kulondolozwa…",
+      "saveAction": "Londoloza",
+      "saved": "Kulondoloziwe."
     }
   },
   "commissionsPage": {
@@ -699,5 +771,83 @@
     "editUnavailableTitle": "Ukuhlela uhlu oselulotshiwe akutholakali okwamanje",
     "pauseListingTitle": "Misa uhlu",
     "activateListingTitle": "Yenza uhlu lusebenze"
+  },
+  "tools": {
+    "eyebrow": "Amathuluzi Omthengisi",
+    "heading": "Amathuluzi",
+    "backLabel": "Emuva ebhodini",
+    "loading": "Kulayishwa…",
+    "starterExplanation": "Amathuluzi omthengisi athuthukisiwe (imininingwane yesidingo, umsizi we-AI, ukuphathwa kweqoqo, ukungenisa/ukukhipha i-CSV, ukushicilela okuhlelwe, ikhalenda) kudinga ukubhalisa okusebenzayo kwe-Pro noma i-Elite.",
+    "upgradeAction": "Bheka izinhlelo",
+    "tabs": {
+      "demand": "Isidingo",
+      "calendar": "Ikhalenda",
+      "schedule": "Isheduli",
+      "csv": "I-CSV",
+      "price": "Intengo yeqoqo",
+      "ai": "Umsizi we-AI"
+    },
+    "demand": {
+      "loading": "Kulayishwa…",
+      "insufficientData": "Akukho imininingwane eyanele okwamanje.",
+      "windowNotice": "Isidingo sokusesha esihlangene ezinsukwini ezingu-{days} ezidlule.",
+      "columns": {
+        "category": "Isigaba",
+        "mode": "Imodi",
+        "searches": "Ukusesha",
+        "zeroResultShare": "Isabelo esingenamiphumela",
+        "allCategories": "Zonke izigaba"
+      }
+    },
+    "calendar": {
+      "loading": "Kulayishwa…",
+      "couldNotLoad": "Ayikwazanga ukulayisha ikhalenda yakho.",
+      "upcomingBookings": "Ukubhukha okuzayo",
+      "noUpcomingBookings": "Akukho kubhukha okuzayo.",
+      "listingStatus": "Isimo sokushicilela"
+    },
+    "schedule": {
+      "loading": "Kulayishwa…",
+      "none": "Akukho okushicilelwa okuhleliwe.",
+      "description": "Izinto ezihlelelwe ukushicilelwa ngokuzenzakalelayo ngesikhathi esizayo.",
+      "working": "Kuyasebenza…",
+      "cancelAction": "Khansela"
+    },
+    "csv": {
+      "exportTitle": "Khipha izinto zakho ezishicilelwe",
+      "exportDescription": "Landa imininingwane yakho yokuphathwa kwezinto ezishicilelwe njengefayela le-CSV.",
+      "exportAction": "Landa i-CSV",
+      "importTitle": "Ngenisa amadrafu ezinto ezishicilelwe",
+      "importDescription": "Layisha ifayela le-CSV ukuze udale amadrafu ezinto ezishicilelwe. Akukho okuzoshicilelwa ngokuzenzakalelayo.",
+      "importColumns": "Amakholomu: {columns}",
+      "importing": "Kungeniswa…",
+      "genericError": "Kukhona okungahambanga kahle — sicela uzame futhi.",
+      "importSummary": "{imported} kungenisiwe, {failed} kwehlulekile.",
+      "rowError": "Umugqa {row}: {error}"
+    },
+    "bulkPrice": {
+      "loading": "Kulayishwa…",
+      "title": "Buyekeza amanani ezintweni ezishicilelwe eziningi",
+      "newDailyRate": "Izinga elisha losuku (R)",
+      "reviewAction": "Buyekeza izinguquko",
+      "confirmMessage": "Lokhu kuzobuyekeza izinga losuku kube ngu-R{rate} kwezinto ezingu-{count} ezishicilelwe. Akusoze kwenza noma yiluphi ushintsho enanini lokubhukha eselivunyiwe.",
+      "backAction": "Emuva",
+      "confirmAction": "Sebenzisa izinguquko",
+      "working": "Kuyasebenza…",
+      "genericError": "Kukhona okungahambanga kahle — sicela uzame futhi.",
+      "success": "Izinto ezingu-{count} ezishicilelwe zibuyekeziwe."
+    },
+    "ai": {
+      "listingTab": "Umsizi wokushicilela nokunikeza",
+      "analyticsTab": "Umsizi wokuhlaziya nezimo ezintsha",
+      "listingIntro": "Namathisela idrafu yento eshicilelwe noma yokunikezwa ukuze uthole iziphakamiso. Ukhetha ukuthi uyazisebenzisa yini — akukho okusetshenziswa ngokuzenzakalelayo.",
+      "listingPlaceholder": "Namathisela isihloko/incazelo yakho lapha…",
+      "analyticsIntro": "Buza mayelana nezibalo zakho nezimo zemakethe eziphephile ngobumfihlo.",
+      "analyticsPlaceholder": "isb. Yini okufanele ngiyithuthukise?",
+      "askAction": "Buza",
+      "working": "Kuyacatshangwa…",
+      "genericError": "Kukhona okungahambanga kahle — sicela uzame futhi.",
+      "suggestionLabel": "Isiphakamiso"
+    }
   }
 }

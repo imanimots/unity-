@@ -114,7 +114,7 @@ console.log('\n--- DICTIONARIES ---')
   // e.g. "i-imeyili", so an unprefixed English-identical string there is
   // still worth flagging).
   const ALLOWED_IDENTICAL = new Set([
-    'Unity', 'CTR', 'R{amount}', 'POPIA', 'Filter', 'Platform', 'Item', 'Elite', 'Pro', 'Thabo Nkosi',
+    'Unity', 'CTR', 'CSV', 'R{amount}', 'POPIA', 'Filter', 'Platform', 'Item', 'Elite', 'Pro', 'Thabo Nkosi',
     // Afrikaans cognates confirmed against this dictionary's own established
     // usage (e.g. "Betalingstatus" already compounds "status" unchanged) --
     // not translation gaps.

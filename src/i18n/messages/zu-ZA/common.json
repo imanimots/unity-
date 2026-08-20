@@ -196,7 +196,8 @@
     "loadMoreReviews": "Layisha okunye ukubuyekezwa",
     "loadingMore": "Kuyalayishwa…",
     "starsAriaLabel": "{rating} kwezingu-5 zezinkanyezi",
-    "reviewerFallbackName": "Ilungu le-Unity"
+    "reviewerFallbackName": "Ilungu le-Unity",
+    "eliteBadgeLabel": "Elite"
   },
   "chat": {
     "metaTitle": "Imilayezo — Unity",

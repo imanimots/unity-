@@ -11,9 +11,19 @@ const STARTER: MerchantSubscriptionPlan = {
   rental_commission_bps: 1200,
   barter_commission_bps: 0,
   plan_rank: 0,
-  active_listing_limit: 5,
+  active_publication_limit: 5,
   is_active: true,
   commercial_version: 1,
+  advertising_discount_bps: 0,
+  affiliate_enabled: false,
+  analytics_level: 'basic',
+  demand_insights_enabled: false,
+  listing_assistant_enabled: false,
+  analytics_assistant_enabled: false,
+  advanced_tools_enabled: false,
+  support_level: 'standard',
+  business_name_enabled: false,
+  elite_badge_enabled: false,
 }
 
 const PRO: MerchantSubscriptionPlan = {
@@ -25,9 +35,19 @@ const PRO: MerchantSubscriptionPlan = {
   rental_commission_bps: 1000,
   barter_commission_bps: 0,
   plan_rank: 1,
-  active_listing_limit: null,
+  active_publication_limit: 20,
   is_active: true,
   commercial_version: 1,
+  advertising_discount_bps: 500,
+  affiliate_enabled: true,
+  analytics_level: 'full',
+  demand_insights_enabled: true,
+  listing_assistant_enabled: true,
+  analytics_assistant_enabled: false,
+  advanced_tools_enabled: true,
+  support_level: 'priority',
+  business_name_enabled: false,
+  elite_badge_enabled: false,
 }
 
 const ELITE: MerchantSubscriptionPlan = {
@@ -39,9 +59,19 @@ const ELITE: MerchantSubscriptionPlan = {
   rental_commission_bps: 800,
   barter_commission_bps: 0,
   plan_rank: 2,
-  active_listing_limit: null,
+  active_publication_limit: null,
   is_active: true,
   commercial_version: 1,
+  advertising_discount_bps: 1000,
+  affiliate_enabled: true,
+  analytics_level: 'full',
+  demand_insights_enabled: true,
+  listing_assistant_enabled: true,
+  analytics_assistant_enabled: true,
+  advanced_tools_enabled: true,
+  support_level: 'highest',
+  business_name_enabled: true,
+  elite_badge_enabled: true,
 }
 
 const ALL_PLANS = [STARTER, PRO, ELITE]

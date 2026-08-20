@@ -1432,10 +1432,19 @@ if (adminSession && affiliateA && affiliateB) {
   const finalCountD = await realActiveSupplyCount(affiliateB.userId)
   check('L-D: final active-supply count never exceeds the cap', finalCountD <= STARTER_CAP, { finalCountD })
 
-  // ── L-E: Looking-For never consumes a supply slot, even under concurrency. Sequential
-  // (not Promise.all) specifically to stay under the route's own rate limiter, which is
-  // an unrelated concern from the cap logic being tested here -- the assertion itself
-  // only cares whether any response was a CAPACITY rejection, never about throughput. ──
+  // ── L-E: Subscription V2 deliberately widened the global publication cap
+  // to count Looking-For Skill/Task posts too (one canonical entity = one
+  // slot regardless of direction/mode -- see subscription_v2_plan_entitlements's
+  // _lock_and_count_active_supply(), which counts barter_skill_task_posts
+  // in status active/offers_received with no direction filter at all).
+  // This supersedes the pre-V2 rule this check used to assert ("Looking-For
+  // never consumes a slot"). affiliateA is at cap here (L-A through L-D
+  // consumed the one free slot from ensureExactlyOneFreeSlot), so every
+  // Looking-For publish attempt below must now be denied for capacity,
+  // exactly like an Available one would be -- direction is no longer a
+  // capacity exemption. Sequential (not Promise.all) to stay under the
+  // route's own rate limiter, an unrelated concern from the cap logic
+  // being tested here. ──
   const countBeforeE = await realActiveSupplyCount(affiliateA.userId)
   const eResults = []
   for (let i = 0; i < 3; i++) {
@@ -1453,10 +1462,10 @@ if (adminSession && affiliateA && affiliateB) {
       eResults.push(draftRes)
     }
   }
-  const capacityRejections = eResults.filter((r) => /active_listing_limit_reached|plan does not allow another active/.test(r.json?.error ?? ''))
-  check('L-E: no concurrent Looking-For Skill/Task publication is ever rejected for capacity reasons', capacityRejections.length === 0, eResults.map((r) => ({ status: r.status, json: r.json })))
+  const capacityRejections = eResults.filter((r) => /active_publication_limit_reached|active_listing_limit_reached|plan does not allow another active/.test(r.json?.error ?? ''))
+  check('L-E (V2): every Looking-For Skill/Task publish is rejected for capacity while the merchant is at cap', capacityRejections.length === eResults.length, eResults.map((r) => ({ status: r.status, json: r.json })))
   const countAfterE = await realActiveSupplyCount(affiliateA.userId)
-  check('L-E: the active-supply count is completely unaffected by Looking-For publications', countAfterE === countBeforeE, { countBeforeE, countAfterE })
+  check('L-E: the active-supply count never exceeds the cap after the denied Looking-For attempts', countAfterE === countBeforeE, { countBeforeE, countAfterE })
 } else {
   skip('L: active-supply cap concurrency', 'missing admin, affiliateA, or affiliateB QA account in .qa-credentials.local.json')
 }

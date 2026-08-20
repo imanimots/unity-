@@ -71,7 +71,9 @@
       "commissionDesc": "Wat Unity jou hef",
       "affiliates": "Filiale",
       "affiliatesDesc": "Verwysingskommissies",
-      "subscription": "Intekening"
+      "subscription": "Intekening",
+      "tools": "Handelaargereedskap",
+      "toolsDesc": "Vraag-insigte, KI-assistent, CSV, groepprysing en meer"
     },
     "planStarter": "Beginner · Tot 5 lysings",
     "planUnlimited": "{plan} · Onbeperkte lysings",
@@ -223,7 +225,21 @@
     "changePlan": "Verander plan",
     "getStarted": "Begin nou",
     "footerNotice": "Kommissie word slegs gehef op voltooide verkope en verhurings. Afgraderings en kansellasies tree in werking aan die begin van jou volgende faktureringstydperk; opgraderings geld onmiddellik.",
-    "unavailable": "Pryse is tydelik nie beskikbaar nie."
+    "unavailable": "Pryse is tydelik nie beskikbaar nie.",
+    "upToPublished": "Tot {count} aktiewe lysings, versoeke & plasings",
+    "unlimitedPublished": "Onbeperkte aktiewe lysings, versoeke & plasings",
+    "adDiscount": "{rate} afslag op Advertensies",
+    "affiliateAccess": "Toegang tot die filiaalprogram",
+    "analyticsBasic": "Basiese handelaar-analise",
+    "analyticsFull": "Volledige handelaar-analise",
+    "demandInsights": "Marksplek-vraag-insigte",
+    "listingAssistant": "KI-lysing- en aanbod-assistent",
+    "analyticsAssistant": "KI-analise- en neigings-assistent",
+    "advancedTools": "Groepgereedskap, duplikaatlysings & CSV-uitvoer",
+    "supportPriority": "Prioriteit-handelaarondersteuning",
+    "supportHighest": "Hoogste-prioriteit-handelaarondersteuning",
+    "businessName": "Openbare besigheidsnaam-handelsmerk",
+    "eliteBadge": "Elite-kenteken op jou profiel & lysings"
   },
   "ambassadors": {
     "metaTitle": "Ambassadeur-program — Unity",
@@ -657,6 +673,62 @@
     "errors": {
       "networkError": "Netwerkfout — probeer asseblief weer",
       "somethingWentWrong": "Iets het verkeerd geloop"
+    },
+    "downgradeFlow": {
+      "title": "Verander jou plan",
+      "stepLabel": "Stap {current} van {total}",
+      "cancelAction": "Kanselleer",
+      "backAction": "Terug",
+      "continueAction": "Gaan voort",
+      "confirmAction": "Bevestig planverandering",
+      "working": "Besig…",
+      "genericError": "Iets het verkeerd geloop — probeer asseblief weer.",
+      "compareIntro": "Om van {from} na {to} te verander, verander die volgende. Gaan asseblief elke item na en merk dit om voort te gaan.",
+      "changes": {
+        "publicationLimit": "Jou aktiewe publikasie-limiet sal laer wees — sommige van jou lysings, versoeke of plasings mag gedeaktiveer moet word.",
+        "saleCommission": "Jou kommissiekoers op verkope sal styg.",
+        "rentalCommission": "Jou kommissiekoers op huur sal styg.",
+        "advertisingDiscount": "Jou Advertensie-afslag sal verminder of verwyder word.",
+        "affiliate": "Jy sal nie meer nuwe filiaaldeelname kan aktiveer nie. Jou historiese filiaalrekords word behou.",
+        "analytics": "Jy sal van volledige analise na basiese analise verskuif.",
+        "demandInsights": "Jy sal toegang tot marksplek-vraag-insigte verloor.",
+        "listingAssistant": "Jy sal toegang tot die KI-lysing- en aanbod-assistent verloor.",
+        "analyticsAssistant": "Jy sal toegang tot die KI-analise- en neigings-assistent verloor.",
+        "advancedTools": "Jy sal toegang tot groepgereedskap, duplikaatlysings en CSV-uitvoer verloor.",
+        "support": "Jou ondersteuningsprioriteit sal verminder word.",
+        "businessName": "Jou openbare besigheidsnaam-handelsmerk sal verwyder word — jou openbare naam sal terugkeer na jou persoonlike naam.",
+        "eliteBadge": "Jou Elite-kenteken sal van jou profiel en lysings verwyder word."
+      },
+      "keepSetIntro": "Jou teikenplan laat tot {limit} aktiewe items toe, maar jy het tans {count}. Kies watter een aktief moet bly — die res sal veilig gedeaktiveer word (nooit uitgevee nie).",
+      "keepSetSelected": "{selected} van {limit} gekies",
+      "reasonLabel": "Hoekom verander jy jou plan?",
+      "reasonCategories": {
+        "too_expensive": "Te duur",
+        "not_using_features": "Ek gebruik nie die ekstra funksies nie",
+        "switching_platform": "Ek verander na 'n ander platform",
+        "business_paused": "My besigheid is tydelik gestop",
+        "other": "Ander"
+      },
+      "reasonTextPlaceholder": "Vertel ons meer (opsioneel)",
+      "confirmSummary": "Jy is op die punt om na {plan} te verskuif.",
+      "confirmEffective": "Hierdie verandering tree in werking aan die einde van jou huidige faktureringsperiode. Jy behou alle huidige-plan-voordele tot dan.",
+      "confirmKeepSet": "{count} items wat jy gekies het, sal aktief bly."
+    },
+    "resolveFrozen": {
+      "title": "Aksie vereis: kies wat aktief bly",
+      "description": "Jou plan het verander, maar jou aktiewe items oorskry die nuwe limiet van {limit}. Kies watter een aktief moet bly — die res sal veilig gepouseer word (nooit uitgevee nie). Niks word gepubliseer of geaktiveer totdat jy dit opgelos het nie.",
+      "selected": "{selected} van {limit} gekies",
+      "genericError": "Iets het verkeerd geloop — probeer asseblief weer.",
+      "working": "Besig…",
+      "confirmAction": "Bevestig keuse"
+    },
+    "businessName": {
+      "title": "Elite besigheidsmerk",
+      "description": "Word openbaar vertoon in plaas van jou persoonlike naam ({fallback}) terwyl jou Elite-intekening aktief is.",
+      "placeholder": "Jou besigheidsnaam",
+      "working": "Stoor tans…",
+      "saveAction": "Stoor",
+      "saved": "Gestoor."
     }
   },
   "commissionsPage": {
@@ -699,5 +771,83 @@
     "editUnavailableTitle": "Om 'n ingediende notering te wysig is nog nie beskikbaar nie",
     "pauseListingTitle": "Onderbreek notering",
     "activateListingTitle": "Aktiveer notering"
+  },
+  "tools": {
+    "eyebrow": "Handelaargereedskap",
+    "heading": "Gereedskap",
+    "backLabel": "Terug na paneelbord",
+    "loading": "Laai tans…",
+    "starterExplanation": "Gevorderde handelaargereedskap (vraag-insigte, KI-assistent, groepbestuur, CSV-in-/uitvoer, geskeduleerde publikasie, kalender) vereis 'n aktiewe Pro- of Elite-intekening.",
+    "upgradeAction": "Bekyk planne",
+    "tabs": {
+      "demand": "Vraag",
+      "calendar": "Kalender",
+      "schedule": "Skedule",
+      "csv": "CSV",
+      "price": "Groepprys",
+      "ai": "KI-assistent"
+    },
+    "demand": {
+      "loading": "Laai tans…",
+      "insufficientData": "Nog nie genoeg data nie.",
+      "windowNotice": "Saamgevoegde soekvraag oor die afgelope {days} dae.",
+      "columns": {
+        "category": "Kategorie",
+        "mode": "Modus",
+        "searches": "Soektogte",
+        "zeroResultShare": "Nul-resultaat-aandeel",
+        "allCategories": "Alle kategorieë"
+      }
+    },
+    "calendar": {
+      "loading": "Laai tans…",
+      "couldNotLoad": "Kon nie jou kalender laai nie.",
+      "upcomingBookings": "Komende besprekings",
+      "noUpcomingBookings": "Geen komende besprekings nie.",
+      "listingStatus": "Lysingstatus"
+    },
+    "schedule": {
+      "loading": "Laai tans…",
+      "none": "Geen geskeduleerde publikasies nie.",
+      "description": "Items geskeduleer om outomaties op 'n toekomstige tyd gepubliseer te word.",
+      "working": "Besig…",
+      "cancelAction": "Kanselleer"
+    },
+    "csv": {
+      "exportTitle": "Voer jou lysings uit",
+      "exportDescription": "Laai jou eie lysingbestuurdata af as 'n CSV-lêer.",
+      "exportAction": "Laai CSV af",
+      "importTitle": "Voer lysing-konsepte in",
+      "importDescription": "Laai 'n CSV-lêer op om konsep-lysings te skep. Niks word outomaties gepubliseer nie.",
+      "importColumns": "Kolomme: {columns}",
+      "importing": "Voer tans in…",
+      "genericError": "Iets het verkeerd geloop — probeer asseblief weer.",
+      "importSummary": "{imported} ingevoer, {failed} misluk.",
+      "rowError": "Ry {row}: {error}"
+    },
+    "bulkPrice": {
+      "loading": "Laai tans…",
+      "title": "Werk pryse vir verskeie lysings op",
+      "newDailyRate": "Nuwe daaglikse tarief (R)",
+      "reviewAction": "Hersien veranderinge",
+      "confirmMessage": "Dit sal die daaglikse tarief na R{rate} vir {count} lysing(s) verander. Dit verander nooit 'n reeds-aanvaarde besprekingsprys nie.",
+      "backAction": "Terug",
+      "confirmAction": "Pas veranderinge toe",
+      "working": "Pas tans toe…",
+      "genericError": "Iets het verkeerd geloop — probeer asseblief weer.",
+      "success": "{count} lysing(s) opgedateer."
+    },
+    "ai": {
+      "listingTab": "Lysing- en aanbod-assistent",
+      "analyticsTab": "Analise- en neigings-assistent",
+      "listingIntro": "Plak 'n lysing- of aanbod-konsep vir voorstelle. Jy kies of jy dit gebruik — niks word outomaties toegepas nie.",
+      "listingPlaceholder": "Plak jou lysingtitel/-beskrywing hier…",
+      "analyticsIntro": "Vra oor jou eie statistieke en privaatheid-veilige marksplekneigings.",
+      "analyticsPlaceholder": "bv. Wat moet ek verbeter?",
+      "askAction": "Vra",
+      "working": "Dink tans…",
+      "genericError": "Iets het verkeerd geloop — probeer asseblief weer.",
+      "suggestionLabel": "Voorstel"
+    }
   }
 }

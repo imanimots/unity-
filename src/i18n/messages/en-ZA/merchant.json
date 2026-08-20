@@ -71,7 +71,9 @@
       "commissionDesc": "What Unity charges you",
       "affiliates": "Affiliates",
       "affiliatesDesc": "Referral commissions",
-      "subscription": "Subscription"
+      "subscription": "Subscription",
+      "tools": "Merchant Tools",
+      "toolsDesc": "Demand insights, AI assistant, CSV, bulk pricing & more"
     },
     "planStarter": "Starter · Up to 5 listings",
     "planUnlimited": "{plan} · Unlimited listings",
@@ -223,7 +225,21 @@
     "changePlan": "Change plan",
     "getStarted": "Get started",
     "footerNotice": "Commission is charged only on completed sales and rentals. Downgrades and cancellations take effect at the start of your next billing period; upgrades apply immediately.",
-    "unavailable": "Pricing is temporarily unavailable."
+    "unavailable": "Pricing is temporarily unavailable.",
+    "upToPublished": "Up to {count} active listings, requests & posts",
+    "unlimitedPublished": "Unlimited active listings, requests & posts",
+    "adDiscount": "{rate} discount on Advertising",
+    "affiliateAccess": "Affiliate program access",
+    "analyticsBasic": "Basic merchant analytics",
+    "analyticsFull": "Full merchant analytics",
+    "demandInsights": "Marketplace demand insights",
+    "listingAssistant": "AI listing & offer assistant",
+    "analyticsAssistant": "AI analytics & trends assistant",
+    "advancedTools": "Bulk tools, duplicate listings & CSV export",
+    "supportPriority": "Priority merchant support",
+    "supportHighest": "Highest-priority merchant support",
+    "businessName": "Public business name branding",
+    "eliteBadge": "Elite badge on your profile & listings"
   },
   "ambassadors": {
     "metaTitle": "Ambassador Program — Unity",
@@ -657,6 +673,62 @@
     "errors": {
       "networkError": "Network error — please try again",
       "somethingWentWrong": "Something went wrong"
+    },
+    "downgradeFlow": {
+      "title": "Change your plan",
+      "stepLabel": "Step {current} of {total}",
+      "cancelAction": "Cancel",
+      "backAction": "Back",
+      "continueAction": "Continue",
+      "confirmAction": "Confirm plan change",
+      "working": "Working…",
+      "genericError": "Something went wrong — please try again.",
+      "compareIntro": "Moving from {from} to {to} changes the following. Please review and check each item to continue.",
+      "changes": {
+        "publicationLimit": "Your active publication limit will be lower — some of your listings, requests or posts may need to be deactivated.",
+        "saleCommission": "Your commission rate on sales will increase.",
+        "rentalCommission": "Your commission rate on rentals will increase.",
+        "advertisingDiscount": "Your Advertising discount will be reduced or removed.",
+        "affiliate": "You will no longer be able to enable new Affiliate participation. Your historical affiliate records are kept.",
+        "analytics": "You will move from full analytics to basic analytics.",
+        "demandInsights": "You will lose access to marketplace demand insights.",
+        "listingAssistant": "You will lose access to the AI listing & offer assistant.",
+        "analyticsAssistant": "You will lose access to the AI analytics & trends assistant.",
+        "advancedTools": "You will lose access to bulk tools, duplicate listings and CSV export.",
+        "support": "Your support priority will be reduced.",
+        "businessName": "Your public business name branding will be removed — your public name will revert to your personal name.",
+        "eliteBadge": "Your Elite badge will be removed from your profile and listings."
+      },
+      "keepSetIntro": "Your target plan allows up to {limit} active items, but you currently have {count}. Choose which ones stay active — the rest will be safely deactivated (never deleted).",
+      "keepSetSelected": "{selected} of {limit} selected",
+      "reasonLabel": "Why are you changing your plan?",
+      "reasonCategories": {
+        "too_expensive": "Too expensive",
+        "not_using_features": "I'm not using the extra features",
+        "switching_platform": "I'm switching platforms",
+        "business_paused": "My business is paused",
+        "other": "Other"
+      },
+      "reasonTextPlaceholder": "Tell us more (optional)",
+      "confirmSummary": "You are about to move to {plan}.",
+      "confirmEffective": "This change takes effect at the end of your current billing period. You keep all current-plan benefits until then.",
+      "confirmKeepSet": "{count} items you selected will remain active."
+    },
+    "resolveFrozen": {
+      "title": "Action required: choose what stays active",
+      "description": "Your plan changed but your active items exceed the new limit of {limit}. Select which ones stay active — the rest will be safely paused (never deleted). Nothing publishes or reactivates until you resolve this.",
+      "selected": "{selected} of {limit} selected",
+      "genericError": "Something went wrong — please try again.",
+      "working": "Working…",
+      "confirmAction": "Confirm selection"
+    },
+    "businessName": {
+      "title": "Elite business branding",
+      "description": "Displayed publicly instead of your personal name ({fallback}) while your Elite subscription is active.",
+      "placeholder": "Your business name",
+      "working": "Saving…",
+      "saveAction": "Save",
+      "saved": "Saved."
     }
   },
   "commissionsPage": {
@@ -699,5 +771,83 @@
     "editUnavailableTitle": "Editing a submitted listing isn't available yet",
     "pauseListingTitle": "Pause listing",
     "activateListingTitle": "Activate listing"
+  },
+  "tools": {
+    "eyebrow": "Merchant Tools",
+    "heading": "Tools",
+    "backLabel": "Back to dashboard",
+    "loading": "Loading…",
+    "starterExplanation": "Advanced merchant tools (demand insights, AI assistant, bulk management, CSV import/export, scheduled publishing, calendar) require an active Pro or Elite subscription.",
+    "upgradeAction": "View plans",
+    "tabs": {
+      "demand": "Demand",
+      "calendar": "Calendar",
+      "schedule": "Schedule",
+      "csv": "CSV",
+      "price": "Bulk price",
+      "ai": "AI assistant"
+    },
+    "demand": {
+      "loading": "Loading…",
+      "insufficientData": "Not enough data yet.",
+      "windowNotice": "Aggregate search demand over the last {days} days.",
+      "columns": {
+        "category": "Category",
+        "mode": "Mode",
+        "searches": "Searches",
+        "zeroResultShare": "Zero-result share",
+        "allCategories": "All categories"
+      }
+    },
+    "calendar": {
+      "loading": "Loading…",
+      "couldNotLoad": "Could not load your calendar.",
+      "upcomingBookings": "Upcoming bookings",
+      "noUpcomingBookings": "No upcoming bookings.",
+      "listingStatus": "Listing status"
+    },
+    "schedule": {
+      "loading": "Loading…",
+      "none": "No scheduled publications.",
+      "description": "Items scheduled to publish automatically at a future time.",
+      "working": "Working…",
+      "cancelAction": "Cancel"
+    },
+    "csv": {
+      "exportTitle": "Export your listings",
+      "exportDescription": "Download your own listing-management data as a CSV file.",
+      "exportAction": "Download CSV",
+      "importTitle": "Import listing drafts",
+      "importDescription": "Upload a CSV file to create draft listings. Nothing is published automatically.",
+      "importColumns": "Columns: {columns}",
+      "importing": "Importing…",
+      "genericError": "Something went wrong — please try again.",
+      "importSummary": "{imported} imported, {failed} failed.",
+      "rowError": "Row {row}: {error}"
+    },
+    "bulkPrice": {
+      "loading": "Loading…",
+      "title": "Update prices for multiple listings",
+      "newDailyRate": "New daily rate (R)",
+      "reviewAction": "Review changes",
+      "confirmMessage": "This will update the daily rate to R{rate} for {count} listing(s). This never changes an already-accepted booking price.",
+      "backAction": "Back",
+      "confirmAction": "Apply changes",
+      "working": "Applying…",
+      "genericError": "Something went wrong — please try again.",
+      "success": "{count} listing(s) updated."
+    },
+    "ai": {
+      "listingTab": "Listing & offer assistant",
+      "analyticsTab": "Analytics & trends assistant",
+      "listingIntro": "Paste a listing or offer draft for suggestions. You choose whether to use them — nothing is applied automatically.",
+      "listingPlaceholder": "Paste your listing title/description here…",
+      "analyticsIntro": "Ask about your own metrics and privacy-safe marketplace trends.",
+      "analyticsPlaceholder": "e.g. What should I improve?",
+      "askAction": "Ask",
+      "working": "Thinking…",
+      "genericError": "Something went wrong — please try again.",
+      "suggestionLabel": "Suggestion"
+    }
   }
 }

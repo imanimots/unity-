@@ -113,6 +113,7 @@
     "bookNow": "Bespreek Nou — {amount}/dag",
     "buyNow": "Koop Nou — {amount}",
     "youMightAlsoLike": "Jy sal dalk ook hou van",
-    "similarListings": "Soortgelyke Noterings"
+    "similarListings": "Soortgelyke Noterings",
+    "eliteBadgeLabel": "Elite"
   }
 }

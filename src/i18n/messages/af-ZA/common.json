@@ -196,7 +196,8 @@
     "loadMoreReviews": "Laai meer resensies",
     "loadingMore": "Laai tans…",
     "starsAriaLabel": "{rating} uit 5 sterre",
-    "reviewerFallbackName": "Unity-lid"
+    "reviewerFallbackName": "Unity-lid",
+    "eliteBadgeLabel": "Elite"
   },
   "chat": {
     "metaTitle": "Boodskappe — Unity",

@@ -25,12 +25,31 @@ describe('requestUpgradeSchema (category: Validation)', () => {
 })
 
 describe('requestDowngradeSchema (category: Validation)', () => {
-  it('5. accepts a valid target plan id', () => {
-    expect(requestDowngradeSchema.safeParse({ targetPlanId: 'starter' }).success).toBe(true)
+  it('5. accepts a valid target plan id with a reasonCategory', () => {
+    expect(requestDowngradeSchema.safeParse({ targetPlanId: 'starter', reasonCategory: 'too_expensive' }).success).toBe(true)
   })
 
   it('6. rejects a missing targetPlanId', () => {
-    expect(requestDowngradeSchema.safeParse({}).success).toBe(false)
+    expect(requestDowngradeSchema.safeParse({ reasonCategory: 'too_expensive' }).success).toBe(false)
+  })
+
+  it('6b. rejects a missing reasonCategory -- Section 54: a downgrade reason is required, server-validated', () => {
+    expect(requestDowngradeSchema.safeParse({ targetPlanId: 'starter' }).success).toBe(false)
+  })
+
+  it('6c. rejects an unknown reasonCategory', () => {
+    expect(requestDowngradeSchema.safeParse({ targetPlanId: 'starter', reasonCategory: 'not_a_real_category' }).success).toBe(false)
+  })
+
+  it('6d. accepts optional keepSetEntities and acknowledgedChangeKeys', () => {
+    expect(
+      requestDowngradeSchema.safeParse({
+        targetPlanId: 'starter',
+        reasonCategory: 'other',
+        acknowledgedChangeKeys: ['publicationLimit'],
+        keepSetEntities: [{ entityType: 'listing', entityId: '11111111-1111-4111-8111-111111111111' }],
+      }).success
+    ).toBe(true)
   })
 })
 

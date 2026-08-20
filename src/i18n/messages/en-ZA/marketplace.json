@@ -113,6 +113,7 @@
     "bookNow": "Book Now — {amount}/day",
     "buyNow": "Buy Now — {amount}",
     "youMightAlsoLike": "You might also like",
-    "similarListings": "Similar Listings"
+    "similarListings": "Similar Listings",
+    "eliteBadgeLabel": "Elite"
   }
 }

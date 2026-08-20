@@ -196,7 +196,8 @@
     "loadMoreReviews": "Load more reviews",
     "loadingMore": "Loading…",
     "starsAriaLabel": "{rating} out of 5 stars",
-    "reviewerFallbackName": "Unity Member"
+    "reviewerFallbackName": "Unity Member",
+    "eliteBadgeLabel": "Elite"
   },
   "chat": {
     "metaTitle": "Messages — Unity",

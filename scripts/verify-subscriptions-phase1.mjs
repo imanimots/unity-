@@ -168,9 +168,9 @@ console.log('=== Scenario A: Plan catalogue & default state ===')
   const plans = json?.plans ?? []
   const byId = Object.fromEntries(plans.map((p) => [p.id, p]))
   check('A2. exactly 3 active plans returned: starter/pro/elite', plans.length === 3 && byId.starter && byId.pro && byId.elite, { ids: plans.map((p) => p.id) })
-  check('A3. Starter rates match the authoritative model (0 fee, 600/1200 bps, cap 5)', byId.starter?.monthly_fee_cents === 0 && byId.starter?.sales_commission_bps === 600 && byId.starter?.rental_commission_bps === 1200 && byId.starter?.active_listing_limit === 5, byId.starter)
-  check('A4. Pro rates match the authoritative model (19900 cents fee, 500/1000 bps, unlimited)', byId.pro?.monthly_fee_cents === 19900 && byId.pro?.sales_commission_bps === 500 && byId.pro?.rental_commission_bps === 1000 && byId.pro?.active_listing_limit === null, byId.pro)
-  check('A5. Elite rates match the authoritative model (49900 cents fee, 400/800 bps, unlimited)', byId.elite?.monthly_fee_cents === 49900 && byId.elite?.sales_commission_bps === 400 && byId.elite?.rental_commission_bps === 800 && byId.elite?.active_listing_limit === null, byId.elite)
+  check('A3. Starter rates match the V2 authoritative model (0 fee, 600/1200 bps, global publication cap 5)', byId.starter?.monthly_fee_cents === 0 && byId.starter?.sales_commission_bps === 600 && byId.starter?.rental_commission_bps === 1200 && byId.starter?.active_publication_limit === 5, byId.starter)
+  check('A4. Pro rates match the V2 authoritative model (19900 cents fee, 500/1000 bps, global publication cap 20 -- no longer unlimited)', byId.pro?.monthly_fee_cents === 19900 && byId.pro?.sales_commission_bps === 500 && byId.pro?.rental_commission_bps === 1000 && byId.pro?.active_publication_limit === 20, byId.pro)
+  check('A5. Elite rates match the V2 authoritative model (49900 cents fee, 400/800 bps, unlimited)', byId.elite?.monthly_fee_cents === 49900 && byId.elite?.sales_commission_bps === 400 && byId.elite?.rental_commission_bps === 800 && byId.elite?.active_publication_limit === null, byId.elite)
   check('A6. barter commission is 0 on every plan', plans.every((p) => p.barter_commission_bps === 0), plans)
 
   const me = await api(merchantACookie, 'GET', '/api/subscriptions/me')
@@ -384,7 +384,7 @@ console.log('=== Scenario G: Starter listing cap (real listings only, test fixtu
   }
 
   check('G3. the first 5 real listings activate successfully on Starter', activationResults.slice(0, 5).every((r) => !r.error), activationResults.slice(0, 5))
-  check('G4. the 6th real listing is blocked by the Starter active-listing cap', !!activationResults[5].error && activationResults[5].error.includes('active_listing_limit_reached'), activationResults[5])
+  check('G4. the 6th real listing is blocked by the Starter global publication cap', !!activationResults[5].error && activationResults[5].error.includes('active_publication_limit_reached'), activationResults[5])
 
   const { count: activeAfterCap } = await admin.from('listings').select('id', { count: 'exact', head: true }).eq('merchant_id', merchantBId).eq('status', 'active').eq('is_test', false)
   check('G5. exactly 5 real listings are active, never 6', (activeAfterCap ?? 0) === 5, { activeAfterCap })

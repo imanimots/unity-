@@ -72,6 +72,10 @@ export const PAGE_COVERAGE_MANIFEST: PageCoverageEntry[] = [
   // dictionary section + useTranslations throughout, formatDate replacing
   // the hardcoded toLocaleDateString('en-ZA') calls).
   { path: '(dashboard)/dashboard/merchant/subscription/page.tsx', status: 'wired' },
+  // Subscription V2: consolidated Pro/Elite tools surface (demand
+  // insights, calendar, scheduled publishing, CSV, bulk price, AI
+  // assistant) -- useTranslations('merchant.tools') throughout.
+  { path: '(dashboard)/dashboard/merchant/tools/page.tsx', status: 'wired' },
   { path: '(dashboard)/dashboard/merchant/affiliates/page.tsx', status: 'wired' },
   { path: '(dashboard)/dashboard/merchant/bookings/[id]/dispute/page.tsx', status: 'wired' },
   { path: '(dashboard)/dashboard/merchant/bookings/[id]/review/page.tsx', status: 'wired' },
