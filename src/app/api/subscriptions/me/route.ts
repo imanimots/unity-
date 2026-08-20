@@ -3,7 +3,7 @@ import { getRequestProfile } from '@/lib/supabase/require-admin'
 import { getAdminServiceClient } from '@/lib/admin/route-helpers'
 import { getEffectiveMerchantPlan } from '@/lib/subscriptions/effective-plan'
 import { getMerchantSubscriptionPlans } from '@/lib/subscriptions/plans'
-import { getListingEntitlementUsage } from '@/lib/subscriptions/entitlements'
+import { getPublicationUsage, getMerchantEntitlements } from '@/lib/subscriptions/entitlements'
 import { getCurrentMonthMerchantVolume } from '@/lib/subscriptions/monthly-volume'
 import { computeMonthlyPlanCost, findCheapestPlans, computeSavingsCents } from '@/lib/subscriptions/economics'
 import { triggerMerchantSubscriptionLazySweep } from '@/lib/subscriptions/lazy-expiry'
@@ -49,11 +49,12 @@ export async function GET() {
       }
     }
 
-    const [{ planId, plan, subscription }, allPlans, listingUsage, volume] = await Promise.all([
+    const [{ planId, plan, subscription }, allPlans, publicationUsage, volume, entitlements] = await Promise.all([
       getEffectiveMerchantPlan(admin, requester.userId),
       getMerchantSubscriptionPlans(admin),
-      getListingEntitlementUsage(admin, requester.userId),
+      getPublicationUsage(admin, requester.userId),
       getCurrentMonthMerchantVolume(admin, requester.userId),
+      getMerchantEntitlements(admin, requester.userId),
     ])
 
     const currentCost = computeMonthlyPlanCost(plan, volume)
@@ -74,9 +75,11 @@ export async function GET() {
             pendingPlanId: subscription.pending_plan_id,
             pendingPlanEffectiveAt: subscription.pending_plan_effective_at,
             lastTransitionCategory: subscription.last_transition_category,
+            publicationFrozen: subscription.publication_frozen,
           }
         : null,
-      listingUsage,
+      publicationUsage,
+      entitlements,
       economics: {
         currentMonthVolume: volume,
         currentPlanCost: currentCost,

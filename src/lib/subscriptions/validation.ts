@@ -20,9 +20,36 @@ export const requestUpgradeSchema = z.object({
   idempotency_key: idempotencyKeySchema.optional(),
 })
 
-/** Downgrade/cancellation never require a billing reference -- the RPC's own branching handles that (see request_merchant_plan_change). */
+const downgradeReasonCategorySchema = z.enum(['too_expensive', 'not_using_features', 'switching_platform', 'business_paused', 'other'])
+
+const keepSetEntitySchema = z.object({
+  entityType: z.enum(['listing', 'marketplace_request', 'barter_skill_task_post']),
+  entityId: z.string().uuid(),
+})
+
+/** Downgrade/cancellation never require a billing reference -- the RPC's
+ * own branching handles that (see request_merchant_plan_change). A
+ * reason and, when the target plan's cap is below current usage, a
+ * keep-set are both server-validated here AND re-validated inside the
+ * RPCs themselves -- this schema only rejects obviously malformed
+ * input early, it is never the actual enforcement point. */
 export const requestDowngradeSchema = z.object({
   targetPlanId: planIdSchema,
+  reasonCategory: downgradeReasonCategorySchema,
+  reasonText: z.string().trim().max(1000).optional(),
+  acknowledgedChangeKeys: z.array(z.string()).default([]),
+  keepSetEntities: z.array(keepSetEntitySchema).max(500).optional(),
+  idempotency_key: idempotencyKeySchema.optional(),
+})
+
+/** Cancelling down to Starter is itself a downgrade -- same reason/
+ * acknowledgement/keep-set requirements, just without a targetPlanId
+ * (always 'starter'). */
+export const cancelSubscriptionSchema = z.object({
+  reasonCategory: downgradeReasonCategorySchema,
+  reasonText: z.string().trim().max(1000).optional(),
+  acknowledgedChangeKeys: z.array(z.string()).default([]),
+  keepSetEntities: z.array(keepSetEntitySchema).max(500).optional(),
   idempotency_key: idempotencyKeySchema.optional(),
 })
 

@@ -7,16 +7,12 @@ import type { Locale } from '@/i18n/locales'
 import { ArrowLeft, Check, TrendingDown } from 'lucide-react'
 import { TestModeBanner } from '@/components/shared/test-mode-banner'
 import { formatMoney, formatDate } from '@/lib/i18n/format'
+import type { MerchantSubscriptionPlan } from '@/types'
+import { DowngradeConsentModal } from '@/components/subscriptions/downgrade-consent-modal'
+import { ResolveFrozenBanner } from '@/components/subscriptions/resolve-frozen-banner'
+import { BusinessNameSettings } from '@/components/subscriptions/business-name-settings'
 
-interface MerchantPlan {
-  id: string
-  display_name: string
-  monthly_fee_cents: number
-  currency: string
-  sales_commission_bps: number
-  rental_commission_bps: number
-  active_listing_limit: number | null
-}
+type MerchantPlan = MerchantSubscriptionPlan
 
 interface PlanCostBreakdown {
   planId: string
@@ -33,8 +29,9 @@ interface SubscriptionMe {
     status: 'active' | 'pending_change' | 'cancelled'
     pendingPlanId: string | null
     pendingPlanEffectiveAt: string | null
+    publicationFrozen: boolean
   } | null
-  listingUsage: { activeCount: number; limit: number | null; atLimit: boolean }
+  publicationUsage: { activeCount: number; limit: number | null; atLimit: boolean }
   economics: {
     currentMonthVolume: { salesVolumeCents: number; rentalVolumeCents: number }
     currentPlanCost: PlanCostBreakdown
@@ -63,16 +60,19 @@ export default function MerchantSubscriptionPage() {
   const [busyPlanId, setBusyPlanId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
+  const [plans, setPlans] = useState<MerchantSubscriptionPlan[]>([])
+
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/subscriptions/me')
-      if (!res.ok) {
-        const b = await res.json().catch(() => ({}))
+      const [meRes, plansRes] = await Promise.all([fetch('/api/subscriptions/me'), fetch('/api/subscriptions/plans')])
+      if (!meRes.ok) {
+        const b = await meRes.json().catch(() => ({}))
         throw new Error(b.error ?? t('couldNotLoad'))
       }
-      setData(await res.json())
+      setData(await meRes.json())
+      if (plansRes.ok) setPlans((await plansRes.json()).plans ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : t('couldNotLoad'))
     } finally {
@@ -85,14 +85,25 @@ export default function MerchantSubscriptionPage() {
     load()
   }, [load])
 
+  const [downgradeTargetId, setDowngradeTargetId] = useState<string | null>(null)
+
   async function changePlan(targetPlanId: string, currentRankHigherThanTarget: boolean) {
+    // Downgrades/cancellations never fire immediately from here -- they
+    // open the deliberate Section 52 consequence flow instead. Only an
+    // upgrade is a direct, immediate action (Section 51).
+    if (currentRankHigherThanTarget) {
+      setDowngradeTargetId(targetPlanId)
+      return
+    }
+
     setActionError(null)
     setBusyPlanId(targetPlanId)
     try {
-      const endpoint = currentRankHigherThanTarget ? (targetPlanId === 'starter' ? '/api/subscriptions/cancel' : '/api/subscriptions/downgrade') : '/api/subscriptions/upgrade'
-      const body: Record<string, unknown> = { idempotency_key: crypto.randomUUID() }
-      if (endpoint !== '/api/subscriptions/cancel') body.targetPlanId = targetPlanId
-      const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const res = await fetch('/api/subscriptions/upgrade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetPlanId, idempotency_key: crypto.randomUUID() }),
+      })
       const result = await res.json()
       if (!res.ok) {
         setActionError(result.error ?? t('errors.somethingWentWrong'))
@@ -149,6 +160,8 @@ export default function MerchantSubscriptionPage() {
         <p className="text-sm text-red-600 dark:text-red-400">{error ?? t('couldNotLoad')}</p>
       ) : (
         <>
+          {data.subscription?.publicationFrozen && <ResolveFrozenBanner publicationLimit={data.plan.active_publication_limit} onResolved={() => void load()} />}
+
           <div className="bg-[#8B1A1A] rounded-xl p-8 mb-6 border-l-4 border-l-[#C4511F]">
             <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-white/60 mb-3">{t('currentPlanLabel')}</p>
             <div className="text-4xl font-extrabold text-white leading-none mb-2">{data.plan.display_name}</div>
@@ -185,10 +198,10 @@ export default function MerchantSubscriptionPage() {
             <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
               <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{t('activeListings')}</p>
               <div className="text-2xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">
-                {data.listingUsage.activeCount}
-                {data.listingUsage.limit !== null && <span className="text-[#9B8B85] text-base"> / {data.listingUsage.limit}</span>}
+                {data.publicationUsage.activeCount}
+                {data.publicationUsage.limit !== null && <span className="text-[#9B8B85] text-base"> / {data.publicationUsage.limit}</span>}
               </div>
-              {data.listingUsage.atLimit && <p className="text-[11px] text-red-600 dark:text-red-400 mt-1.5">{t('limitReached')}</p>}
+              {data.publicationUsage.atLimit && <p className="text-[11px] text-red-600 dark:text-red-400 mt-1.5">{t('limitReached')}</p>}
             </div>
             <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
               <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{t('thisMonthsCost')}</p>
@@ -248,9 +261,28 @@ export default function MerchantSubscriptionPage() {
 
           {actionError && <p className="text-xs text-red-600 dark:text-red-400 mb-6">{actionError}</p>}
 
+          <BusinessNameSettings />
+
           <p className="text-xs text-[#9B8B85] text-center">
             {t('billingNotice')}
           </p>
+
+          {downgradeTargetId &&
+            (() => {
+              const targetPlan = plans.find((p) => p.id === downgradeTargetId)
+              if (!targetPlan) return null
+              return (
+                <DowngradeConsentModal
+                  currentPlan={data.plan}
+                  targetPlan={targetPlan}
+                  onClose={() => setDowngradeTargetId(null)}
+                  onConfirmed={() => {
+                    setDowngradeTargetId(null)
+                    void load()
+                  }}
+                />
+              )
+            })()}
         </>
       )}
     </div>

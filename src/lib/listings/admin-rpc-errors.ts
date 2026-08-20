@@ -31,6 +31,12 @@ export function mapAdminRpcError(message: string | undefined): { status: number;
   if (m.includes('not authenticated') || m.includes('not authorized')) {
     return { status: 401, error: 'You must be signed in as an administrator.' }
   }
+  if (m.includes('active_publication_limit_reached') || m.includes('active_listing_limit_reached')) {
+    return { status: 422, error: "This merchant's current plan has reached its active publication limit." }
+  }
+  if (m.includes('publication_frozen_pending_keep_set')) {
+    return { status: 409, error: 'This merchant must resolve a pending downgrade selection before anything else can be activated.' }
+  }
 
   return { status: 500, error: 'Could not complete this action -- please try again' }
 }

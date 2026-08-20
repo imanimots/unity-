@@ -109,6 +109,10 @@ export interface PublicProfileIdentity {
   is_verified: boolean
   unity_score: number
   created_at: string
+  /** Derived live from the merchant's currently-effective plan (public_profiles view) -- never a stored/client-settable flag. Presentation only, never KYC verification. */
+  is_elite?: boolean
+  /** Only populated when is_elite is true and the merchant has set one -- see resolveMerchantPublicIdentity(). */
+  public_business_name?: string | null
 }
 
 export interface Country {
@@ -856,7 +860,10 @@ export type MerchantSubscriptionChangeCategory =
   | 'upgrade' | 'downgrade' | 'cancellation' | 'reversion' | 'admin_correction' | 'pending_change_cancelled'
 export type MerchantSubscriptionActorType = 'merchant' | 'admin' | 'system'
 
-/** Mirrors merchant_subscription_plans -- the one authoritative source for plan commercial terms. Rates are integer basis points, fees are integer cents. Never hardcode these values a second time anywhere else. */
+export type MerchantAnalyticsLevel = 'basic' | 'full'
+export type MerchantSupportLevel = 'standard' | 'priority' | 'highest'
+
+/** Mirrors merchant_subscription_plans -- the one authoritative source for plan commercial terms AND V2 entitlements. Rates/discounts are integer basis points, fees are integer cents. Never hardcode these values a second time anywhere else. */
 export interface MerchantSubscriptionPlan {
   id: MerchantSubscriptionPlanId
   display_name: string
@@ -866,9 +873,20 @@ export interface MerchantSubscriptionPlan {
   rental_commission_bps: number
   barter_commission_bps: number
   plan_rank: number
-  active_listing_limit: number | null
+  /** null = unlimited. Global cap across listings + marketplace_requests + barter_skill_task_posts -- one canonical entity, one slot, regardless of how many modes it supports. */
+  active_publication_limit: number | null
   is_active: boolean
   commercial_version: number
+  advertising_discount_bps: number
+  affiliate_enabled: boolean
+  analytics_level: MerchantAnalyticsLevel
+  demand_insights_enabled: boolean
+  listing_assistant_enabled: boolean
+  analytics_assistant_enabled: boolean
+  advanced_tools_enabled: boolean
+  support_level: MerchantSupportLevel
+  business_name_enabled: boolean
+  elite_badge_enabled: boolean
 }
 
 /** Mirrors merchant_subscriptions -- absent for a merchant means Starter, see getEffectiveMerchantPlan(). */
@@ -881,6 +899,8 @@ export interface MerchantSubscriptionRow {
   pending_plan_effective_at: string | null
   status: MerchantSubscriptionStatus
   last_transition_category: MerchantSubscriptionChangeCategory | null
+  /** true when a downgrade took effect but the merchant's keep-set was missing/invalid -- every publish/reactivate RPC refuses until resolve_frozen_merchant_downgrade() is called. Unity never auto-selects content on the merchant's behalf. */
+  publication_frozen: boolean
   created_at: string
   updated_at: string
 }

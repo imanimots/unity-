@@ -175,8 +175,17 @@ export function mapBarterRpcError(message: string | undefined): { status: number
   if (m.includes('prohibited_content')) {
     return { status: 422, error: m.split('prohibited_content:')[1]?.trim() || 'This content is not permitted.' }
   }
-  if (m.includes('active_listing_limit_reached')) {
-    return { status: 403, error: 'Your current plan does not allow another active listing/Skill/Task right now.' }
+  if (m.includes('active_publication_limit_reached') || m.includes('active_listing_limit_reached')) {
+    // Matches both the V2 error code and the pre-V2 live code -- the
+    // migration renaming this may not be applied yet in every
+    // environment this runs in (see the V2 migrations' own comment).
+    return { status: 403, error: 'Your current plan does not allow another active published entity right now.' }
+  }
+  if (m.includes('publication_frozen_pending_keep_set')) {
+    return { status: 409, error: 'Resolve your downgrade selection before publishing or reactivating anything.' }
+  }
+  if (m.includes('only a subscription-deactivated post can be reactivated from here')) {
+    return { status: 409, error: 'This post is not in a subscription-deactivated state.' }
   }
   if (m.includes('only the responsible party may mark this milestone completed')) {
     return { status: 403, error: 'Only the responsible party can mark this milestone completed.' }

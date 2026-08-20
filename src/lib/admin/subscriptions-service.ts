@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getEffectiveMerchantPlan } from '@/lib/subscriptions/effective-plan'
-import { getListingEntitlementUsage } from '@/lib/subscriptions/entitlements'
+import { getPublicationUsage } from '@/lib/subscriptions/entitlements'
 
 const DEFAULT_LIMIT = 100
 
@@ -109,7 +109,7 @@ export async function getAdminSubscriptionDetail(admin: SupabaseClient, merchant
 
   const [{ planId, plan, subscription }, listingUsage, { data: historyRows }, { data: billingRows }] = await Promise.all([
     getEffectiveMerchantPlan(admin, merchantId),
-    getListingEntitlementUsage(admin, merchantId),
+    getPublicationUsage(admin, merchantId),
     admin
       .from('merchant_subscription_history')
       .select('id, previous_plan_id, new_plan_id, requested_at, effective_at, actor_type, actor_id, change_category, reason')

@@ -25,6 +25,10 @@ export function mapMarketplaceRpcError(message: string | undefined): { status: n
   if (m.includes('cannot be closed from here')) return { status: 409, error: 'This request cannot be closed from its current status.' }
   if (m.includes('cannot be archived from here')) return { status: 409, error: 'This request cannot be archived from its current status.' }
   if (m.includes('cannot be reposted from here')) return { status: 409, error: 'This request cannot be reposted from its current status.' }
+  if (m.includes('active_publication_limit_reached') || m.includes('active_listing_limit_reached')) return { status: 422, error: 'Your current plan has reached its active publication limit. Upgrade your plan to publish more.' }
+  if (m.includes('publication_frozen_pending_keep_set')) return { status: 409, error: 'Resolve your downgrade selection before publishing or reactivating anything.' }
+  if (m.includes('cannot be deactivated')) return { status: 409, error: 'This request cannot be deactivated from its current status.' }
+  if (m.includes('only a deactivated request can be reactivated from here')) return { status: 409, error: 'Only a deactivated request can be reactivated.' }
   if (m.includes('invalid actor role')) return { status: 500, error: 'Could not process your request — please try again' }
   if (m.includes('invalid offer type')) return { status: 422, error: 'Invalid offer type.' }
   if (m.includes('is not accepting offers')) return { status: 409, error: 'This request is no longer accepting offers.' }

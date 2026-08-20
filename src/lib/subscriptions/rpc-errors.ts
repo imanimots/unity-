@@ -34,8 +34,26 @@ export function mapSubscriptionRpcError(message: string | undefined): { status: 
   if (m.includes('a reason is required for an administrative correction')) {
     return { status: 400, error: 'A reason is required for this action.' }
   }
-  if (m.includes('active_listing_limit_reached')) {
-    return { status: 422, error: 'Your current plan has reached its active listing limit. Upgrade your plan to activate more listings.' }
+  if (m.includes('active_publication_limit_reached') || m.includes('active_listing_limit_reached')) {
+    return { status: 422, error: 'Your current plan has reached its active publication limit. Upgrade your plan to publish more.' }
+  }
+  if (m.includes('a reason is required to downgrade or cancel your plan')) {
+    return { status: 400, error: 'A reason is required to downgrade or cancel your plan.' }
+  }
+  if (m.includes('keep_set_exceeds_target_cap')) {
+    return { status: 422, error: 'You selected more items than your target plan allows. Please choose fewer.' }
+  }
+  if (m.includes('keep_set_entity_invalid')) {
+    return { status: 422, error: 'One of the selected items is no longer eligible. Please refresh and try again.' }
+  }
+  if (m.includes('no pending downgrade to select a keep-set for')) {
+    return { status: 409, error: 'There is no pending downgrade to configure.' }
+  }
+  if (m.includes('no frozen downgrade to resolve')) {
+    return { status: 409, error: 'There is nothing to resolve — your account is not currently frozen.' }
+  }
+  if (m.includes('publication_frozen_pending_keep_set')) {
+    return { status: 409, error: 'Resolve your downgrade selection before publishing or reactivating anything.' }
   }
   if (m.includes('merchant id is required') || m.includes('admin id is required') || m.includes('not authorized')) {
     return { status: 500, error: 'Could not process your request — please try again' }

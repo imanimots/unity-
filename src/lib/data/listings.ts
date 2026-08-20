@@ -82,7 +82,16 @@ function normalizedPrice(l: Listing): number {
 async function fetchPublicProfilesById(supabase: SupabaseClient, ids: string[]): Promise<Map<string, Record<string, unknown>>> {
   const uniqueIds = [...new Set(ids)].filter(Boolean)
   if (uniqueIds.length === 0) return new Map()
-  const { data } = await supabase.from('public_profiles').select('id, display_name, full_name, avatar_url, role, is_verified, unity_score, created_at').in('id', uniqueIds)
+  const initial = await supabase.from('public_profiles').select('id, display_name, full_name, avatar_url, role, is_verified, unity_score, created_at, is_elite, public_business_name').in('id', uniqueIds)
+  // Subscription V2's is_elite/public_business_name columns may not
+  // exist yet in an environment where that migration hasn't been
+  // applied -- fall back to the pre-V2 column set rather than losing
+  // merchant/reviewer identity on every listing.
+  let data = initial.data
+  if (initial.error && /is_elite|public_business_name/.test(initial.error.message)) {
+    const fallback = await supabase.from('public_profiles').select('id, display_name, full_name, avatar_url, role, is_verified, unity_score, created_at').in('id', uniqueIds)
+    data = (fallback.data ?? []).map((p) => ({ ...p, is_elite: false, public_business_name: null }))
+  }
   return new Map(((data ?? []) as { id: string }[]).map((p) => [p.id, p as Record<string, unknown>]))
 }
 

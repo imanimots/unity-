@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { MOCK_PROFILES, MOCK_CURRENT_PROFILE, IS_MOCK_MODE } from '@/lib/mock/data'
+import { getMerchantEntitlements } from '@/lib/subscriptions/entitlements'
 
 export async function getServerUser() {
   if (IS_MOCK_MODE) {
@@ -43,6 +44,8 @@ export interface PublicProfileCore {
   isMerchant: boolean
   /** true only when the CURRENT, live kyc_status is 'approved' -- never the raw enum value. */
   isVerified: boolean
+  /** true only for an ACTIVE Elite subscription entitlement, resolved live -- a distinct concept from isVerified (Section 68: Elite badge is never KYC verification). */
+  isElite: boolean
   memberSince: string
   reviewCount: number
   /** null when reviewCount is 0 -- never substituted with a default/fabricated value. */
@@ -88,6 +91,7 @@ export async function getPublicProfile(id: string): Promise<PublicProfileResult>
         avatarUrl: p.avatar_url,
         isMerchant: p.role === 'merchant' || p.role === 'both',
         isVerified: p.kyc_status === 'approved',
+        isElite: false,
         memberSince: p.created_at,
         reviewCount: 0,
         publicRating: null,
@@ -102,28 +106,44 @@ export async function getPublicProfile(id: string): Promise<PublicProfileResult>
   const { createClient: createServiceClient } = await import('@supabase/supabase-js')
   const supabase = createServiceClient(url, serviceKey)
 
-  const { data: row } = await supabase
+  const initial = await supabase
     .from('profiles')
-    .select('id, display_name, full_name, avatar_url, role, kyc_status, unity_score, account_status, created_at')
+    .select('id, display_name, full_name, business_name, avatar_url, role, kyc_status, unity_score, account_status, created_at')
     .eq('id', id)
     .maybeSingle()
+
+  // Subscription V2's `business_name` column may not exist yet in an
+  // environment where that migration hasn't been applied -- fall back
+  // to the pre-V2 allowlist rather than 404ing every public profile.
+  // Still an explicit allowlist either way, never `select('*')`.
+  let row = initial.data
+  if (initial.error && /business_name/.test(initial.error.message)) {
+    const fallback = await supabase
+      .from('profiles')
+      .select('id, display_name, full_name, avatar_url, role, kyc_status, unity_score, account_status, created_at')
+      .eq('id', id)
+      .maybeSingle()
+    row = fallback.data ? { ...fallback.data, business_name: null } : null
+  }
 
   if (!row) return { status: 'not_found' }
   if (row.account_status === 'suspended') return { status: 'unavailable' }
 
-  const [{ count: reviewCount }, completedTransactionCount] = await Promise.all([
+  const [{ count: reviewCount }, completedTransactionCount, entitlements] = await Promise.all([
     supabase.from('reviews').select('id', { count: 'exact', head: true }).eq('reviewee_id', id),
     getCompletedTransactionCount(supabase, id),
+    getMerchantEntitlements(supabase, id),
   ])
 
   return {
     status: 'ok',
     profile: {
       id: row.id,
-      displayName: displayNameOf(row),
+      displayName: entitlements.businessNameEnabled && row.business_name?.trim() ? row.business_name.trim() : displayNameOf(row),
       avatarUrl: row.avatar_url,
       isMerchant: row.role === 'merchant' || row.role === 'both',
       isVerified: row.kyc_status === 'approved',
+      isElite: entitlements.eliteBadgeEnabled,
       memberSince: row.created_at,
       reviewCount: reviewCount ?? 0,
       publicRating: reviewCount && reviewCount > 0 ? row.unity_score : null,

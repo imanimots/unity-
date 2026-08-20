@@ -26,8 +26,19 @@ function planFeatures(plan: MerchantSubscriptionPlan, t: PricingT): string[] {
     t('salesCommission', { rate: bps(plan.sales_commission_bps) }),
     t('rentalCommission', { rate: bps(plan.rental_commission_bps) }),
     t('noBarterCommission'),
-    plan.active_listing_limit ? t('upToListings', { count: plan.active_listing_limit }) : t('unlimitedListings'),
+    plan.active_publication_limit ? t('upToPublished', { count: plan.active_publication_limit }) : t('unlimitedPublished'),
   ]
+  if (plan.advertising_discount_bps > 0) features.push(t('adDiscount', { rate: bps(plan.advertising_discount_bps) }))
+  if (plan.affiliate_enabled) features.push(t('affiliateAccess'))
+  features.push(plan.analytics_level === 'full' ? t('analyticsFull') : t('analyticsBasic'))
+  if (plan.demand_insights_enabled) features.push(t('demandInsights'))
+  if (plan.listing_assistant_enabled) features.push(t('listingAssistant'))
+  if (plan.analytics_assistant_enabled) features.push(t('analyticsAssistant'))
+  if (plan.advanced_tools_enabled) features.push(t('advancedTools'))
+  if (plan.support_level === 'priority') features.push(t('supportPriority'))
+  if (plan.support_level === 'highest') features.push(t('supportHighest'))
+  if (plan.business_name_enabled) features.push(t('businessName'))
+  if (plan.elite_badge_enabled) features.push(t('eliteBadge'))
   return features
 }
 
