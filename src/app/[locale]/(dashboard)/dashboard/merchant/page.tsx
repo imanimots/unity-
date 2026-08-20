@@ -1,7 +1,7 @@
 import Image from 'next/image'
 import { getTranslations, getLocale } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
-import { Plus, Package, DollarSign, Star, ShieldCheck, ArrowRight, Clock, CheckCircle, Users, Percent } from 'lucide-react'
+import { Plus, Package, DollarSign, Star, ShieldCheck, ArrowRight, Clock, CheckCircle, Users, Percent, Sparkles } from 'lucide-react'
 import { getServerUser, MOCK_CURRENT_PROFILE } from '@/lib/data/profiles'
 import { getListingsByMerchant } from '@/lib/data/listings'
 import { IS_MOCK_MODE, MOCK_MY_LISTINGS, MOCK_MERCHANT_BOOKINGS } from '@/lib/mock/data'
@@ -53,7 +53,7 @@ export default async function MerchantDashboard() {
     if (admin) {
       try {
         const { plan } = await getEffectiveMerchantPlan(admin, profile.id)
-        planLabel = plan.active_listing_limit ? t('planLimited', { plan: plan.display_name, count: plan.active_listing_limit }) : t('planUnlimited', { plan: plan.display_name })
+        planLabel = plan.active_publication_limit ? t('planLimited', { plan: plan.display_name, count: plan.active_publication_limit }) : t('planUnlimited', { plan: plan.display_name })
       } catch {
         // Falls back to the Starter default label
       }
@@ -282,6 +282,15 @@ export default async function MerchantDashboard() {
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-white">{t('quickLinks.subscription')}</p>
               <p className="text-xs text-white/60 mt-0.5">{planLabel}</p>
+            </div>
+          </Link>
+          <Link href="/dashboard/merchant/tools" className="flex items-center gap-3 p-4 bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl hover:border-[#8B1A1A] transition-colors">
+            <div className="w-9 h-9 rounded-xl bg-[#F2EDE8] dark:bg-[#2A1A1A] flex items-center justify-center shrink-0">
+              <Sparkles size={16} className="text-[#8B1A1A]" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">{t('quickLinks.tools')}</p>
+              <p className="text-xs text-[#9B8B85] mt-0.5">{t('quickLinks.toolsDesc')}</p>
             </div>
           </Link>
         </div>
