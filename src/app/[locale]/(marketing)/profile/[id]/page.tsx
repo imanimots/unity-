@@ -12,6 +12,7 @@ import { getMostRecentSharedTransaction } from '@/lib/profiles/messaging'
 import type { Locale } from '@/i18n/locales'
 import { ProfileActions } from '@/components/profile/profile-actions'
 import { ProfileTabs } from '@/components/profile/profile-tabs'
+import { EliteBadge } from '@/components/subscriptions/elite-badge'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -129,6 +130,7 @@ export default async function PublicProfilePage({ params }: Props) {
                 <h1 className="text-2xl sm:text-3xl font-extrabold tracking-[-0.02em] text-[#1A0A0A] dark:text-[#F5F0ED]">
                   {profile.displayName}
                 </h1>
+                {profile.isElite && <EliteBadge label={tProfile('eliteBadgeLabel')} size={18} />}
                 {profile.isVerified && (
                   <span className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.08em] text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2.5 py-1 rounded-full">
                     <ShieldCheck size={12} aria-hidden="true" /> {t('verified')}

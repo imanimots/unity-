@@ -15,6 +15,7 @@ import { KindToggleContainer } from '@/components/listings/kind-toggle-container
 import type { ListingFilters } from '@/lib/data/listings'
 import { Search } from 'lucide-react'
 import { absoluteUrl, isMarketplaceIndexingEnabled, getMarketplaceRobotsMeta } from '@/lib/seo/config'
+import { recordSearchDemandEvent } from '@/lib/subscriptions/demand-telemetry'
 
 const TITLE = 'Browse Listings — Unity'
 const DESCRIPTION = 'Find items to rent near you across South Africa.'
@@ -100,6 +101,16 @@ export default async function ListingsPage({ searchParams }: PageProps) {
   const requests = requestsPage.items
   const skillTaskPosts = skillTaskPage.items
   const nextCursor = isSkillTask ? skillTaskPage.nextCursor : isLookingFor ? requestsPage.nextCursor : listingsPage.nextCursor
+
+  // Aggregate demand telemetry (Section 24-27) -- fire-and-forget,
+  // never awaited by the response, never touches Search Ranking's own
+  // result computation above (this reads its already-final output).
+  void recordSearchDemandEvent({
+    mode: isBarter ? 'barter' : mode === 'rent_to_buy' ? 'rent' : mode,
+    category: params.category ?? null,
+    province: null,
+    zeroResult: listings.length === 0 && requests.length === 0 && skillTaskPosts.length === 0,
+  })
 
   const nextPageUrl = (() => {
     if (!nextCursor) return null

@@ -7,6 +7,7 @@ import { ShieldCheck, Star, ArrowRight, Info } from 'lucide-react'
 import { formatMoneyFromRands } from '@/lib/i18n/format'
 import type { Locale } from '@/i18n/locales'
 import type { Listing } from '@/types'
+import { EliteBadge } from '@/components/subscriptions/elite-badge'
 
 /** Only ever rendered for a listing that has a daily rate (rental or both) — see the caller's guard on the listing detail page. */
 export function BookingCard({ listing }: { listing: Listing & { daily_rate: number } }) {
@@ -46,7 +47,10 @@ export function BookingCard({ listing }: { listing: Listing & { daily_rate: numb
           <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">
             {listing.merchant?.unity_score?.toFixed(1) ?? '5.0'}
           </span>
-          <span>· {listing.merchant?.display_name}</span>
+          <span className="flex items-center gap-1">
+            · {listing.merchant?.display_name}
+            {listing.merchant?.is_elite && <EliteBadge size={11} />}
+          </span>
         </div>
       </div>
 

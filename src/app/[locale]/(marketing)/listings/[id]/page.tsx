@@ -23,6 +23,8 @@ import type { Locale } from '@/i18n/locales'
 import { isPersonalizationEnabled } from '@/lib/personalization/config'
 import { RecordListingView } from '@/components/personalization/record-listing-view'
 import type { PersonalizationMode } from '@/lib/personalization/types'
+import { resolveMerchantPublicIdentity } from '@/lib/subscriptions/public-identity'
+import { EliteBadge } from '@/components/subscriptions/elite-badge'
 
 const CITY_BY_MERCHANT: Record<string, string> = {
   'user-1': 'Johannesburg', 'user-2': 'Sandton',
@@ -287,10 +289,11 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                     <div className="flex items-center gap-2 flex-wrap">
                       <ProfileLink
                         userId={listing.merchant.id}
-                        displayName={listing.merchant.display_name ?? listing.merchant.full_name ?? 'Unity Member'}
+                        displayName={resolveMerchantPublicIdentity(listing.merchant).publicName}
                         currentUserId={viewer?.userId ?? null}
                         className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]"
                       />
+                      {resolveMerchantPublicIdentity(listing.merchant).isElite && <EliteBadge label={t('eliteBadgeLabel')} />}
                       {listing.merchant.is_verified && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded-full">
                           <ShieldCheck size={9} /> {t('kycVerified')}

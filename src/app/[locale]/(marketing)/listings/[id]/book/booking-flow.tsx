@@ -11,6 +11,7 @@ import { calculateBookingPrice } from '@/lib/bookings/price'
 import { formatDate as formatLocaleDate } from '@/lib/i18n/format'
 import type { Locale } from '@/i18n/locales'
 import Image from 'next/image'
+import { EliteBadge } from '@/components/subscriptions/elite-badge'
 
 type Step = 'dates' | 'review' | 'confirmed'
 
@@ -27,7 +28,10 @@ function ListingSummaryCard({ listing, coverImage, t }: { listing: Listing & { d
         <div className="flex items-center gap-1 mt-1 text-xs text-[#9B8B85]">
           <Star size={10} className="text-amber-400 fill-amber-400" />
           <span>{listing.merchant?.unity_score?.toFixed(1)}</span>
-          <span>· {listing.merchant?.display_name}</span>
+          <span className="flex items-center gap-1">
+            · {listing.merchant?.display_name}
+            {listing.merchant?.is_elite && <EliteBadge size={11} />}
+          </span>
         </div>
       </div>
       <div className="text-right shrink-0">
@@ -258,6 +262,7 @@ export function BookingFlow({ listing }: { listing: Listing & { daily_rate: numb
               <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('merchant')}</span>
               <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED] flex items-center gap-1">
                 {listing.merchant?.display_name}
+                {listing.merchant?.is_elite && <EliteBadge size={13} />}
                 {listing.merchant?.is_verified && <ShieldCheck size={13} className="text-green-500" />}
               </span>
             </div>
