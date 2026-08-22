@@ -19,7 +19,7 @@
 
 export type EscrowMockScenario = 'success' | 'declined' | 'timeout' | 'retryable_failure' | 'terminal_failure' | 'duplicate'
 
-export type EscrowTransactionType = 'sale' | 'rental' | 'barter'
+export type EscrowTransactionType = 'sale' | 'rental' | 'barter' | 'rent_to_buy'
 
 export interface EscrowCreateInput {
   transactionType: EscrowTransactionType

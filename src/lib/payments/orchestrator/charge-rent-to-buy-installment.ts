@@ -2,6 +2,7 @@ import type { OrchestratorContext } from './types'
 import { OrchestrationError, type OrchestrationErrorCode } from './errors'
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../provider-errors'
 import { getPaymentProvider } from '../registry'
+import { createEscrowForPayment, fundEscrowForPayment } from '@/lib/escrow/orchestrator'
 
 export interface ChargeRentToBuyInstallmentResult {
   paymentId: string
@@ -15,13 +16,15 @@ export interface ChargeRentToBuyInstallmentResult {
  * financial_workflows row, idempotent via payments_rtb_deposit_unique/
  * the installment's own (agreement_id, sequence) uniqueness).
  *
- * Deliberately does NOT call createEscrowForPayment/fundEscrowForPayment
- * (Rule 19 -- RTB escrow release timing is unresolved and must fail
- * closed) and does NOT call qualifySaleAffiliateCommission or
- * qualifySale/RentalUnityCommission (Rules 16/17 -- no RTB commission
- * rate or affiliate rate exists). The only qualification call is
- * qualify_rent_to_buy_commission_event(), which records the event with
- * a policy-pending rate and never a computed amount.
+ * V2: each captured instalment is escrow-governed like every other
+ * held-funds domain (createEscrowForPayment/fundEscrowForPayment,
+ * both no-ops when ESCROW_ENABLED is off -- fail-closed, never claims
+ * real escrow protection when the capability is unavailable). RTB
+ * commission is no longer qualified per-installment -- it is computed
+ * once, at settlement (finalize_rent_to_buy_ownership /
+ * the default/termination settlement helpers), using the RENTAL
+ * commission rate snapshotted at acceptance, based on the actual
+ * possession period -- never a per-payment sale/rental-style event.
  */
 export async function chargeRentToBuyInstallment(
   ctx: OrchestratorContext,
@@ -112,13 +115,20 @@ export async function chargeRentToBuyInstallment(
     }
 
     try {
-      await admin.rpc('qualify_rent_to_buy_commission_event', {
-        p_agreement_id: agreementId,
-        p_installment_id: installment.id,
-        p_payment_id: paymentId,
+      await createEscrowForPayment(admin, {
+        transactionType: 'rent_to_buy',
+        rentToBuyAgreementId: agreementId,
+        paymentId,
+        principalAmount: Number(installment.principal_amount),
+        currency: agreement.currency,
       })
-    } catch (qualifyErr) {
-      console.error('[rent-to-buy.charge-installment] commission-event qualification failed', { agreementId, installmentId: installment.id, qualifyErr })
+      await fundEscrowForPayment(admin, paymentId)
+    } catch (escrowErr) {
+      // Best-effort, matches every other domain's own escrow wiring --
+      // never blocks an already-captured payment. Escrow accounting
+      // integrity is verified separately by the settlement helpers,
+      // which only ever act on rows that reached 'funded'.
+      console.error('[rent-to-buy.charge-installment] escrow create/fund failed', { agreementId, installmentId: installment.id, escrowErr })
     }
 
     return { paymentId, status: 'captured', installmentId: installment.id }

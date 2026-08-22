@@ -49,6 +49,27 @@ export function mapRentToBuyRpcError(message: string | undefined): { status: num
   if (m.includes('cannot be marked recovered from here')) return { status: 409, error: 'This case cannot be marked recovered from its current status.' }
   if (m.includes('a reason is required')) return { status: 422, error: 'A reason is required.' }
   if (m.includes('this agreement has no security deposit configured')) return { status: 422, error: 'This agreement has no security deposit configured.' }
+
+  // V2 additions -- possession/handover/ownership/default/amendment/termination.
+  if (m.includes('is not eligible for handover')) return { status: 409, error: 'This agreement is not yet eligible for handover.' }
+  if (m.includes('at least one pre-handover condition evidence upload is required')) return { status: 422, error: 'Please upload pre-handover condition evidence before marking this agreement handed over.' }
+  if (m.includes('the merchant has not yet marked this agreement as handed over')) return { status: 409, error: 'The merchant has not yet marked this agreement as handed over.' }
+  if (m.includes('at least one receipt/condition evidence upload is required')) return { status: 422, error: 'Please upload receipt/condition evidence before confirming possession.' }
+  if (m.includes('only the customer can confirm receipt of possession')) return { status: 403, error: 'Only the customer can confirm receipt of possession.' }
+  if (m.includes('default_not_eligible')) return { status: 409, error: 'No installment is currently past its grace period — this agreement is not yet eligible for default.' }
+  if (m.includes('formal_default_irreversible')) return { status: 409, error: 'A formally defaulted rent-to-buy agreement cannot be cured or reactivated.' }
+  if (m.includes('cannot be defaulted from here')) return { status: 409, error: 'This agreement cannot be defaulted from its current status.' }
+  if (m.includes('field') && m.includes('is not amendable')) return { status: 422, error: 'That field cannot be changed via amendment.' }
+  if (m.includes('amended schedule must reconcile exactly')) return { status: 422, error: 'The amended schedule must reconcile exactly to the agreement\'s unchanged total purchase price.' }
+  if (m.includes('amendment not found')) return { status: 404, error: 'Amendment not found.' }
+  if (m.includes('the proposing party cannot also respond to their own amendment')) return { status: 403, error: 'You cannot respond to your own amendment proposal.' }
+  if (m.includes('cannot be responded to from here')) return { status: 409, error: 'This amendment cannot be responded to from its current status.' }
+  if (m.includes('cannot be amended from here')) return { status: 409, error: 'This agreement cannot be amended from its current status.' }
+  if (m.includes('there is no pending mutual termination proposal')) return { status: 409, error: 'There is no pending mutual termination proposal to accept.' }
+  if (m.includes('the proposing party cannot also accept their own termination proposal')) return { status: 403, error: 'You cannot accept your own termination proposal.' }
+  if (m.includes('cannot propose termination from here')) return { status: 409, error: 'Mutual termination cannot be proposed from this agreement\'s current status.' }
+  if (m.includes('cannot terminate from here')) return { status: 409, error: 'This agreement cannot be terminated from its current status.' }
+  if (m.includes('exactly one of booking_id or rent_to_buy_agreement_id')) return { status: 500, error: 'Could not process your request — please try again' }
   if (m.includes('not authorized')) return { status: 500, error: 'Could not process your request — please try again' }
 
   return { status: 500, error: 'Could not process your request — please try again' }

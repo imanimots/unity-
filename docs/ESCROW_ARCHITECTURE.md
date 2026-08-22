@@ -17,7 +17,7 @@ Escrow never recalculates or duplicates:
 
 ## Schema (additive only)
 
-- **`escrow_transactions`** — `transaction_type` (`sale`/`rental`/`barter`), a 3-way exactly-one-of `order_id`/`booking_id`/`barter_agreement_id` (mirrors `payments`/`messages`/`disputes`), `payment_id` (unique FK), `status` (`escrow_status` enum: `pending → funded → released` or `refunded`/`partially_refunded` or `cancelled`/`failed`), `principal_amount`, `secure_transaction_fee_amount`, `currency`, `released_to`, `refunded_amount`, timestamps, `version`, `metadata`. Zero client write policies — every mutation goes through a `SECURITY DEFINER`, service-role-only RPC.
+- **`escrow_transactions`** — `transaction_type` (`sale`/`rental`/`barter`/`rent_to_buy`), a 4-way exactly-one-of `order_id`/`booking_id`/`barter_agreement_id`/`rent_to_buy_agreement_id` (mirrors `payments`/`messages`/`disputes`), `payment_id` (unique FK), `status` (`escrow_status` enum: `pending → funded → released` or `refunded`/`partially_refunded` or `cancelled`/`failed`), `principal_amount`, `secure_transaction_fee_amount`, `currency`, `released_to`, `refunded_amount`, timestamps, `version`, `metadata`. Zero client write policies — every mutation goes through a `SECURITY DEFINER`, service-role-only RPC.
 - **`escrow_transaction_history`** — append-only (`prevent_row_mutation()`), one row per transition, mirrors `merchant_payout_history`/`dispute_history`.
 - **`escrow_provider_events`** — webhook audit/dedup, `unique(provider, provider_event_id)`, mirrors `payment_webhook_events` exactly. A **separate** table from the payments one — escrow is a genuinely distinct concern.
 
@@ -40,6 +40,7 @@ No new status is invented for "disputed" or "held" — release checks the **same
 - **Sale**: `charge-order-payment.ts` creates + funds escrow right after the order payment captures. `confirm-delivery/route.ts` releases to the seller.
 - **Rental**: `authorize-booking-financials.ts` creates + funds escrow right after the `rental_charge` payment captures (deposits are excluded — a different, non-custodial payment type). `confirm-return/route.ts` releases to the merchant.
 - **Barter**: `charge-barter-cash-adjustment.ts` creates + funds escrow for the cash-adjustment payment (barter's only cash leg — a pure item-for-item trade has no payment to escrow, by design, not a gap). `confirm-completion/route.ts` releases to the counterparty.
+- **Rent-to-Buy** (V2): `charge-rent-to-buy-installment.ts` creates + funds escrow for every captured instalment. Release is never a single full-row release like the others — `_rent_to_buy_settle_escrow()` (see `docs/RENT_TO_BUY.md`) releases/refunds a computed split across an agreement's held rows directly via `_escrow_transaction_transition()`, bypassing `release_escrow_transaction`/`refund_escrow_transaction` by design (the settlement flow performs its own authoritative validation once, up front). The security deposit is deliberately **not** escrow-tracked — see `docs/RENT_TO_BUY.md`'s "Escrow" section for why.
 
 Every hook is best-effort (wrapped in try/catch, logged, never re-thrown) — an escrow failure never blocks or fails the underlying payment/booking/order/barter flow it's attached to.
 

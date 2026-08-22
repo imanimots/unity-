@@ -10,11 +10,18 @@ export interface ChargeRentToBuyDepositResult {
 
 /**
  * The security deposit is charged as its own, independent, single-shot
- * payment -- never counted toward purchase progress (Rule 14/H).
- * record_rent_to_buy_deposit_payment() only ever writes a history row;
- * it never touches rent_to_buy_installments or ownership_status. No
- * release/refund/retention logic exists here or anywhere in this phase
- * (Rule 14/18 -- REQUIRES BUSINESS APPROVAL).
+ * payment -- never counted toward purchase progress, never commissioned
+ * (Rule 10-12). record_rent_to_buy_deposit_payment() sets
+ * deposit_funded_at (the Rule 12 handover gate) and re-checks possession
+ * eligibility; it never touches rent_to_buy_installments or
+ * ownership_status. Deliberately NOT wired through escrow_transactions --
+ * the deposit is a genuinely separate pool from purchase escrow (Rule
+ * 28), tracked instead via the agreement's own deposit_funded_at/
+ * deposit_forfeited_at/deposit_refunded_at columns and settled by the
+ * V2 settlement helpers directly; giving it its own escrow row would
+ * make it indistinguishable from purchase-proceeds rows to the generic
+ * settlement sweep, risking exactly the "auto-convert deposit into
+ * purchase payment" outcome Rule 12 prohibits.
  */
 export async function chargeRentToBuyDeposit(
   ctx: OrchestratorContext,

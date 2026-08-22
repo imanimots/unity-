@@ -19,11 +19,17 @@ export async function notifyDisputeParties(
   const ctx = await loadDisputeEmailContext(admin, disputeId)
   if (!ctx) return
 
-  const { data: dispute } = await admin.from('disputes').select('booking_id, order_id, barter_agreement_id').eq('id', disputeId).maybeSingle()
+  const { data: dispute } = await admin.from('disputes').select('booking_id, order_id, barter_agreement_id, rent_to_buy_agreement_id').eq('id', disputeId).maybeSingle()
   if (!dispute) return
 
-  const relatedEntityType = dispute.booking_id ? 'booking' : dispute.order_id ? 'order' : 'barter_agreement'
-  const relatedEntityId = dispute.booking_id ?? dispute.order_id ?? dispute.barter_agreement_id
+  const relatedEntityType = dispute.booking_id
+    ? 'booking'
+    : dispute.order_id
+      ? 'order'
+      : dispute.barter_agreement_id
+        ? 'barter_agreement'
+        : 'rent_to_buy_agreement'
+  const relatedEntityId = dispute.booking_id ?? dispute.order_id ?? dispute.barter_agreement_id ?? dispute.rent_to_buy_agreement_id
 
   for (const recipient of [
     { userId: ctx.raiserId, name: ctx.raiserName, occurrenceSuffix: 'raiser' },

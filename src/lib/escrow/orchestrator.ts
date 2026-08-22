@@ -36,6 +36,7 @@ export interface CreateEscrowForPaymentInput {
   orderId?: string
   bookingId?: string
   barterAgreementId?: string
+  rentToBuyAgreementId?: string
   paymentId: string
   principalAmount: number
   secureTransactionFeeAmount?: number
@@ -84,6 +85,7 @@ export async function createEscrowForPayment(admin: SupabaseClient, input: Creat
     p_currency: input.currency ?? 'ZAR',
     p_provider: provider.name,
     p_provider_reference: providerResult.providerReference,
+    p_rent_to_buy_agreement_id: input.rentToBuyAgreementId ?? null,
   })
 
   if (error) throw new EscrowOrchestrationError('internal_consistency_error', error.message)
@@ -204,7 +206,7 @@ export async function releaseEscrowForPayment(
 }
 
 async function notifyEscrowReleased(admin: SupabaseClient, escrowTransactionId: string, recipientUserId: string): Promise<void> {
-  const { data: escrow } = await admin.from('escrow_transactions').select('order_id, booking_id, barter_agreement_id').eq('id', escrowTransactionId).maybeSingle()
+  const { data: escrow } = await admin.from('escrow_transactions').select('order_id, booking_id, barter_agreement_id, rent_to_buy_agreement_id').eq('id', escrowTransactionId).maybeSingle()
   if (!escrow) return
 
   let transactionReference: string | null = null
@@ -217,6 +219,10 @@ async function notifyEscrowReleased(admin: SupabaseClient, escrowTransactionId: 
   } else if (escrow.barter_agreement_id) {
     const { data } = await admin.from('barter_agreements').select('agreement_reference').eq('id', escrow.barter_agreement_id).maybeSingle()
     transactionReference = data?.agreement_reference ?? null
+  } else if (escrow.rent_to_buy_agreement_id) {
+    // rent_to_buy_agreements has no dedicated reference column -- use a
+    // short id-derived label, consistent in shape with the others.
+    transactionReference = `RTB-${escrow.rent_to_buy_agreement_id.slice(0, 8).toUpperCase()}`
   }
   if (!transactionReference) return
 
