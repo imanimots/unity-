@@ -70,6 +70,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     p_early_payoff_policy: parsed.data.early_payoff_policy ?? null,
     p_default_cure_allowed: parsed.data.default_cure_allowed ?? false,
     p_cure_policy: parsed.data.cure_policy ?? null,
+    p_possession_trigger_type: parsed.data.possession_trigger_type,
+    p_possession_trigger_value: parsed.data.possession_trigger_value ?? null,
+    p_rental_use_rate_amount: parsed.data.rental_use_rate_amount,
+    p_rental_use_rate_unit: parsed.data.rental_use_rate_unit,
+    p_wear_damage_standard: parsed.data.wear_damage_standard ?? null,
+    p_grace_period_days: parsed.data.grace_period_days,
+    p_return_window_days: parsed.data.return_window_days,
   })
 
   if (error) {

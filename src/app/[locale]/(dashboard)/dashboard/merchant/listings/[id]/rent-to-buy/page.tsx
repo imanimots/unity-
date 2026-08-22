@@ -34,7 +34,13 @@ export default function MerchantRentToBuyTermsPage({ params }: PageProps) {
   const [frequency, setFrequency] = useState<'weekly' | 'biweekly' | 'monthly'>('monthly')
   const [depositAmount, setDepositAmount] = useState('')
   const [earlyPayoffAllowed, setEarlyPayoffAllowed] = useState(false)
-  const [cureAllowed, setCureAllowed] = useState(false)
+  const [possessionTriggerType, setPossessionTriggerType] = useState<'first_payment' | 'installment_count' | 'percentage' | 'full_payment'>('first_payment')
+  const [possessionTriggerValue, setPossessionTriggerValue] = useState('')
+  const [rentalUseRateAmount, setRentalUseRateAmount] = useState('')
+  const [rentalUseRateUnit, setRentalUseRateUnit] = useState<'daily' | 'weekly' | 'monthly'>('monthly')
+  const [wearDamageStandard, setWearDamageStandard] = useState('')
+  const [gracePeriodDays, setGracePeriodDays] = useState('7')
+  const [returnWindowDays, setReturnWindowDays] = useState('14')
 
   useEffect(() => {
     fetch(`/api/listings/${id}/rent-to-buy-terms`)
@@ -48,7 +54,13 @@ export default function MerchantRentToBuyTermsPage({ params }: PageProps) {
           setFrequency(body.terms.payment_frequency)
           setDepositAmount(body.terms.security_deposit_amount ? String(body.terms.security_deposit_amount) : '')
           setEarlyPayoffAllowed(body.terms.early_payoff_allowed)
-          setCureAllowed(body.terms.default_cure_allowed)
+          if (body.terms.possession_trigger_type) setPossessionTriggerType(body.terms.possession_trigger_type)
+          if (body.terms.possession_trigger_value !== null && body.terms.possession_trigger_value !== undefined) setPossessionTriggerValue(String(body.terms.possession_trigger_value))
+          if (body.terms.rental_use_rate_amount !== null && body.terms.rental_use_rate_amount !== undefined) setRentalUseRateAmount(String(body.terms.rental_use_rate_amount))
+          if (body.terms.rental_use_rate_unit) setRentalUseRateUnit(body.terms.rental_use_rate_unit)
+          if (body.terms.wear_damage_standard) setWearDamageStandard(body.terms.wear_damage_standard)
+          if (body.terms.grace_period_days !== null && body.terms.grace_period_days !== undefined) setGracePeriodDays(String(body.terms.grace_period_days))
+          if (body.terms.return_window_days !== null && body.terms.return_window_days !== undefined) setReturnWindowDays(String(body.terms.return_window_days))
         }
       })
       .finally(() => setLoading(false))
@@ -59,6 +71,7 @@ export default function MerchantRentToBuyTermsPage({ params }: PageProps) {
     setError(null)
     setSaved(false)
     try {
+      const usesValue = possessionTriggerType === 'installment_count' || possessionTriggerType === 'percentage'
       const res = await fetch(`/api/listings/${id}/rent-to-buy-terms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,7 +83,13 @@ export default function MerchantRentToBuyTermsPage({ params }: PageProps) {
           payment_frequency: frequency,
           security_deposit_amount: depositAmount ? Number(depositAmount) : undefined,
           early_payoff_allowed: earlyPayoffAllowed,
-          default_cure_allowed: cureAllowed,
+          possession_trigger_type: possessionTriggerType,
+          possession_trigger_value: usesValue && possessionTriggerValue ? Number(possessionTriggerValue) : undefined,
+          rental_use_rate_amount: Number(rentalUseRateAmount || 0),
+          rental_use_rate_unit: rentalUseRateUnit,
+          wear_damage_standard: wearDamageStandard || undefined,
+          grace_period_days: Number(gracePeriodDays || 0),
+          return_window_days: Number(returnWindowDays || 0),
         }),
       })
       const body = await res.json().catch(() => ({}))
@@ -127,15 +146,68 @@ export default function MerchantRentToBuyTermsPage({ params }: PageProps) {
         <div>
           <label className={labelClass}>{t('securityDeposit')}</label>
           <input className={inputClass} type="number" min="0" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
+          <p className="text-xs text-[#9B8B85] mt-1">{t('securityDepositNotice')}</p>
         </div>
+
+        <div className="pt-2 border-t border-[#E8E0D8] dark:border-[#2A1A1A]">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1A0A0A] dark:text-[#F5F0ED] mt-4 mb-3">{t('possessionSection')}</h2>
+          <div>
+            <label className={labelClass}>{t('possessionTrigger')}</label>
+            <select className={inputClass} value={possessionTriggerType} onChange={(e) => setPossessionTriggerType(e.target.value as typeof possessionTriggerType)}>
+              <option value="first_payment">{t('trigger.firstPayment')}</option>
+              <option value="installment_count">{t('trigger.installmentCount')}</option>
+              <option value="percentage">{t('trigger.percentage')}</option>
+              <option value="full_payment">{t('trigger.fullPayment')}</option>
+            </select>
+          </div>
+          {(possessionTriggerType === 'installment_count' || possessionTriggerType === 'percentage') && (
+            <div className="mt-3">
+              <label className={labelClass}>{possessionTriggerType === 'installment_count' ? t('trigger.installmentCountValue') : t('trigger.percentageValue')}</label>
+              <input className={inputClass} type="number" min="1" value={possessionTriggerValue} onChange={(e) => setPossessionTriggerValue(e.target.value)} />
+            </div>
+          )}
+        </div>
+
+        <div className="pt-2 border-t border-[#E8E0D8] dark:border-[#2A1A1A]">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1A0A0A] dark:text-[#F5F0ED] mt-4 mb-3">{t('rentalUseSection')}</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>{t('rentalUseRateAmount')}</label>
+              <input className={inputClass} type="number" min="0" value={rentalUseRateAmount} onChange={(e) => setRentalUseRateAmount(e.target.value)} />
+            </div>
+            <div>
+              <label className={labelClass}>{t('rentalUseRateUnit')}</label>
+              <select className={inputClass} value={rentalUseRateUnit} onChange={(e) => setRentalUseRateUnit(e.target.value as typeof rentalUseRateUnit)}>
+                <option value="daily">{t('unit.daily')}</option>
+                <option value="weekly">{t('unit.weekly')}</option>
+                <option value="monthly">{t('unit.monthly')}</option>
+              </select>
+            </div>
+          </div>
+          <p className="text-xs text-[#9B8B85] mt-1.5">{t('rentalUseNotice')}</p>
+        </div>
+
+        <div>
+          <label className={labelClass}>{t('wearDamageStandard')}</label>
+          <textarea className={`${inputClass} min-h-[90px]`} value={wearDamageStandard} onChange={(e) => setWearDamageStandard(e.target.value)} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>{t('gracePeriodDays')}</label>
+            <input className={inputClass} type="number" min="0" value={gracePeriodDays} onChange={(e) => setGracePeriodDays(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelClass}>{t('returnWindowDays')}</label>
+            <input className={inputClass} type="number" min="0" value={returnWindowDays} onChange={(e) => setReturnWindowDays(e.target.value)} />
+          </div>
+        </div>
+
         <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
           <input type="checkbox" checked={earlyPayoffAllowed} onChange={(e) => setEarlyPayoffAllowed(e.target.checked)} />
           {t('allowEarlyPayoff')}
         </label>
-        <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
-          <input type="checkbox" checked={cureAllowed} onChange={(e) => setCureAllowed(e.target.checked)} />
-          {t('allowCure')}
-        </label>
+        <p className="text-xs text-[#9B8B85]">{t('escrowNotice')}</p>
 
         <div className="flex gap-3 pt-2">
           <button disabled={saving} onClick={() => submit(true)} className="px-5 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-[0.08em] bg-[#8B1A1A] text-white hover:bg-[#7A1616] disabled:opacity-50">

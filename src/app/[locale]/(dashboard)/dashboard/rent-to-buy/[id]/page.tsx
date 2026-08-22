@@ -5,6 +5,8 @@ import { ArrowLeft } from 'lucide-react'
 import { requireAuth } from '@/lib/supabase/require-admin'
 import { getRentToBuyAgreementDetail } from '@/lib/data/rent-to-buy'
 import { RentToBuyAgreementActions } from '@/components/rent-to-buy/agreement-detail-client'
+import { AmendmentRespondButtons } from '@/components/rent-to-buy/amendment-respond-buttons'
+import { RentToBuyEvidenceUpload } from '@/components/rent-to-buy/evidence-upload'
 import { formatDate } from '@/lib/i18n/format'
 import { withLocalePrefix, type Locale } from '@/i18n/locales'
 
@@ -60,8 +62,14 @@ export default async function RentToBuyAgreementPage({ params }: PageProps) {
   const detail = await getRentToBuyAgreementDetail(admin, id, requester.userId)
   if (!detail) notFound()
 
-  const { agreement, listing, installments, purchaseProgress, isMerchant, isCustomer } = detail
+  const { agreement, listing, installments, purchaseProgress, isMerchant, isCustomer, history, pendingAmendment } = detail
   const nextUnpaid = installments.find((i) => i.status === 'scheduled')
+
+  const lastTerminationEvent = [...history].reverse().find((h) => h.event_type === 'mutual_termination_proposed' || h.event_type === 'mutual_termination_accepted')
+  const pendingTermination: 'none' | 'proposed_by_me' | 'proposed_by_other' =
+    lastTerminationEvent?.event_type === 'mutual_termination_proposed'
+      ? (lastTerminationEvent.actor_id === requester.userId ? 'proposed_by_me' : 'proposed_by_other')
+      : 'none'
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -107,10 +115,25 @@ export default async function RentToBuyAgreementPage({ params }: PageProps) {
             <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{agreement.currency} {Number(agreement.security_deposit_amount).toLocaleString()}</span>
           </div>
         ) : null}
+        {agreement.status === 'active' && agreement.fully_paid_at && agreement.ownership_status === 'merchant_owned' && (
+          <div className="pt-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A] text-sm">
+            <p className="font-semibold uppercase text-xs tracking-wide text-[#1A0A0A] dark:text-[#F5F0ED]">{t('fullyPaidAwaitingHandover')}</p>
+            <p className="mt-1 text-[#6B5B55] dark:text-[#9B8B85]">{t('completionWindowNotice')}</p>
+          </div>
+        )}
         {agreement.status === 'defaulted' && (
           <div className="pt-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A] text-sm text-[#8B1A1A]">
             <p className="font-semibold uppercase text-xs tracking-wide">{t('terminated')}</p>
             <p className="mt-1">{t('returnRequiredNotice')}</p>
+          </div>
+        )}
+        {pendingAmendment && (
+          <div className="pt-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A] text-sm">
+            <p className="font-semibold uppercase text-xs tracking-wide text-[#1A0A0A] dark:text-[#F5F0ED]">{t('amendmentsTitle')}</p>
+            <p className="mt-1 text-[#6B5B55] dark:text-[#9B8B85]">{t('amendmentPending')}</p>
+            {pendingAmendment.proposed_by !== requester.userId && (
+              <AmendmentRespondButtons agreementId={agreement.id} amendmentId={pendingAmendment.id} />
+            )}
           </div>
         )}
       </div>
@@ -129,6 +152,21 @@ export default async function RentToBuyAgreementPage({ params }: PageProps) {
         </div>
       </div>
 
+      {isMerchant && agreement.possession_status === 'possession_eligible' && !agreement.handed_over_at && (
+        <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-6 mb-6">
+          <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-4">{t('preHandoverEvidence')}</p>
+          <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mb-3">{t('evidenceRequiredMerchant')}</p>
+          <RentToBuyEvidenceUpload agreementId={agreement.id} userId={requester.userId} evidenceType="pre_handover" label={t('uploadEvidence')} />
+        </div>
+      )}
+      {isCustomer && agreement.possession_status === 'possession_eligible' && agreement.handed_over_at && (
+        <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-6 mb-6">
+          <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-4">{t('receiptEvidence')}</p>
+          <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mb-3">{t('evidenceRequiredCustomer')}</p>
+          <RentToBuyEvidenceUpload agreementId={agreement.id} userId={requester.userId} evidenceType="post_handover_receipt" label={t('uploadEvidence')} />
+        </div>
+      )}
+
       <RentToBuyAgreementActions
         agreementId={agreement.id}
         isMerchant={isMerchant}
@@ -136,10 +174,12 @@ export default async function RentToBuyAgreementPage({ params }: PageProps) {
         status={agreement.status}
         possessionStatus={agreement.possession_status}
         ownershipStatus={agreement.ownership_status}
-        cureAllowed={agreement.cure_allowed}
         earlyPayoffAllowed={agreement.early_payoff_allowed}
         securityDepositAmount={agreement.security_deposit_amount}
         nextUnpaidSequence={nextUnpaid?.sequence ?? null}
+        handedOverAt={agreement.handed_over_at}
+        hasPendingAmendment={Boolean(pendingAmendment)}
+        pendingTermination={pendingTermination}
       />
     </div>
   )
