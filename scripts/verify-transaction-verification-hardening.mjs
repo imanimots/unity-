@@ -255,6 +255,7 @@ let rtbListingId, rtbAgreementId
   async function saveTerms(listingId) {
     return api(merchantA.cookie, 'POST', `/api/listings/${listingId}/rent-to-buy-terms`, {
       enabled: true, total_purchase_price: 1200, installment_amount: 400, installment_count: 3, payment_frequency: 'monthly',
+      possession_trigger_type: 'first_payment', rental_use_rate_amount: 60, rental_use_rate_unit: 'monthly', grace_period_days: 7, return_window_days: 14,
     })
   }
 
@@ -329,7 +330,10 @@ console.log('=== LOOKING FOR ===')
 
   // 22. accepted RTB offer cannot bypass merchant verification
   const rtbListing22 = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} LF RTB ${RUN_ID}` })
-  await api(merchantA.cookie, 'POST', `/api/listings/${rtbListing22}/rent-to-buy-terms`, { enabled: true, total_purchase_price: 900, installment_amount: 300, installment_count: 3, payment_frequency: 'monthly' })
+  await api(merchantA.cookie, 'POST', `/api/listings/${rtbListing22}/rent-to-buy-terms`, {
+    enabled: true, total_purchase_price: 900, installment_amount: 300, installment_count: 3, payment_frequency: 'monthly',
+    possession_trigger_type: 'first_payment', rental_use_rate_amount: 60, rental_use_rate_unit: 'monthly', grace_period_days: 7, return_window_days: 14,
+  })
   const rtbReq22 = await createAndPublishRequest(renterA.cookie, { transaction_type: 'rent_to_buy', title: `${QA_MARKER} LF RTB Req ${RUN_ID}` }, `lf-rtb-${RUN_ID}`)
   const offer22 = rtbReq22.requestId
     ? await api(merchantA.cookie, 'POST', `/api/marketplace/requests/${rtbReq22.requestId}/offers`, { offer_type: 'link_listing', linked_listing_id: rtbListing22, idempotency_key: `lf-rtb-off-${RUN_ID}` })

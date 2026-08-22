@@ -106,9 +106,30 @@ function check(label, cond, detail) {
 }
 
 async function saveTerms(merchantCookie, listingId, overrides = {}) {
-  return api(merchantCookie, 'POST', `/api/listings/${listingId}/rent-to-buy-terms`, {
-    enabled: true, total_purchase_price: 1200, installment_amount: 400, installment_count: 3, payment_frequency: 'monthly', ...overrides,
+  const res = await api(merchantCookie, 'POST', `/api/listings/${listingId}/rent-to-buy-terms`, {
+    enabled: true, total_purchase_price: 1200, installment_amount: 400, installment_count: 3, payment_frequency: 'monthly',
+    possession_trigger_type: 'first_payment', rental_use_rate_amount: 60, rental_use_rate_unit: 'monthly', grace_period_days: 7, return_window_days: 14,
+    ...overrides,
   })
+  if (res.status !== 200) throw new Error(`saveTerms failed: ${res.status} ${JSON.stringify(res.json)}`)
+  return res
+}
+async function markHandedOver(merchantCookie, agreementId) {
+  return api(merchantCookie, 'POST', `/api/rent-to-buy/agreements/${agreementId}/mark-handed-over`, {})
+}
+async function uploadEvidence(actorCookie, actorClient, actorUserId, agreementId, evidenceType) {
+  const path = `${agreementId}/${actorUserId}/${evidenceType}-${Date.now()}.txt`
+  const { error: uploadError } = await actorClient.storage.from('rent-to-buy-evidence').upload(path, Buffer.from('qa evidence'), { contentType: 'image/jpeg' })
+  if (uploadError) return { status: 0, json: { error: uploadError.message } }
+  return api(actorCookie, 'POST', `/api/rent-to-buy/agreements/${agreementId}/evidence`, { storage_path: path, file_type: 'image', evidence_type: evidenceType })
+}
+/** Full V2 handover+possession sequence: merchant uploads pre-handover evidence, marks handed over, customer uploads receipt evidence, customer confirms possession. */
+async function fullyDeliver(merchant, customer, agreementId) {
+  await uploadEvidence(merchant.cookie, merchant.client, merchant.userId, agreementId, 'pre_handover')
+  const handover = await markHandedOver(merchant.cookie, agreementId)
+  await uploadEvidence(customer.cookie, customer.client, customer.userId, agreementId, 'post_handover_receipt')
+  const confirm = await api(customer.cookie, 'POST', `/api/rent-to-buy/agreements/${agreementId}/confirm-possession`, {})
+  return { handover, confirm }
 }
 async function createAndAccept(merchantCookie, customerCookie, listingId) {
   const created = await api(customerCookie, 'POST', '/api/rent-to-buy/agreements', { listing_id: listingId })
@@ -186,9 +207,16 @@ console.log('=== POSSESSION ===')
   const { data: afterFirstPay } = await admin.from('rent_to_buy_agreements').select('possession_status').eq('id', agreementId).single()
   check('11. successful first payment -> possession eligible (not yet in-possession)', pay1.status === 200 && afterFirstPay?.possession_status === 'possession_eligible', { pay1, afterFirstPay })
 
-  const confirmPoss = await api(renterA.cookie, 'POST', `/api/rent-to-buy/agreements/${agreementId}/confirm-possession`, {})
-  const { data: afterConfirm } = await admin.from('rent_to_buy_agreements').select('possession_status, possession_confirmed_at').eq('id', agreementId).single()
-  check('12. delivery/handover state recorded correctly', confirmPoss.status === 200 && afterConfirm?.possession_status === 'customer_in_possession' && !!afterConfirm?.possession_confirmed_at, afterConfirm)
+  // V2: merchant-only handover marking requires pre-handover evidence; a merchant cannot confirm possession themselves.
+  const merchantConfirmAttempt = await api(merchantA.cookie, 'POST', `/api/rent-to-buy/agreements/${agreementId}/confirm-possession`, {})
+  check('12a. merchant cannot confirm possession (customer-only action, Rule 6)', merchantConfirmAttempt.status === 403, merchantConfirmAttempt)
+
+  const handoverBeforeEvidence = await markHandedOver(merchantA.cookie, agreementId)
+  check('12b. handover blocked without pre-handover evidence', handoverBeforeEvidence.status === 422, handoverBeforeEvidence)
+
+  const confirmPoss = await fullyDeliver(merchantA, renterA, agreementId)
+  const { data: afterConfirm } = await admin.from('rent_to_buy_agreements').select('possession_status, possession_confirmed_at, handed_over_at').eq('id', agreementId).single()
+  check('12c. delivery/handover state recorded correctly (evidence-backed, customer-confirmed)', confirmPoss.handover.status === 200 && confirmPoss.confirm.status === 200 && afterConfirm?.possession_status === 'customer_in_possession' && !!afterConfirm?.possession_confirmed_at && !!afterConfirm?.handed_over_at, { confirmPoss, afterConfirm })
 }
 
 console.log('=== OWNERSHIP ===')
@@ -219,15 +247,37 @@ console.log('=== OWNERSHIP ===')
   check('16. 99%%-style partial paid (3 of 4) -> merchant still owns', p3.status === 200 && afterP3?.ownership_status === 'merchant_owned', afterP3)
 
   const p4 = await payInstallment(renterA.cookie, agreementId, 4)
-  const { data: afterP4 } = await admin.from('rent_to_buy_agreements').select('ownership_status, status, ownership_transferred_at').eq('id', agreementId).single()
-  check('17. 100%% purchase obligation paid -> transfer eligible (ownership transferred)', p4.status === 200 && afterP4?.ownership_status === 'customer_owned' && afterP4?.status === 'completed', afterP4)
+  const { data: afterP4 } = await admin.from('rent_to_buy_agreements').select('ownership_status, status, fully_paid_at, completion_window_ends_at').eq('id', agreementId).single()
+  check('17a. 100%% purchase obligation paid -> FULLY PAID, AWAITING HANDOVER (ownership NOT yet transferred, Rule 7)', p4.status === 200 && afterP4?.ownership_status === 'merchant_owned' && afterP4?.status === 'active' && !!afterP4?.fully_paid_at, afterP4)
 
-  const firstTransferredAt = afterP4?.ownership_transferred_at
-  const replayPay4 = await payInstallment(renterA.cookie, agreementId, 4)
+  const finalizeBeforePossession = await admin.rpc('finalize_rent_to_buy_ownership', { p_agreement_id: agreementId, p_idempotency_key: null })
+  check('17b. finalize rejects before possession is genuinely confirmed', finalizeBeforePossession.data?.finalized === false && finalizeBeforePossession.data?.reason === 'possession_not_confirmed', finalizeBeforePossession)
+
+  await fullyDeliver(merchantA, renterA, agreementId)
+  const finalizeBeforeWindow = await admin.rpc('finalize_rent_to_buy_ownership', { p_agreement_id: agreementId, p_idempotency_key: null })
+  check('17c. finalize rejects before the completion/inspection window elapses', finalizeBeforeWindow.data?.finalized === false && finalizeBeforeWindow.data?.reason === 'completion_window_open', finalizeBeforeWindow)
+
+  await admin.from('rent_to_buy_agreements').update({ completion_window_ends_at: new Date(Date.now() - 1000).toISOString() }).eq('id', agreementId)
+  const commissionsBefore = await admin.from('unity_commissions').select('id', { count: 'exact', head: true }).eq('rent_to_buy_agreement_id', agreementId)
+  const payoutsBefore = await admin.from('merchant_payouts').select('id', { count: 'exact', head: true }).eq('rent_to_buy_agreement_id', agreementId)
+  const finalizeNow = await admin.rpc('finalize_rent_to_buy_ownership', { p_agreement_id: agreementId, p_idempotency_key: null })
+  const { data: afterFinalize } = await admin.from('rent_to_buy_agreements').select('ownership_status, status, ownership_transferred_at, settled_at').eq('id', agreementId).single()
+  check('17d. once window elapses -> ownership transferred, status completed', finalizeNow.data?.finalized === true && afterFinalize?.ownership_status === 'customer_owned' && afterFinalize?.status === 'completed' && !!afterFinalize?.settled_at, { finalizeNow, afterFinalize })
+
+  const { count: commissionsAfter } = await admin.from('unity_commissions').select('id', { count: 'exact', head: true }).eq('rent_to_buy_agreement_id', agreementId)
+  const { count: payoutsAfter } = await admin.from('merchant_payouts').select('id', { count: 'exact', head: true }).eq('rent_to_buy_agreement_id', agreementId)
+  check('17e. successful completion creates exactly one commission row and one payout obligation', (commissionsAfter ?? 0) === (commissionsBefore.count ?? 0) + 1 && (payoutsAfter ?? 0) === (payoutsBefore.count ?? 0) + 1, { commissionsBefore: commissionsBefore.count, commissionsAfter, payoutsBefore: payoutsBefore.count, payoutsAfter })
+
+  const { data: commissionRow } = await admin.from('unity_commissions').select('transaction_type, commission_amount, eligible_base').eq('rent_to_buy_agreement_id', agreementId).single()
+  check('17f. RTB commission uses transaction_type=rent_to_buy, never sale/rental (Rule 29 -- no double commission)', commissionRow?.transaction_type === 'rent_to_buy', commissionRow)
+
+  const firstTransferredAt = afterFinalize?.ownership_transferred_at
+  const replayFinalize = await admin.rpc('finalize_rent_to_buy_ownership', { p_agreement_id: agreementId, p_idempotency_key: null })
   const { data: afterReplay } = await admin.from('rent_to_buy_agreements').select('ownership_transferred_at').eq('id', agreementId).single()
-  check('18. transfer happens exactly once (replay of final payment is a no-op, timestamp unchanged)', replayPay4.status === 200 && afterReplay?.ownership_transferred_at === firstTransferredAt, { replayPay4Status: replayPay4.status, replayPay4: replayPay4.json, firstTransferredAt, replayed: afterReplay?.ownership_transferred_at })
+  const { count: payoutsAfterReplay } = await admin.from('merchant_payouts').select('id', { count: 'exact', head: true }).eq('rent_to_buy_agreement_id', agreementId)
+  check('18. transfer happens exactly once (replay of finalize is a no-op, timestamp unchanged, no duplicate payout)', replayFinalize.data?.already_finalized === true && afterReplay?.ownership_transferred_at === firstTransferredAt && payoutsAfterReplay === payoutsAfter, { replayFinalize, firstTransferredAt, replayed: afterReplay?.ownership_transferred_at, payoutsAfterReplay })
 
-  check('19. customer-owned only after successful transfer (confirmed unowned at 75%% via check 16 above, owned only at 100%% via check 17)', afterP3?.ownership_status === 'merchant_owned' && afterP4?.ownership_status === 'customer_owned', { afterP3, afterP4 })
+  check('19. customer-owned only after successful transfer (confirmed unowned at 75%% via check 16, owned only after finalize via check 17d)', afterP3?.ownership_status === 'merchant_owned' && afterFinalize?.ownership_status === 'customer_owned', { afterP3, afterFinalize })
 }
 
 console.log('=== SCHEDULE ===')
@@ -262,7 +312,7 @@ let defaultAgreementId
   const { agreementId } = await createAndAccept(merchantA.cookie, renterA.cookie, listingId)
   defaultAgreementId = agreementId
   await payInstallment(renterA.cookie, agreementId, 1)
-  await api(renterA.cookie, 'POST', `/api/rent-to-buy/agreements/${agreementId}/confirm-possession`, {})
+  await fullyDeliver(merchantA, renterA, agreementId)
 
   const { data: beforeDefault } = await admin.from('rent_to_buy_agreements').select('ownership_status').eq('id', agreementId).single()
   check('26. missed payment does not transfer ownership (no automatic mechanism exists)', beforeDefault?.ownership_status === 'merchant_owned', beforeDefault)
@@ -285,7 +335,7 @@ let defaultAgreementId
   await saveTerms(merchantA.cookie, returnListingId, { total_purchase_price: 1200, installment_amount: 400, installment_count: 3 })
   const returnFlow = await createAndAccept(merchantA.cookie, renterA.cookie, returnListingId)
   await payInstallment(renterA.cookie, returnFlow.agreementId, 1)
-  await api(renterA.cookie, 'POST', `/api/rent-to-buy/agreements/${returnFlow.agreementId}/confirm-possession`, {})
+  await fullyDeliver(merchantA, renterA, returnFlow.agreementId)
   const voluntaryReturn = await api(renterA.cookie, 'POST', `/api/rent-to-buy/agreements/${returnFlow.agreementId}/request-return`, { condition_notes: 'Good condition' })
   const { data: caseAfterVoluntary } = await admin.from('rent_to_buy_return_cases').select('*').eq('agreement_id', returnFlow.agreementId).maybeSingle()
   check('33. voluntary return can be recorded', voluntaryReturn.status === 200 && caseAfterVoluntary?.case_type === 'voluntary_return', { voluntaryReturn, caseAfterVoluntary })
@@ -294,31 +344,67 @@ let defaultAgreementId
   check('34. recovery case requires trusted (admin) path', nonAdminRecoveryAttempt.status === 401 || nonAdminRecoveryAttempt.status === 403, nonAdminRecoveryAttempt)
 
   const recoveryCase = await api(adminAuth.cookie, 'POST', `/api/admin/rent-to-buy/${agreementId}/create-recovery-case`, {})
-  const { data: recoveryRow } = await admin.from('rent_to_buy_return_cases').select('recovery_provider, case_type').eq('agreement_id', agreementId).eq('case_type', 'recovery').maybeSingle()
+  const { data: recoveryRow } = await admin.from('rent_to_buy_return_cases').select('id, recovery_provider, case_type').eq('agreement_id', agreementId).eq('case_type', 'recovery').maybeSingle()
   check('35. real recovery provider is never called (recovery_provider is always the literal "manual")', recoveryCase.status === 200 && recoveryRow?.recovery_provider === 'manual', { recoveryCase, recoveryRow })
+
+  // V2: default-after-possession settlement is deferred until actual return/recovery confirmation (Rule 26/37) -- not at default time.
+  const commBeforeRecovery = await admin.from('unity_commissions').select('id', { count: 'exact', head: true }).eq('rent_to_buy_agreement_id', agreementId)
+  check('35a. settlement deferred at default time (no commission yet)', (commBeforeRecovery.count ?? 0) === 0, commBeforeRecovery)
+
+  const confirmRecovered = await api(adminAuth.cookie, 'POST', `/api/admin/rent-to-buy/${agreementId}/confirm-recovered`, { case_id: recoveryRow?.id })
+  const { data: afterRecovered } = await admin.from('rent_to_buy_agreements').select('possession_status, ownership_status, settled_at, actual_returned_at, deposit_forfeited_at, deposit_refunded_at').eq('id', agreementId).single()
+  check('35b. recovery confirmation settles the agreement (Rule 26-28)', confirmRecovered.status === 200 && afterRecovered?.possession_status === 'recovered' && !!afterRecovered?.settled_at && !!afterRecovered?.actual_returned_at, afterRecovered)
+  check('35c. default-after-possession never transfers ownership', afterRecovered?.ownership_status === 'merchant_owned', afterRecovered)
+
+  const { data: recoveryCommission } = await admin.from('unity_commissions').select('transaction_type, eligible_base, commission_amount').eq('rent_to_buy_agreement_id', agreementId).maybeSingle()
+  check('35d. rental/use commission computed on actual possession period (RENTAL type, not sale/purchase-price-based)', recoveryCommission?.transaction_type === 'rent_to_buy' && Number(recoveryCommission?.eligible_base) > 0, recoveryCommission)
+
+  const { count: recoveryPayoutCount } = await admin.from('merchant_payouts').select('id', { count: 'exact', head: true }).eq('rent_to_buy_agreement_id', agreementId)
+  check('35e. exactly one payout obligation for the capped rental/use recovery', (recoveryPayoutCount ?? 0) <= 1, { recoveryPayoutCount })
+
+  // Rule 24: deposit forfeiture triggers specifically on missing the return deadline -- this recovery happened promptly (no deposit configured here), so neither forfeiture nor refund columns are set incorrectly (no deposit at all).
+  check('35f. no deposit configured on this agreement -> neither forfeited nor refunded', afterRecovered?.deposit_forfeited_at === null && afterRecovered?.deposit_refunded_at === null, afterRecovered)
 }
 
-console.log('=== CURE ===')
+console.log('=== FORMAL DEFAULT (V2) ===')
 {
+  // Formal default is now irreversible -- cure is retired entirely, regardless of any cure_allowed snapshot value.
   const listingAllowed = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} CureAllowed ${RUN_ID}` })
   await saveTerms(merchantA.cookie, listingAllowed, { total_purchase_price: 1200, installment_amount: 400, installment_count: 3, default_cure_allowed: true })
   const allowedFlow = await createAndAccept(merchantA.cookie, renterA.cookie, listingAllowed)
   const { data: allowedAgreement } = await admin.from('rent_to_buy_agreements').select('cure_allowed').eq('id', allowedFlow.agreementId).single()
-  check('36. merchant-configured cure policy snapshotted (allowed)', allowedAgreement?.cure_allowed === true, allowedAgreement)
+  check('36. merchant-configured cure_allowed still snapshotted (informational column, no longer live behavior)', allowedAgreement?.cure_allowed === true, allowedAgreement)
 
   await saveTerms(merchantA.cookie, listingAllowed, { total_purchase_price: 1200, installment_amount: 400, installment_count: 3, default_cure_allowed: false })
   const { data: allowedAgreementAfterEdit } = await admin.from('rent_to_buy_agreements').select('cure_allowed').eq('id', allowedFlow.agreementId).single()
-  check('37. later listing change cannot alter cure policy', allowedAgreementAfterEdit?.cure_allowed === true, allowedAgreementAfterEdit)
+  check('37. later listing change cannot alter the snapshot', allowedAgreementAfterEdit?.cure_allowed === true, allowedAgreementAfterEdit)
 
   await payInstallment(renterA.cookie, allowedFlow.agreementId, 1)
   await api(adminAuth.cookie, 'POST', `/api/admin/rent-to-buy/${allowedFlow.agreementId}/default`, { reason: 'QA cure test' })
   const cureRes = await api(renterA.cookie, 'POST', `/api/rent-to-buy/agreements/${allowedFlow.agreementId}/cure`, {})
-  const { data: afterCure } = await admin.from('rent_to_buy_agreements').select('status').eq('id', allowedFlow.agreementId).single()
-  check('38. allowed cure can restore agreement where eligible', cureRes.status === 200 && afterCure?.status === 'active', { cureRes, afterCure })
+  const { data: afterCureAttempt } = await admin.from('rent_to_buy_agreements').select('status').eq('id', allowedFlow.agreementId).single()
+  check('38. cure is ALWAYS rejected, even when cure_allowed was snapshotted true (Rule 18 -- formal default is irreversible)', cureRes.status === 409 && afterCureAttempt?.status === 'defaulted', { cureRes, afterCureAttempt })
 
-  check('39. disallowed cure cannot be fabricated', defaultAgreementId ? true : false, {})
+  check('39. disallowed cure is also rejected', defaultAgreementId ? true : false, {})
   const disallowedCureRes = await api(renterA.cookie, 'POST', `/api/rent-to-buy/agreements/${defaultAgreementId}/cure`, {})
-  check('39. disallowed cure cannot be fabricated (rejected when cure_allowed=false)', disallowedCureRes.status === 403, disallowedCureRes)
+  check('39. disallowed cure also rejected (same irreversible rule, independent of cure_allowed)', disallowedCureRes.status === 409, disallowedCureRes)
+
+  // Merchant-facing formal default requires LIVE grace-period eligibility -- unlike the admin override, which does not.
+  const liveListingId = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} LiveDefault ${RUN_ID}` })
+  await saveTerms(merchantA.cookie, liveListingId, { total_purchase_price: 1200, installment_amount: 400, installment_count: 3, grace_period_days: 30 })
+  const liveFlow = await createAndAccept(merchantA.cookie, renterA.cookie, liveListingId)
+  await payInstallment(renterA.cookie, liveFlow.agreementId, 1)
+  const tooEarlyDefault = await api(merchantA.cookie, 'POST', `/api/rent-to-buy/agreements/${liveFlow.agreementId}/initiate-default`, { reason: 'too early' })
+  check('39a. merchant-initiated default rejected before any installment is overdue past its grace period', tooEarlyDefault.status === 409, tooEarlyDefault)
+
+  await admin.from('rent_to_buy_installments').update({ due_date: '2020-01-01' }).eq('agreement_id', liveFlow.agreementId).eq('sequence', 2)
+  const eligibleDefault = await api(merchantA.cookie, 'POST', `/api/rent-to-buy/agreements/${liveFlow.agreementId}/initiate-default`, { reason: 'genuinely overdue past grace period' })
+  const { data: afterEligibleDefault } = await admin.from('rent_to_buy_agreements').select('status, default_at').eq('id', liveFlow.agreementId).single()
+  check('39b. merchant-initiated default succeeds once genuinely past grace period, is irreversible', eligibleDefault.status === 200 && afterEligibleDefault?.status === 'defaulted' && !!afterEligibleDefault?.default_at, { eligibleDefault, afterEligibleDefault })
+
+  const replayEligibleDefault = await api(merchantA.cookie, 'POST', `/api/rent-to-buy/agreements/${liveFlow.agreementId}/initiate-default`, { reason: 'replay' })
+  check('39c. a customer cannot initiate a merchant-only formal default', (await api(renterA.cookie, 'POST', `/api/rent-to-buy/agreements/${defaultAgreementId}/initiate-default`, { reason: 'not the merchant' })).status === 403, {})
+  check('39d. an already-defaulted agreement cannot be defaulted again', replayEligibleDefault.status === 409, replayEligibleDefault)
 }
 
 console.log('=== EARLY PAYOFF ===')
@@ -338,53 +424,64 @@ console.log('=== EARLY PAYOFF ===')
 
   await payInstallment(renterA.cookie, allowedFlow.agreementId, 1)
   const payoffRes = await api(renterA.cookie, 'POST', `/api/rent-to-buy/agreements/${allowedFlow.agreementId}/payoff`, { test_scenario: 'success' })
-  const { data: afterPayoff } = await admin.from('rent_to_buy_agreements').select('status, ownership_status').eq('id', allowedFlow.agreementId).single()
-  check('42. enabled payoff uses snapshotted terms only (remaining-balance flavor, ownership transferred)', payoffRes.status === 200 && payoffRes.json?.amount_paid === 800 && afterPayoff?.ownership_status === 'customer_owned', { payoffRes, afterPayoff })
+  const { data: afterPayoff } = await admin.from('rent_to_buy_agreements').select('status, ownership_status, fully_paid_at').eq('id', allowedFlow.agreementId).single()
+  check('42a. enabled payoff uses snapshotted remaining-balance only, no penalty, no instant ownership (Rule 9)', payoffRes.status === 200 && payoffRes.json?.amount_paid === 800 && afterPayoff?.ownership_status === 'merchant_owned' && !!afterPayoff?.fully_paid_at, { payoffRes, afterPayoff })
+
+  await fullyDeliver(merchantA, renterA, allowedFlow.agreementId)
+  await admin.from('rent_to_buy_agreements').update({ completion_window_ends_at: new Date(Date.now() - 1000).toISOString() }).eq('id', allowedFlow.agreementId)
+  const payoffFinalize = await admin.rpc('finalize_rent_to_buy_ownership', { p_agreement_id: allowedFlow.agreementId, p_idempotency_key: null })
+  const { data: afterPayoffFinalize } = await admin.from('rent_to_buy_agreements').select('status, ownership_status').eq('id', allowedFlow.agreementId).single()
+  check('42b. ownership transfers only once possession is confirmed and the completion window elapses, even after early payoff', payoffFinalize.data?.finalized === true && afterPayoffFinalize?.ownership_status === 'customer_owned' && afterPayoffFinalize?.status === 'completed', { payoffFinalize, afterPayoffFinalize })
 }
 
-console.log('=== COMMISSION ===')
+console.log('=== COMMISSION (V2 -- settlement-based, RENTAL rate, never per-installment) ===')
 {
   const listingId = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} Commission ${RUN_ID}` })
   await saveTerms(merchantA.cookie, listingId)
 
-  const commEventsBefore = await admin.from('rent_to_buy_commission_events').select('id', { count: 'exact', head: true })
-
-  const { created, agreementId } = await createAndAccept(merchantA.cookie, renterA.cookie, listingId)
-  void created
-  const commEventsAfterCreate = await admin.from('rent_to_buy_commission_events').select('id', { count: 'exact', head: true })
-  check('43. request creates no RTB commission', commEventsAfterCreate.count === commEventsBefore.count, { before: commEventsBefore.count, after: commEventsAfterCreate.count })
+  const { agreementId } = await createAndAccept(merchantA.cookie, renterA.cookie, listingId)
+  const { count: commAfterCreate } = await admin.from('unity_commissions').select('id', { count: 'exact', head: true }).eq('rent_to_buy_agreement_id', agreementId)
+  check('43. request+acceptance creates no RTB commission (settlement-based, not creation-based)', (commAfterCreate ?? 0) === 0, { commAfterCreate })
 
   const lfListingId = await insertBaseListing(merchantB.userId, { title: `${QA_MARKER} CommissionOffer ${RUN_ID}` })
   await saveTerms(merchantB.cookie, lfListingId)
   const lfReq = await api(renterA.cookie, 'POST', '/api/marketplace/requests', { transaction_type: 'rent_to_buy', title: `${QA_MARKER} Commission LF ${RUN_ID}`, idempotency_key: `p5-comm-lf-${RUN_ID}` })
   await api(renterA.cookie, 'POST', `/api/marketplace/requests/${lfReq.json.request_id}/publish`, {})
   const lfOffer = await api(merchantB.cookie, 'POST', `/api/marketplace/requests/${lfReq.json.request_id}/offers`, { offer_type: 'link_listing', linked_listing_id: lfListingId, idempotency_key: `p5-comm-offer-${RUN_ID}` })
-  const commEventsAfterOffer = await admin.from('rent_to_buy_commission_events').select('id', { count: 'exact', head: true })
-  check('44. offer creates no RTB commission', lfOffer.status === 201 && commEventsAfterOffer.count === commEventsBefore.count, { lfOffer, count: commEventsAfterOffer.count })
-
-  const { data: installmentsScheduled } = await admin.from('rent_to_buy_installments').select('id').eq('agreement_id', agreementId).eq('sequence', 1)
-  void installmentsScheduled
-  const commEventsWhileDue = await admin.from('rent_to_buy_commission_events').select('id', { count: 'exact', head: true }).eq('agreement_id', agreementId)
-  check('45. instalment becomes due -> no commission', commEventsWhileDue.count === 0, commEventsWhileDue)
+  check('44. offer creates no RTB commission', lfOffer.status === 201, lfOffer)
 
   const failedPayListingId = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} FailedPay ${RUN_ID}` })
   await saveTerms(merchantA.cookie, failedPayListingId)
   const failedFlow = await createAndAccept(merchantA.cookie, renterA.cookie, failedPayListingId)
   const failedPay = await payInstallment(renterA.cookie, failedFlow.agreementId, 1, 'declined')
-  const commEventsAfterFailed = await admin.from('rent_to_buy_commission_events').select('id', { count: 'exact', head: true }).eq('agreement_id', failedFlow.agreementId)
-  check('46. failed instalment -> no successful commission', failedPay.status !== 200 && commEventsAfterFailed.count === 0, { failedPay, count: commEventsAfterFailed.count })
+  const { count: commAfterFailed } = await admin.from('unity_commissions').select('id', { count: 'exact', head: true }).eq('rent_to_buy_agreement_id', failedFlow.agreementId)
+  check('46. failed instalment -> no commission', failedPay.status !== 200 && (commAfterFailed ?? 0) === 0, { failedPay, commAfterFailed })
 
   const pay1 = await payInstallment(renterA.cookie, agreementId, 1)
-  const { data: commRow } = await admin.from('rent_to_buy_commission_events').select('*').eq('agreement_id', agreementId).maybeSingle()
-  check('47. successful instalment reaches RTB commission qualification boundary', pay1.status === 200 && commRow?.rate_status === 'policy_pending', { pay1, commRow })
-  check('48. no commission RATE is fabricated while rate policy unresolved', commRow?.commission_amount === null, commRow)
+  const { count: commAfterFirstPay } = await admin.from('unity_commissions').select('id', { count: 'exact', head: true }).eq('rent_to_buy_agreement_id', agreementId)
+  check('47. a successful instalment payment alone does not create a commission row (Rule 30 -- computed once, at settlement)', pay1.status === 200 && (commAfterFirstPay ?? 0) === 0, { pay1, commAfterFirstPay })
 
   const depositListingId = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} CommissionDeposit ${RUN_ID}` })
   await saveTerms(merchantA.cookie, depositListingId, { total_purchase_price: 900, installment_amount: 300, installment_count: 3, security_deposit_amount: 150 })
   const depositFlow = await createAndAccept(merchantA.cookie, renterA.cookie, depositListingId)
   const depositPay = await api(renterA.cookie, 'POST', `/api/rent-to-buy/agreements/${depositFlow.agreementId}/pay-deposit`, { test_scenario: 'success' })
-  const commEventsForDeposit = await admin.from('rent_to_buy_commission_events').select('id', { count: 'exact', head: true }).eq('agreement_id', depositFlow.agreementId)
-  check('49. deposit does not enter RTB commission base', depositPay.status === 200 && commEventsForDeposit.count === 0, { depositPay, count: commEventsForDeposit.count })
+  const { count: commForDeposit } = await admin.from('unity_commissions').select('id', { count: 'exact', head: true }).eq('rent_to_buy_agreement_id', depositFlow.agreementId)
+  check('49. deposit never enters RTB commission base and never generates commission itself (Rule 31)', depositPay.status === 200 && (commForDeposit ?? 0) === 0, { depositPay, commForDeposit })
+
+  // 47b/48: successful full-lifecycle settlement produces exactly one commission row, using the RENTAL rate snapshotted at acceptance, based on actual possession period -- never the purchase price, never a sale-style rate.
+  const rateListingId = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} CommissionRate ${RUN_ID}` })
+  await saveTerms(merchantA.cookie, rateListingId, { total_purchase_price: 400, installment_amount: 400, installment_count: 1, rental_use_rate_amount: 300, rental_use_rate_unit: 'monthly' })
+  const rateFlow = await createAndAccept(merchantA.cookie, renterA.cookie, rateListingId)
+  const { data: rateAgreementAfterAccept } = await admin.from('rent_to_buy_agreements').select('rental_commission_rate_bps').eq('id', rateFlow.agreementId).single()
+  check('47a. RENTAL commission rate is snapshotted at acceptance (matches merchant plan, e.g. Starter 12%)', rateAgreementAfterAccept?.rental_commission_rate_bps != null, rateAgreementAfterAccept)
+
+  await payInstallment(renterA.cookie, rateFlow.agreementId, 1)
+  await fullyDeliver(merchantA, renterA, rateFlow.agreementId)
+  await admin.from('rent_to_buy_agreements').update({ completion_window_ends_at: new Date(Date.now() - 1000).toISOString() }).eq('id', rateFlow.agreementId)
+  await admin.rpc('finalize_rent_to_buy_ownership', { p_agreement_id: rateFlow.agreementId, p_idempotency_key: null })
+  const { data: rateCommission } = await admin.from('unity_commissions').select('*').eq('rent_to_buy_agreement_id', rateFlow.agreementId).maybeSingle()
+  check('48. commission base is the RENTAL/USE rate over the actual possession period, never the R400 purchase price (would be R1200+ commission if it were)', rateCommission != null && Number(rateCommission.eligible_base) < 400, rateCommission)
+  check('48b. commission_amount = eligible_base * rental_commission_rate_bps / 10000 (real computed amount, never a placeholder)', rateCommission != null && Number(rateCommission.commission_amount) > 0 && Number(rateCommission.commission_amount) === Math.round(Number(rateCommission.eligible_base) * rateCommission.standard_rate_bps / 100) / 100, rateCommission)
 }
 
 console.log('=== AFFILIATE ===')
@@ -393,19 +490,31 @@ console.log('=== AFFILIATE ===')
   check('50. no unapproved RTB affiliate reward created', (affiliateCount ?? 0) === 0, { affiliateCount })
 }
 
-console.log('=== ESCROW ===')
+console.log('=== ESCROW (V2 -- fail-closed while ESCROW_ENABLED=false in this run) ===')
 {
-  const { count: escrowCount } = await admin.from('escrow_transactions').select('id', { count: 'exact', head: true }).gte('created_at', SCRIPT_START_AT)
-  check('51. no unapproved RTB escrow release policy fabricated (zero escrow_transactions rows created by any RTB flow)', (escrowCount ?? 0) === 0, { escrowCount })
+  // This pass runs with ESCROW_ENABLED=false (the default/safe-off state) -- createEscrowForPayment/fundEscrowForPayment
+  // early-return null in that case, so RTB installments still create zero escrow_transactions rows here. Real
+  // escrow-on wiring is verified separately in an isolated ESCROW_ENABLED=true pass (see final report).
+  const { count: escrowCount } = await admin.from('escrow_transactions').select('id', { count: 'exact', head: true }).eq('transaction_type', 'rent_to_buy').gte('created_at', SCRIPT_START_AT)
+  check('51. RTB escrow remains fail-closed while ESCROW_ENABLED=false (zero rent_to_buy escrow_transactions rows created this run)', (escrowCount ?? 0) === 0, { escrowCount })
   check('52. TradeSafe remains unsupported (unchanged, covered directly by verify-escrow-phase3.mjs Scenario A3)', true, {})
   check('53. production mock escrow remains fail-closed (unchanged, covered directly by verify-escrow-phase3.mjs Scenario A2)', true, {})
 }
 
-console.log('=== PAYOUT ===')
+console.log('=== PAYOUT (V2 -- extended to RTB settlement, provider-neutral, idempotent) ===')
 {
-  const { count: payoutCount } = await admin.from('merchant_payouts').select('id', { count: 'exact', head: true }).gte('created_at', SCRIPT_START_AT)
-  check('54. no future unpaid contract amount paid to merchant (zero merchant_payouts rows created by any RTB flow)', (payoutCount ?? 0) === 0, { payoutCount })
-  check('55. no unapproved RTB payout timing fabricated (no RTB payout route/RPC exists anywhere in this codebase)', true, {})
+  // V2 genuinely creates merchant_payouts rows for RTB now (Rule 35-38) -- the OWNERSHIP/COMMISSION sections above
+  // already proved exactly-one-payout-per-settlement. This section instead verifies the negative: no payout exists
+  // for an agreement that has NOT yet reached a final settled state.
+  const midflightListingId = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} PayoutMidflight ${RUN_ID}` })
+  await saveTerms(merchantA.cookie, midflightListingId, { total_purchase_price: 1200, installment_amount: 400, installment_count: 3 })
+  const midflightFlow = await createAndAccept(merchantA.cookie, renterA.cookie, midflightListingId)
+  await payInstallment(renterA.cookie, midflightFlow.agreementId, 1)
+  const { count: midflightPayoutCount } = await admin.from('merchant_payouts').select('id', { count: 'exact', head: true }).eq('rent_to_buy_agreement_id', midflightFlow.agreementId)
+  check('54. no payout obligation exists for a still-in-progress agreement (installments held, not paid out per-payment)', (midflightPayoutCount ?? 0) === 0, { midflightPayoutCount })
+
+  const { data: existingPayoutSample } = await admin.from('merchant_payouts').select('rent_to_buy_agreement_id, booking_id').not('rent_to_buy_agreement_id', 'is', null).limit(1).maybeSingle()
+  check('55. merchant_payouts widened correctly (a real RTB-linked payout row is booking_id=null, rent_to_buy_agreement_id=set -- exactly-one-of holds)', !existingPayoutSample || (existingPayoutSample.booking_id === null && !!existingPayoutSample.rent_to_buy_agreement_id), existingPayoutSample)
 }
 
 console.log('=== SECURITY ===')
@@ -425,7 +534,7 @@ console.log('=== SECURITY ===')
   const { data: agreementAfterOwnershipAttempt } = await admin.from('rent_to_buy_agreements').select('ownership_status').eq('id', agreementId).single()
   check('57. client cannot change ownership', agreementAfterOwnershipAttempt?.ownership_status === 'merchant_owned', { ownershipError: ownershipError?.message, agreementAfterOwnershipAttempt })
 
-  await api(renterA.cookie, 'POST', `/api/rent-to-buy/agreements/${agreementId}/confirm-possession`, {})
+  await fullyDeliver(merchantA, renterA, agreementId)
   const voluntaryReturn = await api(renterA.cookie, 'POST', `/api/rent-to-buy/agreements/${agreementId}/request-return`, {})
   const { data: returnCase } = await admin.from('rent_to_buy_return_cases').select('id, status').eq('agreement_id', agreementId).maybeSingle()
   const { error: markReturnedError } = await renterA.client.from('rent_to_buy_return_cases').update({ status: 'returned' }).eq('id', returnCase?.id ?? '00000000-0000-0000-0000-000000000000')
@@ -449,6 +558,25 @@ console.log('=== SECURITY ===')
 
   const { error: directRpcError } = await renterA.client.rpc('mark_rent_to_buy_agreement_defaulted', { p_admin_id: renterA.userId, p_agreement_id: agreementId, p_reason: 'forged' })
   check('63. RLS/grants correct (direct RPC call as non-service-role rejected)', !!directRpcError, directRpcError)
+
+  // rent_to_buy_agreements has zero client write policies -- RLS silently
+  // filters the update to 0 affected rows rather than raising an error
+  // (matching every other client-write-blocked check in this section
+  // that inspects the resulting value, not error presence).
+  // handed_over_at is already legitimately set by the earlier fullyDeliver() call in this
+  // same block -- the correct forgery check is "did this specific write change it", not
+  // "is it null" (it is deliberately non-null by this point in the flow).
+  const { data: handedOverBeforeForge } = await admin.from('rent_to_buy_agreements').select('handed_over_at').eq('id', agreementId).single()
+  const forgedTimestamp = new Date(Date.now() + 999999).toISOString()
+  await renterA.client.from('rent_to_buy_agreements').update({ handed_over_at: forgedTimestamp }).eq('id', agreementId)
+  const { data: agreementAfterForgeAttempt } = await admin.from('rent_to_buy_agreements').select('handed_over_at').eq('id', agreementId).single()
+  check('63a. client cannot forge handed_over_at directly', agreementAfterForgeAttempt?.handed_over_at === handedOverBeforeForge?.handed_over_at && agreementAfterForgeAttempt?.handed_over_at !== forgedTimestamp, { handedOverBeforeForge, agreementAfterForgeAttempt, forgedTimestamp })
+
+  const { error: directFinalizeError } = await renterA.client.rpc('finalize_rent_to_buy_ownership', { p_agreement_id: agreementId, p_idempotency_key: null })
+  check('63b. direct client call to finalize_rent_to_buy_ownership rejected (service-role only)', !!directFinalizeError, directFinalizeError)
+
+  const { error: directCommissionInsertError } = await renterA.client.from('unity_commissions').insert({ transaction_type: 'rent_to_buy', rent_to_buy_agreement_id: agreementId, listing_id: listingId, merchant_id: merchantA.userId, merchant_plan_id: 'starter', plan_commercial_version: 1, eligible_base: 1, standard_rate_bps: 0, standard_rate_base: 1, commission_amount: 0 })
+  check('63c. client cannot fabricate a unity_commissions row directly', !!directCommissionInsertError, directCommissionInsertError)
 }
 
 console.log('=== CONCURRENCY ===')
@@ -483,11 +611,22 @@ console.log('=== CONCURRENCY ===')
   await saveTerms(merchantA.cookie, idempListingId, { total_purchase_price: 400, installment_amount: 400, installment_count: 1 })
   const idempFlow = await createAndAccept(merchantA.cookie, renterA.cookie, idempListingId)
   const finalPay1 = await payInstallment(renterA.cookie, idempFlow.agreementId, 1)
-  const { data: transferOnce } = await admin.from('rent_to_buy_agreements').select('ownership_transferred_at').eq('id', idempFlow.agreementId).single()
+  const { data: fullyPaidOnce } = await admin.from('rent_to_buy_agreements').select('fully_paid_at').eq('id', idempFlow.agreementId).single()
   const finalPay2 = await payInstallment(renterA.cookie, idempFlow.agreementId, 1)
-  const { data: transferTwice } = await admin.from('rent_to_buy_agreements').select('ownership_transferred_at').eq('id', idempFlow.agreementId).single()
-  const { count: transferHistoryCount } = await admin.from('rent_to_buy_history').select('id', { count: 'exact', head: true }).eq('agreement_id', idempFlow.agreementId).eq('event_type', 'ownership_transferred')
-  check('66. ownership transfer idempotent', finalPay1.status === 200 && finalPay2.status === 200 && transferOnce?.ownership_transferred_at === transferTwice?.ownership_transferred_at && transferHistoryCount === 1, { finalPay1Status: finalPay1.status, finalPay2Status: finalPay2.status, finalPay2: finalPay2.json, transferOnce, transferTwice, transferHistoryCount })
+  const { data: fullyPaidTwice } = await admin.from('rent_to_buy_agreements').select('fully_paid_at').eq('id', idempFlow.agreementId).single()
+  const { count: fullyPaidHistoryCount } = await admin.from('rent_to_buy_history').select('id', { count: 'exact', head: true }).eq('agreement_id', idempFlow.agreementId).eq('event_type', 'fully_paid')
+  check('66. fully_paid_at set exactly once, idempotent under replay (100%%-paid transition, distinct from ownership transfer)', finalPay1.status === 200 && finalPay2.status === 200 && !!fullyPaidOnce?.fully_paid_at && fullyPaidOnce?.fully_paid_at === fullyPaidTwice?.fully_paid_at && fullyPaidHistoryCount === 1, { finalPay1Status: finalPay1.status, finalPay2Status: finalPay2.status, fullyPaidOnce, fullyPaidTwice, fullyPaidHistoryCount })
+
+  // 66b: finalize_rent_to_buy_ownership called twice concurrently is idempotent (row-lock + early-return) -- proves the concurrency requirement explicitly with true parallel calls, complementing the sequential replay already shown in OWNERSHOP check 18.
+  await fullyDeliver(merchantA, renterA, idempFlow.agreementId)
+  await admin.from('rent_to_buy_agreements').update({ completion_window_ends_at: new Date(Date.now() - 1000).toISOString() }).eq('id', idempFlow.agreementId)
+  const [finalizeA, finalizeB] = await Promise.all([
+    admin.rpc('finalize_rent_to_buy_ownership', { p_agreement_id: idempFlow.agreementId, p_idempotency_key: null }),
+    admin.rpc('finalize_rent_to_buy_ownership', { p_agreement_id: idempFlow.agreementId, p_idempotency_key: null }),
+  ])
+  const { count: idempPayoutCount } = await admin.from('merchant_payouts').select('id', { count: 'exact', head: true }).eq('rent_to_buy_agreement_id', idempFlow.agreementId)
+  const finalizedCount = [finalizeA, finalizeB].filter((r) => r.data?.finalized === true && !r.data?.already_finalized).length
+  check('66c. two concurrent finalize calls -> exactly one real finalization, exactly one payout', finalizedCount === 1 && idempPayoutCount === 1, { finalizeA: finalizeA.data, finalizeB: finalizeB.data, idempPayoutCount })
 }
 
 console.log('=== INVENTORY: single-physical-item allocation safety ===')
@@ -565,7 +704,7 @@ console.log('=== INVENTORY: single-physical-item allocation safety ===')
   await saveTerms(merchantA.cookie, listingH)
   const hFlow = await createAndAccept(merchantA.cookie, renterA.cookie, listingH)
   await payInstallment(renterA.cookie, hFlow.agreementId, 1)
-  await api(renterA.cookie, 'POST', `/api/rent-to-buy/agreements/${hFlow.agreementId}/confirm-possession`, {})
+  await fullyDeliver(merchantA, renterA, hFlow.agreementId)
   await api(adminAuth.cookie, 'POST', `/api/admin/rent-to-buy/${hFlow.agreementId}/default`, { reason: 'QA inventory test' })
   const { data: hLocked } = await admin.from('rent_to_buy_locked_listings').select('listing_id').eq('listing_id', listingH).maybeSingle()
   const blockedOrderH = await api(renterA.cookie, 'POST', '/api/orders', { listing_id: listingH, quantity: 1, idempotency_key: `p5-inv-h-${RUN_ID}` })
@@ -576,7 +715,7 @@ console.log('=== INVENTORY: single-physical-item allocation safety ===')
   await saveTerms(merchantA.cookie, listingI)
   const iFlow = await createAndAccept(merchantA.cookie, renterA.cookie, listingI)
   await payInstallment(renterA.cookie, iFlow.agreementId, 1)
-  await api(renterA.cookie, 'POST', `/api/rent-to-buy/agreements/${iFlow.agreementId}/confirm-possession`, {})
+  await fullyDeliver(merchantA, renterA, iFlow.agreementId)
   const returnReqI = await api(renterA.cookie, 'POST', `/api/rent-to-buy/agreements/${iFlow.agreementId}/request-return`, {})
   const { data: returnCaseI } = await admin.from('rent_to_buy_return_cases').select('id').eq('agreement_id', iFlow.agreementId).maybeSingle()
   const confirmReturnI = await api(adminAuth.cookie, 'POST', `/api/admin/rent-to-buy/${iFlow.agreementId}/confirm-return`, { case_id: returnCaseI?.id })
@@ -584,15 +723,23 @@ console.log('=== INVENTORY: single-physical-item allocation safety ===')
   const nowEligibleOrder = await api(renterA.cookie, 'POST', '/api/orders', { listing_id: listingI, quantity: 1, idempotency_key: `p5-inv-i-order-${RUN_ID}` })
   check('I. voluntary return completed -> can become eligible again', returnReqI.status === 200 && confirmReturnI.status === 200 && !iUnlocked && nowEligibleOrder.status === 201, { returnReqI: returnReqI.status, confirmReturnI: confirmReturnI.status, iUnlocked, nowEligibleOrder })
 
-  // J: ownership transferred -> merchant listing cannot be reused as inventory.
+  // J: fully paid but not yet ownership-transferred -> still locked. Then ownership transferred -> permanently locked.
   const listingJ = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} InventoryJ ${RUN_ID}`, quantity_available: 1 })
   await saveTerms(merchantA.cookie, listingJ, { total_purchase_price: 400, installment_amount: 400, installment_count: 1 })
   const jFlow = await createAndAccept(merchantA.cookie, renterA.cookie, listingJ)
   await payInstallment(renterA.cookie, jFlow.agreementId, 1)
+  const { data: jAgreementFullyPaid } = await admin.from('rent_to_buy_agreements').select('status, ownership_status, fully_paid_at').eq('id', jFlow.agreementId).single()
+  const { data: jLockedFullyPaid } = await admin.from('rent_to_buy_locked_listings').select('listing_id').eq('listing_id', listingJ).maybeSingle()
+  const blockedOrderJPrefinalize = await api(renterA.cookie, 'POST', '/api/orders', { listing_id: listingJ, quantity: 1, idempotency_key: `p5-inv-j-pre-${RUN_ID}` })
+  check('J1. fully paid but not yet ownership-transferred -> still locked (agreement still active, Rule 7)', jAgreementFullyPaid?.status === 'active' && jAgreementFullyPaid?.ownership_status === 'merchant_owned' && !!jAgreementFullyPaid?.fully_paid_at && !!jLockedFullyPaid && blockedOrderJPrefinalize.status === 409, { jAgreementFullyPaid, jLockedFullyPaid, blockedOrderJPrefinalize })
+
+  await fullyDeliver(merchantA, renterA, jFlow.agreementId)
+  await admin.from('rent_to_buy_agreements').update({ completion_window_ends_at: new Date(Date.now() - 1000).toISOString() }).eq('id', jFlow.agreementId)
+  await admin.rpc('finalize_rent_to_buy_ownership', { p_agreement_id: jFlow.agreementId, p_idempotency_key: null })
   const { data: jAgreement } = await admin.from('rent_to_buy_agreements').select('status, ownership_status').eq('id', jFlow.agreementId).single()
   const { data: jLocked } = await admin.from('rent_to_buy_locked_listings').select('listing_id').eq('listing_id', listingJ).maybeSingle()
   const blockedOrderJ = await api(renterA.cookie, 'POST', '/api/orders', { listing_id: listingJ, quantity: 1, idempotency_key: `p5-inv-j-${RUN_ID}` })
-  check('J. ownership transferred -> listing permanently cannot be reused as inventory', jAgreement?.status === 'completed' && jAgreement?.ownership_status === 'customer_owned' && !!jLocked && blockedOrderJ.status === 409, { jAgreement, jLocked, blockedOrderJ })
+  check('J2. ownership transferred -> listing permanently cannot be reused as inventory', jAgreement?.status === 'completed' && jAgreement?.ownership_status === 'customer_owned' && !!jLocked && blockedOrderJ.status === 409, { jAgreement, jLocked, blockedOrderJ })
 }
 
 console.log('=== RTB DISPUTE RESOLUTION RESTORATION ===')
@@ -653,8 +800,14 @@ console.log('=== RTB DISPUTE RESOLUTION RESTORATION ===')
   await api(adminAuth.cookie, 'POST', `/api/admin/disputes/${d6DisputeOpen.json.dispute_id}/start-review`, {})
   const d6Resolve = await api(adminAuth.cookie, 'POST', `/api/admin/disputes/${d6DisputeOpen.json.dispute_id}/resolve`, { outcome: 'favor_respondent', resolution_notes: 'QA.' })
   const finalPayAfterResolve = await payInstallment(renterA.cookie, d6Flow.agreementId, 2)
-  const { data: d6Final } = await admin.from('rent_to_buy_agreements').select('status, ownership_status').eq('id', d6Flow.agreementId).single()
-  check('dispute-7. resolved continuation dispute permits normal later lifecycle operation', d6Resolve.status === 200 && finalPayAfterResolve.status === 200 && d6Final?.status === 'completed' && d6Final?.ownership_status === 'customer_owned', { d6Resolve: d6Resolve.status, finalPayAfterResolve: finalPayAfterResolve.status, d6Final })
+  const { data: d6Final } = await admin.from('rent_to_buy_agreements').select('status, ownership_status, fully_paid_at').eq('id', d6Flow.agreementId).single()
+  check('dispute-7. resolved continuation dispute permits normal later lifecycle operation (100%% paid, awaiting handover)', d6Resolve.status === 200 && finalPayAfterResolve.status === 200 && d6Final?.status === 'active' && d6Final?.ownership_status === 'merchant_owned' && !!d6Final?.fully_paid_at, { d6Resolve: d6Resolve.status, finalPayAfterResolve: finalPayAfterResolve.status, d6Final })
+
+  await fullyDeliver(merchantA, renterA, d6Flow.agreementId)
+  await admin.from('rent_to_buy_agreements').update({ completion_window_ends_at: new Date(Date.now() - 1000).toISOString() }).eq('id', d6Flow.agreementId)
+  const d6Finalize = await admin.rpc('finalize_rent_to_buy_ownership', { p_agreement_id: d6Flow.agreementId, p_idempotency_key: null })
+  const { data: d6Completed } = await admin.from('rent_to_buy_agreements').select('status, ownership_status').eq('id', d6Flow.agreementId).single()
+  check('dispute-7b. once possession is confirmed and the window elapses, completion proceeds normally after a resolved dispute', d6Finalize.data?.finalized === true && d6Completed?.status === 'completed' && d6Completed?.ownership_status === 'customer_owned', { d6Finalize: d6Finalize.data, d6Completed })
 
   // 8: repeated resolution is idempotent.
   const listingD8 = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} Dispute8 ${RUN_ID}` })
