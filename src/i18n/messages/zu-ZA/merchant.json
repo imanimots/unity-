@@ -795,7 +795,17 @@
     "editUnavailableTitle": "Ukuhlela uhlu oselulotshiwe akutholakali okwamanje",
     "pauseListingTitle": "Misa uhlu",
     "activateListingTitle": "Yenza uhlu lusebenze",
-    "rentToBuyTermsTitle": "Setha imigomo Yokuqasha-ukuze-Uthenge"
+    "rentToBuyTermsTitle": "Setha imigomo Yokuqasha-ukuze-Uthenge",
+    "pauseConfirmTitle": "Misa lolu hlu?",
+    "pauseConfirmDesc": "Ngeke lusatholakala kumakhasimende amasha. Amabhukhingi, ama-oda, nezivumelwano ezikhona azikhanseliwe. Ungaluqalisa kabusha kamuva, kuncike emkhawulweni wokushicilela wohlelo lwakho lwamanje.",
+    "pausing": "Kuyamiswa…",
+    "cancel": "Khansela",
+    "suspendedTitle": "Lolu hlu lumisiwe umlawuli",
+    "pauseResumeErrors": {
+      "generic": "Ayikwazanga ukubuyekeza lolu hlu — sicela uzame futhi",
+      "pausedSuccess": "Uhlu lumisiwe",
+      "resumedSuccess": "Uhlu luqaliswe kabusha"
+    }
   },
   "tools": {
     "eyebrow": "Amathuluzi Omthengisi",

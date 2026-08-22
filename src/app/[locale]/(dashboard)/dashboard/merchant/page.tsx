@@ -23,11 +23,12 @@ const BOOKING_STATUS_CLASSES: Record<BookingStatus, string> = {
 }
 
 const LISTING_STATUS_CLASSES: Record<ListingStatus, string> = {
-  active:  'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  paused:  'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  draft:   'bg-[#F2EDE8] text-[#6B5B55] dark:bg-[#2A1A1A] dark:text-[#9B8B85]',
-  pending: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  rented:  'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  active:    'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  paused:    'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  draft:     'bg-[#F2EDE8] text-[#6B5B55] dark:bg-[#2A1A1A] dark:text-[#9B8B85]',
+  pending:   'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  rented:    'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  suspended: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 }
 
 export default async function MerchantDashboard() {

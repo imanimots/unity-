@@ -795,7 +795,17 @@
     "editUnavailableTitle": "Om 'n ingediende notering te wysig is nog nie beskikbaar nie",
     "pauseListingTitle": "Onderbreek notering",
     "activateListingTitle": "Aktiveer notering",
-    "rentToBuyTermsTitle": "Stel Huur-om-te-Koop-voorwaardes op"
+    "rentToBuyTermsTitle": "Stel Huur-om-te-Koop-voorwaardes op",
+    "pauseConfirmTitle": "Onderbreek hierdie notering?",
+    "pauseConfirmDesc": "Dit sal nie meer vir nuwe kliënte beskikbaar wees nie. Bestaande besprekings, bestellings en ooreenkomste word nie gekanselleer nie. Jy kan dit later hervat, onderworpe aan jou huidige plan se publikasieperk.",
+    "pausing": "Word onderbreek…",
+    "cancel": "Kanselleer",
+    "suspendedTitle": "Hierdie notering is deur ’n administrateur geskors",
+    "pauseResumeErrors": {
+      "generic": "Kon nie hierdie notering opdateer nie — probeer asseblief weer",
+      "pausedSuccess": "Notering onderbreek",
+      "resumedSuccess": "Notering hervat"
+    }
   },
   "tools": {
     "eyebrow": "Handelaargereedskap",

@@ -1,11 +1,12 @@
 import Image from 'next/image'
 import { getTranslations } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
-import { Plus, Eye, Pencil, PauseCircle, PlayCircle, MoreHorizontal, Package, ArrowLeft, AlertTriangle, Wallet } from 'lucide-react'
+import { Plus, Eye, Pencil, MoreHorizontal, Package, ArrowLeft, AlertTriangle, Wallet } from 'lucide-react'
 import { IS_MOCK_MODE, MOCK_MY_LISTINGS } from '@/lib/mock/data'
 import { getServerUser } from '@/lib/data/profiles'
 import { getListingsByMerchant } from '@/lib/data/listings'
 import { isRentToBuyEnabled } from '@/lib/rent-to-buy/config'
+import { PauseResumeButton } from '@/components/listings/pause-resume-button'
 import type { Listing } from '@/types'
 
 export const metadata = { title: 'My Listings — Unity' }
@@ -253,22 +254,13 @@ export default async function MyListingsPage() {
                       <Wallet size={16} />
                     </Link>
                   )}
-                  {listing.status === 'active' ? (
-                    <button
-                      className="p-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 text-[#9B8B85] hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
-                      title={tPage('pauseListingTitle')}
-                    >
-                      <PauseCircle size={16} />
-                    </button>
-                  ) : listing.status === 'paused' ? (
-                    <button
-                      className="p-2 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 text-[#9B8B85] hover:text-green-600 dark:hover:text-green-400 transition-colors"
-                      title={tPage('activateListingTitle')}
-                    >
-                      <PlayCircle size={16} />
-                    </button>
+                  {listing.status === 'active' || listing.status === 'paused' ? (
+                    <PauseResumeButton listingId={listing.id} status={listing.status} />
                   ) : (
-                    <button className="p-2 rounded-lg text-[#F2EDE8] dark:text-[#2A1A1A] cursor-default">
+                    <button
+                      className="p-2 rounded-lg text-[#F2EDE8] dark:text-[#2A1A1A] cursor-default"
+                      title={listing.status === 'suspended' ? tPage('suspendedTitle') : undefined}
+                    >
                       <MoreHorizontal size={16} />
                     </button>
                   )}

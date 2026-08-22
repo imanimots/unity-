@@ -1,6 +1,6 @@
 export type UserRole = 'renter' | 'merchant' | 'both' | 'admin'
 export type KycStatus = 'none' | 'pending' | 'approved' | 'rejected'
-export type ListingStatus = 'draft' | 'pending' | 'active' | 'paused' | 'rented'
+export type ListingStatus = 'draft' | 'pending' | 'active' | 'paused' | 'rented' | 'suspended'
 export type BookingStatus = 'pending' | 'approved' | 'active' | 'returned' | 'disputed' | 'cancelled'
 export type ShippingPayer = 'renter' | 'merchant' | 'split' | 'negotiate'
 export type ItemCondition = 'new' | 'like_new' | 'good' | 'fair'

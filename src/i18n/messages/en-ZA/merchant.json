@@ -795,7 +795,17 @@
     "editUnavailableTitle": "Editing a submitted listing isn't available yet",
     "pauseListingTitle": "Pause listing",
     "activateListingTitle": "Activate listing",
-    "rentToBuyTermsTitle": "Configure Rent-to-Buy terms"
+    "rentToBuyTermsTitle": "Configure Rent-to-Buy terms",
+    "pauseConfirmTitle": "Pause this listing?",
+    "pauseConfirmDesc": "It will stop being available to new customers. Existing bookings, orders, and agreements are not cancelled. You can resume it later, subject to your current plan's publication limit.",
+    "pausing": "Pausing…",
+    "cancel": "Cancel",
+    "suspendedTitle": "This listing has been suspended by an administrator",
+    "pauseResumeErrors": {
+      "generic": "Could not update this listing — please try again",
+      "pausedSuccess": "Listing paused",
+      "resumedSuccess": "Listing resumed"
+    }
   },
   "tools": {
     "eyebrow": "Merchant Tools",

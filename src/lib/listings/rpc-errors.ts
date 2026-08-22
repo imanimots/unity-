@@ -37,6 +37,27 @@ export function mapListingRpcError(message: string | undefined): { status: numbe
   if (m.includes('not authenticated')) {
     return { status: 401, error: 'You must be signed in.' }
   }
+  if (m.includes('not authorized')) {
+    return { status: 401, error: 'You must be signed in.' }
+  }
+  if (m.includes('listing not found')) {
+    return { status: 404, error: 'Listing not found.' }
+  }
+  if (m.includes('you do not own this listing')) {
+    return { status: 403, error: 'You do not own this listing.' }
+  }
+  if (m.includes('only an active listing can be paused')) {
+    return { status: 409, error: 'Only an active listing can be paused.' }
+  }
+  if (m.includes('only a paused listing can be resumed')) {
+    return { status: 409, error: 'Only a paused listing can be resumed.' }
+  }
+  if (m.includes('active_publication_limit_reached') || m.includes('active_listing_limit_reached')) {
+    return { status: 422, error: 'Your current plan has reached its active publication limit. Upgrade your plan or pause another listing to make room.' }
+  }
+  if (m.includes('publication_frozen_pending_keep_set')) {
+    return { status: 409, error: 'Resolve your downgrade selection before resuming this listing.' }
+  }
 
   return { status: 500, error: 'Could not save your listing — please try again' }
 }

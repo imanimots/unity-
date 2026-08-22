@@ -89,14 +89,21 @@ Kept entirely separate from `listings.status` — see "Status vs. moderation" be
 
 ## Status vs. moderation
 
-`listings.status` (lifecycle: `draft`/`pending`/`active`/`paused`/`rented`, unchanged this pass) and `moderation_status` (review verdict: `pending`/`approved`/`rejected`/`requires_review`/`flagged`) are deliberately separate enums in separate tables. Conflating them would mean "is this listing visible to renters" and "has Unity reviewed it" fight over the same field. Once a real publishing-completeness service exists, a transition to `status = 'active'` will need to check `moderation_status = 'approved'` wherever moderation is required (by risk tier — see `getRiskRequirements()` in `src/lib/risk/engine.ts`) — that integration point is **not built this pass**.
+`listings.status` (lifecycle: `draft`/`pending`/`active`/`paused`/`rented`/`suspended`) and `moderation_status` (review verdict: `pending`/`approved`/`rejected`/`requires_review`/`flagged`) are deliberately separate enums in separate tables. Conflating them would mean "is this listing visible to renters" and "has Unity reviewed it" fight over the same field. `activate_listing()` (service-role only) is the completeness + moderation-check gate now referenced below — built and live, not merely planned.
+
+`paused` (merchant-controlled temporary withdrawal) and `suspended` (admin/moderation-controlled) are distinct states with distinct authority — a merchant can never self-resume a `suspended` listing; only `activate_listing()` (admin-invoked) can move a listing out of `suspended`.
+
+**Individual pause/resume is a basic listing lifecycle control available to every merchant subscription tier (Starter/Pro/Elite alike) — it is not a paid entitlement.** `POST /api/listings/[id]/pause` and `.../resume` call `merchant_pause_listing()`/`merchant_resume_listing()` directly, with no `bulkListingEnabled`-style gate. **Bulk listing management (pausing/resuming many listings at once) remains Pro/Elite-only** — `POST /api/listings/bulk` (gated on `entitlements.bulkListingEnabled`) loops the identical per-row RPCs, so the two paths share the exact same ownership/state/cap authority and differ only in whether the *bulk* capability is entitled.
 
 | Transition | Who |
 |---|---|
 | anything → `draft` | merchant (edit/save draft) |
 | `draft` → `pending` | merchant (submit for review) |
-| `active` → `paused` | merchant (self-service pause) |
-| any status → `active` | **blocked from direct client writes** — requires a future service-role completeness + moderation check |
+| `active` → `paused` | merchant (self-service, individual or bulk, any tier for individual — see above) |
+| `paused` → `active` | merchant (self-service resume — `merchant_resume_listing()`, revalidates publication cap + downgrade-freeze state on every call, any tier for individual) |
+| `active` → `suspended` | admin only (`suspend_listing()`, moderation action) |
+| `suspended` → `active` | admin only (`activate_listing()`) — merchants cannot self-resume a suspension |
+| `pending`/`suspended` → `active` | admin (`activate_listing()`, re-checks moderation + publication cap) |
 | any status → `rented` | **blocked from direct client writes** — requires a real booking transition, which doesn't exist yet |
 | any status, if starting from `draft`/`pending`/`paused`/`rented` and NOT changing to `active`/`rented` | merchant, freely (e.g. editing other fields while paused) |
 
