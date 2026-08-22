@@ -193,7 +193,7 @@
     "back": "Emuva",
     "enabledNotice": "Ukuqasha-ukuze-uthenge kuvunyelwe kule nto ohlwini.",
     "disabledNotice": "Ukuqasha-ukuze-uthenge akukavunyelwa kule nto ohlwini.",
-    "ownershipNotice": "Uhlala ungumnikazi wento kuze kube yilapho ikhasimende likhokhe isamba esigcwele ngezansi.",
+    "ownershipNotice": "Uhlala ungumnikazi wento kuze kube yilapho umthengi eseqedile inqubo yonke yokudluliswa kobunikazi engezansi — ukuba nento nobunikazi bayo kuhlukene.",
     "loading": "Kuyalayishwa…",
     "termsSaved": "Imigomo igciniwe.",
     "totalPurchasePrice": "Intengo ephelele yokuqasha-ukuze-uthenge (ZAR)",
@@ -207,7 +207,31 @@
     "saveAsDisabled": "Gcina njengokungavunyelwe",
     "errors": {
       "couldNotSave": "Ayikwazanga ukugcina imigomo"
-    }
+    },
+    "securityDepositNotice": "Igcinwa ehlukile enanini lokuthenga. Iyabuyiselwa lapho isivumelwano siphela ngempumelelo, ngaphandle uma ilahlekile ngenxa yokubuyiselwa kwesikhathi eside okuqinisekisiwe.",
+    "possessionSection": "Umthengi uthatha nini into?",
+    "possessionTrigger": "Isimo esidinga ukuze kuthathwe into",
+    "trigger": {
+      "firstPayment": "Ngemva kwenkokhelo yokuqala",
+      "installmentCount": "Ngemva kwenani lezavenga",
+      "percentage": "Ngemva kokuba iphesenti lenani likhokhiwe",
+      "fullPayment": "Kuphela ngemva kokuba inani lonke likhokhiwe",
+      "installmentCountValue": "Inani lezavenga elidingekayo",
+      "percentageValue": "Iphesenti lenani elidingekayo (%)"
+    },
+    "rentalUseSection": "Izinga lokuqasha/lokusebenzisa",
+    "rentalUseRateAmount": "Inani lezinga (ZAR)",
+    "rentalUseRateUnit": "Isisekelo sokukhokhisa",
+    "unit": {
+      "daily": "Ngosuku",
+      "weekly": "Ngeviki",
+      "monthly": "Ngenyanga"
+    },
+    "rentalUseNotice": "Isetshenziswa kuphela uma lesi sivumelwano siphela ngaphambi kokuba ubunikazi budluliswe — i-Unity ikhokhisa ikhomishini yayo yokuqasha kuleli zinga ngesikhathi umthengi ayenayo ngempela into, hhayi enanini lokuthenga.",
+    "wearDamageStandard": "Izinga lokugugeka nokulimala (akudingekile — kuboniswa kumthengi ngaphambi kokuba avume)",
+    "gracePeriodDays": "Isikhathi esengeziwe ngaphambi kokuthi inkokhelo engakhokhwanga ifaneleke ekwehluleceni (izinsuku)",
+    "returnWindowDays": "Isikhathi sokubuyisela ngemva kokwehluleka ngokusemthethweni (izinsuku)",
+    "escrowNotice": "Izavenga zigcinwa kuze kube yilapho isivumelwano siphothulwa ngempumelelo noma sixazululwe ngemva kokwehluleka — azikhokhelwa wena ngokushesha."
   },
   "pricing": {
     "sectionLabel": "Amaqhinga Omthengisi",
@@ -770,7 +794,8 @@
     "continueEditingDraftTitle": "Qhubeka uhlele uhlaka",
     "editUnavailableTitle": "Ukuhlela uhlu oselulotshiwe akutholakali okwamanje",
     "pauseListingTitle": "Misa uhlu",
-    "activateListingTitle": "Yenza uhlu lusebenze"
+    "activateListingTitle": "Yenza uhlu lusebenze",
+    "rentToBuyTermsTitle": "Setha imigomo Yokuqasha-ukuze-Uthenge"
   },
   "tools": {
     "eyebrow": "Amathuluzi Omthengisi",

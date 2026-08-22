@@ -193,7 +193,7 @@
     "back": "Terug",
     "enabledNotice": "Huur-om-te-koop is vir hierdie lysing geaktiveer.",
     "disabledNotice": "Huur-om-te-koop is nog nie vir hierdie lysing geaktiveer nie.",
-    "ownershipNotice": "Jy bly die eienaar van die item totdat die kliënt die volle bedrag hieronder betaal het.",
+    "ownershipNotice": "Jy bly die eienaar van die item totdat die klant die volle eienaarskapoordragproses hieronder voltooi het — besit en eienaarskap is afsonderlik.",
     "loading": "Laai tans…",
     "termsSaved": "Voorwaardes gestoor.",
     "totalPurchasePrice": "Totale huur-om-te-koop-koopprys (ZAR)",
@@ -207,7 +207,31 @@
     "saveAsDisabled": "Stoor as gedeaktiveer",
     "errors": {
       "couldNotSave": "Kon nie voorwaardes stoor nie"
-    }
+    },
+    "securityDepositNotice": "Word afsonderlik van die aankoopprys gehou. Terugbetaal wanneer die ooreenkoms suksesvol eindig, tensy dit verbeur word weens ’n bevestigde laat teruggawe.",
+    "possessionSection": "Wanneer neem die klant besit?",
+    "possessionTrigger": "Besitsneemvoorwaarde",
+    "trigger": {
+      "firstPayment": "Na die eerste betaling",
+      "installmentCount": "Na ’n aantal paaiemente",
+      "percentage": "Na ’n persentasie van die prys betaal is",
+      "fullPayment": "Slegs nadat die volle prys betaal is",
+      "installmentCountValue": "Aantal paaiemente vereis",
+      "percentageValue": "Persentasie van prys vereis (%)"
+    },
+    "rentalUseSection": "Huur-/gebruikstarief",
+    "rentalUseRateAmount": "Tariefbedrag (ZAR)",
+    "rentalUseRateUnit": "Faktureringsbasis",
+    "unit": {
+      "daily": "Per dag",
+      "weekly": "Weekliks",
+      "monthly": "Per maand"
+    },
+    "rentalUseNotice": "Word slegs gebruik as hierdie ooreenkoms eindig voordat eienaarskap oorgedra word — Unity hef sy huurkommissie op hierdie tarief vir die tyd wat die klant werklik die item gehad het, nooit op die aankoopprys nie.",
+    "wearDamageStandard": "Standaard vir slytasie en skade (opsioneel — aan die klant getoon voordat hulle aanvaar)",
+    "gracePeriodDays": "Genadetydperk voordat ’n gemiste betaling vir gebrekstatus kwalifiseer (dae)",
+    "returnWindowDays": "Teruggawevenster na ’n formele gebrekstatus (dae)",
+    "escrowNotice": "Paaiemente word in trust gehou totdat die ooreenkoms suksesvol afgehandel of na ’n gebrekstatus afgereken word — dit word nie onmiddellik aan jou uitbetaal nie."
   },
   "pricing": {
     "sectionLabel": "Handelaarplanne",
@@ -770,7 +794,8 @@
     "continueEditingDraftTitle": "Gaan voort om konsep te wysig",
     "editUnavailableTitle": "Om 'n ingediende notering te wysig is nog nie beskikbaar nie",
     "pauseListingTitle": "Onderbreek notering",
-    "activateListingTitle": "Aktiveer notering"
+    "activateListingTitle": "Aktiveer notering",
+    "rentToBuyTermsTitle": "Stel Huur-om-te-Koop-voorwaardes op"
   },
   "tools": {
     "eyebrow": "Handelaargereedskap",

@@ -193,7 +193,7 @@
     "back": "Back",
     "enabledNotice": "Rent-to-buy is enabled for this listing.",
     "disabledNotice": "Rent-to-buy is not yet enabled for this listing.",
-    "ownershipNotice": "You remain the owner of the item until the customer has paid the full amount below.",
+    "ownershipNotice": "You remain the owner of the item until the customer has completed the full ownership-transfer process below — possession and ownership are separate.",
     "loading": "Loading…",
     "termsSaved": "Terms saved.",
     "totalPurchasePrice": "Total rent-to-buy purchase price (ZAR)",
@@ -207,7 +207,31 @@
     "saveAsDisabled": "Save as disabled",
     "errors": {
       "couldNotSave": "Could not save terms"
-    }
+    },
+    "securityDepositNotice": "Held separately from the purchase price. Refunded when the agreement ends successfully, unless forfeited for a confirmed late return.",
+    "possessionSection": "When does the customer take possession?",
+    "possessionTrigger": "Possession trigger",
+    "trigger": {
+      "firstPayment": "After the first payment",
+      "installmentCount": "After a number of instalments",
+      "percentage": "After a percentage of the price is paid",
+      "fullPayment": "Only after the full price is paid",
+      "installmentCountValue": "Number of instalments required",
+      "percentageValue": "Percentage of price required (%)"
+    },
+    "rentalUseSection": "Rental/use rate",
+    "rentalUseRateAmount": "Rate amount (ZAR)",
+    "rentalUseRateUnit": "Billing basis",
+    "unit": {
+      "daily": "Per day",
+      "weekly": "Per week",
+      "monthly": "Per month"
+    },
+    "rentalUseNotice": "Used only if this agreement ends before ownership transfers — Unity charges its rental commission on this rate for the time the customer actually had the item, never on the purchase price.",
+    "wearDamageStandard": "Wear and damage standard (optional — shown to the customer before they accept)",
+    "gracePeriodDays": "Grace period before a missed payment becomes default-eligible (days)",
+    "returnWindowDays": "Return window after a formal default (days)",
+    "escrowNotice": "Instalments are held (escrow-governed) until the agreement completes successfully or is settled after a default — they are not paid out to you immediately."
   },
   "pricing": {
     "sectionLabel": "Merchant Plans",
@@ -770,7 +794,8 @@
     "continueEditingDraftTitle": "Continue editing draft",
     "editUnavailableTitle": "Editing a submitted listing isn't available yet",
     "pauseListingTitle": "Pause listing",
-    "activateListingTitle": "Activate listing"
+    "activateListingTitle": "Activate listing",
+    "rentToBuyTermsTitle": "Configure Rent-to-Buy terms"
   },
   "tools": {
     "eyebrow": "Merchant Tools",

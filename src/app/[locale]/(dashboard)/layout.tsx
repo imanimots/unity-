@@ -6,6 +6,7 @@ import { redirect } from '@/i18n/navigation'
 import { requireAuth } from '@/lib/supabase/require-admin'
 import { PERMANENT_NOINDEX } from '@/lib/seo/config'
 import { isPersonalizationEnabled } from '@/lib/personalization/config'
+import { isRentToBuyEnabled } from '@/lib/rent-to-buy/config'
 
 // Every authenticated dashboard route (renter/merchant/orders/barter/
 // disputes/checkout/booking-transaction pages) is always noindex,
@@ -37,7 +38,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const messages = await getMessages()
   return (
     <NextIntlClientProvider messages={messages}>
-      <Navbar personalizationEnabled={isPersonalizationEnabled()} />
+      <Navbar personalizationEnabled={isPersonalizationEnabled()} rentToBuyEnabled={isRentToBuyEnabled()} />
       <main className="pt-16 min-h-screen bg-[#FAF8F5] dark:bg-[#0F0A0A]">
         <div className="pt-8 pb-16">
           {children}

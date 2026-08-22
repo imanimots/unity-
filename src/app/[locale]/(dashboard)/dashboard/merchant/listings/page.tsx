@@ -1,10 +1,11 @@
 import Image from 'next/image'
 import { getTranslations } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
-import { Plus, Eye, Pencil, PauseCircle, PlayCircle, MoreHorizontal, Package, ArrowLeft, AlertTriangle } from 'lucide-react'
+import { Plus, Eye, Pencil, PauseCircle, PlayCircle, MoreHorizontal, Package, ArrowLeft, AlertTriangle, Wallet } from 'lucide-react'
 import { IS_MOCK_MODE, MOCK_MY_LISTINGS } from '@/lib/mock/data'
 import { getServerUser } from '@/lib/data/profiles'
 import { getListingsByMerchant } from '@/lib/data/listings'
+import { isRentToBuyEnabled } from '@/lib/rent-to-buy/config'
 import type { Listing } from '@/types'
 
 export const metadata = { title: 'My Listings — Unity' }
@@ -108,6 +109,7 @@ export default async function MyListingsPage() {
   const t = await getTranslations('marketplace')
   const tPage = await getTranslations('merchant.listingsPage')
   const tMerchant = await getTranslations('merchant')
+  const rentToBuyEnabled = isRentToBuyEnabled()
   const listings = await getMyListings()
   const { moderation, ownership } = await getModerationSummaries(listings.map((l) => l.id))
 
@@ -241,6 +243,15 @@ export default async function MyListingsPage() {
                     >
                       <Pencil size={16} />
                     </button>
+                  )}
+                  {rentToBuyEnabled && (
+                    <Link
+                      href={`/dashboard/merchant/listings/${listing.id}/rent-to-buy`}
+                      className="p-2 rounded-lg hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors"
+                      title={tPage('rentToBuyTermsTitle')}
+                    >
+                      <Wallet size={16} />
+                    </Link>
                   )}
                   {listing.status === 'active' ? (
                     <button

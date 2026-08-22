@@ -3,7 +3,7 @@ import { getTranslations, getLocale } from 'next-intl/server'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
-import { ShieldCheck, Star, MapPin, ArrowLeft, ArrowRight, CheckCircle, UserCheck, Repeat } from 'lucide-react'
+import { ShieldCheck, Star, MapPin, ArrowLeft, ArrowRight, CheckCircle, UserCheck, Repeat, Wallet } from 'lucide-react'
 import { getListing, getSimilarListings, getListingReviews, getAverageRating, getListingsByMerchant } from '@/lib/data/listings'
 import { getRiskRequirements, RISK_TIER_LABELS } from '@/lib/risk/engine'
 import { ImageGallery } from '@/components/listings/image-gallery'
@@ -17,6 +17,10 @@ import { ProposeTradeButton } from '@/components/barter/propose-trade-button'
 import { getRequestProfile } from '@/lib/supabase/require-admin'
 import { ProfileLink } from '@/components/shared/profile-link'
 import { isListingBarterLocked, getAllBarterLockedListingIds } from '@/lib/barter/listing-lock'
+import { isListingRentToBuyLocked } from '@/lib/rent-to-buy/listing-lock'
+import { getPublicRentToBuyTerms } from '@/lib/rent-to-buy/public-terms'
+import { isRentToBuyEnabled } from '@/lib/rent-to-buy/config'
+import { RequestRentToBuyButton } from '@/components/rent-to-buy/request-rent-to-buy-button'
 import { absoluteUrl, isMarketplaceIndexingEnabled, PERMANENT_NOINDEX } from '@/lib/seo/config'
 import { formatDate, formatMoneyFromRands } from '@/lib/i18n/format'
 import type { Locale } from '@/i18n/locales'
@@ -66,6 +70,7 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
   const { ref: affiliateRef } = await searchParams
   const tCommon = await getTranslations('common')
   const t = await getTranslations('marketplace.detail')
+  const tRtb = await getTranslations('rtb')
   const locale = (await getLocale()) as Locale
   const CONDITION_LABEL: Record<string, string> = {
     new: t('condition.new'), like_new: t('condition.like_new'), good: t('condition.good'), fair: t('condition.fair'),
@@ -97,6 +102,19 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
   const viewer = await getRequestProfile()
   const canProposeTrade = Boolean(viewer) && viewer!.userId !== listing.merchant_id && !isBarterLocked
 
+  // Rent-to-Buy — a listing-attached transaction option (rent_to_buy_
+  // listing_terms, 1:1 on listing_id), not a separate listing/duplicate
+  // entity. RENT_TO_BUY_ENABLED gates the fetch itself so a disabled
+  // flag never even queries RTB data (Rule 28 -- flag-off must be
+  // byte-identical to before this feature existed). Locking mirrors
+  // barter's own precedent exactly: an accepted RTB agreement suppresses
+  // ALL transaction CTAs on this listing (Buy/Rent/Barter/RTB alike),
+  // not only a new RTB request.
+  const rtbTerms = isRentToBuyEnabled() ? await getPublicRentToBuyTerms(listing.id) : null
+  const isRtbLocked = rtbTerms ? await isListingRentToBuyLocked(listing.id) : false
+  const isCommitted = isBarterLocked || isRtbLocked
+  const canRequestRtb = Boolean(rtbTerms) && !isCommitted && Boolean(viewer) && viewer!.userId !== listing.merchant_id
+
   let viewerListings: Awaited<ReturnType<typeof getListingsByMerchant>> = []
   let ownerListings: Awaited<ReturnType<typeof getListingsByMerchant>> = []
   if (canProposeTrade) {
@@ -115,7 +133,7 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
   // server-side via getTranslations() directly and never touches this
   // provider's payload.
   const messages = await getMessages()
-  const scoped = { rent: { bookingCard: messages.rent.bookingCard } }
+  const scoped = { rent: { bookingCard: messages.rent.bookingCard }, rtb: messages.rtb }
 
   const personalizationMode: PersonalizationMode | null =
     listing.listing_type === 'sale' ? 'buy' : listing.listing_type === 'rental' ? 'rent' : null
@@ -360,6 +378,33 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
               </div>
             )}
 
+            {/* Rent-to-Buy summary — only for a listing with enabled, public RTB terms. Full material terms + acceptance happen in the request dialog (RequestRentToBuyButton); this is the truthful, at-a-glance summary Rule 9's "no overloaded card" instruction asks for. */}
+            {rtbTerms && (
+              <div>
+                <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-4 flex items-center gap-2">
+                  <Wallet size={14} /> {tRtb('rtbSectionTitle')}
+                </h2>
+                <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-4">{tRtb('rtbSectionDesc')}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    { label: tRtb('totalPurchasePriceLabel'), value: formatMoneyFromRands(rtbTerms.total_purchase_price, rtbTerms.currency, locale) },
+                    { label: tRtb('installmentSummaryLabel'), value: `${formatMoneyFromRands(rtbTerms.installment_amount, rtbTerms.currency, locale)} × ${rtbTerms.installment_count} (${tRtb(`frequency.${rtbTerms.payment_frequency}`)})` },
+                    ...(rtbTerms.security_deposit_amount ? [{ label: tRtb('securityDepositLabel'), value: formatMoneyFromRands(rtbTerms.security_deposit_amount, rtbTerms.currency, locale) }] : []),
+                    { label: tRtb('rentalUseRateLabel'), value: `${formatMoneyFromRands(rtbTerms.rental_use_rate_amount, rtbTerms.currency, locale)} / ${tRtb(`unit.${rtbTerms.rental_use_rate_unit}`)}` },
+                    { label: tRtb('earlyPayoffLabel'), value: rtbTerms.early_payoff_allowed ? tRtb('yes') : tRtb('no') },
+                  ].map(({ label, value }) => (
+                    <div
+                      key={label}
+                      className="flex justify-between items-center px-4 py-3 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm"
+                    >
+                      <span className="text-[#6B5B55] dark:text-[#9B8B85]">{label}</span>
+                      <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Trust features */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
@@ -440,12 +485,14 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
           {/* ── RIGHT COLUMN — sticky booking/sale card(s) ── */}
           <div className="hidden lg:block">
             <div className="sticky top-24 space-y-5">
-              {isBarterLocked ? (
+              {isCommitted ? (
                 <div className="rounded-2xl border border-[#8B1A1A]/30 bg-[#8B1A1A]/5 p-5 text-center">
-                  <Repeat size={22} className="mx-auto text-[#8B1A1A] mb-2" />
-                  <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('committedToTrade')}</p>
+                  {isBarterLocked ? <Repeat size={22} className="mx-auto text-[#8B1A1A] mb-2" /> : <Wallet size={22} className="mx-auto text-[#8B1A1A] mb-2" />}
+                  <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+                    {isBarterLocked ? t('committedToTrade') : tRtb('committedToRentToBuy')}
+                  </p>
                   <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-1">
-                    {t('committedToTradeDesc')}
+                    {isBarterLocked ? t('committedToTradeDesc') : tRtb('committedToRentToBuyDesc')}
                   </p>
                 </div>
               ) : (
@@ -455,6 +502,9 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                   )}
                   {listing.sale_price !== null && listing.sale_price !== undefined && (
                     <SaleSummaryCard listing={{ ...listing, sale_price: listing.sale_price }} />
+                  )}
+                  {canRequestRtb && (
+                    <RequestRentToBuyButton listingId={listing.id} terms={rtbTerms!} locale={locale} />
                   )}
                   {canProposeTrade && (
                     <ProposeTradeButton
@@ -488,9 +538,9 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
 
       {/* ── Mobile sticky CTA ── */}
       <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 px-4 pb-2 bg-gradient-to-t from-[#FAF8F5] dark:from-[#0F0A0A] pt-4 space-y-2">
-        {isBarterLocked ? (
+        {isCommitted ? (
           <div className="flex items-center justify-center gap-2 w-full py-3.5 bg-white dark:bg-[#1A1010] border border-[#8B1A1A]/30 text-[#8B1A1A] font-semibold rounded-xl text-sm shadow-lg">
-            <Repeat size={15} /> {t('committedToTrade')}
+            {isBarterLocked ? <Repeat size={15} /> : <Wallet size={15} />} {isBarterLocked ? t('committedToTrade') : tRtb('committedToRentToBuy')}
           </div>
         ) : (
           <>
@@ -509,6 +559,14 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                 {t('buyNow', { amount: formatMoneyFromRands(listing.sale_price, 'ZAR', locale) })} <ArrowRight size={16} />
               </Link>
             ) : null}
+            {canRequestRtb && (
+              <RequestRentToBuyButton
+                listingId={listing.id}
+                terms={rtbTerms!}
+                locale={locale}
+                className="flex items-center justify-center gap-2 w-full py-3.5 bg-white dark:bg-[#1A1010] border border-[#8B1A1A] text-[#8B1A1A] font-semibold rounded-xl text-sm shadow-lg hover:bg-[#8B1A1A]/5 transition-colors"
+              />
+            )}
             {canProposeTrade && (
               <ProposeTradeButton
                 anchorListing={listing}

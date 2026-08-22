@@ -8,7 +8,7 @@ import {
   Sun, Moon, Menu, X, Home, Search,
   MessageCircle, User, ChevronDown, LogOut,
   Package, Calendar, ExternalLink, Link2,
-  ShoppingBag, Store, Repeat, AlertTriangle, Sparkles,
+  ShoppingBag, Store, Repeat, AlertTriangle, Sparkles, Wallet,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { CountrySelector } from '@/components/shared/country-selector'
@@ -19,9 +19,15 @@ interface NavbarProps {
    * NEXT_PUBLIC_-derived -- see src/lib/personalization/config.ts).
    * Defaults false so this component never assumes the flag is on. */
   personalizationEnabled?: boolean
+  /** Server-resolved RENT_TO_BUY_ENABLED state (see src/lib/rent-to-buy/
+   * config.ts) -- mirrors personalizationEnabled's own prop shape.
+   * Defaults false; only gates the nav LINK, never RTB data access
+   * itself (an existing agreement page remains reachable by direct URL
+   * either way, per Rule M). */
+  rentToBuyEnabled?: boolean
 }
 
-export function Navbar({ personalizationEnabled = false }: NavbarProps) {
+export function Navbar({ personalizationEnabled = false, rentToBuyEnabled = false }: NavbarProps) {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -127,6 +133,12 @@ export function Navbar({ personalizationEnabled = false }: NavbarProps) {
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
                         <Repeat size={14} className="text-[#9B8B85]" /> {t('myTrades')}
                       </Link>
+                      {rentToBuyEnabled && (
+                        <Link href="/dashboard/rent-to-buy" onClick={() => setProfileOpen(false)}
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                          <Wallet size={14} className="text-[#9B8B85]" /> {t('rentToBuy')}
+                        </Link>
+                      )}
                       <Link href="/dashboard/disputes" onClick={() => setProfileOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
                         <AlertTriangle size={14} className="text-[#9B8B85]" /> {t('myDisputes')}
