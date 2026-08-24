@@ -16,6 +16,20 @@ const RECONCILE_MISSING_BATCH_LIMIT = 50
  * that already has a payout row (any status, matching the fixed
  * duplicate guard in create-merchant-payout.ts) is never touched again.
  * Creates at most one payout per booking. No provider is ever called.
+ *
+ * Candidate discovery (Wave 2C -- payout query scalability): previously
+ * fetched EVERY historical merchant_payouts.booking_id into memory and
+ * embedded the full list in a `.not('id', 'in', <list>)` PostgREST
+ * filter -- the resulting request URL/headers overflowed PostgREST's
+ * size limit once payout history grew large enough (confirmed live at
+ * ~409 rows). Now delegates the exclusion entirely to
+ * _payout_reconcile_missing_candidates(), a single bounded, indexed,
+ * server-side NOT EXISTS anti-join (see migration
+ * 20260904000004_payout_query_scalability.sql) -- no client-collected ID
+ * list of any size ever crosses the wire. No offset/keyset pagination
+ * state is needed: a booking that gets a payout (from this batch or from
+ * best-effort creation elsewhere) simply falls out of the candidate set
+ * on the next call.
  */
 export async function POST(request: NextRequest) {
   const secret = process.env.INTERNAL_CRON_SECRET
@@ -37,29 +51,19 @@ export async function POST(request: NextRequest) {
     const { createClient: createServiceClient } = await import('@supabase/supabase-js')
     const admin = createServiceClient(url, serviceKey)
 
-    // Excluding bookings that already have a payout at the query level
-    // (rather than only checking per-row inside the loop) keeps this sweep
-    // from re-scanning the same already-resolved batch forever once
-    // completed-booking volume grows past the batch limit.
-    const { data: existingPayoutBookings } = await admin.from('merchant_payouts').select('booking_id').not('booking_id', 'is', null)
-    const excludedBookingIds = (existingPayoutBookings ?? []).map((p) => p.booking_id).filter((id): id is string => !!id)
-
-    let bookingQuery = admin.from('bookings').select('id').eq('status', 'completed').limit(RECONCILE_MISSING_BATCH_LIMIT)
-    if (excludedBookingIds.length > 0) {
-      bookingQuery = bookingQuery.not('id', 'in', `(${excludedBookingIds.join(',')})`)
-    }
-    const { data: completedBookings, error: selectError } = await bookingQuery
+    const { data: candidates, error: selectError } = await admin.rpc('_payout_reconcile_missing_candidates', { p_limit: RECONCILE_MISSING_BATCH_LIMIT })
 
     if (selectError) {
       console.error('[internal.payouts.reconcile-missing] select error', selectError)
       return NextResponse.json({ error: 'Sweep failed' }, { status: 500 })
     }
+    const completedBookings = (candidates ?? []).map((row: { booking_id: string }) => ({ id: row.booking_id }))
 
     let consideredCount = 0
     let createdCount = 0
     let skippedCount = 0
 
-    for (const booking of completedBookings ?? []) {
+    for (const booking of completedBookings) {
       const { data: capturedRental } = await admin
         .from('payments')
         .select('id')
@@ -84,7 +88,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ scanned: (completedBookings ?? []).length, considered: consideredCount, created: createdCount, skipped: skippedCount })
+    return NextResponse.json({ scanned: completedBookings.length, considered: consideredCount, created: createdCount, skipped: skippedCount })
   } catch (err) {
     console.error('[internal.payouts.reconcile-missing] unexpected error', err)
     return NextResponse.json({ error: 'Sweep failed' }, { status: 500 })

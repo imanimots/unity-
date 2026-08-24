@@ -382,10 +382,30 @@ console.log('\n=== Scenario E: Paid followed by financial issue ===')
   const { data: afterRefund } = await admin.from('merchant_payouts').select('status, amount, provider_reference').eq('id', payout.id).single()
   check('paid payout remains unchanged after a later refund -- status, amount, and reference are never rewritten', afterRefund.status === 'paid' && Number(afterRefund.amount) === Number(paidPayout.amount) && afterRefund.provider_reference === paidPayout.provider_reference, { before: paidPayout, after: afterRefund })
 
+  // Control fixture: a second, independent paid payout on a DIFFERENT
+  // booking with NO refund -- proves correct entity association (only
+  // the genuinely refunded payout is flagged) and the false-positive
+  // control required for the payout-exceptions scalability fix (Wave 2C).
+  const listingControl = await insertBaseListing(merchantAId, { title: `${QA_LISTING_MARKER} Payout Regression — Scenario E control ${runSuffix}`, daily_rate: 355 })
+  const { bookingId: controlBookingId } = await createCompletedBooking(renterACookie, merchantACookie, listingControl, `scenario-e-control-${runSuffix}`, 221)
+  const controlPayout = await getPayoutForBooking(controlBookingId)
+  await api(adminCookie, 'POST', `/api/admin/payouts/${controlPayout.id}/mark-processing`, { idempotency_key: `payout-regression-econtrol-processing-${runSuffix}` })
+  await api(adminCookie, 'POST', `/api/admin/payouts/${controlPayout.id}/mark-paid`, {
+    payoutReference: `MOCK-ECTRL-${runSuffix}`, payoutMethod: 'manual', confirmManualPayment: true,
+    idempotency_key: `payout-regression-econtrol-paid-${runSuffix}`,
+  })
+  // No refund applied to controlBookingId's rental payment -- it stays 'captured'.
+
   const exceptionsRes = await api(adminCookie, 'GET', '/api/admin/exceptions')
   const exceptions = exceptionsRes.json?.exceptions ?? exceptionsRes.json?.items ?? []
   const flagged = exceptions.find((e) => e.entityId === payout.id && e.type === 'merchant_payout_paid_then_refunded')
   check('a paid-then-refunded exception is surfaced for admin review', !!flagged, flagged)
+
+  const falsePositive = exceptions.find((e) => e.entityId === controlPayout.id && e.type === 'merchant_payout_paid_then_refunded')
+  check('a paid payout with no refund is NOT falsely flagged as paid-then-refunded (false-positive control)', !falsePositive, falsePositive)
+
+  const wrongAssociation = exceptions.find((e) => e.type === 'merchant_payout_paid_then_refunded' && e.entityId === controlPayout.id)
+  check('the refund is correctly associated with its own booking/payout, never the unrelated control payout', !wrongAssociation, wrongAssociation)
 }
 
 console.log('\n=== Scenario F: Admin ===')
@@ -476,6 +496,118 @@ console.log('\n=== Reconciliation routes ===')
 
   const reconcileRes = await internalApi('/api/internal/payouts/reconcile')
   check('reconcile sweep responds 200 with a detection summary, never mutating', reconcileRes.status === 200 && typeof reconcileRes.json?.detected === 'number', reconcileRes)
+}
+
+console.log('\n=== No full-history payout-ID transport (structural, source-code proof) ===')
+{
+  const reconcileSrc = readFileSync(join(REPO_ROOT, 'src/app/api/internal/payouts/reconcile-missing/route.ts'), 'utf8')
+  // Checks the actual functional call shape (a real template literal
+  // immediately after the filter args), not this file's own doc-comment
+  // prose describing the old pattern by name for documentation purposes.
+  check('reconcile-missing route never builds a `.not(id,in,...)` exclusion filter', !/\.not\('id',\s*'in',\s*`/.test(reconcileSrc), {})
+  check('reconcile-missing route never fetches the full merchant_payouts.booking_id set into Node', !reconcileSrc.includes("select('booking_id')"), {})
+  check('reconcile-missing route calls the bounded candidate RPC', reconcileSrc.includes('_payout_reconcile_missing_candidates'), {})
+
+  const exceptionsSrc = readFileSync(join(REPO_ROOT, 'src/lib/admin/exceptions-service.ts'), 'utf8')
+  // Checks the actual functional call shape (admin.rpc(...)), not this
+  // file's own doc-comment prose naming the superseded RPC for context.
+  check('exceptions-service never calls the superseded array-based RPC (_merchant_payout_relevant_context)', !exceptionsSrc.includes("admin.rpc('_merchant_payout_relevant_context'"), {})
+  check('exceptions-service never constructs allRelevantBookingIds (the old unbounded id-array pattern)', !exceptionsSrc.includes('allRelevantBookingIds'), {})
+  check('exceptions-service never does a `.in(\'booking_id\', ...)` filter for payout exception context', !/\.in\('booking_id',\s*(all|relevant)/i.test(exceptionsSrc), {})
+  check('exceptions-service calls the final parameterless, relational candidate RPC', exceptionsSrc.includes('_merchant_payout_exception_candidates()'), {})
+}
+
+console.log('\n=== Reconcile-missing scalability (Wave 2C) ===')
+{
+  // A. completed eligible booking with no payout -> discovered -> payout created once.
+  // Constructed by flipping the booking straight to 'completed' via the
+  // service client (bypassing confirm-return's own best-effort creation
+  // hook entirely) -- the ONLY way to get a genuinely payout-less
+  // completed booking to test candidate discovery in isolation, since
+  // merchant_payouts has a real ON DELETE-blocking FK from
+  // merchant_payout_history once a payout has ever been created.
+  const runSuffix = Date.now()
+  const listingA = await insertBaseListing(merchantAId, { title: `${QA_LISTING_MARKER} Payout Regression — Reconcile A ${runSuffix}`, daily_rate: 210 })
+  const createdA = await api(renterACookie, 'POST', '/api/bookings', { listing_id: listingA, start_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), end_at: new Date(Date.now() + 33 * 24 * 60 * 60 * 1000).toISOString(), idempotency_key: `reconcile-a-create-${runSuffix}` })
+  const bookingA = createdA.json.booking_id
+  await api(merchantACookie, 'POST', `/api/bookings/${bookingA}/accept`, { idempotency_key: `reconcile-a-accept-${runSuffix}` })
+  await api(renterACookie, 'POST', `/api/bookings/${bookingA}/checkout`, { test_scenario: 'success', idempotency_key: `reconcile-a-checkout-${runSuffix}` })
+  await admin.from('bookings').update({ status: 'completed' }).eq('id', bookingA)
+  const { data: payoutBeforeA } = await admin.from('merchant_payouts').select('id').eq('booking_id', bookingA).maybeSingle()
+  check('Reconcile-A0. booking is completed with genuinely no payout row before reconciliation', !payoutBeforeA, payoutBeforeA)
+
+  const reconcileA = await internalApi('/api/internal/payouts/reconcile-missing')
+  check('Reconcile-A1. reconcile-missing responds 200', reconcileA.status === 200, reconcileA)
+  const { data: payoutsAfterA } = await admin.from('merchant_payouts').select('id').eq('booking_id', bookingA)
+  check('Reconcile-A2. exactly one payout is created for the discovered candidate', payoutsAfterA?.length === 1, payoutsAfterA)
+
+  // B-E. eligible booking with an existing payout in each status -> never duplicated.
+  const statuses = ['pending', 'processing', 'paid', 'failed']
+  for (const [i, status] of statuses.entries()) {
+    const key = `reconcile-bcde-${i}-${runSuffix}`
+    const listing = await insertBaseListing(merchantAId, { title: `${QA_LISTING_MARKER} Payout Regression — Reconcile ${status} ${runSuffix}`, daily_rate: 215 })
+    const { bookingId } = await createCompletedBooking(renterACookie, merchantACookie, listing, key, 200 + i)
+    const existingPayout = await getPayoutForBooking(bookingId)
+    if (!existingPayout) throw new Error(`expected confirm-return to have already created a payout for ${key}`)
+    await admin.from('merchant_payouts').update({ status }).eq('id', existingPayout.id)
+
+    const reconcileRun = await internalApi('/api/internal/payouts/reconcile-missing')
+    check(`Reconcile-${status}1. reconcile-missing responds 200 with an existing ${status} payout present`, reconcileRun.status === 200, reconcileRun)
+    const { data: payoutsAfter } = await admin.from('merchant_payouts').select('id').eq('booking_id', bookingId)
+    check(`Reconcile-${status}2. still exactly one payout row -- never duplicated for an existing ${status} payout`, payoutsAfter?.length === 1 && payoutsAfter[0].id === existingPayout.id, payoutsAfter)
+
+    // Restore to pending so this fixture doesn't skew other scenarios' assumptions.
+    await admin.from('merchant_payouts').update({ status: 'pending' }).eq('id', existingPayout.id)
+  }
+
+  // I. many historical payouts -> route still responds successfully, no oversized NOT IN URL.
+  // Uses the ACTUAL accumulated DEVELOPMENT volume rather than manufacturing
+  // thousands more rows -- this dev database already carries far more than
+  // the ~409 rows that were already enough to reproduce the original
+  // failure, so a live 200 here is itself the high-volume proof.
+  const { count: totalPayoutRows } = await admin.from('merchant_payouts').select('id', { count: 'exact', head: true })
+  const reconcileHighVolume = await internalApi('/api/internal/payouts/reconcile-missing')
+  check(`Reconcile-I1. route responds 200 at current accumulated volume (${totalPayoutRows} total payout rows, already far past the ~409-row threshold that broke the old implementation)`, reconcileHighVolume.status === 200, { totalPayoutRows, status: reconcileHighVolume.status })
+
+  // J. repeated reconciliation -> idempotent.
+  const reconcileRepeat1 = await internalApi('/api/internal/payouts/reconcile-missing')
+  const reconcileRepeat2 = await internalApi('/api/internal/payouts/reconcile-missing')
+  check('Reconcile-J1. two sequential reconcile-missing calls both respond 200', reconcileRepeat1.status === 200 && reconcileRepeat2.status === 200, { reconcileRepeat1, reconcileRepeat2 })
+  const { data: payoutsAfterA_repeat } = await admin.from('merchant_payouts').select('id').eq('booking_id', bookingA)
+  check('Reconcile-J2. Scenario A booking still has exactly one payout after repeated reconciliation', payoutsAfterA_repeat?.length === 1, payoutsAfterA_repeat)
+
+  // K. concurrent reconciliation -> no duplicate payout.
+  const listingK = await insertBaseListing(merchantAId, { title: `${QA_LISTING_MARKER} Payout Regression — Reconcile K ${runSuffix}`, daily_rate: 220 })
+  const createdK = await api(renterACookie, 'POST', '/api/bookings', { listing_id: listingK, start_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), end_at: new Date(Date.now() + 33 * 24 * 60 * 60 * 1000).toISOString(), idempotency_key: `reconcile-k-create-${runSuffix}` })
+  const bookingK = createdK.json.booking_id
+  await api(merchantACookie, 'POST', `/api/bookings/${bookingK}/accept`, { idempotency_key: `reconcile-k-accept-${runSuffix}` })
+  await api(renterACookie, 'POST', `/api/bookings/${bookingK}/checkout`, { test_scenario: 'success', idempotency_key: `reconcile-k-checkout-${runSuffix}` })
+  await admin.from('bookings').update({ status: 'completed' }).eq('id', bookingK)
+
+  const concurrentResults = await Promise.all([internalApi('/api/internal/payouts/reconcile-missing'), internalApi('/api/internal/payouts/reconcile-missing')])
+  check('Reconcile-K1. both concurrent reconcile-missing calls respond 200, no 500', concurrentResults.every((r) => r.status === 200), concurrentResults)
+  const { data: payoutsAfterK } = await admin.from('merchant_payouts').select('id').eq('booking_id', bookingK)
+  check('Reconcile-K2. exactly one payout row exists after concurrent reconciliation -- no duplicate obligation', payoutsAfterK?.length === 1, payoutsAfterK)
+}
+
+console.log('\n=== CLEANUP ===')
+{
+  // This script had no fixture-hygiene sweep at all -- every listing it
+  // ever created stayed real (is_test=false) indefinitely. Flips every
+  // QA_LISTING_MARKER-tagged listing to is_test=true (never deletes,
+  // never touches merchant_payouts/merchant_payout_history rows) so
+  // fixtures stop counting toward cap/public-visibility, matching the
+  // convention every other verify-*.mjs script in this repo already
+  // follows.
+  // Scoped to "Payout Regression" specifically (not the bare QA_LISTING_MARKER,
+  // which is the generic `[QA]` prefix shared by every other script in this
+  // repo) -- stays precisely within the fixtures this script itself creates.
+  const { data: leaked } = await admin.from('listings').select('id').ilike('title', '%Payout Regression%').eq('is_test', false)
+  if ((leaked ?? []).length > 0) {
+    await admin.from('listings').update({ is_test: true }).in('id', leaked.map((l) => l.id))
+  }
+  const { count: stillLeaked } = await admin.from('listings').select('id', { count: 'exact', head: true }).ilike('title', '%Payout Regression%').eq('is_test', false)
+  check('cleanup succeeds -- no real (is_test=false) QA listing fixture left behind after this run', (stillLeaked ?? 0) === 0, { stillLeaked })
 }
 
 console.log('\n=== SUMMARY ===')
