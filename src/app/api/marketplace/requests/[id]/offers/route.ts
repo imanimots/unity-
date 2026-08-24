@@ -5,6 +5,7 @@ import { submitMarketplaceOfferSchema } from '@/lib/marketplace/validation'
 import { mapMarketplaceRpcError } from '@/lib/marketplace/rpc-errors'
 import { computeSubmitOfferHash, checkIdempotentReplay } from '@/lib/marketplace/idempotency'
 import { notifyMarketplaceRequestParty } from '@/lib/marketplace/notify'
+import { blockIfCannotCreate } from '@/lib/admin/account-status'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -33,6 +34,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
   const parsed = submitMarketplaceOfferSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid request', fieldErrors: parsed.error.flatten().fieldErrors }, { status: 400 })
+
+  // Only commercial offer types constitute new commercial activity --
+  // message_only stays ungated, mirroring the RPC's own KYC condition.
+  if (parsed.data.offer_type !== 'message_only') {
+    const blocked = blockIfCannotCreate(responder.profile)
+    if (blocked) return blocked
+  }
 
   const { createClient: createServiceClient } = await import('@supabase/supabase-js')
   const admin = createServiceClient(url, serviceKey)

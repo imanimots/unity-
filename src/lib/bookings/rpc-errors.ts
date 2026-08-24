@@ -33,6 +33,12 @@ export function mapBookingRpcError(message: string | undefined): { status: numbe
   if (m.includes('verification_required:self')) {
     return { status: 403, error: 'You need to complete verification before doing this.' }
   }
+  if (m.includes('account_restricted:self') || m.includes('account_suspended:self')) {
+    return { status: 403, error: 'Your account cannot do this right now. Contact support if you believe this is a mistake.' }
+  }
+  if (m.includes('account_restricted:counterparty') || m.includes('account_suspended:counterparty')) {
+    return { status: 403, error: 'This listing is not currently available for a new transaction.' }
+  }
   if (m.includes('currently committed to a barter agreement')) {
     return { status: 409, error: 'This listing is currently committed to a barter agreement and cannot be booked.' }
   }

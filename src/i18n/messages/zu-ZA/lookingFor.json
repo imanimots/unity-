@@ -21,6 +21,7 @@
     "errors": {
       "couldNotCreate": "Ayikwazanga ukudala isicelo",
       "verificationRequired": "Kudingeka uqedele ukuqinisekiswa ngaphambi kokushicilela isicelo. Isicelo sakho sigcinwe njengohlaka.",
+      "accountRestricted": "I-akhawunti yakho ayikwazi ukushicilela izicelo ezintsha okwamanje. Xhumana nosekelo uma ucabanga ukuthi lokhu kuyiphutha. Isicelo sakho sigcinwe njengohlaka.",
       "couldNotPublish": "Ayikwazanga ukushicilela isicelo",
       "networkError": "Iphutha lenethiwekhi — sicela uzame futhi"
     }

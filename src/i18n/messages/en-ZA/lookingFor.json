@@ -21,6 +21,7 @@
     "errors": {
       "couldNotCreate": "Could not create request",
       "verificationRequired": "You need to complete verification before publishing a request. Your request was saved as a draft.",
+      "accountRestricted": "Your account cannot publish new requests right now. Contact support if you believe this is a mistake. Your request was saved as a draft.",
       "couldNotPublish": "Could not publish request",
       "networkError": "Network error — please try again"
     }

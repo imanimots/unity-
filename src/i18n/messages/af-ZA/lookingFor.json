@@ -21,6 +21,7 @@
     "errors": {
       "couldNotCreate": "Kon nie versoek skep nie",
       "verificationRequired": "Jy moet verifikasie voltooi voordat jy 'n versoek publiseer. Jou versoek is as konsep gestoor.",
+      "accountRestricted": "Jou rekening kan nie tans nuwe versoeke publiseer nie. Kontak ondersteuning as jy dink dit is 'n fout. Jou versoek is as konsep gestoor.",
       "couldNotPublish": "Kon nie versoek publiseer nie",
       "networkError": "Netwerkfout — probeer asseblief weer"
     }

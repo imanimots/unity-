@@ -5,6 +5,7 @@ import { createRentToBuyRequestSchema } from '@/lib/rent-to-buy/validation'
 import { mapRentToBuyRpcError } from '@/lib/rent-to-buy/rpc-errors'
 import { computeCreateRequestHash, checkIdempotentReplay } from '@/lib/rent-to-buy/idempotency'
 import { isRentToBuyEnabled } from '@/lib/rent-to-buy/config'
+import { blockIfCannotCreate } from '@/lib/admin/account-status'
 
 /**
  * POST /api/rent-to-buy/agreements -- customer initiates directly
@@ -23,6 +24,8 @@ export async function POST(request: NextRequest) {
 
   const requester = await getRequestProfile()
   if (!requester) return NextResponse.json({ error: 'You must be signed in' }, { status: 401 })
+  const blocked = blockIfCannotCreate(requester.profile)
+  if (blocked) return blocked
 
   let body: unknown
   try {

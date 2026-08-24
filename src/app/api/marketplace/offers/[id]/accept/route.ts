@@ -5,6 +5,7 @@ import { acceptOfferSchema } from '@/lib/marketplace/validation'
 import { mapMarketplaceRpcError } from '@/lib/marketplace/rpc-errors'
 import { computeAcceptOfferHash, checkIdempotentReplay } from '@/lib/marketplace/idempotency'
 import { notifyMarketplaceRequestParty } from '@/lib/marketplace/notify'
+import { blockIfCannotTransact } from '@/lib/admin/account-status'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -28,6 +29,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const requester = await getRequestProfile()
   if (!requester) return NextResponse.json({ error: 'You must be signed in' }, { status: 401 })
+  const blocked = blockIfCannotTransact(requester.profile)
+  if (blocked) return blocked
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY

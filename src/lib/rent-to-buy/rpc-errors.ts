@@ -12,6 +12,12 @@ export function mapRentToBuyRpcError(message: string | undefined): { status: num
     return { status: 409, error: 'This request was already submitted with different data. Please refresh and try again.' }
   }
   if (m.includes('verification_required')) return { status: 403, error: 'Both parties need to complete verification before this can proceed.' }
+  if (m.includes('account_restricted:self') || m.includes('account_suspended:self')) {
+    return { status: 403, error: 'Your account cannot do this right now. Contact support if you believe this is a mistake.' }
+  }
+  if (m.includes('account_restricted:counterparty') || m.includes('account_suspended:counterparty')) {
+    return { status: 403, error: 'This listing is not currently available for a new transaction.' }
+  }
   if (m.includes('listing not found')) return { status: 404, error: 'Listing not found.' }
   if (m.includes('not the owner of this listing')) return { status: 403, error: 'You are not the owner of this listing.' }
   if (m.includes('invalid terms')) return { status: 422, error: 'Invalid rent-to-buy terms.' }

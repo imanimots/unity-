@@ -64,6 +64,8 @@ export function RequestForm() {
       if (!publishRes.ok) {
         if (published.error?.includes('verification')) {
           setError(t('errors.verificationRequired'))
+        } else if (published.error?.includes('Your account cannot do this right now')) {
+          setError(t('errors.accountRestricted'))
         } else {
           setError(published.error ?? t('errors.couldNotPublish'))
         }

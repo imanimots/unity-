@@ -53,6 +53,12 @@ export function mapBarterRpcError(message: string | undefined): { status: number
   if (m.includes('verification_required:self')) {
     return { status: 403, error: 'You need to complete verification before doing this.' }
   }
+  if (m.includes('account_restricted:self') || m.includes('account_suspended:self')) {
+    return { status: 403, error: 'Your account cannot do this right now. Contact support if you believe this is a mistake.' }
+  }
+  if (m.includes('account_restricted:counterparty') || m.includes('account_suspended:counterparty')) {
+    return { status: 403, error: 'This listing is not currently available for a new transaction.' }
+  }
   if (m.includes('barter agreement not found or you are not a party to it')) {
     return { status: 404, error: 'Barter agreement not found.' }
   }
