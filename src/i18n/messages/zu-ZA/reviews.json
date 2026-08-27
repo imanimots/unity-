@@ -1,0 +1,24 @@
+{
+  "form": {
+    "leaveReview": "Bhala ukubuyekeza",
+    "reviewingTransactionFor": "Ubuyekeza ukuthengiselana kwakho kwe-",
+    "blindExplainer": "Ukubuyekeza kwakho kuhlala kuyimfihlo kuze kube yilapho omunye umuntu naye ethumela okwakhe, noma kudlula izinsuku ezingu-14 — noma yikuphi okuzokwenzeka kuqala.",
+    "rate": "Linganisela {reviewee}",
+    "chooseRating": "Sicela ukhethe izinkanyezi zokulinganisela.",
+    "writeReview": "Bhala ukubuyekeza (kuzikhethela)",
+    "sharePlaceholder": "Yabelana ngolwazi lwakho no-{reviewee}",
+    "cancel": "Khansela",
+    "submitting": "Kuyathunyelwa…",
+    "submitReview": "Thumela ukubuyekeza",
+    "couldNotSubmit": "Ayikwazanga ukuthumela ukubuyekeza kwakho — sicela uzame futhi.",
+    "couldNotSubmitRetry": "Ayikwazanga ukuthumela ukubuyekeza kwakho — sicela uzame futhi.",
+    "submittedTitle": "Ukubuyekeza kwakho kuthunyelwe.",
+    "submittedBlindExplainer": "Kuhlala kuyimfihlo kuze kube yilapho omunye umuntu naye ethumela ukubuyekeza kwakhe, noma kudlula izinsuku ezingu-14.",
+    "alreadySubmittedTitle": "Usuvele wabuyekeza lokhu kuthengiselana.",
+    "nowPublic": "Ukubuyekeza kwakho manje kusesidlangalaleni.",
+    "orderNotFound": "I-oda alitholakalanga noma alikakalungeli ukubuyekezwa.",
+    "backToOrders": "Buyela emaodeni",
+    "agreementNotFound": "Isivumelwano asitholakalanga noma asikakalungeli ukubuyekezwa.",
+    "backToAgreements": "Buyela ezivumelwaneni"
+  }
+}

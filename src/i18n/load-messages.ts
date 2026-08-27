@@ -20,6 +20,7 @@ export const MESSAGE_NAMESPACES = [
   'tasks',
   'lookingFor',
   'rtb',
+  'reviews',
   'advertising',
   'merchant',
   'errors',

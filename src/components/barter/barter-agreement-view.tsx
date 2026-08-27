@@ -11,7 +11,7 @@ import { BarterTimeline } from './barter-timeline'
 import { CounterOfferDialog } from './counter-offer-dialog'
 import { ContributionMilestonesPanel } from './contribution-milestones-panel'
 import { DepositEligibilityPanel } from './deposit-eligibility-panel'
-import { BarterReviewForm } from './barter-review-form'
+import { ReviewForm } from '@/components/reviews/review-form'
 import type { ContributionInput } from './contribution-builder'
 import { formatDateTime } from '@/lib/i18n/format'
 import { MAX_MILESTONE_EVIDENCE_SIZE_BYTES } from '@/lib/barter/skill-task-evidence'
@@ -342,7 +342,13 @@ export function BarterAgreementView({
       )}
 
       {agreement.status === 'completed' && !alreadyReviewed && (
-        <BarterReviewForm agreementId={agreement.id} revieweeName={otherPartyName} />
+        <ReviewForm
+          domain="barter"
+          transactionId={agreement.id}
+          revieweeName={otherPartyName}
+          transactionTitle={agreement.agreement_reference}
+          backHref={`/dashboard/barter/${agreement.id}`}
+        />
       )}
 
       <BarterTimeline history={history} labels={timelineLabels} />

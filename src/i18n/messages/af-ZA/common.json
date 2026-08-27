@@ -197,7 +197,21 @@
     "loadingMore": "Laai tans…",
     "starsAriaLabel": "{rating} uit 5 sterre",
     "reviewerFallbackName": "Unity-lid",
-    "eliteBadgeLabel": "Elite"
+    "eliteBadgeLabel": "Elite",
+    "textRemovedForPolicy": "Resensieteks verwyder omdat dit Unity se beleid oortree het.",
+    "replyLabel": "Antwoord",
+    "transactionKind": {
+      "buy": "{title} gekoop",
+      "sell": "{title} verkoop",
+      "rent": "{title} gehuur",
+      "rent_out": "{title} verhuur",
+      "barter": "{title} geruil",
+      "skill": "Vaardigheid geruil: {title}",
+      "task": "Taak voltooi: {title}",
+      "rent_to_buy_customer": "Huur-om-te-koop: {title}",
+      "rent_to_buy_merchant": "Huur-om-te-koop: {title}",
+      "historical_qa_fixture": "{title}"
+    }
   },
   "chat": {
     "metaTitle": "Boodskappe — Unity",

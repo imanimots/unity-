@@ -31,6 +31,7 @@ const FULL_SYNTHETIC_VARS: TemplateVars = {
   failureMessage: 'Unity is reviewing an internal payout issue.',
   planName: 'Pro Merchant',
   requestTitle: 'Looking for a pressure washer',
+  transactionTitle: 'Adidas Running Shoes',
 }
 
 const FORBIDDEN_CLAIM_PATTERNS = [
@@ -130,6 +131,7 @@ describe('email template catalogue (category: Templates)', () => {
       'escrow_transaction.released',
       'marketplace_request.offer_received', 'marketplace_request.offer_accepted',
       'rent_to_buy.agreement_accepted', 'rent_to_buy.first_payment_settled', 'rent_to_buy.defaulted',
+      'review.eligible', 'review.reminder', 'review.published', 'review.reply_received',
     ])
     for (const t of EMAIL_TEMPLATES) {
       expect(knownEvents.has(t.event), `unexpected event "${t.event}" on template "${t.id}"`).toBe(true)

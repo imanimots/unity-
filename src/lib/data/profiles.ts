@@ -129,8 +129,8 @@ export async function getPublicProfile(id: string): Promise<PublicProfileResult>
   if (!row) return { status: 'not_found' }
   if (row.account_status === 'suspended') return { status: 'unavailable' }
 
-  const [{ count: reviewCount }, completedTransactionCount, entitlements] = await Promise.all([
-    supabase.from('reviews').select('id', { count: 'exact', head: true }).eq('reviewee_id', id),
+  const [reviewAggregate, completedTransactionCount, entitlements] = await Promise.all([
+    getPublicReviewAggregate(supabase, id),
     getCompletedTransactionCount(supabase, id),
     getMerchantEntitlements(supabase, id),
   ])
@@ -145,10 +145,27 @@ export async function getPublicProfile(id: string): Promise<PublicProfileResult>
       isVerified: row.kyc_status === 'approved',
       isElite: entitlements.eliteBadgeEnabled,
       memberSince: row.created_at,
-      reviewCount: reviewCount ?? 0,
-      publicRating: reviewCount && reviewCount > 0 ? row.unity_score : null,
+      reviewCount: reviewAggregate.reviewCount,
+      publicRating: reviewAggregate.reviewCount > 0 ? reviewAggregate.averageRating : null,
       completedTransactionCount,
     },
+  }
+}
+
+/**
+ * Reviews V2 (Rule 21): public reputation is computed fresh from valid,
+ * published, non-invalidated, non-test reviews via the DB aggregate RPC
+ * (supabase/migrations/20260904000010_reviews_v2_aggregates.sql) --
+ * NEVER from profiles.unity_score, which is a separate, deliberately
+ * decoupled objective trust score (Rule 8) and is no longer updated by
+ * review submission at all.
+ */
+async function getPublicReviewAggregate(supabase: SupabaseClient, revieweeId: string): Promise<{ reviewCount: number; averageRating: number | null }> {
+  const { data } = await supabase.rpc('_review_public_aggregate', { p_reviewee_id: revieweeId }).maybeSingle()
+  const row = data as { review_count: number; average_rating: number | null } | null
+  return {
+    reviewCount: Number(row?.review_count ?? 0),
+    averageRating: row?.average_rating !== null && row?.average_rating !== undefined ? Number(row.average_rating) : null,
   }
 }
 
@@ -311,11 +328,26 @@ export interface PublicProfileReview {
   id: string
   rating: number
   comment: string | null
+  textHidden: boolean
   created_at: string
+  publishedAt: string | null
+  context: { kind: string; title: string } | null
+  reviewerRole: string | null
+  revieweeRole: string | null
   reviewer: { id: string; displayName: string; avatarUrl: string | null } | null
+  reply: { id: string; text: string | null; hidden: boolean; createdAt: string } | null
 }
 
-/** Paginated, genuine reviews only -- never fabricated, never test data mixed in (reviews carry no is_test flag; see docs/CLICKABLE_PROFILES.md known limitation). */
+/**
+ * Reviews V2 (Rule 21): genuine reviews only -- RLS ("reviews: public
+ * read published valid" on public.reviews, supabase/migrations/20260904000008)
+ * transparently excludes unpublished, invalidated, and is_test=true rows
+ * for any caller who isn't the review's own author, so this query never
+ * needs to duplicate that filter client-side. Text-hidden (moderated)
+ * reviews still surface their rating and a neutral placeholder in place
+ * of the removed text (Rule 15) -- the star still counts toward the
+ * aggregate; only the free-text is suppressed.
+ */
 export async function getPublicProfileReviews(revieweeId: string, { limit = 10, offset = 0 }: { limit?: number; offset?: number } = {}): Promise<{ reviews: PublicProfileReview[]; total: number }> {
   if (IS_MOCK_MODE) return { reviews: [], total: 0 }
 
@@ -330,26 +362,53 @@ export async function getPublicProfileReviews(revieweeId: string, { limit = 10, 
   // identity view instead.
   const { data, count } = await supabase
     .from('reviews')
-    .select('id, rating, comment, created_at, reviewer_id', { count: 'exact' })
+    .select('id, rating, comment, text_hidden_at, created_at, published_at, header_snapshot, reviewer_role, reviewee_role, reviewer_id', { count: 'exact' })
     .eq('reviewee_id', revieweeId)
-    .order('created_at', { ascending: false })
+    .order('published_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
-  const rows = (data ?? []) as Array<{ id: string; rating: number; comment: string | null; created_at: string; reviewer_id: string }>
+  type Row = {
+    id: string
+    rating: number
+    comment: string | null
+    text_hidden_at: string | null
+    created_at: string
+    published_at: string | null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    header_snapshot: any
+    reviewer_role: string | null
+    reviewee_role: string | null
+    reviewer_id: string
+  }
+  const rows = (data ?? []) as Row[]
   const reviewerIds = [...new Set(rows.map((r) => r.reviewer_id))]
-  const { data: reviewers } = reviewerIds.length
-    ? await supabase.from('public_profiles').select('id, display_name, full_name, avatar_url').in('id', reviewerIds)
-    : { data: [] as { id: string; display_name: string | null; full_name: string | null; avatar_url: string | null }[] }
+  const [{ data: reviewers }, { data: replies }] = await Promise.all([
+    reviewerIds.length
+      ? supabase.from('public_profiles').select('id, display_name, full_name, avatar_url').in('id', reviewerIds)
+      : Promise.resolve({ data: [] as { id: string; display_name: string | null; full_name: string | null; avatar_url: string | null }[] }),
+    rows.length
+      ? supabase.from('review_replies').select('id, review_id, reply_text, hidden_at, created_at').in('review_id', rows.map((r) => r.id))
+      : Promise.resolve({ data: [] as { id: string; review_id: string; reply_text: string; hidden_at: string | null; created_at: string }[] }),
+  ])
   const reviewerById = new Map((reviewers ?? []).map((r) => [r.id, r]))
+  const replyByReviewId = new Map((replies ?? []).map((r) => [r.review_id, r]))
 
   const reviews = rows.map((r) => {
     const reviewer = reviewerById.get(r.reviewer_id)
+    const reply = replyByReviewId.get(r.id)
+    const textHidden = !!r.text_hidden_at
     return {
       id: r.id,
       rating: r.rating,
-      comment: r.comment,
+      comment: textHidden ? null : r.comment,
+      textHidden,
       created_at: r.created_at,
-      reviewer: reviewer ? { id: reviewer.id, displayName: displayNameOf(reviewer), avatarUrl: reviewer.avatar_url } : null,
+      publishedAt: r.published_at,
+      context: r.header_snapshot ?? null,
+      reviewerRole: r.reviewer_role,
+      revieweeRole: r.reviewee_role,
+      reviewer: reviewer ? { id: reviewer.id, displayName: displayNameOf(reviewer), avatarUrl: reviewer.avatar_url } : { id: r.reviewer_id, displayName: 'Former Unity user', avatarUrl: null },
+      reply: reply && !reply.hidden_at ? { id: reply.id, text: reply.reply_text, hidden: false, createdAt: reply.created_at } : reply ? { id: reply.id, text: null, hidden: true, createdAt: reply.created_at } : null,
     }
   })
 

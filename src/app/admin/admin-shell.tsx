@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { href: '/admin/exceptions',          label: 'Exception Queue',      icon: AlertTriangle    },
   { href: '/admin/audit',               label: 'Audit Log',            icon: ScrollText       },
   { href: '/admin/disputes',            label: 'Disputes',             icon: AlertTriangle    },
+  { href: '/admin/reviews',             label: 'Review Moderation',    icon: ShieldCheck      },
   { href: '/admin/barter',              label: 'Barter Trades',        icon: Repeat           },
   { href: '/admin/orders',              label: 'Orders',               icon: ShoppingBag      },
   { href: '/admin/affiliates',          label: 'Affiliates',           icon: Link2            },

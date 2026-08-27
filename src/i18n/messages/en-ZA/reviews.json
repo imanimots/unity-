@@ -1,0 +1,24 @@
+{
+  "form": {
+    "leaveReview": "Leave a Review",
+    "reviewingTransactionFor": "Reviewing your transaction for",
+    "blindExplainer": "Your review stays private until the other party also submits theirs, or 14 days pass — whichever comes first.",
+    "rate": "Rate {reviewee}",
+    "chooseRating": "Please choose a star rating.",
+    "writeReview": "Write a review (optional)",
+    "sharePlaceholder": "Share your experience with {reviewee}",
+    "cancel": "Cancel",
+    "submitting": "Submitting…",
+    "submitReview": "Submit review",
+    "couldNotSubmit": "Could not submit your review — please try again.",
+    "couldNotSubmitRetry": "Could not submit your review — please try again.",
+    "submittedTitle": "Your review has been submitted.",
+    "submittedBlindExplainer": "It stays private until the other party also submits their review, or 14 days pass.",
+    "alreadySubmittedTitle": "You've already reviewed this transaction.",
+    "nowPublic": "Your review is now public.",
+    "orderNotFound": "Order not found or not yet eligible for a review.",
+    "backToOrders": "Back to orders",
+    "agreementNotFound": "Agreement not found or not yet eligible for a review.",
+    "backToAgreements": "Back to agreements"
+  }
+}

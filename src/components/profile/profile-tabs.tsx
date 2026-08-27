@@ -282,7 +282,22 @@ export function ProfileTabs({
                       ))}
                     </div>
                   </div>
-                  {r.comment && <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] leading-relaxed">{r.comment}</p>}
+                  {r.context?.title && (
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#9B8B85] mb-1.5">
+                      {t(`transactionKind.${r.context.kind}`, { title: r.context.title })}
+                    </p>
+                  )}
+                  {r.textHidden ? (
+                    <p className="text-sm italic text-[#9B8B85]">{t('textRemovedForPolicy')}</p>
+                  ) : (
+                    r.comment && <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] leading-relaxed">{r.comment}</p>
+                  )}
+                  {r.reply && !r.reply.hidden && r.reply.text && (
+                    <div className="mt-3 pl-3 border-l-2 border-[#F2EDE8] dark:border-[#2A1A1A]">
+                      <p className="text-xs font-semibold text-[#9B8B85] mb-1">{t('replyLabel')}</p>
+                      <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] leading-relaxed">{r.reply.text}</p>
+                    </div>
+                  )}
                 </div>
               ))}
               {reviews.length < reviewsTotal && (

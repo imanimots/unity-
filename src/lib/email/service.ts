@@ -22,6 +22,7 @@ export type RelatedEntityType =
   | 'escrow_transaction'
   | 'marketplace_request'
   | 'rent_to_buy_agreement'
+  | 'review'
 
 export interface SendTemplateRequest {
   eventType: string

@@ -30,12 +30,12 @@ describe('email coverage manifest', () => {
     expect(summary.incompleteIds.length).toBe(summary.customerMerchantCount - summary.fullyCompleteCount)
   })
 
-  it('5. current real coverage: 87 total templates, 0 staff-only, 87 fully complete -- full en-ZA/af-ZA/zu-ZA coverage (documented ground truth -- update this test when coverage genuinely changes, not to make it pass)', () => {
+  it('5. current real coverage: 91 total templates, 0 staff-only, 91 fully complete -- full en-ZA/af-ZA/zu-ZA coverage (documented ground truth -- update this test when coverage genuinely changes, not to make it pass)', () => {
     const summary = summarizeEmailCoverage()
-    expect(summary.totalTemplates).toBe(87)
+    expect(summary.totalTemplates).toBe(91)
     expect(summary.staffOnlyCount).toBe(0)
-    expect(summary.fullyCompleteCount).toBe(87)
+    expect(summary.fullyCompleteCount).toBe(91)
     expect(summary.incompleteIds).toEqual([])
-    expect(summary.perLocale).toEqual({ 'en-ZA': 87, 'af-ZA': 87, 'zu-ZA': 87 })
+    expect(summary.perLocale).toEqual({ 'en-ZA': 91, 'af-ZA': 91, 'zu-ZA': 91 })
   })
 })

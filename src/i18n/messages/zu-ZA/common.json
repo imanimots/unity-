@@ -197,7 +197,21 @@
     "loadingMore": "Kuyalayishwa…",
     "starsAriaLabel": "{rating} kwezingu-5 zezinkanyezi",
     "reviewerFallbackName": "Ilungu le-Unity",
-    "eliteBadgeLabel": "Elite"
+    "eliteBadgeLabel": "Elite",
+    "textRemovedForPolicy": "Umbhalo wokubuyekeza ususiwe ngoba wephule inqubomgomo ye-Unity.",
+    "replyLabel": "Impendulo",
+    "transactionKind": {
+      "buy": "Kuthengiwe: {title}",
+      "sell": "Kudayisiwe: {title}",
+      "rent": "Kuqashiwe: {title}",
+      "rent_out": "Kuqashisiwe: {title}",
+      "barter": "Kushintshanisiwe: {title}",
+      "skill": "Ikhono elishintshaniwe: {title}",
+      "task": "Umsebenzi oqediwe: {title}",
+      "rent_to_buy_customer": "Ukuqasha-ukuze-uthenge: {title}",
+      "rent_to_buy_merchant": "Ukuqasha-ukuze-uthenge: {title}",
+      "historical_qa_fixture": "{title}"
+    }
   },
   "chat": {
     "metaTitle": "Imilayezo — Unity",

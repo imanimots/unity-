@@ -684,21 +684,56 @@ let mainAgreementId = null
   const { data: affiliateRows } = await admin.from('affiliate_commissions').select('id').eq('barter_agreement_id', mainAgreementId)
   check('K2: zero affiliate commission rows for a completed Skill/Task barter agreement', (affiliateRows ?? []).length === 0, affiliateRows)
 
-  // I -- reviews: first real review-creation path in this codebase.
-  const reviewBeforeCompletion = await api(merchantB.cookie, 'POST', `/api/barter/${FORGED_ID}/review`, { rating: 5, idempotency_key: `stb-i-forged-${Date.now()}` })
+  // I -- reviews: Reviews V2 unified path (/api/reviews/submit,
+  // domain='barter') -- supersedes the retired /api/barter/[id]/review +
+  // create_barter_review-only path as of the Reviews V2 remediation;
+  // barter reviews are now created through the same canonical authority
+  // as every other transaction domain (submit_review()).
+  //
+  // Reviews V2's cutover authority (supabase/migrations/20260904000013)
+  // is genuinely tied to the moment Reviews V2 was activated -- mainAgreementId
+  // is a long-lived, idempotently-reused fixture (see D1 above, "on a
+  // rerun an agreement for this exact pair already exists, so the
+  // propose call is skipped") whose completed_at may predate that
+  // cutover on any run after the first, which would correctly (not a
+  // bug) deny a review against it. A dedicated, freshly-completed plain
+  // item-barter agreement is used here instead, so this check exercises
+  // "genuinely eligible, submitted now" every run, independent of
+  // mainAgreementId's own historical completion time.
+  const reviewBeforeCompletion = await api(merchantB.cookie, 'POST', '/api/reviews/submit', { domain: 'barter', transaction_id: FORGED_ID, rating: 5, idempotency_key: `stb-i-forged-${Date.now()}` })
   check('I: review against a forged/nonexistent agreement id is rejected', reviewBeforeCompletion.status >= 400, reviewBeforeCompletion)
 
-  const reviewA = await api(merchantA.cookie, 'POST', `/api/barter/${mainAgreementId}/review`, { rating: 5, comment: 'Great work on the video edit.', idempotency_key: 'stb-i-review-a-v2' })
-  check('I: review creation succeeds once the agreement is completed', reviewA.status === 201 && !!reviewA.json?.review_id, reviewA)
-  // create_barter_review is a graceful idempotent upsert (ON CONFLICT
-  // (barter_agreement_id, reviewer_id) DO NOTHING + fallback select) --
-  // a second call from the same reviewer returns the SAME existing
-  // review_id rather than erroring. The real "at most once" invariant is
-  // that exactly one row exists, not that the second call is rejected.
-  const reviewADuplicate = await api(merchantA.cookie, 'POST', `/api/barter/${mainAgreementId}/review`, { rating: 3, idempotency_key: 'stb-i-review-a-dup-v2' })
+  // is_test:true at creation (never a public-visibility fixture, no
+  // cleanup tracking needed) -- a fresh pair every run by design, so
+  // reviewAgreementId's completed_at is always recent/post-cutover.
+  const reviewListingA = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} STB-I Review fixture A ${Date.now()}`, is_test: true })
+  const reviewListingB = await insertBaseListing(merchantB.userId, { title: `${QA_MARKER} STB-I Review fixture B ${Date.now()}`, is_test: true })
+  const reviewPropose = await api(merchantB.cookie, 'POST', '/api/barter', { anchor_listing_id: reviewListingA, party_a_listing_ids: [reviewListingA], party_b_listing_ids: [reviewListingB], delivery_method: 'meet_in_person', idempotency_key: `stb-i-review-propose-${Date.now()}` })
+  const reviewAgreementId = reviewPropose.json?.agreement_id
+  check('I: fresh review-fixture agreement proposed', !!reviewAgreementId, reviewPropose)
+  await api(merchantA.cookie, 'POST', `/api/barter/${reviewAgreementId}/accept`, { idempotency_key: `stb-i-review-accept-${Date.now()}` })
+  await api(merchantA.cookie, 'POST', `/api/barter/${reviewAgreementId}/progress`, { target_status: 'preparing', idempotency_key: `stb-i-review-prep-${Date.now()}` })
+  await api(merchantA.cookie, 'POST', `/api/barter/${reviewAgreementId}/progress`, { target_status: 'awaiting_confirmation', idempotency_key: `stb-i-review-ready-${Date.now()}` })
+  await api(merchantA.cookie, 'POST', `/api/barter/${reviewAgreementId}/confirm-completion`, { idempotency_key: `stb-i-review-c1-${Date.now()}` })
+  const reviewFixtureComplete = await api(merchantB.cookie, 'POST', `/api/barter/${reviewAgreementId}/confirm-completion`, { idempotency_key: `stb-i-review-c2-${Date.now()}` })
+  check('I: fresh review-fixture agreement reaches completed', reviewFixtureComplete.json?.status === 'completed', reviewFixtureComplete)
+
+  const reviewA = await api(merchantA.cookie, 'POST', '/api/reviews/submit', { domain: 'barter', transaction_id: reviewAgreementId, rating: 5, comment: 'Great work on the video edit.', idempotency_key: 'stb-i-review-a-v2' })
+  check('I: review creation succeeds once the agreement is completed', reviewA.status === 200 && !!reviewA.json?.review_id, reviewA)
+  // submit_review is a graceful idempotent upsert (ON CONFLICT DO
+  // NOTHING + fallback select) -- a second call from the same reviewer
+  // returns the SAME existing review_id rather than erroring. The real
+  // "at most once" invariant is that exactly one row exists, not that
+  // the second call is rejected.
+  const reviewADuplicate = await api(merchantA.cookie, 'POST', '/api/reviews/submit', { domain: 'barter', transaction_id: reviewAgreementId, rating: 3, idempotency_key: 'stb-i-review-a-dup-v2' })
   check('I: a second submission by the same reviewer returns the SAME review_id (upsert, not a duplicate)', reviewADuplicate.json?.review_id === reviewA.json?.review_id, { reviewA, reviewADuplicate })
-  const { data: reviewCount } = await admin.from('reviews').select('id').eq('barter_agreement_id', mainAgreementId).eq('reviewer_id', merchantA.userId)
+  const { data: reviewCount } = await admin.from('reviews').select('id').eq('barter_agreement_id', reviewAgreementId).eq('reviewer_id', merchantA.userId)
   check('I: exactly one review row exists for this reviewer despite two submission attempts', (reviewCount ?? []).length === 1, reviewCount)
+
+  // QA hygiene: this review's own transaction fixtures are already
+  // is_test:true (listings above); mark the review row itself the same
+  // way so it never contributes to a real public aggregate.
+  await admin.from('reviews').update({ is_test: true }).eq('barter_agreement_id', reviewAgreementId)
 }
 
 console.log(`\n=== SECTIONS D-I DONE -- ${failures} failure(s) so far ===`)

@@ -197,7 +197,21 @@
     "loadingMore": "Loading…",
     "starsAriaLabel": "{rating} out of 5 stars",
     "reviewerFallbackName": "Unity Member",
-    "eliteBadgeLabel": "Elite"
+    "eliteBadgeLabel": "Elite",
+    "textRemovedForPolicy": "Review text removed for violating Unity policy.",
+    "replyLabel": "Reply",
+    "transactionKind": {
+      "buy": "Bought {title}",
+      "sell": "Sold {title}",
+      "rent": "Rented {title}",
+      "rent_out": "Rented out {title}",
+      "barter": "Bartered {title}",
+      "skill": "Exchanged Skill: {title}",
+      "task": "Completed Task: {title}",
+      "rent_to_buy_customer": "Rent to Buy: {title}",
+      "rent_to_buy_merchant": "Rent to Buy: {title}",
+      "historical_qa_fixture": "{title}"
+    }
   },
   "chat": {
     "metaTitle": "Messages — Unity",

@@ -3402,6 +3402,163 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       },
     },
   },
+  // ── Reviews V2 ──
+  {
+    id: 'review-eligible',
+    version: '1',
+    event: 'review.eligible',
+    requiredVars: ['recipientName', 'transactionTitle'],
+    subject: () => 'You can now leave a review',
+    build: (v) => ({
+      preheader: 'Share your experience — it stays private until both sides submit or 14 days pass',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [
+        `Your transaction for "${s(v, 'transactionTitle')}" is complete. You can now leave a review of the other party — it stays private until they also submit a review, or 14 days pass, whichever comes first.`,
+      ],
+      cta: { label: 'Leave a review', path: '/dashboard/reviews' },
+    }),
+    localeVariants: {
+      'af-ZA': {
+        subject: () => "Jy kan nou 'n resensie skryf",
+        build: (v) => ({
+          preheader: 'Deel jou ervaring — dit bly privaat totdat albei kante indien of 14 dae verloop',
+          greeting: `Hallo ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Jou transaksie vir "${s(v, 'transactionTitle')}" is voltooi. Jy kan nou 'n resensie oor die ander party skryf — dit bly privaat totdat hulle ook 'n resensie indien, of 14 dae verloop, wat ook al eerste gebeur.`,
+          ],
+          cta: { label: "Skryf 'n resensie", path: '/dashboard/reviews' },
+        }),
+      },
+      'zu-ZA': {
+        subject: () => 'Manje ungabhala ukubuyekeza',
+        build: (v) => ({
+          preheader: 'Yabelana ngolwazi lwakho — kuhlala kuyimfihlo kuze kube yilapho bobabili bethumela noma kudlula izinsuku ezingu-14',
+          greeting: `Sawubona ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Ukuthengiselana kwakho kwe-"${s(v, 'transactionTitle')}" kuqediwe. Manje ungabhala ukubuyekeza omunye umuntu — kuhlala kuyimfihlo kuze kube yilapho naye ethumela ukubuyekeza, noma kudlula izinsuku ezingu-14, noma yikuphi okuzokwenzeka kuqala.`,
+          ],
+          cta: { label: 'Bhala ukubuyekeza', path: '/dashboard/reviews' },
+        }),
+      },
+    },
+  },
+  {
+    id: 'review-reminder',
+    version: '1',
+    event: 'review.reminder',
+    requiredVars: ['recipientName', 'transactionTitle'],
+    subject: () => 'Reminder: you can still leave a review',
+    build: (v) => ({
+      preheader: 'Your review window closes soon',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [
+        `You haven't yet reviewed your transaction for "${s(v, 'transactionTitle')}". Your review window closes a few days from now — after that, it's no longer possible to submit one.`,
+      ],
+      cta: { label: 'Leave a review', path: '/dashboard/reviews' },
+    }),
+    localeVariants: {
+      'af-ZA': {
+        subject: () => "Herinnering: jy kan steeds 'n resensie skryf",
+        build: (v) => ({
+          preheader: 'Jou resensievenster sluit binnekort',
+          greeting: `Hallo ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Jy het nog nie jou transaksie vir "${s(v, 'transactionTitle')}" beoordeel nie. Jou resensievenster sluit oor 'n paar dae — daarna is dit nie meer moontlik om een in te dien nie.`,
+          ],
+          cta: { label: "Skryf 'n resensie", path: '/dashboard/reviews' },
+        }),
+      },
+      'zu-ZA': {
+        subject: () => 'Isikhumbuzo: usengabhala ukubuyekeza',
+        build: (v) => ({
+          preheader: 'Iwindi lakho lokubuyekeza livalwa maduze',
+          greeting: `Sawubona ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Awukakabuyekezi ukuthengiselana kwakho kwe-"${s(v, 'transactionTitle')}". Iwindi lakho lokubuyekeza livalwa ezinsukwini ezimbalwa ezizayo — ngemva kwalokho, akusenakwenzeka ukuthumela okunye.`,
+          ],
+          cta: { label: 'Bhala ukubuyekeza', path: '/dashboard/reviews' },
+        }),
+      },
+    },
+  },
+  {
+    id: 'review-published',
+    version: '1',
+    event: 'review.published',
+    requiredVars: ['recipientName', 'transactionTitle'],
+    subject: () => 'A review is now visible',
+    build: (v) => ({
+      preheader: 'A review for your transaction is now public',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [
+        `A review linked to your transaction for "${s(v, 'transactionTitle')}" is now visible on Unity.`,
+      ],
+      cta: { label: 'View reviews', path: '/dashboard/reviews' },
+    }),
+    localeVariants: {
+      'af-ZA': {
+        subject: () => "'n Resensie is nou sigbaar",
+        build: (v) => ({
+          preheader: "'n Resensie vir jou transaksie is nou publiek",
+          greeting: `Hallo ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `'n Resensie gekoppel aan jou transaksie vir "${s(v, 'transactionTitle')}" is nou sigbaar op Unity.`,
+          ],
+          cta: { label: 'Bekyk resensies', path: '/dashboard/reviews' },
+        }),
+      },
+      'zu-ZA': {
+        subject: () => 'Ukubuyekeza manje kuyabonakala',
+        build: (v) => ({
+          preheader: 'Ukubuyekeza kokuthengiselana kwakho manje kusesidlangalaleni',
+          greeting: `Sawubona ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Ukubuyekeza okuxhumene nokuthengiselana kwakho kwe-"${s(v, 'transactionTitle')}" manje kuyabonakala ku-Unity.`,
+          ],
+          cta: { label: 'Buka ukubuyekeza', path: '/dashboard/reviews' },
+        }),
+      },
+    },
+  },
+  {
+    id: 'review-reply-received',
+    version: '1',
+    event: 'review.reply_received',
+    requiredVars: ['recipientName', 'transactionTitle'],
+    subject: () => 'You received a reply to your review',
+    build: (v) => ({
+      preheader: 'The reviewed party replied to your review',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [
+        `The party you reviewed for "${s(v, 'transactionTitle')}" has posted a public reply to your review.`,
+      ],
+      cta: { label: 'View the reply', path: '/dashboard/reviews' },
+    }),
+    localeVariants: {
+      'af-ZA': {
+        subject: () => "Jy het 'n antwoord op jou resensie ontvang",
+        build: (v) => ({
+          preheader: 'Die beoordeelde party het op jou resensie geantwoord',
+          greeting: `Hallo ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Die party wat jy vir "${s(v, 'transactionTitle')}" beoordeel het, het 'n openbare antwoord op jou resensie geplaas.`,
+          ],
+          cta: { label: 'Bekyk die antwoord', path: '/dashboard/reviews' },
+        }),
+      },
+      'zu-ZA': {
+        subject: () => 'Uthole impendulo yokubuyekeza kwakho',
+        build: (v) => ({
+          preheader: 'Umuntu obuyekeziwe uphendule ukubuyekeza kwakho',
+          greeting: `Sawubona ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Umuntu ombuyekeze nge-"${s(v, 'transactionTitle')}" uthumele impendulo esidlangalaleni ekubuyekezeni kwakho.`,
+          ],
+          cta: { label: 'Buka impendulo', path: '/dashboard/reviews' },
+        }),
+      },
+    },
+  },
 ]
 
 const TEMPLATES_BY_ID = new Map(EMAIL_TEMPLATES.map((t) => [t.id, t]))

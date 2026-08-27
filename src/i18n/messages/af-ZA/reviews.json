@@ -1,0 +1,24 @@
+{
+  "form": {
+    "leaveReview": "Skryf 'n resensie",
+    "reviewingTransactionFor": "Jy beoordeel jou transaksie vir",
+    "blindExplainer": "Jou resensie bly privaat totdat die ander party ook hulle s'n indien, of 14 dae verloop — wat ook al eerste gebeur.",
+    "rate": "Beoordeel {reviewee}",
+    "chooseRating": "Kies asseblief 'n sterbeoordeling.",
+    "writeReview": "Skryf 'n resensie (opsioneel)",
+    "sharePlaceholder": "Deel jou ervaring met {reviewee}",
+    "cancel": "Kanselleer",
+    "submitting": "Word ingedien…",
+    "submitReview": "Dien resensie in",
+    "couldNotSubmit": "Kon nie jou resensie indien nie — probeer asseblief weer.",
+    "couldNotSubmitRetry": "Kon nie jou resensie indien nie — probeer asseblief weer.",
+    "submittedTitle": "Jou resensie is ingedien.",
+    "submittedBlindExplainer": "Dit bly privaat totdat die ander party ook hulle resensie indien, of 14 dae verloop.",
+    "alreadySubmittedTitle": "Jy het reeds hierdie transaksie beoordeel.",
+    "nowPublic": "Jou resensie is nou publiek.",
+    "orderNotFound": "Bestelling nie gevind nie of nog nie gereed vir 'n resensie nie.",
+    "backToOrders": "Terug na bestellings",
+    "agreementNotFound": "Ooreenkoms nie gevind nie of nog nie gereed vir 'n resensie nie.",
+    "backToAgreements": "Terug na ooreenkomste"
+  }
+}

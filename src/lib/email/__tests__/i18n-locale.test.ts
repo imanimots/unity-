@@ -32,6 +32,7 @@ const FULL_SYNTHETIC_VARS: TemplateVars = {
   failureMessage: 'Unity is reviewing an internal payout issue.',
   planName: 'Pro Merchant',
   requestTitle: 'Looking for a pressure washer',
+  transactionTitle: 'Adidas Running Shoes',
 }
 
 const NON_DEFAULT_LOCALES = LOCALES.filter((l) => l !== 'en-ZA') as Locale[]
