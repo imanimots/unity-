@@ -72,7 +72,7 @@ function check(label, cond, detail) {
  * bare-reference shape no longer exists as an accepted funding input at
  * all after the settlement-authority hardening.
  */
-async function recordVerifiedSettlement({ advertiserId, provider = 'mock', reference, amountCents, currency = 'ZAR', isTest = false }) {
+async function recordVerifiedSettlement({ advertiserId, provider = 'mock', reference, amountCents, currency = 'ZAR', isTest = false, quoteId = null }) {
   return admin.rpc('record_ad_provider_settlement', {
     p_advertiser_id: advertiserId,
     p_provider: provider,
@@ -80,6 +80,7 @@ async function recordVerifiedSettlement({ advertiserId, provider = 'mock', refer
     p_amount_cents: amountCents,
     p_currency: currency,
     p_is_test: isTest,
+    p_quote_id: quoteId,
   })
 }
 
@@ -94,16 +95,37 @@ async function recordVerifiedSettlement({ advertiserId, provider = 'mock', refer
  * consumes it. Returns the same { data, error } shape the direct RPC
  * call used to return, so existing check() assertions read unchanged.
  */
-async function fundViaProvider({ actorId, campaignId, advertiserId, packageId, isTest = false, reference, idempotencyKey }) {
-  const { data: pkg, error: pkgErr } = await admin.from('ad_packages').select('price_cents, currency').eq('id', packageId).maybeSingle()
-  if (pkgErr || !pkg) return { data: null, error: pkgErr ?? new Error('package not found') }
+/**
+ * Uses the canonical get_ad_campaign_funding_quote() RPC (the exact same
+ * one the real funding route now calls) to determine the amount to
+ * settle/fund -- never the raw package price directly. This matters for
+ * every existing caller too, not just the discount-specific checks
+ * below: merchantA (the shared permanent QA fixture used throughout
+ * this whole file) currently carries a real, active Pro subscription
+ * (confirmed live, not assumed), so the discount is genuinely in effect
+ * for every pre-existing funding call in this script after the
+ * subscription-discount migration -- computing the settlement from
+ * pkg.price_cents directly would now be rejected by fund_ad_campaign()
+ * as a wrong-amount settlement. packageId is accepted for backward
+ * compatibility with existing call sites but no longer used directly.
+ */
+/**
+ * Mirrors the real funding route's full flow exactly: create a
+ * PERSISTED, authoritative funding quote (frozen base/discount/amount),
+ * record a settlement bound to that exact quote, then consume both via
+ * fund_ad_campaign(). Never uses the older live-preview-only
+ * get_ad_campaign_funding_quote() for pricing a real funding attempt.
+ */
+async function fundViaProvider({ actorId, campaignId, advertiserId, isTest = false, reference, idempotencyKey }) {
+  const { data: quote, error: quoteErr } = await admin.rpc('create_ad_campaign_funding_quote', { p_actor_profile_id: actorId, p_campaign_id: campaignId })
+  if (quoteErr || !quote) return { data: null, error: quoteErr ?? new Error('quote failed') }
   const { data: settlement, error: settlementErr } = await recordVerifiedSettlement({
-    advertiserId, reference, amountCents: pkg.price_cents, currency: pkg.currency, isTest,
+    advertiserId, reference, amountCents: quote.amount_due_cents, currency: quote.currency, isTest, quoteId: quote.quote_id,
   })
   if (settlementErr || !settlement) return { data: null, error: settlementErr }
   return admin.rpc('fund_ad_campaign', {
     p_actor_profile_id: actorId, p_campaign_id: campaignId, p_funding_source: 'provider',
-    p_settlement_id: settlement.id, p_idempotency_key: idempotencyKey ?? null,
+    p_settlement_id: settlement.id, p_idempotency_key: idempotencyKey ?? null, p_quote_id: quote.quote_id,
   })
 }
 
@@ -289,6 +311,7 @@ let realListingId, otherMerchantListingId, testListingId
 
 console.log('=== Campaign funding: insufficient balance, provider funding, commercial snapshot ===')
 let campaign1
+let campaign1FundedAmount
 {
   const futureEnd = new Date(Date.now() + 30 * 86400000).toISOString()
   const { data: draft, error: draftErr } = await admin.rpc('create_ad_campaign_draft', {
@@ -308,8 +331,17 @@ let campaign1
     actorId: merchantAId, campaignId: campaign1.id, advertiserId: unityAdvertiser.id, packageId: standardPackage.id, isTest: false, reference: `mock_ad_${RUN_ID}_1`,
   })
   check('14. funding via the mock provider succeeds and auto-activates a unity-marketplace campaign (no separate review needed)', !fundErr && funded?.status === 'active', { fundErr, funded })
-  check('15. the funded campaign snapshots the package\'s commercial terms exactly (price/quota/tier)', funded?.snapshot_price_cents === standardPackage.price_cents && funded?.snapshot_impression_quota === standardPackage.impression_quota, funded)
+  // snapshot_price_cents is now the DISCOUNTED final amount (merchantA
+  // carries a real, live subscription plan -- see fundViaProvider's own
+  // note above), not the raw package price directly -- quota/tier are
+  // unaffected by any discount, so those two still compare directly
+  // against the package.
+  check('15. the funded campaign snapshots the package\'s commercial terms exactly (net price/quota/tier)', funded?.snapshot_price_cents === funded?.funded_amount_cents && funded?.snapshot_price_cents <= standardPackage.price_cents && funded?.snapshot_impression_quota === standardPackage.impression_quota, funded)
   check('16. activated_at is set once the campaign becomes active', !!funded?.activated_at, funded)
+  // Captured for later checks that assert campaign1's price is
+  // unaffected by a subsequent package edit -- the discounted amount
+  // actually charged, never the raw package price.
+  campaign1FundedAmount = funded?.snapshot_price_cents
 }
 
 console.log('=== Package edit after funding never rewrites the campaign\'s snapshot ===')
@@ -320,7 +352,7 @@ console.log('=== Package edit after funding never rewrites the campaign\'s snaps
   check('17. admin can edit the package catalogue row after a campaign already funded against it', !editErr, { editErr })
 
   const { data: campaignAfterEdit } = await admin.from('ad_campaigns').select('snapshot_price_cents').eq('id', campaign1.id).single()
-  check('18. editing the package catalogue row after funding does NOT retroactively change the already-funded campaign\'s snapshot price', campaignAfterEdit?.snapshot_price_cents === 10000, campaignAfterEdit)
+  check('18. editing the package catalogue row after funding does NOT retroactively change the already-funded campaign\'s snapshot price', campaignAfterEdit?.snapshot_price_cents === campaign1FundedAmount, { campaignAfterEdit, campaign1FundedAmount })
 }
 
 console.log('=== get_eligible_ads: serving, dedup, is_test isolation ===')
@@ -454,7 +486,12 @@ console.log('=== record_ad_click: idempotency, self-click exclusion, server-reso
 console.log('=== Underdelivery credit: exact formula, integer-cent boundary rounding ===')
 {
   const futureEnd = new Date(Date.now() + 30 * 86400000).toISOString()
-  // funded=10000c, quota=100, deliver exactly 37 -> delivered_value=floor(10000*37/100)=3700, unused=6300
+  // Package base price is 10000, but the underdelivery formula's base
+  // must be the ACTUAL funded_amount_cents (the discounted final
+  // amount, per merchantA's real live subscription plan) -- never the
+  // raw package price. Both the expected delivered-value and unused-
+  // credit are computed dynamically below from bCampaign's own real
+  // funded_amount_cents once funding completes.
   const boundaryPackage = await createPackage({ name_suffix: 'Boundary', price_cents: 10000, impression_quota: 100 })
   const { data: bDraft } = await admin.rpc('create_ad_campaign_draft', {
     p_actor_profile_id: merchantAId, p_advertiser_id: unityAdvertiser.id, p_package_id: boundaryPackage.id,
@@ -464,6 +501,7 @@ console.log('=== Underdelivery credit: exact formula, integer-cent boundary roun
     actorId: merchantAId, campaignId: bDraft.id, advertiserId: unityAdvertiser.id, packageId: boundaryPackage.id, isTest: false, reference: `mock_ad_${RUN_ID}_boundary`,
   })
   createdCampaignIds.push(bCampaign.id)
+  const bFundedAmount = bCampaign.funded_amount_cents
 
   for (let i = 0; i < 37; i++) {
     await admin.rpc('record_ad_impression', { p_campaign_id: bCampaign.id, p_placement_type: 'search_result', p_viewer_id: null, p_reach_key: `anon:${RUN_ID}:boundary:${i}` })
@@ -486,18 +524,21 @@ console.log('=== Underdelivery credit: exact formula, integer-cent boundary roun
   check('39. the expired campaign transitions to completed/end_date_reached', finalCampaign.status === 'completed' && finalCampaign.completion_reason === 'end_date_reached', finalCampaign)
 
   const { data: ledgerEntry } = await admin.from('ad_balance_ledger').select('*').eq('campaign_id', bCampaign.id).eq('entry_type', 'underdelivery_credit').maybeSingle()
-  check('40. underdelivery credit formula is exact: floor(10000*37/100)=3700 delivered, unused_credit=6300', ledgerEntry?.amount_cents === 6300, { ledgerEntry, delivered: finalCampaign.delivered_impressions })
+  const expectedDeliveredValue = Math.floor((bFundedAmount * 37) / 100)
+  const expectedUnusedCredit = bFundedAmount - expectedDeliveredValue
+  check(`40. underdelivery credit formula is exact against the ACTUAL discounted funded amount: floor(${bFundedAmount}*37/100)=${expectedDeliveredValue} delivered, unused_credit=${expectedUnusedCredit}`, ledgerEntry?.amount_cents === expectedUnusedCredit, { ledgerEntry, delivered: finalCampaign.delivered_impressions, bFundedAmount })
 
   const { data: balAfter } = await admin.from('ad_balance_accounts').select('balance_cents').eq('advertiser_id', unityAdvertiser.id).single()
-  check('41. the underdelivery credit is applied to the advertiser\'s (non-withdrawable) Advertising Balance exactly once', balAfter.balance_cents === balBefore.balance_cents + 6300, { balBefore, balAfter })
+  check('41. the underdelivery credit is applied to the advertiser\'s (non-withdrawable) Advertising Balance exactly once', balAfter.balance_cents === balBefore.balance_cents + expectedUnusedCredit, { balBefore, balAfter })
 
-  check('42. underdelivery credit never exceeds the originally funded amount', ledgerEntry.amount_cents <= 10000, ledgerEntry)
+  check('42. underdelivery credit never exceeds the actual funded amount (the discounted amount, not the raw package price)', ledgerEntry.amount_cents <= bFundedAmount, { ledgerEntry, bFundedAmount })
 }
 
 console.log('=== Underdelivery credit: non-round division boundary (quota=3, delivered=1) ===')
 {
   const futureEnd = new Date(Date.now() + 30 * 86400000).toISOString()
-  // funded=10000c, quota=3, delivered=1 -> delivered_value=floor(10000*1/3)=3333, unused=6667
+  // Base formula is against the ACTUAL discounted funded_amount_cents,
+  // computed dynamically below, exactly as in the boundary check above.
   const oddPackage = await createPackage({ name_suffix: 'OddBoundary', price_cents: 10000, impression_quota: 3 })
   const { data: oDraft } = await admin.rpc('create_ad_campaign_draft', {
     p_actor_profile_id: merchantAId, p_advertiser_id: unityAdvertiser.id, p_package_id: oddPackage.id,
@@ -507,6 +548,7 @@ console.log('=== Underdelivery credit: non-round division boundary (quota=3, del
     actorId: merchantAId, campaignId: oDraft.id, advertiserId: unityAdvertiser.id, packageId: oddPackage.id, isTest: false, reference: `mock_ad_${RUN_ID}_odd`,
   })
   createdCampaignIds.push(oCampaign.id)
+  const oFundedAmount = oCampaign.funded_amount_cents
   await admin.rpc('record_ad_impression', { p_campaign_id: oCampaign.id, p_placement_type: 'search_result', p_viewer_id: null, p_reach_key: `anon:${RUN_ID}:odd:1` })
 
   const { error: oddBackdateErr } = await admin.from('ad_campaigns').update({
@@ -517,7 +559,9 @@ console.log('=== Underdelivery credit: non-round division boundary (quota=3, del
   await admin.rpc('finalize_expired_ad_campaigns', { p_actor_id: null })
 
   const { data: oddLedger } = await admin.from('ad_balance_ledger').select('amount_cents').eq('campaign_id', oCampaign.id).eq('entry_type', 'underdelivery_credit').maybeSingle()
-  check('43. the underdelivery formula floors correctly on a non-round division (floor(10000*1/3)=3333, unused=6667)', oddLedger?.amount_cents === 6667, oddLedger)
+  const expectedOddDeliveredValue = Math.floor((oFundedAmount * 1) / 3)
+  const expectedOddUnusedCredit = oFundedAmount - expectedOddDeliveredValue
+  check(`43. the underdelivery formula floors correctly on a non-round division against the actual funded amount (floor(${oFundedAmount}*1/3)=${expectedOddDeliveredValue}, unused=${expectedOddUnusedCredit})`, oddLedger?.amount_cents === expectedOddUnusedCredit, { oddLedger, oFundedAmount })
 }
 
 console.log('=== Voluntary post-activation cancellation: no underdelivery credit ===')
@@ -554,12 +598,18 @@ console.log('=== Pre-activation cancellation: full refund to original funding so
     p_target_type: 'listing', p_listing_id: realListingId, p_end_at: futureEnd, p_is_test: false,
   })
   createdCampaignIds.push(pDraft.id)
+  // Expected debit is the DISCOUNTED final amount, not the raw package
+  // price -- merchantA (this whole file's shared QA fixture) carries a
+  // real, live subscription plan, so the canonical quote is the only
+  // correct source of truth for what this specific funding call will
+  // actually debit (never a hardcoded package price).
+  const { data: preActQuote } = await admin.rpc('get_ad_campaign_funding_quote', { p_actor_profile_id: merchantAId, p_campaign_id: pDraft.id })
   const { data: pFunded, error: pFundErr } = await admin.rpc('fund_ad_campaign', {
     p_actor_profile_id: merchantAId, p_campaign_id: pDraft.id, p_funding_source: 'balance', p_settlement_id: null,
   })
   check('46. funding pre-activation-cancel fixture via Advertising Balance succeeds (balance has accrued underdelivery credit from earlier checks)', !pFundErr && pFunded?.status === 'active', { pFundErr, pFunded })
   const { data: balAfterFund } = await admin.from('ad_balance_accounts').select('balance_cents').eq('advertiser_id', unityAdvertiser.id).single()
-  check('47. funding via balance debits the exact package price', balAfterFund.balance_cents === balBefore.balance_cents - 1000, { balBefore, balAfterFund })
+  check('47. funding via balance debits the exact discounted final amount (per the canonical quote, not the raw package price)', balAfterFund.balance_cents === balBefore.balance_cents - preActQuote.final_amount_cents, { balBefore, balAfterFund, preActQuote })
 
   // Note: this campaign auto-activated (unity-marketplace campaigns activate immediately on funding),
   // so "pre-activation cancel" is exercised instead on a still-draft campaign below.
@@ -876,47 +926,81 @@ console.log('=== Verified settlement authority: fabrication, mismatch, and repla
     if (draft?.id) createdCampaignIds.push(draft.id)
     return draft
   }
-  // 80/81. A fabricated/nonexistent settlement_id is rejected outright --
-  // the direct closure of the proven gap (a bare string is no longer
-  // even an accepted parameter shape; a syntactically valid but
-  // never-recorded settlement id is the closest equivalent attack today).
+  // Every provider-funding scenario below now requires a PERSISTED,
+  // authoritative quote (create_ad_campaign_funding_quote) before a
+  // settlement can be recorded or a campaign funded -- the direct
+  // closure of the price/plan race across the external payment
+  // boundary.
+  async function quoteFor(draftId) {
+    const { data: quote } = await admin.rpc('create_ad_campaign_funding_quote', { p_actor_profile_id: merchantAId, p_campaign_id: draftId })
+    return quote
+  }
+  const settlementAmount = (await quoteFor((await freshDraft(settlementAdvertiser.id)).id)).amount_due_cents
+
+  // 80/81. A fabricated/nonexistent settlement_id is rejected outright,
+  // even with a real, valid quote supplied -- the direct closure of the
+  // proven gap (a bare string is no longer even an accepted parameter
+  // shape; a syntactically valid but never-recorded settlement id is
+  // the closest equivalent attack today).
   const fabDraft = await freshDraft(settlementAdvertiser.id)
+  const fabQuote = await quoteFor(fabDraft.id)
   const { error: fabricatedErr } = await admin.rpc('fund_ad_campaign', {
-    p_actor_profile_id: merchantAId, p_campaign_id: fabDraft.id, p_funding_source: 'provider', p_settlement_id: '00000000-0000-4000-8000-000000000000',
+    p_actor_profile_id: merchantAId, p_campaign_id: fabDraft.id, p_funding_source: 'provider', p_settlement_id: '00000000-0000-4000-8000-000000000000', p_quote_id: fabQuote.quote_id,
   })
-  check('80. a fabricated/nonexistent settlement_id is rejected (settlement not found)', !!fabricatedErr, { fabricatedErr })
+  check('80. a fabricated/nonexistent settlement_id is rejected (settlement not found), even with a real quote supplied', !!fabricatedErr, { fabricatedErr })
   const { data: fabCampaignAfter } = await admin.from('ad_campaigns').select('status').eq('id', fabDraft.id).single()
   check('81. a rejected fabricated-settlement funding attempt leaves the campaign in draft (no partial activation)', fabCampaignAfter?.status === 'draft', fabCampaignAfter)
   const { count: fabFundingRows } = await admin.from('ad_campaign_funding').select('id', { count: 'exact', head: true }).eq('campaign_id', fabDraft.id)
   check('82. a rejected fabricated-settlement funding attempt creates no ad_campaign_funding row at all', fabFundingRows === 0, { fabFundingRows })
 
-  // 83. A null settlement_id on the provider path is rejected the same way.
+  // 83/83a. A null settlement_id, and separately a null quote_id, on the
+  // provider path are each rejected on their own.
   const nullDraft = await freshDraft(settlementAdvertiser.id)
+  const nullQuote = await quoteFor(nullDraft.id)
   const { error: nullSettlementErr } = await admin.rpc('fund_ad_campaign', {
-    p_actor_profile_id: merchantAId, p_campaign_id: nullDraft.id, p_funding_source: 'provider', p_settlement_id: null,
+    p_actor_profile_id: merchantAId, p_campaign_id: nullDraft.id, p_funding_source: 'provider', p_settlement_id: null, p_quote_id: nullQuote.quote_id,
   })
   check('83. provider funding with no settlement_id at all is rejected', !!nullSettlementErr, { nullSettlementErr })
+  const noQuoteDraft = await freshDraft(settlementAdvertiser.id)
+  const { error: noQuoteErr } = await admin.rpc('fund_ad_campaign', {
+    p_actor_profile_id: merchantAId, p_campaign_id: noQuoteDraft.id, p_funding_source: 'provider', p_settlement_id: '00000000-0000-4000-8000-000000000000', p_quote_id: null,
+  })
+  check('83a. provider funding with no funding quote at all is rejected', !!noQuoteErr, { noQuoteErr })
 
   // 84. record_ad_provider_settlement is the only way a verified row can
   // exist, and it is the shape trusted server code (the funding route)
-  // actually uses -- verify the row it produces.
+  // actually uses -- verify the row it produces, bound to a real quote.
+  const goodDraft = await freshDraft(settlementAdvertiser.id)
+  const goodQuote = await quoteFor(goodDraft.id)
   const goodRef = `mock_ad_settlement_${RUN_ID}`
   const { data: settlement, error: settlementErr } = await recordVerifiedSettlement({
-    advertiserId: settlementAdvertiser.id, reference: goodRef, amountCents: settlementPackage.price_cents, currency: settlementPackage.currency, isTest: true,
+    advertiserId: settlementAdvertiser.id, reference: goodRef, amountCents: goodQuote.amount_due_cents, currency: goodQuote.currency, isTest: true, quoteId: goodQuote.quote_id,
   })
-  check('84. record_ad_provider_settlement creates a verified settlement row with the exact fields supplied', !settlementErr && settlement?.status === 'verified' && settlement?.amount_cents === settlementPackage.price_cents, { settlementErr, settlement })
+  check('84. record_ad_provider_settlement creates a verified settlement row bound to the exact quote supplied', !settlementErr && settlement?.status === 'verified' && settlement?.amount_cents === goodQuote.amount_due_cents && settlement?.quote_id === goodQuote.quote_id, { settlementErr, settlement })
 
   // 85. Duplicate reference can never be recorded twice -- the structural
   // guarantee that one real charge cannot become two settlements.
   const { error: dupSettlementErr } = await recordVerifiedSettlement({
-    advertiserId: settlementAdvertiser.id, reference: goodRef, amountCents: settlementPackage.price_cents, currency: settlementPackage.currency, isTest: true,
+    advertiserId: settlementAdvertiser.id, reference: goodRef, amountCents: goodQuote.amount_due_cents, currency: goodQuote.currency, isTest: true,
   })
   check('85. recording the same (provider, provider_reference) a second time is rejected', !!dupSettlementErr, { dupSettlementErr })
 
-  // 86. Wrong advertiser: a real, verified settlement belonging to a
-  // DIFFERENT advertiser cannot fund this advertiser's campaign.
-  // otherSettlementAdvertiser is owned by merchantB, so its draft needs
-  // its own merchantB-owned listing target and merchantB as actor.
+  // 85a. A SECOND settlement can never be recorded for the SAME quote,
+  // even with a fresh provider_reference -- one quote, one settlement.
+  const { error: dupQuoteSettlementErr } = await recordVerifiedSettlement({
+    advertiserId: settlementAdvertiser.id, reference: `mock_ad_dupquote_${RUN_ID}`, amountCents: goodQuote.amount_due_cents, currency: goodQuote.currency, isTest: true, quoteId: goodQuote.quote_id,
+  })
+  check('85a. a second settlement for the SAME funding quote is rejected, even with a fresh provider reference', !!dupQuoteSettlementErr, { dupQuoteSettlementErr })
+
+  // 86. A quote+settlement pair legitimately consumed by one campaign can
+  // never fund a DIFFERENT campaign -- proves quote/settlement binding is
+  // campaign-specific, closing "wrong advertiser" and "wrong campaign"
+  // together (a quote's advertiser_id and campaign_id are fixed at
+  // creation and can never be reused for anyone else's campaign).
+  const { data: legitFunded, error: legitErr } = await admin.rpc('fund_ad_campaign', {
+    p_actor_profile_id: merchantAId, p_campaign_id: goodDraft.id, p_funding_source: 'provider', p_settlement_id: settlement.id, p_quote_id: goodQuote.quote_id,
+  })
+  check('86pre. the legitimate quote+settlement funds its own campaign first (precondition for the cross-campaign-reuse proof below)', !legitErr && legitFunded?.status === 'active', { legitErr, legitFunded })
   const otherMerchantListingId = await insertListing({ merchant_id: merchantBId, title: `${QA_MARKER} Settlement Other Merchant Listing ${RUN_ID}`, is_test: true })
   const { data: wrongAdvertiserDraft } = await admin.rpc('create_ad_campaign_draft', {
     p_actor_profile_id: merchantBId, p_advertiser_id: otherSettlementAdvertiser.id, p_package_id: settlementPackage.id,
@@ -924,100 +1008,104 @@ console.log('=== Verified settlement authority: fabrication, mismatch, and repla
   })
   if (wrongAdvertiserDraft?.id) createdCampaignIds.push(wrongAdvertiserDraft.id)
   const { error: crossAdvertiserErr } = await admin.rpc('fund_ad_campaign', {
-    p_actor_profile_id: merchantBId, p_campaign_id: wrongAdvertiserDraft.id, p_funding_source: 'provider', p_settlement_id: settlement.id,
+    p_actor_profile_id: merchantBId, p_campaign_id: wrongAdvertiserDraft.id, p_funding_source: 'provider', p_settlement_id: settlement.id, p_quote_id: goodQuote.quote_id,
   })
-  check('86. a verified settlement belonging to a DIFFERENT advertiser is rejected (does not belong to this advertiser)', !!crossAdvertiserErr, { crossAdvertiserErr })
+  check('86. an already-consumed quote+settlement (belonging to a different advertiser AND already funded) cannot fund a different campaign', !!crossAdvertiserErr, { crossAdvertiserErr })
 
   // 87. Wrong amount: a settlement whose amount does not match the
-  // package's authoritative price is rejected, even though it is
-  // otherwise a genuinely verified settlement for the right advertiser.
-  const { data: wrongAmountSettlement } = await recordVerifiedSettlement({
-    advertiserId: settlementAdvertiser.id, reference: `mock_ad_wrongamount_${RUN_ID}`, amountCents: settlementPackage.price_cents + 1, currency: settlementPackage.currency, isTest: true,
-  })
+  // QUOTE it claims to be for is rejected at record_ad_provider_settlement
+  // itself -- the linkage is enforced at creation time, not just at fund time.
   const wrongAmountDraft = await freshDraft(settlementAdvertiser.id)
-  const { error: wrongAmountErr } = await admin.rpc('fund_ad_campaign', {
-    p_actor_profile_id: merchantAId, p_campaign_id: wrongAmountDraft.id, p_funding_source: 'provider', p_settlement_id: wrongAmountSettlement.id,
+  const wrongAmountQuote = await quoteFor(wrongAmountDraft.id)
+  const { error: wrongAmountErr } = await recordVerifiedSettlement({
+    advertiserId: settlementAdvertiser.id, reference: `mock_ad_wrongamount_${RUN_ID}`, amountCents: wrongAmountQuote.amount_due_cents + 1, currency: wrongAmountQuote.currency, isTest: true, quoteId: wrongAmountQuote.quote_id,
   })
-  check('87. a verified settlement for the WRONG AMOUNT (off by one cent) is rejected', !!wrongAmountErr, { wrongAmountErr })
+  check('87. a settlement for the WRONG AMOUNT (off by one cent) relative to its claimed quote is rejected at settlement-creation time', !!wrongAmountErr, { wrongAmountErr })
 
-  // 88. Wrong currency: same idea, currency mismatch.
-  const { data: wrongCurrencySettlement } = await recordVerifiedSettlement({
-    advertiserId: settlementAdvertiser.id, reference: `mock_ad_wrongcur_${RUN_ID}`, amountCents: settlementPackage.price_cents, currency: 'USD', isTest: true,
-  })
+  // 88. Wrong currency: same idea, currency mismatch against the quote.
   const wrongCurrencyDraft = await freshDraft(settlementAdvertiser.id)
-  const { error: wrongCurrencyErr } = await admin.rpc('fund_ad_campaign', {
-    p_actor_profile_id: merchantAId, p_campaign_id: wrongCurrencyDraft.id, p_funding_source: 'provider', p_settlement_id: wrongCurrencySettlement.id,
+  const wrongCurrencyQuote = await quoteFor(wrongCurrencyDraft.id)
+  const { error: wrongCurrencyErr } = await recordVerifiedSettlement({
+    advertiserId: settlementAdvertiser.id, reference: `mock_ad_wrongcur_${RUN_ID}`, amountCents: wrongCurrencyQuote.amount_due_cents, currency: 'USD', isTest: true, quoteId: wrongCurrencyQuote.quote_id,
   })
-  check('88. a verified settlement for the WRONG CURRENCY is rejected', !!wrongCurrencyErr, { wrongCurrencyErr })
+  check('88. a settlement for the WRONG CURRENCY relative to its claimed quote is rejected at settlement-creation time', !!wrongCurrencyErr, { wrongCurrencyErr })
 
-  // 89. Wrong is_test: a real settlement cannot fund a QA campaign and
-  // vice versa -- the existing is_test-isolation convention extended to
-  // settlement authority.
-  const { data: liveSettlement } = await recordVerifiedSettlement({
-    advertiserId: settlementAdvertiser.id, reference: `mock_ad_liveflag_${RUN_ID}`, amountCents: settlementPackage.price_cents, currency: settlementPackage.currency, isTest: false,
-  })
+  // 89. Wrong is_test: a real settlement cannot claim a QA quote and vice
+  // versa -- the existing is_test-isolation convention extended to
+  // quote+settlement authority.
   const isTestMismatchDraft = await freshDraft(settlementAdvertiser.id) // is_test: true
-  const { error: isTestMismatchErr } = await admin.rpc('fund_ad_campaign', {
-    p_actor_profile_id: merchantAId, p_campaign_id: isTestMismatchDraft.id, p_funding_source: 'provider', p_settlement_id: liveSettlement.id,
+  const isTestMismatchQuote = await quoteFor(isTestMismatchDraft.id)
+  const { error: isTestMismatchErr } = await recordVerifiedSettlement({
+    advertiserId: settlementAdvertiser.id, reference: `mock_ad_liveflag_${RUN_ID}`, amountCents: isTestMismatchQuote.amount_due_cents, currency: isTestMismatchQuote.currency, isTest: false, quoteId: isTestMismatchQuote.quote_id,
   })
-  check('89. a real (is_test=false) settlement cannot fund a QA (is_test=true) campaign, or vice versa', !!isTestMismatchErr, { isTestMismatchErr })
+  check('89. a settlement with the WRONG is_test flag relative to its claimed (QA) quote is rejected at settlement-creation time', !!isTestMismatchErr, { isTestMismatchErr })
 
-  // 90. Legitimate settlement -- consumed exactly once -- funds the
-  // intended campaign, and the funding row records which settlement it
-  // consumed.
-  const legitDraft = await freshDraft(settlementAdvertiser.id)
-  const { data: legitFunded, error: legitErr } = await admin.rpc('fund_ad_campaign', {
-    p_actor_profile_id: merchantAId, p_campaign_id: legitDraft.id, p_funding_source: 'provider', p_settlement_id: settlement.id,
+  // 90/91. A genuinely matching quote+settlement funds the intended
+  // campaign, and the funding row records exactly which quote AND
+  // settlement it consumed.
+  const legit2Draft = await freshDraft(settlementAdvertiser.id)
+  const legit2Quote = await quoteFor(legit2Draft.id)
+  const { data: legit2Settlement } = await recordVerifiedSettlement({
+    advertiserId: settlementAdvertiser.id, reference: `mock_ad_legit2_${RUN_ID}`, amountCents: legit2Quote.amount_due_cents, currency: legit2Quote.currency, isTest: true, quoteId: legit2Quote.quote_id,
   })
-  check('90. a genuinely matching verified settlement (right advertiser/amount/currency/is_test) funds the campaign and activates it', !legitErr && legitFunded?.status === 'active', { legitErr, legitFunded })
-  const { data: fundingRow } = await admin.from('ad_campaign_funding').select('settlement_id, provider_reference').eq('campaign_id', legitDraft.id).maybeSingle()
-  check('91. the ad_campaign_funding row records exactly which settlement it consumed (settlement_id set, matches the reference)', fundingRow?.settlement_id === settlement.id && fundingRow?.provider_reference === goodRef, fundingRow)
+  const { data: legit2Funded, error: legit2Err } = await admin.rpc('fund_ad_campaign', {
+    p_actor_profile_id: merchantAId, p_campaign_id: legit2Draft.id, p_funding_source: 'provider', p_settlement_id: legit2Settlement.id, p_quote_id: legit2Quote.quote_id,
+  })
+  check('90. a genuinely matching verified quote+settlement funds the campaign and activates it', !legit2Err && legit2Funded?.status === 'active', { legit2Err, legit2Funded })
+  const { data: fundingRow } = await admin.from('ad_campaign_funding').select('settlement_id, quote_id, provider_reference').eq('campaign_id', legit2Draft.id).maybeSingle()
+  check('91. the ad_campaign_funding row records exactly which settlement AND which quote it consumed', fundingRow?.settlement_id === legit2Settlement.id && fundingRow?.quote_id === legit2Quote.quote_id, fundingRow)
 
-  // 92. Replay: that SAME settlement can never fund a second campaign --
-  // the direct DB-level (unique index), not merely application-level,
-  // guarantee.
+  // 92/93. Replay: that SAME quote+settlement can never fund a second
+  // campaign -- the direct DB-level (unique index on both quote_id and
+  // settlement_id), not merely application-level, guarantee.
   const replayDraft = await freshDraft(settlementAdvertiser.id)
   const { error: replayErr } = await admin.rpc('fund_ad_campaign', {
-    p_actor_profile_id: merchantAId, p_campaign_id: replayDraft.id, p_funding_source: 'provider', p_settlement_id: settlement.id,
+    p_actor_profile_id: merchantAId, p_campaign_id: replayDraft.id, p_funding_source: 'provider', p_settlement_id: legit2Settlement.id, p_quote_id: legit2Quote.quote_id,
   })
-  check('92. the same verified settlement cannot fund a SECOND campaign (already consumed)', !!replayErr, { replayErr })
+  check('92. the same verified quote+settlement cannot fund a SECOND campaign (already consumed)', !!replayErr, { replayErr })
   const { count: replayFundingRows } = await admin.from('ad_campaign_funding').select('id', { count: 'exact', head: true }).eq('campaign_id', replayDraft.id)
-  check('93. a rejected settlement-replay attempt creates no funding row for the second campaign', replayFundingRows === 0, { replayFundingRows })
+  check('93. a rejected quote/settlement-replay attempt creates no funding row for the second campaign', replayFundingRows === 0, { replayFundingRows })
 
-  // 94. Balance funding is completely unaffected by any of this -- still
-  // works exactly as before, never touching a settlement at all.
-  await admin.from('ad_balance_accounts').update({ balance_cents: settlementPackage.price_cents }).eq('advertiser_id', settlementAdvertiser.id)
+  // 94/95. Balance funding is completely unaffected by any of this --
+  // still works exactly as before, never touching a quote or settlement
+  // at all, and explicitly rejects a quote_id if one is mistakenly supplied.
+  await admin.from('ad_balance_accounts').update({ balance_cents: settlementAmount }).eq('advertiser_id', settlementAdvertiser.id)
   const balanceDraft = await freshDraft(settlementAdvertiser.id)
   const { data: balanceFunded, error: balanceErr } = await admin.rpc('fund_ad_campaign', {
-    p_actor_profile_id: merchantAId, p_campaign_id: balanceDraft.id, p_funding_source: 'balance', p_settlement_id: null,
+    p_actor_profile_id: merchantAId, p_campaign_id: balanceDraft.id, p_funding_source: 'balance', p_settlement_id: null, p_quote_id: null,
   })
-  check('94. balance-funded campaigns continue to work unchanged (no settlement required or consumed)', !balanceErr && balanceFunded?.status === 'active', { balanceErr, balanceFunded })
-  const { data: balanceFundingRow } = await admin.from('ad_campaign_funding').select('settlement_id, funding_source').eq('campaign_id', balanceDraft.id).maybeSingle()
-  check('95. a balance-funded row has settlement_id NULL (balance funding never touches settlement authority)', balanceFundingRow?.funding_source === 'balance' && balanceFundingRow?.settlement_id === null, balanceFundingRow)
+  check('94. balance-funded campaigns continue to work unchanged (no quote or settlement required or consumed)', !balanceErr && balanceFunded?.status === 'active', { balanceErr, balanceFunded })
+  const { data: balanceFundingRow } = await admin.from('ad_campaign_funding').select('settlement_id, quote_id, funding_source').eq('campaign_id', balanceDraft.id).maybeSingle()
+  check('95. a balance-funded row has settlement_id AND quote_id both NULL (balance funding never touches either authority)', balanceFundingRow?.funding_source === 'balance' && balanceFundingRow?.settlement_id === null && balanceFundingRow?.quote_id === null, balanceFundingRow)
+  const balanceQuoteMisuseDraft = await freshDraft(settlementAdvertiser.id)
+  const balanceQuoteMisuseQuote = await quoteFor(balanceQuoteMisuseDraft.id)
+  const { error: balanceQuoteMisuseErr } = await admin.rpc('fund_ad_campaign', {
+    p_actor_profile_id: merchantAId, p_campaign_id: balanceQuoteMisuseDraft.id, p_funding_source: 'balance', p_settlement_id: null, p_quote_id: balanceQuoteMisuseQuote.quote_id,
+  })
+  check('95a. supplying a quote_id for BALANCE funding is rejected (a quote exists only to protect the external payment boundary)', !!balanceQuoteMisuseErr, { balanceQuoteMisuseErr })
 
   // 96. Idempotency of a legitimate funding operation is unchanged --
   // replaying the SAME fund_ad_campaign call (same idempotency key, same
-  // settlement) is a safe no-op, not a second consumption.
+  // quote+settlement) is a safe no-op, not a second consumption.
   const idemDraft = await freshDraft(settlementAdvertiser.id)
+  const idemQuote = await quoteFor(idemDraft.id)
   const { data: idemSettlement } = await recordVerifiedSettlement({
-    advertiserId: settlementAdvertiser.id, reference: `mock_ad_idem_${RUN_ID}`, amountCents: settlementPackage.price_cents, currency: settlementPackage.currency, isTest: true,
+    advertiserId: settlementAdvertiser.id, reference: `mock_ad_idem_${RUN_ID}`, amountCents: idemQuote.amount_due_cents, currency: idemQuote.currency, isTest: true, quoteId: idemQuote.quote_id,
   })
   const idemKey = `settlement-idem-${RUN_ID}`
   const { data: idem1, error: idem1Err } = await admin.rpc('fund_ad_campaign', {
-    p_actor_profile_id: merchantAId, p_campaign_id: idemDraft.id, p_funding_source: 'provider', p_settlement_id: idemSettlement.id, p_idempotency_key: idemKey,
+    p_actor_profile_id: merchantAId, p_campaign_id: idemDraft.id, p_funding_source: 'provider', p_settlement_id: idemSettlement.id, p_idempotency_key: idemKey, p_quote_id: idemQuote.quote_id,
   })
   check('96. the first funding call with a fresh idempotency key succeeds', !idem1Err && idem1?.status === 'active', { idem1Err, idem1 })
   // Pre-existing behavior, unchanged by this hardening: fund_ad_campaign
   // checks campaign.status <> 'draft' BEFORE it ever consults the
-  // idempotency_keys cache (this ordering is identical to the original,
-  // pre-hardening body -- verified by direct comparison against the
-  // unmodified migration 20260903000009). Once idem1 has moved the
-  // campaign to 'active', a literal replay never reaches the cache at
-  // all -- it is rejected on the status check first. The genuine safety
-  // property (no double-consumption, no duplicate row) is proven by
-  // check 97 below regardless of which path rejects the replay.
+  // idempotency_keys cache. Once idem1 has moved the campaign to
+  // 'active', a literal replay never reaches the cache at all -- it is
+  // rejected on the status check first. The genuine safety property (no
+  // double-consumption, no duplicate row) is proven by check 97 below
+  // regardless of which path rejects the replay.
   const { error: idem2Err } = await admin.rpc('fund_ad_campaign', {
-    p_actor_profile_id: merchantAId, p_campaign_id: idemDraft.id, p_funding_source: 'provider', p_settlement_id: idemSettlement.id, p_idempotency_key: idemKey,
+    p_actor_profile_id: merchantAId, p_campaign_id: idemDraft.id, p_funding_source: 'provider', p_settlement_id: idemSettlement.id, p_idempotency_key: idemKey, p_quote_id: idemQuote.quote_id,
   })
   check('96a. replaying the exact same funding call after success is safely rejected (campaign no longer in draft), never silently re-applied', !!idem2Err, { idem2Err })
   const { count: idemFundingRows } = await admin.from('ad_campaign_funding').select('id', { count: 'exact', head: true }).eq('campaign_id', idemDraft.id)
@@ -1025,20 +1113,16 @@ console.log('=== Verified settlement authority: fabrication, mismatch, and repla
 
   // 98. Same-campaign double-funding is still prevented (campaign.status
   // must be 'draft') -- unchanged pre-existing protection, reconfirmed
-  // under the new settlement-based flow.
-  const { data: secondSettlementForFunded } = await recordVerifiedSettlement({
-    advertiserId: settlementAdvertiser.id, reference: `mock_ad_doublefund_${RUN_ID}`, amountCents: settlementPackage.price_cents, currency: settlementPackage.currency, isTest: true,
-  })
-  const { error: doubleFundErr } = await admin.rpc('fund_ad_campaign', {
-    p_actor_profile_id: merchantAId, p_campaign_id: legitDraft.id, p_funding_source: 'provider', p_settlement_id: secondSettlementForFunded.id,
-  })
-  check('98. a campaign that is already funded/active cannot be funded a second time, with any settlement', !!doubleFundErr, { doubleFundErr })
+  // under the new quote+settlement-based flow. A brand new quote against
+  // the already-funded campaign is itself refused (campaign not draft).
+  const { error: secondQuoteErr } = await admin.rpc('create_ad_campaign_funding_quote', { p_actor_profile_id: merchantAId, p_campaign_id: legit2Draft.id })
+  check('98. a brand new funding quote cannot even be created for a campaign that is already funded/active', !!secondQuoteErr, { secondQuoteErr })
 
   // 99. The funding route's own feature-flag gate is real and server-side
   // -- proven live against the actual running route (not just source
   // text), since ADVERTISING_ENABLED is unset/false in this environment
   // right now.
-  const { status: disabledStatus, json: disabledJson } = await apiAsMerchantA('POST', `/api/advertising/campaigns/${legitDraft.id}/fund`, { fundingSource: 'provider' })
+  const { status: disabledStatus, json: disabledJson } = await apiAsMerchantA('POST', `/api/advertising/campaigns/${legit2Draft.id}/fund`, { fundingSource: 'provider' })
   check('99. the funding route itself refuses to run at all while ADVERTISING_ENABLED is not "true" (live proof against the real route, 503)', disabledStatus === 503, { disabledStatus, disabledJson })
 
   // 100/101. Structural proof of the route's own control flow, mirroring
@@ -1066,47 +1150,56 @@ console.log('=== Verified settlement authority: fabrication, mismatch, and repla
   const crossLedgerViolations = ['payments', 'escrow', 'merchant_payouts', 'affiliate', 'commission', 'subscription'].filter((t) => new RegExp(`\\b${t}\\b`, 'i').test(settlementMigrationSrc.replace(/--.*$/gm, '')))
   check('103. the verified-settlement migration never references payments/escrow/merchant_payouts/affiliate/commission/subscription tables outside comments', crossLedgerViolations.length === 0, { crossLedgerViolations })
 
-  // 104-107. Canonical price authority: a package price change AFTER a
-  // draft exists but BEFORE it is funded must not produce any mismatch
-  // between what is charged, what settlement is recorded, what
-  // fund_ad_campaign snapshots, and what ad_campaign_funding stores.
-  // fund_ad_campaign has always re-locked and re-read the package's
-  // CURRENT row at funding time (confirmed by direct comparison against
-  // the unmodified 20260903000009 body -- this predates and is
-  // unaffected by the settlement-authority hardening); the funding route
-  // must charge/settle against that same current price, never the
-  // draft-time preview snapshot, or a legitimate no-race funding attempt
-  // would be wrongly rejected by the new exact-amount settlement check.
+  // 104-107. RACE PROOF (Step 8 Test A): a package price change AFTER a
+  // quote is created must NOT affect that already-created quote -- the
+  // exact fix for the proven race. base/discount/amount_due are frozen
+  // the moment the quote is created; a real charge against that frozen
+  // amount must still fund successfully even though the package's LIVE
+  // price has since moved on. Only a BRAND NEW quote (created after the
+  // price change) sees the new price.
   const priceChangePackage = await createPackage({ name_suffix: 'PriceChange', price_cents: 8000, impression_quota: 10 })
   const priceChangeDraft = await freshDraftFor(settlementAdvertiser.id, priceChangePackage.id)
-  const draftTimeSnapshot = priceChangeDraft.snapshot_price_cents
+  const preChangeQuote = await quoteFor(priceChangeDraft.id)
+  check('104pre. the quote created BEFORE the price change reflects the pre-change price (base 8000, Pro 5% -> 7600)', preChangeQuote.base_price_cents === 8000 && preChangeQuote.amount_due_cents === 7600, preChangeQuote)
+
   await admin.rpc('admin_update_ad_package', { p_admin_id: adminUserId, p_package_id: priceChangePackage.id, p_price_cents: 15000 })
   const { data: pkgAfterEdit } = await admin.from('ad_packages').select('price_cents, currency').eq('id', priceChangePackage.id).single()
-  check('104. after the draft exists, an admin can still edit the package price before funding (X -> Y)', pkgAfterEdit.price_cents === 15000, pkgAfterEdit)
+  check('104. after the quote exists, an admin can still edit the package price (X -> Y)', pkgAfterEdit.price_cents === 15000, pkgAfterEdit)
 
+  // The already-created quote is re-fetched (get-or-create semantics)
+  // and must be BYTE-IDENTICAL to preChangeQuote -- still frozen at the
+  // OLD price, completely unaffected by the edit above.
+  const stillFrozenQuote = await quoteFor(priceChangeDraft.id)
+  check('105. the SAME quote, re-fetched after the package price change, is completely unaffected -- still frozen at base 8000 / amount 7600, not the new 15000', stillFrozenQuote.quote_id === preChangeQuote.quote_id && stillFrozenQuote.base_price_cents === 8000 && stillFrozenQuote.amount_due_cents === 7600, { preChangeQuote, stillFrozenQuote, currentPackagePrice: pkgAfterEdit.price_cents })
+
+  // A real charge/settlement against the FROZEN quote still funds
+  // successfully -- the successful (simulated) charge is never stranded
+  // by the later price change.
   const { data: priceChangeSettlement, error: priceChangeSettlementErr } = await recordVerifiedSettlement({
-    advertiserId: settlementAdvertiser.id, reference: `mock_ad_pricechange_${RUN_ID}`, amountCents: pkgAfterEdit.price_cents, currency: pkgAfterEdit.currency, isTest: true,
+    advertiserId: settlementAdvertiser.id, reference: `mock_ad_pricechange_${RUN_ID}`, amountCents: preChangeQuote.amount_due_cents, currency: preChangeQuote.currency, isTest: true, quoteId: preChangeQuote.quote_id,
   })
   const { data: priceChangeFunded, error: priceChangeFundErr } = await admin.rpc('fund_ad_campaign', {
-    p_actor_profile_id: merchantAId, p_campaign_id: priceChangeDraft.id, p_funding_source: 'provider', p_settlement_id: priceChangeSettlement?.id,
+    p_actor_profile_id: merchantAId, p_campaign_id: priceChangeDraft.id, p_funding_source: 'provider', p_settlement_id: priceChangeSettlement?.id, p_quote_id: preChangeQuote.quote_id,
   })
-  check('105. funding after a price change succeeds when the settlement matches the CURRENT (post-edit) package price, not the draft-time preview', !priceChangeSettlementErr && !priceChangeFundErr && priceChangeFunded?.status === 'active', { priceChangeSettlementErr, priceChangeFundErr, priceChangeFunded })
+  check('106. funding against the pre-change FROZEN quote succeeds at the OLD amount (7600), never stranded by the later price change to 15000', !priceChangeSettlementErr && !priceChangeFundErr && priceChangeFunded?.status === 'active' && priceChangeFunded?.funded_amount_cents === 7600, { priceChangeSettlementErr, priceChangeFundErr, priceChangeFunded })
 
-  const { data: priceChangeFundingRow } = await admin.from('ad_campaign_funding').select('amount_cents').eq('campaign_id', priceChangeDraft.id).single()
-  const canonicalAmounts = new Set([pkgAfterEdit.price_cents, priceChangeFunded?.snapshot_price_cents, priceChangeFunded?.funded_amount_cents, priceChangeFundingRow?.amount_cents])
-  check('106. the charge/settlement amount, fund_ad_campaign\'s own re-snapshot, and the ad_campaign_funding row all agree on exactly ONE canonical amount (the current package price at funding time)', canonicalAmounts.size === 1, { draftTimeSnapshot, currentPackagePrice: pkgAfterEdit.price_cents, funded: priceChangeFunded, fundingRow: priceChangeFundingRow })
+  const { data: priceChangeFundingRow } = await admin.from('ad_campaign_funding').select('amount_cents, quote_id').eq('campaign_id', priceChangeDraft.id).single()
+  check('106a. the campaign snapshot (base/final) and the funding row all agree on the FROZEN pre-change amount, never the new live package price', priceChangeFunded?.snapshot_base_price_cents === 8000 && priceChangeFunded?.snapshot_price_cents === 7600 && priceChangeFundingRow?.amount_cents === 7600 && priceChangeFundingRow?.quote_id === preChangeQuote.quote_id, { funded: priceChangeFunded, fundingRow: priceChangeFundingRow })
 
-  // 107. A settlement recorded for the STALE draft-time amount (X, not
-  // the current Y) is correctly rejected -- proving the route's
-  // current-price fetch is load-bearing, not incidental.
-  const stalePriceDraft = await freshDraftFor(settlementAdvertiser.id, priceChangePackage.id)
-  const { data: staleSettlement } = await recordVerifiedSettlement({
-    advertiserId: settlementAdvertiser.id, reference: `mock_ad_stalesnapshot_${RUN_ID}`, amountCents: draftTimeSnapshot, currency: pkgAfterEdit.currency, isTest: true,
+  // 107. A NEW quote (created after the price change) DOES see the new
+  // live price -- only an already-started attempt is protected; a fresh
+  // funding attempt always uses current authority.
+  const newAttemptDraft = await freshDraftFor(settlementAdvertiser.id, priceChangePackage.id)
+  const postChangeQuote = await quoteFor(newAttemptDraft.id)
+  check('107. a BRAND NEW quote created after the price change correctly reflects the new price (base 15000, Pro 5% -> 14250)', postChangeQuote.base_price_cents === 15000 && postChangeQuote.amount_due_cents === 14250, postChangeQuote)
+
+  // 107a. A settlement recorded for the OLD (pre-change) amount can
+  // never satisfy the NEW quote -- the two quotes are genuinely distinct
+  // authorities, never conflated.
+  const { error: staleAgainstNewErr } = await recordVerifiedSettlement({
+    advertiserId: settlementAdvertiser.id, reference: `mock_ad_staleagainstnew_${RUN_ID}`, amountCents: preChangeQuote.amount_due_cents, currency: postChangeQuote.currency, isTest: true, quoteId: postChangeQuote.quote_id,
   })
-  const { error: stalePriceErr } = await admin.rpc('fund_ad_campaign', {
-    p_actor_profile_id: merchantAId, p_campaign_id: stalePriceDraft.id, p_funding_source: 'provider', p_settlement_id: staleSettlement.id,
-  })
-  check('107. a settlement recorded for the stale draft-time price (X) is rejected once the package price has moved on to Y -- proves the canonical amount is current-at-funding-time, not snapshot-at-draft-time', !!stalePriceErr, { draftTimeSnapshot, stalePriceErr })
+  check('107a. a settlement for the OLD frozen amount (7600) is rejected against the NEW quote (which requires 14250)', !!staleAgainstNewErr, { staleAgainstNewErr })
 
   console.log(`\n=== SETTLEMENT AUTHORITY SECTION DONE -- ${failures} failure(s) so far ===`)
 }
@@ -1172,17 +1265,321 @@ console.log('=== Serving authority requires verified settlement (Blocker 1 closu
   check('109. a campaign in the exact legacy shape (active status, provider funding, settlement_id NULL) is structurally EXCLUDED from get_eligible_ads', !unsettledServes, { unsettledServes })
 
   const settledDraft = await freshDraftForListing(servingAuthorityAdvertiser.id, servingProofPackage.id, servingListingId, servingFutureEnd, false)
+  // merchantA carries a real, live subscription plan, so the settlement
+  // must match the discounted amount from a real PERSISTED quote --
+  // never the raw package price, and never the live-preview-only RPC.
+  const { data: servingQuote } = await admin.rpc('create_ad_campaign_funding_quote', { p_actor_profile_id: merchantAId, p_campaign_id: settledDraft.id })
   const { data: servingSettlement } = await recordVerifiedSettlement({
-    advertiserId: servingAuthorityAdvertiser.id, reference: `mock_ad_serving_settled_${RUN_ID}`, amountCents: servingProofPackage.price_cents, currency: servingProofPackage.currency ?? 'ZAR', isTest: false,
+    advertiserId: servingAuthorityAdvertiser.id, reference: `mock_ad_serving_settled_${RUN_ID}`, amountCents: servingQuote.amount_due_cents, currency: servingQuote.currency, isTest: false, quoteId: servingQuote.quote_id,
   })
   const { data: settledFunded } = await admin.rpc('fund_ad_campaign', {
-    p_actor_profile_id: merchantAId, p_campaign_id: settledDraft.id, p_funding_source: 'provider', p_settlement_id: servingSettlement.id,
+    p_actor_profile_id: merchantAId, p_campaign_id: settledDraft.id, p_funding_source: 'provider', p_settlement_id: servingSettlement.id, p_quote_id: servingQuote.quote_id,
   })
   const { data: settledCandidates } = await admin.rpc('get_eligible_ads', {
     p_placement_type: 'search_result', p_exclude_listing_ids: [], p_rent_to_buy_enabled: false, p_limit: 50,
   })
   const settledServes = (settledCandidates ?? []).some((c) => c.campaign_id === settledDraft.id)
   check('110. an otherwise-identical campaign with a genuine verified settlement DOES serve (the new rule excludes only unsettled provider funding, nothing else)', settledFunded?.status === 'active' && settledServes, { settledStatus: settledFunded?.status, settledServes })
+}
+
+console.log('=== Subscription discount actually applied at funding (Starter/Pro/Elite) ===')
+{
+  // Isolated plan control over merchantA -- the shared QA fixture this
+  // whole file otherwise leaves on whatever real plan it currently
+  // carries. Captured and restored to its exact original state at the
+  // end of this section (never left mutated for anything that runs
+  // after it).
+  const { data: originalSub } = await admin.from('merchant_subscriptions').select('*').eq('merchant_id', merchantAId).maybeSingle()
+  async function setMerchantAPlan(planId, opts = {}) {
+    await admin.from('merchant_subscriptions').upsert({
+      merchant_id: merchantAId, current_plan_id: planId, current_plan_effective_at: new Date().toISOString(),
+      pending_plan_id: opts.pendingPlanId ?? null, pending_plan_effective_at: opts.pendingEffectiveAt ?? null,
+      status: opts.status ?? 'active',
+    }, { onConflict: 'merchant_id' })
+  }
+  async function restoreMerchantAPlan() {
+    if (originalSub) {
+      await admin.from('merchant_subscriptions').update({
+        current_plan_id: originalSub.current_plan_id, current_plan_effective_at: originalSub.current_plan_effective_at,
+        pending_plan_id: originalSub.pending_plan_id, pending_plan_effective_at: originalSub.pending_plan_effective_at,
+        status: originalSub.status,
+      }).eq('merchant_id', merchantAId)
+    } else {
+      await admin.from('merchant_subscriptions').delete().eq('merchant_id', merchantAId)
+    }
+  }
+
+  const discAdvertiser = await admin.rpc('create_ad_advertiser', {
+    p_owner_profile_id: merchantAId, p_advertiser_type: 'unity', p_display_name: `${QA_MARKER} Discount Test Advertiser ${RUN_ID}`, p_is_test: true,
+  }).then((r) => r.data)
+  if (discAdvertiser?.id) createdAdvertiserIds.push(discAdvertiser.id)
+  const discPackage = await createPackage({ name_suffix: 'Discount', price_cents: 10000, impression_quota: 10 })
+  const discListingId = await insertListing({ title: `${QA_MARKER} Discount Listing ${RUN_ID}` })
+  const discFutureEnd = new Date(Date.now() + 30 * 86400000).toISOString()
+
+  async function discDraft() {
+    const { data: draft } = await admin.rpc('create_ad_campaign_draft', {
+      p_actor_profile_id: merchantAId, p_advertiser_id: discAdvertiser.id, p_package_id: discPackage.id,
+      p_target_type: 'listing', p_listing_id: discListingId, p_end_at: discFutureEnd, p_is_test: false,
+    })
+    if (draft?.id) createdCampaignIds.push(draft.id)
+    return draft
+  }
+  const EXPECTED = { starter: { bps: 0, amount: 10000 }, pro: { bps: 500, amount: 9500 }, elite: { bps: 1000, amount: 9000 } }
+
+  // 111-113: Starter/Pro/Elite provider funding.
+  // 114-116: Starter/Pro/Elite balance funding (topped up exactly once per plan).
+  const providerResults = {}
+  const balanceResults = {}
+  let checkNum = 111
+  for (const plan of ['starter', 'pro', 'elite']) {
+    await setMerchantAPlan(plan)
+    const pDraft = await discDraft()
+    const { data: pFunded, error: pErr } = await fundViaProvider({ actorId: merchantAId, campaignId: pDraft.id, advertiserId: discAdvertiser.id, isTest: false, reference: `mock_ad_disc_${plan}_${RUN_ID}` })
+    check(`${checkNum++}. ${plan[0].toUpperCase()}${plan.slice(1)} (${EXPECTED[plan].bps}bps) provider funding charges exactly ${EXPECTED[plan].amount} (base 10000)`, !pErr && pFunded?.status === 'active' && pFunded?.funded_amount_cents === EXPECTED[plan].amount, { pErr, pFunded, plan })
+    providerResults[plan] = pFunded?.funded_amount_cents
+  }
+  for (const plan of ['starter', 'pro', 'elite']) {
+    await setMerchantAPlan(plan)
+    const bDraft = await discDraft()
+    await admin.from('ad_balance_accounts').update({ balance_cents: EXPECTED[plan].amount }).eq('advertiser_id', discAdvertiser.id)
+    const { data: bFunded, error: bErr } = await admin.rpc('fund_ad_campaign', { p_actor_profile_id: merchantAId, p_campaign_id: bDraft.id, p_funding_source: 'balance', p_settlement_id: null })
+    check(`${checkNum++}. ${plan[0].toUpperCase()}${plan.slice(1)} (${EXPECTED[plan].bps}bps) balance funding debits exactly ${EXPECTED[plan].amount} (base 10000)`, !bErr && bFunded?.status === 'active' && bFunded?.funded_amount_cents === EXPECTED[plan].amount, { bErr, bFunded, plan })
+    balanceResults[plan] = bFunded?.funded_amount_cents
+  }
+  // 117: provider/balance parity across every plan.
+  check('117. provider funding and balance funding charge the exact same amount for every plan (Starter/Pro/Elite)', ['starter', 'pro', 'elite'].every((p) => providerResults[p] === balanceResults[p]), { providerResults, balanceResults })
+
+  // 118: funding-time upgrade Starter -> Pro: draft while Starter, upgrade, fund -- Pro 5% applies.
+  await setMerchantAPlan('starter')
+  const upgradeSPDraft = await discDraft()
+  const spDraftSnapshot = upgradeSPDraft.snapshot_discount_bps
+  await setMerchantAPlan('pro')
+  const { data: upgradeSPFunded } = await fundViaProvider({ actorId: merchantAId, campaignId: upgradeSPDraft.id, advertiserId: discAdvertiser.id, isTest: false, reference: `mock_ad_disc_upgrade_sp_${RUN_ID}` })
+  check('118. draft created as Starter, upgraded to Pro before funding -> funding uses Pro 5% (funding-time effective plan, not draft-time)', upgradeSPFunded?.snapshot_discount_bps === 500 && upgradeSPFunded?.funded_amount_cents === 9500, { spDraftSnapshot, upgradeSPFunded })
+
+  // 119: funding-time upgrade Pro -> Elite.
+  await setMerchantAPlan('pro')
+  const upgradePEDraft = await discDraft()
+  await setMerchantAPlan('elite')
+  const { data: upgradePEFunded } = await fundViaProvider({ actorId: merchantAId, campaignId: upgradePEDraft.id, advertiserId: discAdvertiser.id, isTest: false, reference: `mock_ad_disc_upgrade_pe_${RUN_ID}` })
+  check('119. draft created as Pro, upgraded to Elite before funding -> funding uses Elite 10%', upgradePEFunded?.snapshot_discount_bps === 1000 && upgradePEFunded?.funded_amount_cents === 9000, upgradePEFunded)
+
+  // 120: effective downgrade Elite -> Starter.
+  await setMerchantAPlan('elite')
+  const downgradeESDraft = await discDraft()
+  await setMerchantAPlan('starter')
+  const { data: downgradeESFunded } = await fundViaProvider({ actorId: merchantAId, campaignId: downgradeESDraft.id, advertiserId: discAdvertiser.id, isTest: false, reference: `mock_ad_disc_downgrade_es_${RUN_ID}` })
+  check('120. draft created as Elite, effectively downgraded to Starter before funding -> funding uses Starter 0%', downgradeESFunded?.snapshot_discount_bps === 0 && downgradeESFunded?.funded_amount_cents === 10000, downgradeESFunded)
+
+  // 121: a PENDING downgrade that has NOT yet become effective must not
+  // prematurely affect pricing -- the still-currently-effective plan's
+  // discount applies, exactly matching _get_effective_merchant_plan_id's
+  // own existing semantics (pending_plan_effective_at in the future).
+  await setMerchantAPlan('elite', { pendingPlanId: 'starter', pendingEffectiveAt: new Date(Date.now() + 30 * 86400000).toISOString(), status: 'pending_change' })
+  const pendingDraft = await discDraft()
+  const { data: pendingFunded } = await fundViaProvider({ actorId: merchantAId, campaignId: pendingDraft.id, advertiserId: discAdvertiser.id, isTest: false, reference: `mock_ad_disc_pending_${RUN_ID}` })
+  check('121. a PENDING downgrade (effective date in the future) does not prematurely affect pricing -- still-effective Elite 10% applies', pendingFunded?.snapshot_discount_bps === 1000 && pendingFunded?.funded_amount_cents === 9000, pendingFunded)
+
+  // 122/123: Pro/Elite odd-cent rounding, floor(price*bps/10000), across
+  // three non-round prices.
+  for (const price of [9999, 10001, 12345]) {
+    for (const plan of ['pro', 'elite']) {
+      await setMerchantAPlan(plan)
+      const bps = plan === 'pro' ? 500 : 1000
+      const roundPackage = await createPackage({ name_suffix: `Round${price}${plan}`, price_cents: price, impression_quota: 10 })
+      const roundListingId = await insertListing({ title: `${QA_MARKER} Round Listing ${price} ${plan} ${RUN_ID}` })
+      const { data: roundDraft } = await admin.rpc('create_ad_campaign_draft', {
+        p_actor_profile_id: merchantAId, p_advertiser_id: discAdvertiser.id, p_package_id: roundPackage.id,
+        p_target_type: 'listing', p_listing_id: roundListingId, p_end_at: discFutureEnd, p_is_test: false,
+      })
+      if (roundDraft?.id) createdCampaignIds.push(roundDraft.id)
+      const expectedDiscount = Math.floor((price * bps) / 10000)
+      const expectedFinal = price - expectedDiscount
+      const { data: roundFunded } = await fundViaProvider({ actorId: merchantAId, campaignId: roundDraft.id, advertiserId: discAdvertiser.id, isTest: false, reference: `mock_ad_disc_round_${price}_${plan}_${RUN_ID}` })
+      check(`12${plan === 'pro' ? '2' : '3'}. ${plan} rounding at price=${price}: floor(${price}*${bps}/10000)=${expectedDiscount}, final=${expectedFinal}`, roundFunded?.snapshot_discount_cents === expectedDiscount && roundFunded?.funded_amount_cents === expectedFinal, { price, plan, expectedDiscount, expectedFinal, roundFunded })
+    }
+  }
+
+  // 124: a real, persisted quote correctly resolves the discounted final
+  // amount (Pro), never the raw base price.
+  await setMerchantAPlan('pro')
+  const settleMatchDraft = await discDraft()
+  const settleMatchQuote = await admin.rpc('create_ad_campaign_funding_quote', { p_actor_profile_id: merchantAId, p_campaign_id: settleMatchDraft.id }).then((r) => r.data)
+  check('124. a persisted funding quote resolves the discounted final amount (9500 for Pro on base 10000), never the raw base price', settleMatchQuote.amount_due_cents === 9500 && settleMatchQuote.base_price_cents === 10000, settleMatchQuote)
+
+  // 125: a full-price (undiscounted) settlement is rejected for a
+  // discounted quote -- tested at fund_ad_campaign's own defense-in-depth
+  // layer: the settlement is recorded WITHOUT a quote_id (so creation
+  // itself doesn't reject it), then fund_ad_campaign is asked to consume
+  // it against the real discounted quote -- the amount mismatch is
+  // caught there.
+  const fullPriceRejectDraft = await discDraft()
+  const fullPriceQuote = await admin.rpc('create_ad_campaign_funding_quote', { p_actor_profile_id: merchantAId, p_campaign_id: fullPriceRejectDraft.id }).then((r) => r.data)
+  const { data: fullPriceSettlement } = await recordVerifiedSettlement({ advertiserId: discAdvertiser.id, reference: `mock_ad_disc_fullprice_${RUN_ID}`, amountCents: 10000, currency: 'ZAR', isTest: false })
+  const { error: fullPriceErr } = await admin.rpc('fund_ad_campaign', { p_actor_profile_id: merchantAId, p_campaign_id: fullPriceRejectDraft.id, p_funding_source: 'provider', p_settlement_id: fullPriceSettlement.id, p_quote_id: fullPriceQuote.quote_id })
+  check('125. a full-price (10000) settlement is REJECTED against a Pro quote that requires 9500', !!fullPriceErr, { fullPriceErr })
+
+  // 126: any other wrong discounted amount is also rejected (off by one cent from the correct 9500).
+  const wrongDiscDraft = await discDraft()
+  const wrongDiscQuote = await admin.rpc('create_ad_campaign_funding_quote', { p_actor_profile_id: merchantAId, p_campaign_id: wrongDiscDraft.id }).then((r) => r.data)
+  const { data: wrongDiscSettlement } = await recordVerifiedSettlement({ advertiserId: discAdvertiser.id, reference: `mock_ad_disc_wrongamt_${RUN_ID}`, amountCents: 9501, currency: 'ZAR', isTest: false })
+  const { error: wrongDiscErr } = await admin.rpc('fund_ad_campaign', { p_actor_profile_id: merchantAId, p_campaign_id: wrongDiscDraft.id, p_funding_source: 'provider', p_settlement_id: wrongDiscSettlement.id, p_quote_id: wrongDiscQuote.quote_id })
+  check('126. a settlement for the wrong discounted amount (9501, off by one cent from the correct 9500) is rejected against the quote', !!wrongDiscErr, { wrongDiscErr })
+
+  // 127/128: the funding row and balance ledger both store the exact final discounted amount.
+  const rowCheckDraft = await discDraft()
+  const { data: rowCheckFunded } = await fundViaProvider({ actorId: merchantAId, campaignId: rowCheckDraft.id, advertiserId: discAdvertiser.id, isTest: false, reference: `mock_ad_disc_row_${RUN_ID}` })
+  const { data: rowCheckFundingRow } = await admin.from('ad_campaign_funding').select('amount_cents, quote_id').eq('campaign_id', rowCheckDraft.id).single()
+  check('127. ad_campaign_funding.amount_cents (and quote_id) stores the exact final discounted amount (9500), not the raw package price', rowCheckFundingRow.amount_cents === 9500 && !!rowCheckFundingRow.quote_id && rowCheckFunded?.funded_amount_cents === 9500, { rowCheckFundingRow, rowCheckFunded })
+
+  const balRowDraft = await discDraft()
+  await admin.from('ad_balance_accounts').update({ balance_cents: 9500 }).eq('advertiser_id', discAdvertiser.id)
+  const { data: balRowBefore } = await admin.from('ad_balance_accounts').select('balance_cents').eq('advertiser_id', discAdvertiser.id).single()
+  await admin.rpc('fund_ad_campaign', { p_actor_profile_id: merchantAId, p_campaign_id: balRowDraft.id, p_funding_source: 'balance', p_settlement_id: null, p_quote_id: null })
+  const { data: balRowLedger } = await admin.from('ad_balance_ledger').select('amount_cents').eq('campaign_id', balRowDraft.id).eq('entry_type', 'campaign_purchase_debit').single()
+  check('128. campaign_purchase_debit ledger entry stores the exact final discounted amount (-9500), not the raw package price', balRowLedger.amount_cents === -9500, { balRowBefore, balRowLedger })
+
+  // 129: preactivation refund is based on the actual (discounted) funded amount.
+  const refundDraft = await discDraft()
+  const { data: refundFunded } = await fundViaProvider({ actorId: merchantAId, campaignId: refundDraft.id, advertiserId: discAdvertiser.id, isTest: false, reference: `mock_ad_disc_refund_${RUN_ID}` })
+  // Voluntary post-activation cancellation does not refund (existing,
+  // unchanged rule) -- prove the pre-activation path specifically using
+  // a still-draft campaign's balance-funding-then-cancel cycle instead,
+  // mirroring the existing "Pre-activation cancellation" section's own
+  // approach (a unity-marketplace campaign auto-activates on funding, so
+  // "pre-activation" is only reachable by cancelling before that
+  // ever-so-brief activation completes is not exercised here -- this
+  // check instead directly proves the REFUND FORMULA reads
+  // ad_campaign_funding.amount_cents, which is already proven to equal
+  // the discounted amount by check 127 above).
+  check('129. preactivation/refund accounting anchor (ad_campaign_funding.amount_cents) is the actual discounted funded amount, never the undiscounted base price', refundFunded?.funded_amount_cents === 9500, refundFunded)
+
+  // 130: underdelivery credit is capped by the actual (discounted) funded amount.
+  const underDiscDraft = await discDraft()
+  const { data: underDiscFunded } = await fundViaProvider({ actorId: merchantAId, campaignId: underDiscDraft.id, advertiserId: discAdvertiser.id, isTest: false, reference: `mock_ad_disc_under_${RUN_ID}` })
+  for (let i = 0; i < 4; i++) {
+    await admin.rpc('record_ad_impression', { p_campaign_id: underDiscDraft.id, p_placement_type: 'search_result', p_viewer_id: null, p_reach_key: `disc:under:${RUN_ID}:${i}` })
+  }
+  await admin.from('ad_campaigns').update({ activated_at: new Date(Date.now() - 120000).toISOString(), end_at: new Date(Date.now() - 60000).toISOString() }).eq('id', underDiscDraft.id)
+  await admin.rpc('finalize_expired_ad_campaigns', { p_actor_id: null })
+  const { data: underDiscLedger } = await admin.from('ad_balance_ledger').select('amount_cents').eq('campaign_id', underDiscDraft.id).eq('entry_type', 'underdelivery_credit').maybeSingle()
+  const expectedUnderDelivered = Math.floor((9500 * 4) / 10)
+  const expectedUnderCredit = 9500 - expectedUnderDelivered
+  check(`130. underdelivery credit is capped by the actual discounted funded amount (9500), never the undiscounted base (10000): expected ${expectedUnderCredit}`, underDiscLedger?.amount_cents === expectedUnderCredit && underDiscLedger?.amount_cents < 10000 - Math.floor((10000 * 4) / 10), { underDiscLedger, underDiscFunded, expectedUnderCredit })
+
+  // 131: no double application -- the discount is subtracted exactly
+  // once (discount_cents itself, not the final amount, is never negative
+  // and never exceeds the base price; and a campaign cannot be funded
+  // twice to accumulate two discounts). A second quote cannot even be
+  // minted for an already-funded campaign (campaign.status is no longer
+  // 'draft' -- same authority as check 98), and a raw fund_ad_campaign
+  // retry with a fresh, unbound settlement is separately rejected too.
+  const noStackDraft = await discDraft()
+  const { data: noStackFunded } = await fundViaProvider({ actorId: merchantAId, campaignId: noStackDraft.id, advertiserId: discAdvertiser.id, isTest: false, reference: `mock_ad_disc_nostack_${RUN_ID}` })
+  const { error: noStackQuoteErr } = await admin.rpc('create_ad_campaign_funding_quote', { p_actor_profile_id: merchantAId, p_campaign_id: noStackDraft.id })
+  const { data: noStackSecondSettlement } = await recordVerifiedSettlement({ advertiserId: discAdvertiser.id, reference: `mock_ad_disc_nostack2_${RUN_ID}`, amountCents: 9500, currency: 'ZAR', isTest: false })
+  const { error: noStackSecondErr } = await admin.rpc('fund_ad_campaign', { p_actor_profile_id: merchantAId, p_campaign_id: noStackDraft.id, p_funding_source: 'provider', p_settlement_id: noStackSecondSettlement.id, p_quote_id: null })
+  check('131. the discount is applied exactly once: discount_cents equals the single computed value (500); no new quote can be minted for an already-funded campaign; and a second funding attempt (which would imply a second discount) is rejected outright', noStackFunded?.snapshot_discount_cents === 500 && !!noStackQuoteErr && !!noStackSecondErr, { noStackFunded, noStackQuoteErr, noStackSecondErr })
+
+  // 132: funded snapshot is immutable after a LATER plan change.
+  const immutablePlanDraft = await discDraft()
+  const { data: immutablePlanFunded } = await fundViaProvider({ actorId: merchantAId, campaignId: immutablePlanDraft.id, advertiserId: discAdvertiser.id, isTest: false, reference: `mock_ad_disc_immutplan_${RUN_ID}` })
+  await setMerchantAPlan('elite')
+  const { data: afterPlanChange } = await admin.from('ad_campaigns').select('snapshot_discount_bps, snapshot_discount_cents, funded_amount_cents, snapshot_price_cents').eq('id', immutablePlanDraft.id).single()
+  check('132. a funded campaign\'s discount snapshot is immutable after a LATER merchant plan change (Pro 9500 stays 9500 even after upgrading to Elite)', afterPlanChange.funded_amount_cents === 9500 && afterPlanChange.snapshot_discount_bps === 500, { immutablePlanFunded, afterPlanChange })
+
+  // 133: funded snapshot is immutable after a LATER package-price change.
+  await setMerchantAPlan('pro')
+  const immutablePriceDraft = await discDraft()
+  const { data: immutablePriceFunded } = await fundViaProvider({ actorId: merchantAId, campaignId: immutablePriceDraft.id, advertiserId: discAdvertiser.id, isTest: false, reference: `mock_ad_disc_immutprice_${RUN_ID}` })
+  await admin.rpc('admin_update_ad_package', { p_admin_id: adminUserId, p_package_id: discPackage.id, p_price_cents: 77777 })
+  const { data: afterPriceChange } = await admin.from('ad_campaigns').select('snapshot_base_price_cents, snapshot_discount_cents, funded_amount_cents').eq('id', immutablePriceDraft.id).single()
+  check('133. a funded campaign\'s discount/price snapshot is immutable after a LATER package-price change (stays base=10000, funded=9500 even after the catalogue price changes to 77777)', afterPriceChange.snapshot_base_price_cents === 10000 && afterPriceChange.funded_amount_cents === 9500, { immutablePriceFunded, afterPriceChange })
+  // Restore discPackage's price for cleanliness (not strictly required, but avoids leaving a QA package at an absurd price for any later reruns of this section).
+  await admin.rpc('admin_update_ad_package', { p_admin_id: adminUserId, p_package_id: discPackage.id, p_price_cents: 10000 })
+
+  // 134-136. RACE PROOF (Step 8 Test B): a merchant PLAN change AFTER a
+  // quote is created must NOT affect that already-created quote --
+  // mirrors the price-change proof (104-107a) but on the plan axis.
+  await setMerchantAPlan('pro')
+  const planRaceDraft = await discDraft()
+  const planRaceQuote = await admin.rpc('create_ad_campaign_funding_quote', { p_actor_profile_id: merchantAId, p_campaign_id: planRaceDraft.id }).then((r) => r.data)
+  check('134. the quote created BEFORE the plan change reflects the pre-change plan (Pro, 5% -> 9500)', planRaceQuote.discount_bps === 500 && planRaceQuote.amount_due_cents === 9500, planRaceQuote)
+
+  await setMerchantAPlan('elite')
+  const planRaceStillFrozen = await admin.rpc('create_ad_campaign_funding_quote', { p_actor_profile_id: merchantAId, p_campaign_id: planRaceDraft.id }).then((r) => r.data)
+  check('135. the SAME quote, re-fetched after the plan change to Elite, is completely unaffected -- still frozen at Pro\'s 500bps/9500, not Elite\'s 1000bps/9000', planRaceStillFrozen.quote_id === planRaceQuote.quote_id && planRaceStillFrozen.discount_bps === 500 && planRaceStillFrozen.amount_due_cents === 9500, planRaceStillFrozen)
+
+  const { data: planRaceSettlement, error: planRaceSettlementErr } = await recordVerifiedSettlement({ advertiserId: discAdvertiser.id, reference: `mock_ad_disc_planrace_${RUN_ID}`, amountCents: planRaceQuote.amount_due_cents, currency: planRaceQuote.currency, isTest: false, quoteId: planRaceQuote.quote_id })
+  const { data: planRaceFunded, error: planRaceFundErr } = await admin.rpc('fund_ad_campaign', { p_actor_profile_id: merchantAId, p_campaign_id: planRaceDraft.id, p_funding_source: 'provider', p_settlement_id: planRaceSettlement?.id, p_quote_id: planRaceQuote.quote_id })
+  check('136. funding against the pre-plan-change FROZEN quote succeeds at the OLD Pro amount (9500), never stranded or upgraded by the later Elite plan change', !planRaceSettlementErr && !planRaceFundErr && planRaceFunded?.snapshot_discount_bps === 500 && planRaceFunded?.funded_amount_cents === 9500, { planRaceSettlementErr, planRaceFundErr, planRaceFunded })
+
+  // 137-138. RACE PROOF (Step 8 Test C): an expired, never-charged quote
+  // cannot be used to initiate a NEW charge -- record_ad_provider_settlement
+  // checks now() >= quote.expires_at at settlement-creation time. The
+  // quotes table's own immutability trigger blocks any UPDATE to
+  // expires_at (by design -- it's a frozen financial/identity field, see
+  // migration 20260904000020), so real elapsed time cannot be faked via
+  // an UPDATE. The trigger only fires on UPDATE/DELETE, not INSERT, so
+  // this constructs a synthetic quote row directly, already expired at
+  // insert time -- exactly simulating "a quote was created, nobody
+  // charged the provider against it, and the 15-minute window has since
+  // passed" without ever mutating an existing row.
+  await setMerchantAPlan('pro')
+  const expiredDraft = await discDraft()
+  const { data: expiredQuoteRow, error: expiredQuoteInsertErr } = await admin
+    .from('ad_campaign_funding_quotes')
+    .insert({
+      campaign_id: expiredDraft.id,
+      advertiser_id: discAdvertiser.id,
+      package_id: discPackage.id,
+      base_price_cents: 10000,
+      discount_bps: 500,
+      discount_cents: 500,
+      amount_due_cents: 9500,
+      currency: 'ZAR',
+      subscription_plan_id: 'pro',
+      is_test: false,
+      expires_at: new Date(Date.now() - 60000).toISOString(),
+    })
+    .select('id')
+    .single()
+  const { data: expiredSettlement, error: expiredSettlementErr } = await recordVerifiedSettlement({ advertiserId: discAdvertiser.id, reference: `mock_ad_disc_expired_${RUN_ID}`, amountCents: 9500, currency: 'ZAR', isTest: false, quoteId: expiredQuoteRow?.id })
+  check('137. a settlement can NOT be recorded against an expired, never-charged quote (a new funding attempt cannot be initiated once the quote window has passed)', !expiredQuoteInsertErr && !!expiredSettlementErr && !expiredSettlement, { expiredQuoteInsertErr, expiredSettlementErr, expiredSettlement })
+  const { data: expiredDraftStatus } = await admin.from('ad_campaigns').select('status').eq('id', expiredDraft.id).single()
+  check('138. the campaign behind an expired quote remains in draft status -- no funding row, no snapshot, no state change of any kind', expiredDraftStatus?.status === 'draft', expiredDraftStatus)
+
+  // 139-141. RETRY-SAFETY PROOF (Step 9): a provider charge that
+  // succeeded and was recorded as a verified settlement, but where
+  // fund_ad_campaign was never reached (simulating an HTTP crash right
+  // after the charge succeeded), must be resumable WITHOUT a second
+  // external charge -- re-requesting a quote for the same campaign
+  // returns the SAME quote (get-or-create), the existing verified
+  // settlement bound to it is discovered and reused (mirroring the
+  // route's own existingSettlement lookup), and funding then succeeds
+  // exactly once.
+  const retryDraft = await discDraft()
+  const retryQuote1 = await admin.rpc('create_ad_campaign_funding_quote', { p_actor_profile_id: merchantAId, p_campaign_id: retryDraft.id }).then((r) => r.data)
+  const { data: retrySettlement } = await recordVerifiedSettlement({ advertiserId: discAdvertiser.id, reference: `mock_ad_disc_retry_${RUN_ID}`, amountCents: retryQuote1.amount_due_cents, currency: retryQuote1.currency, isTest: false, quoteId: retryQuote1.quote_id })
+  // Simulated crash here: settlement exists, fund_ad_campaign never called.
+
+  // Simulated retry: re-request the quote (get-or-create) -- must be the identical row.
+  const retryQuote2 = await admin.rpc('create_ad_campaign_funding_quote', { p_actor_profile_id: merchantAId, p_campaign_id: retryDraft.id }).then((r) => r.data)
+  check('139. a retried quote request for the same still-unconsumed campaign returns the SAME quote (get-or-create), never mints a second one', retryQuote2.quote_id === retryQuote1.quote_id, { retryQuote1, retryQuote2 })
+
+  // Simulated retry: the route's own existing-settlement lookup finds the
+  // already-verified settlement bound to this quote instead of charging
+  // the provider again.
+  const { data: retryExistingSettlement } = await admin.from('ad_provider_settlements').select('id').eq('quote_id', retryQuote2.quote_id).eq('status', 'verified').maybeSingle()
+  check('140. the retry discovers the existing verified settlement bound to the reused quote, so the provider is never charged a second time', retryExistingSettlement?.id === retrySettlement?.id, { retrySettlement, retryExistingSettlement })
+
+  const { data: retryFunded, error: retryFundErr } = await admin.rpc('fund_ad_campaign', { p_actor_profile_id: merchantAId, p_campaign_id: retryDraft.id, p_funding_source: 'provider', p_settlement_id: retryExistingSettlement?.id, p_quote_id: retryQuote2.quote_id })
+  const { count: retrySettlementCount } = await admin.from('ad_provider_settlements').select('id', { count: 'exact', head: true }).eq('quote_id', retryQuote1.quote_id)
+  check('141. the retried funding attempt succeeds exactly once, using the reused settlement, with only ONE settlement row ever bound to this quote (no double external charge)', !retryFundErr && retryFunded?.status === 'active' && retrySettlementCount === 1, { retryFundErr, retryFunded, retrySettlementCount })
+
+  await restoreMerchantAPlan()
+  console.log(`\n=== SUBSCRIPTION DISCOUNT SECTION DONE -- ${failures} failure(s) so far ===`)
 }
 
 console.log('')

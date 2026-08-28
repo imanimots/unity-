@@ -26,6 +26,11 @@ interface AdCampaignReport {
   funded_amount_cents: number
   currency: string
   underdelivery_credit_cents: number
+  base_price_cents: number
+  discount_bps: number
+  discount_cents: number
+  subscription_plan_id: string
+  pricing_is_live_quote: boolean
 }
 
 export default function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -133,6 +138,10 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
 
       {report.status === 'draft' && (
         <div className="mb-8 rounded-xl border border-dashed border-[#E8E0D8] dark:border-[#2A1A1A] px-5 py-4">
+          <PricingBreakdown report={report} money={money} />
+          <p className="text-xs text-[#9B8B85] mt-3 mb-3">
+            This is a live preview, not a guaranteed price — it may change if the package price or your subscription plan changes before you fund. The final amount is locked in the moment you click Fund, before any charge happens.
+          </p>
           <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-3">
             Fund this campaign to activate it. This is a development mock charge — no real money moves.
           </p>
@@ -143,6 +152,12 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
           >
             Fund campaign
           </button>
+        </div>
+      )}
+
+      {report.status !== 'draft' && (
+        <div className="mb-8 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] px-5 py-4">
+          <PricingBreakdown report={report} money={money} />
         </div>
       )}
 
@@ -183,6 +198,35 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Package price -> subscription discount -> amount due, server-derived throughout (never client-computed). */
+function PricingBreakdown({ report, money }: { report: AdCampaignReport; money: (cents: number, currency: string) => string }) {
+  const planLabel = report.subscription_plan_id ? report.subscription_plan_id.charAt(0).toUpperCase() + report.subscription_plan_id.slice(1) : ''
+  const discountPercent = report.discount_bps / 100
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-semibold uppercase tracking-wide text-[#9B8B85] mb-2">
+        {report.pricing_is_live_quote ? 'Pricing' : 'Amount charged'}
+      </p>
+      <div className="flex justify-between text-sm">
+        <span className="text-[#6B5B55] dark:text-[#9B8B85]">Package price</span>
+        <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{money(report.base_price_cents, report.currency)}</span>
+      </div>
+      {report.discount_bps > 0 && (
+        <div className="flex justify-between text-sm">
+          <span className="text-[#6B5B55] dark:text-[#9B8B85]">
+            {planLabel} discount ({discountPercent}%)
+          </span>
+          <span className="font-medium text-[#1A7A3A]">-{money(report.discount_cents, report.currency)}</span>
+        </div>
+      )}
+      <div className="flex justify-between text-sm pt-1.5 mt-1.5 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
+        <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{report.pricing_is_live_quote ? 'Amount due' : 'Amount charged'}</span>
+        <span className="font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{money(report.funded_amount_cents, report.currency)}</span>
+      </div>
     </div>
   )
 }

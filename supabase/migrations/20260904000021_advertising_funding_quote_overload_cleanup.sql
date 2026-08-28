@@ -1,0 +1,26 @@
+-- Fix-forward: migration 20260904000020 widened fund_ad_campaign() and
+-- record_ad_provider_settlement() by appending a new trailing p_quote_id
+-- parameter via a bare `create or replace function`. That is only safe
+-- when the parameter TYPE LIST is unchanged (e.g. renaming a parameter in
+-- place); adding a genuinely new parameter changes the type list, so
+-- Postgres does not replace the existing function -- it creates a second,
+-- distinct overload alongside it. Both the pre-quote and quote-aware
+-- versions of each function were therefore left live simultaneously.
+--
+-- This was caught live: a caller that omits p_quote_id entirely (fully
+-- valid, since PostgREST/Postgres both allow omitting a defaulted
+-- parameter) produces "PGRST203 -- Could not choose the best candidate
+-- function" from PostgREST, because such a call matches both overloads.
+-- Worse than a mere usability bug: the stale pre-quote fund_ad_campaign()
+-- overload still contains the OLD body, which does not require or consume
+-- a funding quote at all for provider funding -- i.e. it is still
+-- reachable and would silently reintroduce the exact race this whole
+-- migration series exists to close, for any caller that happens to omit
+-- p_quote_id.
+--
+-- Fix: drop the exact stale (pre-quote) signature of each function. The
+-- current, quote-aware six/seven-parameter versions created by
+-- 20260904000020 are left completely untouched -- there is nothing to
+-- recreate, only the leftover overload to remove.
+drop function if exists public.fund_ad_campaign(uuid, uuid, public.ad_funding_source, uuid, text);
+drop function if exists public.record_ad_provider_settlement(uuid, text, text, integer, text, boolean);
