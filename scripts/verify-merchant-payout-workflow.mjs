@@ -410,8 +410,115 @@ console.log('\n=== Scenario E: Paid followed by financial issue ===')
 
 console.log('\n=== Scenario F: Admin ===')
 {
-  const listRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent('Payout Regression — Scenario A')}`)
+  // ── Direct search proofs ──
+  // Scenario A's payout is deliberately old (created once, on the fixed
+  // 'scenario-a' fixture key, and never re-created on subsequent runs)
+  // and, at current dataset volume, ranks far outside a top-100-by-
+  // created_at window. This is the actual regression: the old
+  // implementation fetched only the top 100 rows by created_at, then
+  // searched in Node -- so this specific check is the one that catches
+  // a regression back to that shape.
+  const scenarioASearchTerm = 'Payout Regression — Scenario A'
+  const listRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent(scenarioASearchTerm)}`)
   check('admin list filtering by search works', listRes.status === 200 && (listRes.json?.payouts ?? []).some((p) => p.id === scenarioAPayout?.id), listRes.status)
+
+  const lowerRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent(scenarioASearchTerm.toLowerCase())}`)
+  check('search: lowercase variant still matches (case-insensitive)', lowerRes.status === 200 && (lowerRes.json?.payouts ?? []).some((p) => p.id === scenarioAPayout?.id), lowerRes.status)
+
+  const upperRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent(scenarioASearchTerm.toUpperCase())}`)
+  check('search: uppercase variant still matches (case-insensitive)', upperRes.status === 200 && (upperRes.json?.payouts ?? []).some((p) => p.id === scenarioAPayout?.id), upperRes.status)
+
+  const partialRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent('Scenario A')}`)
+  check('search: partial substring (mid-string, no marker prefix) still matches', partialRes.status === 200 && (partialRes.json?.payouts ?? []).some((p) => p.id === scenarioAPayout?.id), partialRes.status)
+
+  const whitespaceRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent(`  ${scenarioASearchTerm}  `)}`)
+  check('search: leading/trailing whitespace is trimmed before matching', whitespaceRes.status === 200 && (whitespaceRes.json?.payouts ?? []).some((p) => p.id === scenarioAPayout?.id), whitespaceRes.status)
+
+  const noMatchRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent('totally-unrelated-xyz-does-not-exist')}`)
+  check('search: a genuinely non-matching term returns 0 results, not an error', noMatchRes.status === 200 && (noMatchRes.json?.payouts ?? []).length === 0, noMatchRes.status)
+
+  // Narrow enough to uniquely identify scenarioA specifically -- 'Regression — Scenario'
+  // alone matches ~196 fixtures accumulated across every prior run of this
+  // suite, and scenarioA (the oldest) correctly falls outside the
+  // default 100-row bound for that overly generic term. That is the
+  // intended, bounded behavior (Step 5), not a defect -- this check
+  // instead isolates the em-dash-handling question specifically.
+  const emdashRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent('Regression — Scenario A')}`)
+  check('search: em-dash punctuation in the term matches correctly', emdashRes.status === 200 && (emdashRes.json?.payouts ?? []).some((p) => p.id === scenarioAPayout?.id), emdashRes.status)
+
+  const literalPercentRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent('Scenario%A')}`)
+  check('search: a literal "%" in the term is NOT treated as a SQL wildcard (no match against "Scenario A")', literalPercentRes.status === 200 && !(literalPercentRes.json?.payouts ?? []).some((p) => p.id === scenarioAPayout?.id), literalPercentRes.status)
+
+  const literalUnderscoreRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent('Scenario_A')}`)
+  check('search: a literal "_" in the term is NOT treated as a SQL wildcard (no match against "Scenario A")', literalUnderscoreRes.status === 200 && !(literalUnderscoreRes.json?.payouts ?? []).some((p) => p.id === scenarioAPayout?.id), literalUnderscoreRes.status)
+
+  // ── Merchant-name / apostrophe / booking-reference / provider-reference: dedicated fixture ──
+  // merchantA's profile has no full_name/display_name set by default (a
+  // real, pre-existing QA-account state, not something this phase
+  // changes) -- temporarily set one to prove merchant-name search,
+  // mirroring this file's own established Scenario D3 pattern
+  // (temporarily mutate a shared QA profile field, restore immediately
+  // after, verify the restore).
+  const searchRunSuffix = Date.now()
+  const searchMerchantName = `${QA_LISTING_MARKER} Search Proof Merchant ${searchRunSuffix}`
+  await admin.from('profiles').update({ full_name: searchMerchantName }).eq('id', merchantAId)
+
+  const searchListingTitle = `${QA_LISTING_MARKER} Payout Regression — Search Fields' Test ${searchRunSuffix}`
+  const searchListingId = await insertBaseListing(merchantAId, { title: searchListingTitle, daily_rate: 260 })
+  const { bookingId: searchBookingId } = await createCompletedBooking(renterACookie, merchantACookie, searchListingId, `search-fields-${searchRunSuffix}`, 500)
+  const searchPayout = await getPayoutForBooking(searchBookingId)
+  const searchProviderReference = `MOCK-SEARCH-${searchRunSuffix}`
+  await api(adminCookie, 'POST', `/api/admin/payouts/${searchPayout.id}/mark-processing`, { idempotency_key: `payout-regression-search-proc-${searchRunSuffix}` })
+  await api(adminCookie, 'POST', `/api/admin/payouts/${searchPayout.id}/mark-paid`, {
+    payoutReference: searchProviderReference, payoutMethod: 'manual', confirmManualPayment: true, idempotency_key: `payout-regression-search-paid-${searchRunSuffix}`,
+  })
+  const { data: searchBookingRow } = await admin.from('bookings').select('booking_reference').eq('id', searchBookingId).single()
+
+  const merchantNameRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent(searchMerchantName)}`)
+  check('search: merchant name field is searchable', merchantNameRes.status === 200 && (merchantNameRes.json?.payouts ?? []).some((p) => p.id === searchPayout.id), merchantNameRes.status)
+
+  const apostropheRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent("Fields' Test")}`)
+  check('search: apostrophe in the term is handled safely (parameterized, no SQL error) and matches correctly', apostropheRes.status === 200 && (apostropheRes.json?.payouts ?? []).some((p) => p.id === searchPayout.id), apostropheRes.status)
+
+  const bookingReferenceRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent(searchBookingRow.booking_reference)}`)
+  check('search: booking reference field is searchable', bookingReferenceRes.status === 200 && (bookingReferenceRes.json?.payouts ?? []).some((p) => p.id === searchPayout.id), bookingReferenceRes.status)
+
+  const providerReferenceRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent(searchProviderReference)}`)
+  check('search: payout/provider reference field is searchable', providerReferenceRes.status === 200 && (providerReferenceRes.json?.payouts ?? []).some((p) => p.id === searchPayout.id), providerReferenceRes.status)
+
+  await admin.from('profiles').update({ full_name: null }).eq('id', merchantAId)
+  const { data: restoredMerchantA } = await admin.from('profiles').select('full_name').eq('id', merchantAId).single()
+  check('merchantA full_name restored to null after the search proof (shared fixture account)', restoredMerchantA.full_name === null, restoredMerchantA)
+
+  // ── Filter combination proofs: search composes correctly with existing filters, each applied before limit ──
+  const searchPlusStatusMatchRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent(scenarioASearchTerm)}&status=pending`)
+  check('search + status=pending: matches (scenarioA payout genuinely is pending)', searchPlusStatusMatchRes.status === 200 && (searchPlusStatusMatchRes.json?.payouts ?? []).some((p) => p.id === scenarioAPayout?.id), searchPlusStatusMatchRes.status)
+
+  const searchPlusStatusNoMatchRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent(scenarioASearchTerm)}&status=paid`)
+  check('search + status=paid: no match (scenarioA payout is pending, not paid -- filters apply together, not either/or)', searchPlusStatusNoMatchRes.status === 200 && !(searchPlusStatusNoMatchRes.json?.payouts ?? []).some((p) => p.id === scenarioAPayout?.id), searchPlusStatusNoMatchRes.status)
+
+  const searchPlusOverdueMatchRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent(scenarioASearchTerm)}&overdueOnly=true`)
+  check('search + overdueOnly=true: matches (scenarioA payout is genuinely far past the 48h threshold and still pending)', searchPlusOverdueMatchRes.status === 200 && (searchPlusOverdueMatchRes.json?.payouts ?? []).some((p) => p.id === scenarioAPayout?.id), searchPlusOverdueMatchRes.status)
+
+  const searchPlusOverdueNoMatchRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent(searchMerchantName)}&overdueOnly=true`)
+  check('search + overdueOnly=true: no match against a brand-new (not overdue) fixture', searchPlusOverdueNoMatchRes.status === 200 && !(searchPlusOverdueNoMatchRes.json?.payouts ?? []).some((p) => p.id === searchPayout.id), searchPlusOverdueNoMatchRes.status)
+
+  // Dedicated dispute fixture for the search + disputeRelated combination, mirroring Scenario D2's pattern.
+  const disputeRunSuffix = Date.now()
+  const disputeListingTitle = `${QA_LISTING_MARKER} Payout Regression — Search Dispute ${disputeRunSuffix}`
+  const disputeListingId = await insertBaseListing(merchantAId, { title: disputeListingTitle, daily_rate: 270 })
+  const { bookingId: disputeBookingId } = await createCompletedBooking(renterACookie, merchantACookie, disputeListingId, `search-dispute-${disputeRunSuffix}`, 501)
+  await api(renterACookie, 'POST', '/api/disputes', {
+    booking_id: disputeBookingId, title: 'Search filter regression dispute fixture', description: 'Payout search + disputeRelated combination proof.',
+    requested_resolution: 'Refund requested for regression testing.', idempotency_key: `payout-regression-search-dispute-${disputeRunSuffix}`,
+  })
+  const disputePayout = await getPayoutForBooking(disputeBookingId)
+
+  const searchPlusDisputeMatchRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent(disputeListingTitle)}&disputeRelated=true`)
+  check('search + disputeRelated=true: matches a payout with a genuine unresolved dispute', searchPlusDisputeMatchRes.status === 200 && (searchPlusDisputeMatchRes.json?.payouts ?? []).some((p) => p.id === disputePayout?.id), searchPlusDisputeMatchRes.status)
+
+  const searchPlusDisputeNoMatchRes = await api(adminCookie, 'GET', `/api/admin/payouts?search=${encodeURIComponent(scenarioASearchTerm)}&disputeRelated=true`)
+  check('search + disputeRelated=true: no match against scenarioA (no dispute on that booking)', searchPlusDisputeNoMatchRes.status === 200 && !(searchPlusDisputeNoMatchRes.json?.payouts ?? []).some((p) => p.id === scenarioAPayout?.id), searchPlusDisputeNoMatchRes.status)
 
   const detailRes = await api(adminCookie, 'GET', `/api/admin/payouts/${scenarioAPayout.id}`)
   check('admin detail returns the correct booking and financial data', detailRes.status === 200 && detailRes.json?.payout?.id === scenarioAPayout.id && detailRes.json?.booking?.id === scenarioABookingId, detailRes.status)
