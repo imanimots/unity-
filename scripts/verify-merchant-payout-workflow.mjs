@@ -695,6 +695,45 @@ console.log('\n=== Reconcile-missing scalability (Wave 2C) ===')
   check('Reconcile-K1. both concurrent reconcile-missing calls respond 200, no 500', concurrentResults.every((r) => r.status === 200), concurrentResults)
   const { data: payoutsAfterK } = await admin.from('merchant_payouts').select('id').eq('booking_id', bookingK)
   check('Reconcile-K2. exactly one payout row exists after concurrent reconciliation -- no duplicate obligation', payoutsAfterK?.length === 1, payoutsAfterK)
+
+  // L. Head-of-line-blocking regression coverage (migration 20260904000023).
+  // A completed booking with NO rental_charge payment at all must never
+  // enter the candidate queue -- it can never be processed, so including
+  // it would only ever waste a batch slot.
+  const listingL = await insertBaseListing(merchantAId, { title: `${QA_LISTING_MARKER} Payout Regression — Reconcile L ${runSuffix}`, daily_rate: 225 })
+  const createdL = await api(renterACookie, 'POST', '/api/bookings', { listing_id: listingL, start_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), end_at: new Date(Date.now() + 33 * 24 * 60 * 60 * 1000).toISOString(), idempotency_key: `reconcile-l-create-${runSuffix}` })
+  const bookingL = createdL.json.booking_id
+  await api(merchantACookie, 'POST', `/api/bookings/${bookingL}/accept`, { idempotency_key: `reconcile-l-accept-${runSuffix}` })
+  // Deliberately never checked out -- no rental_charge payment will exist for this booking.
+  await admin.from('bookings').update({ status: 'completed' }).eq('id', bookingL)
+  const { data: candidatesForL } = await admin.rpc('_payout_reconcile_missing_candidates', { p_limit: 1000 })
+  check('Reconcile-L1. a completed booking with no rental_charge payment at all is excluded from the candidate queue (head-of-line-blocking fix)', !(candidatesForL ?? []).some((c) => c.booking_id === bookingL), { bookingL })
+
+  // M. Non-actionable rows cannot starve an actionable candidate, proven
+  // against this shared dataset's REAL accumulated backlog (already known
+  // to exceed the LIMIT-50 batch size with payment-less completed
+  // bookings from unrelated suites -- no manufacturing needed).
+  const { data: allCompletedForM } = await admin.from('bookings').select('id').eq('status', 'completed')
+  const { data: allPayoutRowsForM } = await admin.from('merchant_payouts').select('booking_id').not('booking_id', 'is', null)
+  const withPayoutForM = new Set((allPayoutRowsForM ?? []).map((r) => r.booking_id))
+  const missingPayoutForM = (allCompletedForM ?? []).filter((b) => !withPayoutForM.has(b.id))
+  let nonActionableBacklogCount = 0
+  for (const b of missingPayoutForM) {
+    const { data: rental } = await admin.from('payments').select('status').eq('booking_id', b.id).eq('payment_type', 'rental_charge').maybeSingle()
+    if (rental?.status !== 'captured') nonActionableBacklogCount++
+  }
+  check(`Reconcile-M1. the shared dataset's non-actionable (no captured payment) completed/no-payout backlog already exceeds LIMIT 50 (currently ${nonActionableBacklogCount})`, nonActionableBacklogCount > 50, { nonActionableBacklogCount })
+
+  const listingM = await insertBaseListing(merchantAId, { title: `${QA_LISTING_MARKER} Payout Regression — Reconcile M ${runSuffix}`, daily_rate: 230 })
+  const createdM = await api(renterACookie, 'POST', '/api/bookings', { listing_id: listingM, start_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), end_at: new Date(Date.now() + 33 * 24 * 60 * 60 * 1000).toISOString(), idempotency_key: `reconcile-m-create-${runSuffix}` })
+  const bookingM = createdM.json.booking_id
+  await api(merchantACookie, 'POST', `/api/bookings/${bookingM}/accept`, { idempotency_key: `reconcile-m-accept-${runSuffix}` })
+  await api(renterACookie, 'POST', `/api/bookings/${bookingM}/checkout`, { test_scenario: 'success', idempotency_key: `reconcile-m-checkout-${runSuffix}` })
+  await admin.from('bookings').update({ status: 'completed' }).eq('id', bookingM)
+  const reconcileM = await internalApi('/api/internal/payouts/reconcile-missing')
+  check('Reconcile-M2. reconcile-missing responds 200 despite a non-actionable backlog well over LIMIT 50', reconcileM.status === 200, reconcileM)
+  const { data: payoutsAfterM } = await admin.from('merchant_payouts').select('id').eq('booking_id', bookingM)
+  check('Reconcile-M3. a genuinely fresh, actionable (captured, no payout) candidate is still reached and gets exactly one payout, proving non-actionable rows cannot starve it -- the exact fix for A2/J2/K2', payoutsAfterM?.length === 1, payoutsAfterM)
 }
 
 console.log('\n=== CLEANUP ===')
