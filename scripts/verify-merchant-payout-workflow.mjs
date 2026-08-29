@@ -634,6 +634,42 @@ console.log('\n=== No full-history payout-ID transport (structural, source-code 
   check('exceptions-service no longer diffs a Node-side bookingIdsWithPayout set for the missing-payout category', !exceptionsSrc.includes('bookingIdsWithPayout'), {})
   check('exceptions-service missing-payout category has no per-booking payments N+1 query remaining', !/for \(const booking of completedBookings.*\n[\s\S]{0,200}admin\s*\n?\s*\.from\('payments'\)/.test(exceptionsSrc), {})
   check('exceptions-service missing-payout category reuses the canonical reconciliation candidate RPC', exceptionsSrc.includes("admin.rpc('_payout_reconcile_missing_candidates'"), {})
+  check('exceptions-service missing-payout category still uses LIMIT 50 (P1 untouched by P2)', exceptionsSrc.includes('p_limit: 50'), {})
+
+  // P2 remediation (Admin Operational Exceptions latency): every
+  // independent category's initial data fetch is fired at function
+  // entry, before any of them is awaited -- proven structurally via
+  // source-text ordering (not a brittle timing assertion). Cumulative
+  // sequential-wave latency collapses toward the single slowest wave
+  // instead of their sum.
+  const waveKickoffNames = ['wave1P', 'wave2P', 'wave3P', 'wave4P', 'wave5P', 'wave6P', 'payoutExceptionCandidatesP', 'missingPayoutCandidatesP', 'wave7P', 'wave8P', 'wave9P', 'wave10P']
+  const allKickoffsPresent = waveKickoffNames.every((name) => exceptionsSrc.includes(`const ${name} =`))
+  const noneAwaitedAtDeclaration = waveKickoffNames.every((name) => !exceptionsSrc.includes(`const ${name} = await`))
+  check('exceptions-service: all 12 independent category fetches exist and are fired without awaiting at declaration', allKickoffsPresent && noneAwaitedAtDeclaration, { allKickoffsPresent, noneAwaitedAtDeclaration })
+  const lastKickoffIndex = Math.max(...waveKickoffNames.map((name) => exceptionsSrc.indexOf(`const ${name} =`)))
+  const firstAwaitUsageIndex = Math.min(
+    ...waveKickoffNames.map((name) => {
+      const idx = exceptionsSrc.indexOf(`await ${name}`)
+      return idx === -1 ? Infinity : idx
+    })
+  )
+  check('exceptions-service: every independent fetch is kicked off before any of them is first awaited (structural proof of concurrent scheduling)', lastKickoffIndex > -1 && firstAwaitUsageIndex < Infinity && lastKickoffIndex < firstAwaitUsageIndex, { lastKickoffIndex, firstAwaitUsageIndex })
+
+  // Every pre-P2 exception category (one representative type string per
+  // wave) must still be present -- proves the restructuring didn't drop
+  // a category while relocating query declarations.
+  const representativeCategoryTypes = [
+    'listing_review_overdue', 'dispute_open_too_long', 'barter_proposal_stale', 'order_disputed',
+    'affiliate_commission_pending_stale', 'merchant_payout_pending_overdue', 'merchant_payout_missing_for_completed_booking',
+    'merchant_subscription_pending_change_overdue', 'unity_commission_held_overdue', 'unity_commission_missing_for_sale', 'unity_commission_missing_for_rental',
+  ]
+  check('exceptions-service: every pre-P2 exception category type string is still present (none dropped by the restructuring)', representativeCategoryTypes.every((t) => exceptionsSrc.includes(`'${t}'`)), { missing: representativeCategoryTypes.filter((t) => !exceptionsSrc.includes(`'${t}'`)) })
+
+  // The three suspended-account N+1 loops (P3, deferred) must remain
+  // structurally untouched by P2 -- same query shape, same predicates.
+  check('exceptions-service: suspended_account_with_open_booking N+1 loop query shape unchanged (P3 deferred)', exceptionsSrc.includes("'suspended_account_with_open_booking'") && exceptionsSrc.includes("or(`renter_id.eq.${user.id},merchant_id.eq.${user.id}`)"), {})
+  check('exceptions-service: suspended_account_with_open_order N+1 loop query shape unchanged (P3 deferred)', exceptionsSrc.includes("'suspended_account_with_open_order'") && exceptionsSrc.includes("or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)"), {})
+  check('exceptions-service: suspended_affiliate_with_open_commissions N+1 loop query shape unchanged (P3 deferred)', exceptionsSrc.includes("'suspended_affiliate_with_open_commissions'") && exceptionsSrc.includes(".eq('affiliate_id', affiliate.id)"), {})
 }
 
 console.log('\n=== Reconcile-missing scalability (Wave 2C) ===')

@@ -45,25 +45,34 @@ function exceptionId(type: string, entityId: string): string {
  * to flag. No category invents an automatic financial fix; every
  * suggestedAction points at an existing admin surface/action.
  */
+interface PayoutExceptionCandidateRow {
+  payout_id: string
+  booking_id: string | null
+  merchant_id: string
+  status: 'pending' | 'processing' | 'paid'
+  updated_at: string
+  provider_reference: string | null
+  rental_payment_status: string | null
+  has_blocking_dispute: boolean
+  merchant_account_status: string | null
+}
+
 export async function listOperationalExceptions(admin: SupabaseClient): Promise<AdminException[]> {
   const threshold = hoursAgo(REVIEW_OVERDUE_HOURS)
   const now = new Date().toISOString()
 
-  const [
-    { data: overdueListingReviews },
-    { data: overdueOwnershipReviews },
-    { data: overdueKyc },
-    { data: overduePayments },
-    { data: retryableWorkflows },
-    { data: terminalWorkflows },
-    { data: failedEmails },
-    { data: overdueRentals },
-    { data: suspendedWithBookings },
-    { data: lateSuccessfulPayments },
-    { data: bookingsMissingWorkflow },
-    { data: existingWorkflowBookingIds },
-    { data: resolutions },
-  ] = await Promise.all([
+  // P2: every category's initial data fetch is mutually independent --
+  // no query below depends on another category's result, only the
+  // in-memory exception-building further down does, and that already
+  // runs strictly after its own wave resolves (unchanged). Firing every
+  // wave here, at function entry, collapses total wall-clock latency
+  // toward the single slowest wave instead of their sum -- previously
+  // each wave was individually awaited in sequence, so their latencies
+  // accumulated. Genuinely dependent follow-up queries (the barter
+  // financial-readiness lookup, and the three suspended-account N+1
+  // loops) are unchanged and still run during processing, after their
+  // inputs are available -- only the top-level fetch scheduling moved.
+  const wave1P = Promise.all([
     admin.from('listing_moderation').select('listing_id, created_at, listings(title)').eq('moderation_status', 'pending').lt('created_at', threshold),
     admin.from('listing_ownership_verification').select('listing_id, status, updated_at, listings(title)').in('status', ['pending', 'under_review']).lt('updated_at', threshold),
     admin.from('identity_verifications').select('user_id, status, updated_at, profiles(full_name, display_name)').in('status', ['pending', 'under_review']).lt('updated_at', threshold),
@@ -89,26 +98,11 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
     admin.from('exception_resolutions').select('exception_type, entity_type, entity_id'),
   ])
 
-  const [{ data: overdueDisputes }] = await Promise.all([
+  const wave2P = Promise.all([
     admin.from('disputes').select('id, title, status, created_at').in('status', ['open', 'evidence', 'under_review']).lt('created_at', threshold),
   ])
 
-  // Step 11 Phase 5 closure -- barter categories, absorbing the former
-  // "Phase 5 (Barter Phase C)" roadmap item. Every category mirrors an
-  // existing pattern above exactly (overdue reviews, failed payments,
-  // suspended-with-open-commitment); no automatic financial correction
-  // is invented, every suggestedAction points at an existing admin
-  // surface.
-  const [
-    { data: staleBarterProposals },
-    { data: accruedAcceptedBarter },
-    { data: failedBarterPayments },
-    { data: disputedBarterAgreements },
-    { data: staleAwaitingConfirmation },
-    { data: heldBarterAgreements },
-    { data: frozenCancelledBarter },
-    { data: completedWithUnresolvedDeposit },
-  ] = await Promise.all([
+  const wave3P = Promise.all([
     admin.from('barter_agreements').select('id, agreement_reference, status, proposed_at').in('status', ['proposed', 'countered']).lt('proposed_at', threshold),
     admin.from('barter_agreements').select('id, agreement_reference, accepted_offer_id, accepted_at, party_a_id, party_b_id').eq('status', 'accepted').not('accepted_at', 'is', null).lt('accepted_at', threshold),
     admin.from('payments').select('id, barter_agreement_id, payment_type, updated_at, barter_agreements(agreement_reference)').in('payment_type', ['barter_deposit', 'barter_cash_adjustment']).eq('status', 'failed'),
@@ -119,22 +113,7 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
     admin.from('payments').select('id, barter_agreement_id, updated_at, barter_agreements(agreement_reference, status)').eq('payment_type', 'barter_deposit').eq('status', 'authorised'),
   ])
 
-  // Step 11 Phase 6 -- order categories. Every category mirrors an
-  // existing pattern above exactly (overdue reviews, failed payments,
-  // suspended-with-open-commitment); no automatic financial correction
-  // is invented, every suggestedAction points at an existing admin
-  // surface. order_payment_failed is a single category, not a
-  // retryable/terminal split -- orders have no financial_workflows-style
-  // stored classification the way bookings do (see
-  // docs/ORDER_ADMINISTRATION.md, "failure category").
-  const [
-    { data: staleUnpaidOrders },
-    { data: failedOrderPayments },
-    { data: staleAwaitingShipment },
-    { data: staleAwaitingDelivery },
-    { data: disputedOrders },
-    { data: cancelledOrdersWithPayment },
-  ] = await Promise.all([
+  const wave4P = Promise.all([
     admin.from('orders').select('id, order_reference, status, created_at').eq('status', 'pending').lt('created_at', threshold),
     admin.from('payments').select('id, order_id, updated_at, orders(order_reference, status)').eq('payment_type', 'order_payment').eq('status', 'failed'),
     admin.from('orders').select('id, order_reference, paid_at').eq('status', 'paid').not('paid_at', 'is', null).lt('paid_at', threshold),
@@ -142,6 +121,99 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
     admin.from('orders').select('id, order_reference, created_at').eq('status', 'disputed'),
     admin.from('payments').select('id, order_id, status, updated_at, orders(order_reference, status)').eq('payment_type', 'order_payment').in('status', ['authorised', 'captured']),
   ])
+
+  const wave5P = Promise.all([
+    admin.from('affiliate_commissions').select('id, listing_id, created_at').eq('status', 'pending').lt('created_at', threshold),
+    admin.from('affiliate_commissions').select('id, listing_id, updated_at').eq('status', 'held').lt('updated_at', threshold),
+    admin.from('affiliate_commissions').select('id, listing_id, approved_at').eq('status', 'approved').not('approved_at', 'is', null).lt('approved_at', threshold),
+    admin.from('affiliate_commissions').select('id, listing_id, updated_at').eq('status', 'payout_queued').lt('updated_at', threshold),
+    admin.from('affiliate_commissions').select('id, listing_id, updated_at').eq('status', 'failed'),
+    admin.from('affiliate_commissions').select('id, listing_id, payout_requested_at').eq('status', 'processing').not('payout_requested_at', 'is', null).lt('payout_requested_at', threshold),
+    admin.from('affiliate_commissions').select('id, listing_id, updated_at, payments(status)').eq('status', 'paid'),
+    admin.from('profiles').select('id, full_name, display_name').eq('is_affiliate', true).eq('account_status', 'suspended'),
+  ])
+
+  const wave6P = Promise.all([
+    admin.from('merchant_payouts').select('id, created_at').eq('status', 'pending').lt('created_at', threshold),
+    admin.from('merchant_payouts').select('id, processing_started_at').eq('status', 'processing').not('processing_started_at', 'is', null).lt('processing_started_at', threshold),
+    admin.from('merchant_payouts').select('id, updated_at').eq('status', 'failed'),
+    admin.from('merchant_payouts').select('id, booking_id, created_at'),
+    admin.from('merchant_payouts').select('id, status, processing_started_by').neq('status', 'pending'),
+    admin.from('merchant_payout_history').select('payout_id'),
+  ])
+
+  // P1 (unchanged): the SAME canonical eligibility authority as payout
+  // reconciliation, _payout_reconcile_missing_candidates -- do not
+  // reintroduce a full-table booking/payout fetch or a per-booking N+1
+  // here.
+  const payoutExceptionCandidatesP = admin.rpc('_merchant_payout_exception_candidates') as unknown as Promise<{ data: PayoutExceptionCandidateRow[] | null }>
+  const missingPayoutCandidatesP = admin.rpc('_payout_reconcile_missing_candidates', { p_limit: 50 }) as unknown as Promise<{ data: { booking_id: string }[] | null }>
+
+  const wave7P = Promise.all([
+    admin
+      .from('merchant_subscriptions')
+      .select('id, merchant_id, status, pending_plan_id, pending_plan_effective_at')
+      .in('status', ['pending_change', 'cancelled'])
+      .lt('pending_plan_effective_at', threshold),
+    admin
+      .from('merchant_subscription_billing_attempts')
+      .select('merchant_id, status, created_at')
+      .gte('created_at', threshold),
+  ])
+
+  const wave8P = admin
+    .from('unity_commissions')
+    .select('id, merchant_id, updated_at')
+    .eq('status', 'held')
+    .lt('updated_at', threshold)
+
+  const wave9P = Promise.all([
+    admin.from('payments').select('id, order_id, captured_at').eq('payment_type', 'order_payment').eq('status', 'captured').lt('captured_at', threshold),
+    admin.from('unity_commissions').select('payment_id').eq('transaction_type', 'sale'),
+  ])
+
+  const wave10P = Promise.all([
+    admin.from('payments').select('id, booking_id, captured_at').eq('payment_type', 'rental_charge').in('status', ['captured', 'partially_captured']).lt('captured_at', threshold),
+    admin.from('unity_commissions').select('payment_id').eq('transaction_type', 'rental'),
+  ])
+
+  const [
+    { data: overdueListingReviews },
+    { data: overdueOwnershipReviews },
+    { data: overdueKyc },
+    { data: overduePayments },
+    { data: retryableWorkflows },
+    { data: terminalWorkflows },
+    { data: failedEmails },
+    { data: overdueRentals },
+    { data: suspendedWithBookings },
+    { data: lateSuccessfulPayments },
+    { data: bookingsMissingWorkflow },
+    { data: existingWorkflowBookingIds },
+    { data: resolutions },
+  ] = await wave1P
+
+  const [{ data: overdueDisputes }] = await wave2P
+
+  const [
+    { data: staleBarterProposals },
+    { data: accruedAcceptedBarter },
+    { data: failedBarterPayments },
+    { data: disputedBarterAgreements },
+    { data: staleAwaitingConfirmation },
+    { data: heldBarterAgreements },
+    { data: frozenCancelledBarter },
+    { data: completedWithUnresolvedDeposit },
+  ] = await wave3P
+
+  const [
+    { data: staleUnpaidOrders },
+    { data: failedOrderPayments },
+    { data: staleAwaitingShipment },
+    { data: staleAwaitingDelivery },
+    { data: disputedOrders },
+    { data: cancelledOrdersWithPayment },
+  ] = await wave4P
 
   const resolvedSet = new Set((resolutions ?? []).map((r) => `${r.exception_type}:${r.entity_type}:${r.entity_id}`))
   const isResolved = (type: string, entityType: string, entityId: string) => resolvedSet.has(`${type}:${entityType}:${entityId}`)
@@ -616,16 +688,7 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
     { data: staleProcessingCommissions },
     { data: paidCommissionsForRefundCheck },
     { data: suspendedAffiliates },
-  ] = await Promise.all([
-    admin.from('affiliate_commissions').select('id, listing_id, created_at').eq('status', 'pending').lt('created_at', threshold),
-    admin.from('affiliate_commissions').select('id, listing_id, updated_at').eq('status', 'held').lt('updated_at', threshold),
-    admin.from('affiliate_commissions').select('id, listing_id, approved_at').eq('status', 'approved').not('approved_at', 'is', null).lt('approved_at', threshold),
-    admin.from('affiliate_commissions').select('id, listing_id, updated_at').eq('status', 'payout_queued').lt('updated_at', threshold),
-    admin.from('affiliate_commissions').select('id, listing_id, updated_at').eq('status', 'failed'),
-    admin.from('affiliate_commissions').select('id, listing_id, payout_requested_at').eq('status', 'processing').not('payout_requested_at', 'is', null).lt('payout_requested_at', threshold),
-    admin.from('affiliate_commissions').select('id, listing_id, updated_at, payments(status)').eq('status', 'paid'),
-    admin.from('profiles').select('id, full_name, display_name').eq('is_affiliate', true).eq('account_status', 'suspended'),
-  ])
+  ] = await wave5P
 
   for (const row of stalePendingCommissions ?? []) {
     exceptions.push({
@@ -765,14 +828,7 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
     { data: allPayoutsForDuplicateCheck },
     { data: nonPendingPayoutIds },
     { data: historyRows },
-  ] = await Promise.all([
-    admin.from('merchant_payouts').select('id, created_at').eq('status', 'pending').lt('created_at', threshold),
-    admin.from('merchant_payouts').select('id, processing_started_at').eq('status', 'processing').not('processing_started_at', 'is', null).lt('processing_started_at', threshold),
-    admin.from('merchant_payouts').select('id, updated_at').eq('status', 'failed'),
-    admin.from('merchant_payouts').select('id, booking_id, created_at'),
-    admin.from('merchant_payouts').select('id, status, processing_started_by').neq('status', 'pending'),
-    admin.from('merchant_payout_history').select('payout_id'),
-  ])
+  ] = await wave6P
 
   // Wave 2C -- payout query scalability, final correction. The prior fix
   // (_merchant_payout_relevant_context(uuid[])) removed the PostgREST
@@ -789,19 +845,7 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
   // size, still or ever, crosses this boundary -- the returned row set is
   // bounded to "payouts currently exhibiting an exception", which does
   // not grow with total historical payout volume.
-  interface PayoutExceptionCandidateRow {
-    payout_id: string
-    booking_id: string | null
-    merchant_id: string
-    status: 'pending' | 'processing' | 'paid'
-    updated_at: string
-    provider_reference: string | null
-    rental_payment_status: string | null
-    has_blocking_dispute: boolean
-    merchant_account_status: string | null
-  }
-
-  const { data: payoutExceptionCandidates } = await (admin.rpc('_merchant_payout_exception_candidates') as unknown as Promise<{ data: PayoutExceptionCandidateRow[] | null }>)
+  const { data: payoutExceptionCandidates } = await payoutExceptionCandidatesP
 
   for (const payout of payoutExceptionCandidates ?? []) {
     if (!payout.booking_id) continue
@@ -995,8 +1039,8 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
   // (booking_id) -- every other field on the exception object below is
   // either static text or the function's own `now`, so no additional
   // hydration query is required.
-  const { data: missingPayoutCandidates } = await admin.rpc('_payout_reconcile_missing_candidates', { p_limit: 50 })
-  for (const candidate of (missingPayoutCandidates ?? []) as { booking_id: string }[]) {
+  const { data: missingPayoutCandidates } = await missingPayoutCandidatesP
+  for (const candidate of missingPayoutCandidates ?? []) {
     exceptions.push({
       id: exceptionId('merchant_payout_missing_for_completed_booking', candidate.booking_id),
       type: 'merchant_payout_missing_for_completed_booking',
@@ -1016,17 +1060,7 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
   // suggestedAction points at the admin subscription detail page or the
   // existing admin_correct_merchant_subscription action.
   // ------------------------------------------------------------
-  const [{ data: overduePendingChanges }, { data: recentBillingAttempts }] = await Promise.all([
-    admin
-      .from('merchant_subscriptions')
-      .select('id, merchant_id, status, pending_plan_id, pending_plan_effective_at')
-      .in('status', ['pending_change', 'cancelled'])
-      .lt('pending_plan_effective_at', threshold),
-    admin
-      .from('merchant_subscription_billing_attempts')
-      .select('merchant_id, status, created_at')
-      .gte('created_at', threshold),
-  ])
+  const [{ data: overduePendingChanges }, { data: recentBillingAttempts }] = await wave7P
 
   for (const row of overduePendingChanges ?? []) {
     exceptions.push({
@@ -1069,11 +1103,7 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
   // Unity Phase 2: Unity commission categories. Read-only detection
   // only -- nothing here mutates a commission.
   // ------------------------------------------------------------
-  const { data: overdueHeldCommissions } = await admin
-    .from('unity_commissions')
-    .select('id, merchant_id, updated_at')
-    .eq('status', 'held')
-    .lt('updated_at', threshold)
+  const { data: overdueHeldCommissions } = await wave8P
 
   for (const row of overdueHeldCommissions ?? []) {
     exceptions.push({
@@ -1089,10 +1119,7 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
     })
   }
 
-  const [{ data: capturedOrderPayments }, { data: qualifiedOrderPaymentIds }] = await Promise.all([
-    admin.from('payments').select('id, order_id, captured_at').eq('payment_type', 'order_payment').eq('status', 'captured').lt('captured_at', threshold),
-    admin.from('unity_commissions').select('payment_id').eq('transaction_type', 'sale'),
-  ])
+  const [{ data: capturedOrderPayments }, { data: qualifiedOrderPaymentIds }] = await wave9P
   const qualifiedOrderPaymentIdSet = new Set((qualifiedOrderPaymentIds ?? []).map((r) => r.payment_id))
   for (const payment of capturedOrderPayments ?? []) {
     if (qualifiedOrderPaymentIdSet.has(payment.id)) continue
@@ -1109,10 +1136,7 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
     })
   }
 
-  const [{ data: capturedRentalPayments }, { data: qualifiedRentalPaymentIds }] = await Promise.all([
-    admin.from('payments').select('id, booking_id, captured_at').eq('payment_type', 'rental_charge').in('status', ['captured', 'partially_captured']).lt('captured_at', threshold),
-    admin.from('unity_commissions').select('payment_id').eq('transaction_type', 'rental'),
-  ])
+  const [{ data: capturedRentalPayments }, { data: qualifiedRentalPaymentIds }] = await wave10P
   const qualifiedRentalPaymentIdSet = new Set((qualifiedRentalPaymentIds ?? []).map((r) => r.payment_id))
   for (const payment of capturedRentalPayments ?? []) {
     if (qualifiedRentalPaymentIdSet.has(payment.id)) continue
