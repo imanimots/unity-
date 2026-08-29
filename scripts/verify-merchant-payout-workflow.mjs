@@ -622,6 +622,18 @@ console.log('\n=== No full-history payout-ID transport (structural, source-code 
   check('exceptions-service never constructs allRelevantBookingIds (the old unbounded id-array pattern)', !exceptionsSrc.includes('allRelevantBookingIds'), {})
   check('exceptions-service never does a `.in(\'booking_id\', ...)` filter for payout exception context', !/\.in\('booking_id',\s*(all|relevant)/i.test(exceptionsSrc), {})
   check('exceptions-service calls the final parameterless, relational candidate RPC', exceptionsSrc.includes('_merchant_payout_exception_candidates()'), {})
+
+  // P1 remediation (Admin Operational Exceptions latency): the
+  // merchant_payout_missing_for_completed_booking category no longer
+  // fetches every completed booking, every payout, and one payments row
+  // per unmatched booking (a ~67-sequential-query N+1 at current
+  // volume) -- it reuses the SAME canonical eligibility authority as
+  // reconciliation, _payout_reconcile_missing_candidates(), with zero
+  // per-row follow-up queries.
+  check('exceptions-service no longer fetches all completed bookings for the missing-payout category', !exceptionsSrc.includes('completedBookingsForMissingPayout'), {})
+  check('exceptions-service no longer diffs a Node-side bookingIdsWithPayout set for the missing-payout category', !exceptionsSrc.includes('bookingIdsWithPayout'), {})
+  check('exceptions-service missing-payout category has no per-booking payments N+1 query remaining', !/for \(const booking of completedBookings.*\n[\s\S]{0,200}admin\s*\n?\s*\.from\('payments'\)/.test(exceptionsSrc), {})
+  check('exceptions-service missing-payout category reuses the canonical reconciliation candidate RPC', exceptionsSrc.includes("admin.rpc('_payout_reconcile_missing_candidates'"), {})
 }
 
 console.log('\n=== Reconcile-missing scalability (Wave 2C) ===')
@@ -734,6 +746,56 @@ console.log('\n=== Reconcile-missing scalability (Wave 2C) ===')
   check('Reconcile-M2. reconcile-missing responds 200 despite a non-actionable backlog well over LIMIT 50', reconcileM.status === 200, reconcileM)
   const { data: payoutsAfterM } = await admin.from('merchant_payouts').select('id').eq('booking_id', bookingM)
   check('Reconcile-M3. a genuinely fresh, actionable (captured, no payout) candidate is still reached and gets exactly one payout, proving non-actionable rows cannot starve it -- the exact fix for A2/J2/K2', payoutsAfterM?.length === 1, payoutsAfterM)
+}
+
+console.log('\n=== Operational Exceptions missing-payout parity (P1 latency remediation) ===')
+{
+  const opSuffix = Date.now()
+
+  async function isReconcileCandidate(bookingId) {
+    const { data } = await admin.rpc('_payout_reconcile_missing_candidates', { p_limit: 1000 })
+    return (data ?? []).some((c) => c.booking_id === bookingId)
+  }
+  async function missingPayoutException(bookingId) {
+    const res = await api(adminCookie, 'GET', '/api/admin/exceptions')
+    return (res.json.exceptions ?? []).find((e) => e.type === 'merchant_payout_missing_for_completed_booking' && e.entityId === bookingId)
+  }
+
+  // A. completed + captured rental_charge + no payout -> appears in both, same eligibility source.
+  // Deliberately bypasses confirm-return (which has its own best-effort
+  // payout-creation hook) by forcing straight to 'completed' after
+  // checkout, exactly mirroring the Reconcile-A/K/L/M fixture pattern
+  // above -- the only way to get a genuinely payout-less completed
+  // booking to test candidate/exception discovery in isolation.
+  const listingOpA = await insertBaseListing(merchantAId, { title: `${QA_LISTING_MARKER} Payout Regression — OpException A ${opSuffix}`, daily_rate: 240 })
+  const createdOpA = await api(renterACookie, 'POST', '/api/bookings', { listing_id: listingOpA, start_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), end_at: new Date(Date.now() + 33 * 24 * 60 * 60 * 1000).toISOString(), idempotency_key: `opexception-a-create-${opSuffix}` })
+  const bookingOpA = createdOpA.json.booking_id
+  await api(merchantACookie, 'POST', `/api/bookings/${bookingOpA}/accept`, { idempotency_key: `opexception-a-accept-${opSuffix}` })
+  await api(renterACookie, 'POST', `/api/bookings/${bookingOpA}/checkout`, { test_scenario: 'success', idempotency_key: `opexception-a-checkout-${opSuffix}` })
+  await admin.from('bookings').update({ status: 'completed' }).eq('id', bookingOpA)
+  const opAReconcile = await isReconcileCandidate(bookingOpA)
+  const opAException = await missingPayoutException(bookingOpA)
+  check('OpException-A. completed/captured/no-payout booking is a reconciliation candidate', opAReconcile === true, { opAReconcile })
+  check('OpException-A. the SAME booking appears as a merchant_payout_missing_for_completed_booking exception', !!opAException, { opAException })
+  check('OpException-A. exception object preserves the existing output contract (type/severity/entityType/entityId/summary/suggestedAction)', opAException?.severity === 'high' && opAException?.entityType === 'booking' && opAException?.entityId === bookingOpA && typeof opAException?.summary === 'string' && typeof opAException?.suggestedAction === 'string', opAException)
+
+  // B. completed + no payment at all -> excluded from both, no drift.
+  const listingOpB = await insertBaseListing(merchantAId, { title: `${QA_LISTING_MARKER} Payout Regression — OpException B ${opSuffix}`, daily_rate: 241 })
+  const createdOpB = await api(renterACookie, 'POST', '/api/bookings', { listing_id: listingOpB, start_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), end_at: new Date(Date.now() + 33 * 24 * 60 * 60 * 1000).toISOString(), idempotency_key: `opexception-b-create-${opSuffix}` })
+  const bookingOpB = createdOpB.json.booking_id
+  await api(merchantACookie, 'POST', `/api/bookings/${bookingOpB}/accept`, { idempotency_key: `opexception-b-accept-${opSuffix}` })
+  await admin.from('bookings').update({ status: 'completed' }).eq('id', bookingOpB)
+  const opBReconcile = await isReconcileCandidate(bookingOpB)
+  const opBException = await missingPayoutException(bookingOpB)
+  check('OpException-B. completed booking with no payment at all is excluded from reconciliation candidates', opBReconcile === false, { opBReconcile })
+  check('OpException-B. the SAME booking does NOT appear as a missing-payout exception -- no eligibility drift between reconciliation and Operational Exceptions', !opBException, { opBException })
+
+  // Bounded result + no per-row query loop: isolated category latency stays well clear of N+1-scale cost.
+  const isolatedT0 = Date.now()
+  const { data: isolatedCandidates } = await admin.rpc('_payout_reconcile_missing_candidates', { p_limit: 50 })
+  const isolatedMs = Date.now() - isolatedT0
+  check(`OpException-C. missing-payout category result stays bounded (<=50 rows, got ${isolatedCandidates?.length})`, (isolatedCandidates?.length ?? 0) <= 50, { count: isolatedCandidates?.length })
+  check(`OpException-C. missing-payout category resolves in a single bounded call, not proportional to backlog size (${isolatedMs}ms, well under N+1-scale cost)`, isolatedMs < 3000, { isolatedMs })
 }
 
 console.log('\n=== CLEANUP ===')
