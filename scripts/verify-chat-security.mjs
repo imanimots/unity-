@@ -128,6 +128,19 @@ const adminSession = creds.accounts.admin ? await clientFor(creds.accounts.admin
 
 const FORGED_ID = '00000000-0000-4000-8000-000000000000'
 
+// A fresh tag per script execution. The permanent BOOKING/ORDER/BARTER
+// fixtures are reused indefinitely across runs, and listMessages() is a
+// bounded ORDER BY created_at DESC LIMIT 50 query -- a fixed idempotency
+// key on the send/attach-probe messages would replay the exact same row
+// forever, letting it age outside that window as the thread accumulates
+// history (confirmed live: the original fixed-key row ranked 56th in a
+// 56-message thread). Tagging each run's probe messages keeps every
+// assertion targeting a message that's actually in the returned window,
+// without weakening what's asserted. The tag is still constant *within*
+// one run, so the idempotent-replay check below (reusing the same key)
+// still verifies real replay/dedupe behavior, not just uniqueness.
+const RUN_TAG = `${Date.now()}`
+
 // ── Generic thread-level checks, reused across booking/order/barter ──
 async function checkThreadSecurity(cfg) {
   console.log(`\n=== ${cfg.label}: send / read / non-participant / forged id / idempotency ===`)
@@ -135,7 +148,7 @@ async function checkThreadSecurity(cfg) {
   const sendRes = await api(cfg.partyA.cookie, 'POST', '/api/messages', {
     [cfg.fetchParam]: cfg.transactionId,
     content: `Hello from the ${cfg.label} regression fixture`,
-    idempotency_key: `chat-regression-${cfg.type}-send-v1`,
+    idempotency_key: `chat-regression-${cfg.type}-send-${RUN_TAG}`,
   })
   check(`${cfg.label}: party A can send`, sendRes.status === 201, sendRes)
   const messageId = sendRes.json?.id
@@ -171,7 +184,7 @@ async function checkThreadSecurity(cfg) {
   const replay = await api(cfg.partyA.cookie, 'POST', '/api/messages', {
     [cfg.fetchParam]: cfg.transactionId,
     content: `Hello from the ${cfg.label} regression fixture`,
-    idempotency_key: `chat-regression-${cfg.type}-send-v1`,
+    idempotency_key: `chat-regression-${cfg.type}-send-${RUN_TAG}`,
   })
   check(`${cfg.label}: idempotent replay returns the same message`, replay.status === 201 && replay.json?.id === messageId, replay)
 
@@ -184,7 +197,7 @@ async function checkAttachments(cfg) {
   const sendRes = await api(cfg.partyA.cookie, 'POST', '/api/messages', {
     [cfg.fetchParam]: cfg.transactionId,
     content: 'Attachment probe',
-    idempotency_key: `chat-regression-${cfg.type}-attach-msg-v1`,
+    idempotency_key: `chat-regression-${cfg.type}-attach-msg-${RUN_TAG}`,
   })
   const messageId = sendRes.json?.id
   check(`${cfg.label}: attachment probe message sent`, sendRes.status === 201, sendRes)
@@ -192,18 +205,17 @@ async function checkAttachments(cfg) {
 
   // Attachments are immutable/append-only by design (no update/delete
   // client policy -- see 20260815000001_message_attachments.sql), so a
-  // re-run can't just overwrite last run's object at the same path.
-  // Reset via the service-role client (bypasses RLS) so this check stays
-  // safely re-runnable indefinitely rather than accumulating attachments
-  // across runs or colliding on a fixed path.
-  const { data: existingAttachments } = await admin.from('message_attachments').select('id, storage_path').eq('message_id', messageId)
-  if (existingAttachments?.length) {
-    await admin.storage.from('chat-attachments').remove(existingAttachments.map((a) => a.storage_path))
-    await admin.from('message_attachments').delete().eq('message_id', messageId)
-  }
+  // re-run can't just overwrite last run's object at the same path. The
+  // storage path stays fixed per type/transaction/user (only the message
+  // it attaches to changes every run via RUN_TAG now), so reset by path
+  // directly -- removing/deleting something that doesn't exist yet is a
+  // safe no-op -- rather than by message_id, which is always fresh now
+  // and would never match a prior run's row.
+  const path = `${cfg.type}/${cfg.transactionId}/${cfg.partyA.userId}/regression-test.jpg`
+  await admin.storage.from('chat-attachments').remove([path])
+  await admin.from('message_attachments').delete().eq('storage_path', path)
 
   const fakeImage = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4])
-  const path = `${cfg.type}/${cfg.transactionId}/${cfg.partyA.userId}/regression-test.jpg`
 
   const { error: uploadError } = await cfg.partyA.client.storage.from('chat-attachments').upload(path, fakeImage, { contentType: 'image/jpeg', upsert: false })
   check(`${cfg.label}: participant can upload to the thread's storage path`, !uploadError, uploadError)
