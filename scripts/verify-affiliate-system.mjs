@@ -520,6 +520,307 @@ console.log('\n=== Scenario H: Security ===')
   check('direct client insert into affiliate_commissions is blocked (zero client write policies)', !!forgedRlsInsert.error, forgedRlsInsert)
 }
 
+console.log('\n=== Scenario I: Plan-gate enforcement (P1 remediation) ===')
+{
+  // save_listing_draft/enable_listing_affiliate previously enforced the
+  // Pro/Elite gate inconsistently -- this scenario proves every path
+  // that can set accepts_affiliates=true agrees. merchantA's live plan
+  // is captured and restored at the end so scenarios A-H (which run
+  // before this one, against whatever tier merchantA already has) and
+  // any later run of this script are unaffected by the tier changes
+  // made here.
+  const { data: originalSub } = await admin.from('merchant_subscriptions').select('current_plan_id').eq('merchant_id', merchantA.id).maybeSingle()
+  const originalPlanId = originalSub?.current_plan_id ?? 'starter'
+
+  async function setPlan(merchantId, planId) {
+    await admin.from('merchant_subscriptions').upsert(
+      { merchant_id: merchantId, current_plan_id: planId, current_plan_effective_at: new Date().toISOString(), pending_plan_id: null, pending_plan_effective_at: null },
+      { onConflict: 'merchant_id' }
+    )
+  }
+
+  const runSuffix = Date.now()
+
+  // A. Starter creating a listing with accepts_affiliates=true is rejected.
+  await setPlan(merchantA.id, 'starter')
+  const starterCreate = await api(merchantACookie, 'POST', '/api/listings', {
+    listing: {
+      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Starter Create ${runSuffix}`,
+      description: 'Plan gate regression fixture listing used to prove the affiliate entitlement gate is enforced consistently.', category: 'tech', condition: 'good',
+      listing_type: 'rental', daily_rate: 100, accepts_affiliates: true, affiliate_commission_rate: 10,
+    },
+    requirements: {}, media: [],
+    idempotency_key: `affiliate-regression-plangate-starter-create-${runSuffix}`,
+  })
+  check('I-A. Starter create with accepts_affiliates=true is rejected (403)', starterCreate.status === 403, starterCreate)
+  check('I-A2. no listing was actually created', !starterCreate.json?.listing_id, starterCreate)
+
+  // B. Starter editing a draft from false -> true is blocked.
+  const starterDraft = await api(merchantACookie, 'POST', '/api/listings', {
+    listing: {
+      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Starter Edit ${runSuffix}`,
+      description: 'Plan gate regression fixture listing used to prove the affiliate entitlement gate is enforced consistently.', category: 'tech', condition: 'good',
+      listing_type: 'rental', daily_rate: 100, accepts_affiliates: false,
+    },
+    requirements: {}, media: [],
+    idempotency_key: `affiliate-regression-plangate-starter-draft-${runSuffix}`,
+  })
+  const starterDraftId = starterDraft.json?.listing_id
+  check('starter draft fixture (affiliates off) created', !!starterDraftId, starterDraft)
+
+  // save_listing_draft always re-validates category (looks it up fresh on
+  // every call, create or edit -- a pre-existing property of the RPC,
+  // unrelated to this remediation), so every call below resends the full
+  // required field set, matching how the real listing wizard accumulates
+  // and resends full form state on every step rather than true partial patches.
+  const starterEdit = await api(merchantACookie, 'POST', '/api/listings', {
+    listing_id: starterDraftId,
+    listing: {
+      category: 'tech', description: 'Plan gate regression fixture listing used to prove the affiliate entitlement gate is enforced consistently.',
+      accepts_affiliates: true, affiliate_commission_rate: 10,
+    },
+    requirements: {}, media: [],
+    idempotency_key: `affiliate-regression-plangate-starter-edit-${runSuffix}`,
+  })
+  check('I-B. Starter editing a draft from false -> true is blocked (403)', starterEdit.status === 403, starterEdit)
+  const { data: starterDraftAfter } = await admin.from('listings').select('accepts_affiliates').eq('id', starterDraftId).single()
+  check('I-B2. the draft remains accepts_affiliates=false after the blocked edit', starterDraftAfter.accepts_affiliates === false, starterDraftAfter)
+
+  // Re-saving the SAME draft without touching accepts_affiliates (still
+  // false -> false) must succeed normally -- the gate only fires on an
+  // actual transition into true, not on every save by a Starter merchant.
+  const starterNoopSave = await api(merchantACookie, 'POST', '/api/listings', {
+    listing_id: starterDraftId,
+    listing: {
+      category: 'tech', description: 'Plan gate regression fixture listing, description updated without touching affiliate settings at all.',
+      listing_type: 'rental', daily_rate: 100,
+    },
+    requirements: {}, media: [],
+    idempotency_key: `affiliate-regression-plangate-starter-noop-${runSuffix}`,
+  })
+  check('I-B3. Starter can still save a draft that does not touch accepts_affiliates', starterNoopSave.status === 200, starterNoopSave)
+
+  // C. Starter calling save_listing_draft directly (bypassing the route) is blocked server-side.
+  const merchantAClient = createClient(SUPABASE_URL, ANON_KEY)
+  await merchantAClient.auth.signInWithPassword({ email: creds.accounts.merchantA.email, password: creds.accounts.merchantA.password })
+  const directRpc = await merchantAClient.rpc('save_listing_draft', {
+    p_listing_id: null,
+    p_listing: {
+      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Direct RPC ${runSuffix}`,
+      description: 'Plan gate regression fixture listing used to prove the affiliate entitlement gate is enforced consistently.', category: 'tech', condition: 'good',
+      listing_type: 'rental', daily_rate: 100, accepts_affiliates: true, affiliate_commission_rate: 10,
+    },
+    p_requirements: {}, p_media: [],
+    p_idempotency_key: `affiliate-regression-plangate-direct-rpc-${runSuffix}`,
+  })
+  check('I-C. Starter calling save_listing_draft directly is blocked server-side', !!directRpc.error && /affiliate_requires_pro_or_elite/.test(directRpc.error.message), directRpc)
+
+  // D. Starter calling enable_listing_affiliate on their own listing is blocked (the already-gated path, confirmed still gated for the caller's OWN listing, not just a different merchant's).
+  const dedicatedEnable = await api(merchantACookie, 'POST', `/api/listings/${starterDraftId}/affiliate/enable`, { idempotency_key: `affiliate-regression-plangate-dedicated-${runSuffix}` })
+  check('I-D. Starter calling the dedicated enable route on their own listing is blocked', dedicatedEnable.status === 403, dedicatedEnable)
+
+  // E. Pro merchant create/save with affiliates enabled is allowed.
+  await setPlan(merchantA.id, 'pro')
+  const proCreate = await api(merchantACookie, 'POST', '/api/listings', {
+    listing: {
+      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Pro Create ${runSuffix}`,
+      description: 'Plan gate regression fixture listing used to prove the affiliate entitlement gate is enforced consistently.', category: 'tech', condition: 'good',
+      listing_type: 'rental', daily_rate: 100, accepts_affiliates: true, affiliate_commission_rate: 10,
+    },
+    requirements: {}, media: [],
+    idempotency_key: `affiliate-regression-plangate-pro-create-${runSuffix}`,
+  })
+  check('I-E. Pro create with accepts_affiliates=true is allowed', proCreate.status === 200 && !!proCreate.json?.listing_id, proCreate)
+
+  // F. Elite merchant create/save with affiliates enabled is allowed.
+  await setPlan(merchantA.id, 'elite')
+  const eliteCreate = await api(merchantACookie, 'POST', '/api/listings', {
+    listing: {
+      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Elite Create ${runSuffix}`,
+      description: 'Plan gate regression fixture listing used to prove the affiliate entitlement gate is enforced consistently.', category: 'tech', condition: 'good',
+      listing_type: 'rental', daily_rate: 100, accepts_affiliates: true, affiliate_commission_rate: 10,
+    },
+    requirements: {}, media: [],
+    idempotency_key: `affiliate-regression-plangate-elite-create-${runSuffix}`,
+  })
+  check('I-F. Elite create with accepts_affiliates=true is allowed', eliteCreate.status === 200 && !!eliteCreate.json?.listing_id, eliteCreate)
+
+  // G. Downgrade to Starter blocks future/new affiliate participation --
+  // an already-existing grandfathered listing (proCreate above, enabled
+  // while Pro) is deliberately left untouched by downgrade (matches
+  // docs/AFFILIATE_SYSTEM.md's grandfathering rule -- see the final
+  // report's Downgrade Behavior section for why this is not treated as
+  // part of this remediation); only a NEW transition into true is
+  // re-blocked once back on Starter.
+  await setPlan(merchantA.id, 'starter')
+  const afterDowngradeNewEnable = await api(merchantACookie, 'POST', '/api/listings', {
+    listing: {
+      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Post-Downgrade ${runSuffix}`,
+      description: 'Plan gate regression fixture listing used to prove the affiliate entitlement gate is enforced consistently.', category: 'tech', condition: 'good',
+      listing_type: 'rental', daily_rate: 100, accepts_affiliates: true, affiliate_commission_rate: 10,
+    },
+    requirements: {}, media: [],
+    idempotency_key: `affiliate-regression-plangate-postdowngrade-${runSuffix}`,
+  })
+  check('I-G. after downgrading to Starter, a NEW affiliate-enabled listing is blocked', afterDowngradeNewEnable.status === 403, afterDowngradeNewEnable)
+
+  // H. Historical commission/attribution rows survive the downgrade --
+  // Scenario C/D's commissions (created earlier in this same run, for
+  // merchantA regardless of its tier at the time) must still be present
+  // and unchanged after merchantA is back on Starter.
+  const { count: survivingCommissions } = await admin.from('affiliate_commissions').select('id', { count: 'exact', head: true }).eq('merchant_id', merchantA.id)
+  check('I-H. historical commission rows still exist after downgrade', (survivingCommissions ?? 0) > 0, { survivingCommissions })
+  const { data: grandfatheredListing } = await admin.from('listings').select('accepts_affiliates').eq('id', proCreate.json.listing_id).single()
+  check('I-H2. a listing enabled while Pro remains accepts_affiliates=true after downgrade (grandfathered, untouched)', grandfatheredListing.accepts_affiliates === true, grandfatheredListing)
+
+  // Restore merchantA's original plan so this script's own repeated runs,
+  // and every other verifier that assumes today's live baseline, are unaffected.
+  await setPlan(merchantA.id, originalPlanId)
+  const { data: restoredSub } = await admin.from('merchant_subscriptions').select('current_plan_id').eq('merchant_id', merchantA.id).maybeSingle()
+  check('merchantA plan restored to its original value', restoredSub?.current_plan_id === originalPlanId, restoredSub)
+
+  // ---- Downgrade-authority correction: grandfathered listing config
+  // must NOT equal current merchant entitlement for NEW attribution/
+  // commission activity (matrix A-J). A dedicated disposable merchant +
+  // fresh renters are used throughout -- never merchantA/renterA -- with
+  // KYC pre-approved directly on these throwaway accounts (never on the
+  // shared renterA fixture) so this doesn't depend on that account's
+  // separately-tracked KYC state.
+  console.log('\n=== Scenario I continued: current-plan gate for NEW attribution/commission across downgrade ===')
+  const dgSuffix = `${Date.now()}dg`
+  async function dgDisposableUser(label, extraProfileFields = {}) {
+    const email = `qa-affiliate-dg-${label}-${dgSuffix}@unitytest.internal`
+    const { data: user } = await admin.auth.admin.createUser({ email, password: 'DowngradeRegress123!', email_confirm: true })
+    await admin.from('profiles').update({ kyc_status: 'approved', ...extraProfileFields }).eq('id', user.user.id)
+    const { cookie } = await cookieFor(email, 'DowngradeRegress123!')
+    return { userId: user.user.id, cookie }
+  }
+
+  const dgMerchant = await dgDisposableUser('merchant', { role: 'merchant' })
+  await setPlan(dgMerchant.userId, 'pro')
+
+  const { data: dgSaleListing } = await admin.from('listings').insert({
+    merchant_id: dgMerchant.userId, country_id: 'ZA', category: 'tech', condition: 'good',
+    listing_type: 'sale', sale_price: 400, quantity_available: 99, status: 'active',
+    risk_tier: 'low', ownership_verified: false, condition_confirmed: true,
+    accepts_affiliates: false, is_test: true,
+    title: `${QA_LISTING_MARKER} Affiliate Regression — Downgrade Sale ${dgSuffix}`,
+  }).select('id').single()
+  const dgEnableSale = await api(dgMerchant.cookie, 'POST', `/api/listings/${dgSaleListing.id}/affiliate/enable`, { idempotency_key: `dg-enable-sale-${dgSuffix}` })
+  check('Downgrade-precondition. sale listing enabled while Pro', dgEnableSale.status === 200, dgEnableSale)
+
+  const { data: dgRentalListing } = await admin.from('listings').insert({
+    merchant_id: dgMerchant.userId, country_id: 'ZA', category: 'tech', condition: 'good',
+    listing_type: 'rental', daily_rate: 150, deposit_required: true, deposit_amount: 300, min_rental_days: 1,
+    quantity_available: 1, status: 'active',
+    risk_tier: 'low', ownership_verified: false, condition_confirmed: true,
+    accepts_affiliates: false, is_test: true,
+    title: `${QA_LISTING_MARKER} Affiliate Regression — Downgrade Rental ${dgSuffix}`,
+  }).select('id').single()
+  const dgEnableRental = await api(dgMerchant.cookie, 'POST', `/api/listings/${dgRentalListing.id}/affiliate/enable`, { idempotency_key: `dg-enable-rental-${dgSuffix}` })
+  check('Downgrade-precondition. rental listing enabled while Pro', dgEnableRental.status === 200, dgEnableRental)
+
+  const dgRenter1 = await dgDisposableUser('renter1')
+
+  const dgAttrSale = await api(dgRenter1.cookie, 'POST', '/api/affiliate/attribution', { listing_id: dgSaleListing.id, referral_code: affiliateACode, idempotency_key: `dg-attr-sale-${dgSuffix}` })
+  check('Downgrade-precondition. attribution created while Pro (sale listing)', dgAttrSale.status === 200 && !!dgAttrSale.json?.attribution_id, dgAttrSale)
+  const dgAttrRental = await api(dgRenter1.cookie, 'POST', '/api/affiliate/attribution', { listing_id: dgRentalListing.id, referral_code: affiliateACode, idempotency_key: `dg-attr-rental-${dgSuffix}` })
+  check('Downgrade-precondition. attribution created while Pro (rental listing)', dgAttrRental.status === 200 && !!dgAttrRental.json?.attribution_id, dgAttrRental)
+
+  // G-precondition: a commission created WHILE PRO -- proven later to survive downgrade untouched.
+  const dgOrderPre = await api(dgRenter1.cookie, 'POST', '/api/orders', { listing_id: dgSaleListing.id, quantity: 1, idempotency_key: `dg-order-pre-${dgSuffix}` })
+  const dgOrderPreId = dgOrderPre.json?.order_id
+  await api(dgRenter1.cookie, 'POST', `/api/orders/${dgOrderPreId}/checkout`, { test_scenario: 'success', idempotency_key: `dg-checkout-pre-${dgSuffix}` })
+  const { data: dgPreCommission } = await admin.from('affiliate_commissions').select('id, status').eq('order_id', dgOrderPreId).maybeSingle()
+  check('Downgrade-precondition. a commission was created for a payment made while Pro', !!dgPreCommission, dgPreCommission)
+
+  // ---- Downgrade ----
+  await setPlan(dgMerchant.userId, 'starter')
+
+  const { data: dgSaleListingCheck } = await admin.from('listings').select('accepts_affiliates').eq('id', dgSaleListing.id).single()
+  check('Downgrade-A-precondition. listing still accepts_affiliates=true after downgrade (grandfathered, not auto-disabled)', dgSaleListingCheck.accepts_affiliates === true, dgSaleListingCheck)
+
+  // A. Starter + grandfathered affiliate-enabled listing -> new attribution BLOCKED.
+  const dgRenter2 = await dgDisposableUser('renter2')
+  const dgNewAttrAfterDowngrade = await api(dgRenter2.cookie, 'POST', '/api/affiliate/attribution', { listing_id: dgSaleListing.id, referral_code: affiliateACode, idempotency_key: `dg-attr-after-downgrade-${dgSuffix}` })
+  check('Downgrade-A. Starter + grandfathered listing -> NEW attribution is blocked', dgNewAttrAfterDowngrade.status === 403, dgNewAttrAfterDowngrade)
+
+  // E. new sale payment after downgrade -> NO new affiliate commission
+  // (dgRenter1's attribution is still 'active'/valid from before the
+  // downgrade -- only the PAYMENT EVENT happens post-downgrade).
+  const dgOrderPost = await api(dgRenter1.cookie, 'POST', '/api/orders', { listing_id: dgSaleListing.id, quantity: 1, idempotency_key: `dg-order-post-${dgSuffix}` })
+  const dgOrderPostId = dgOrderPost.json?.order_id
+  check('Downgrade-E-precondition. a second post-downgrade order can be created', !!dgOrderPostId, dgOrderPost)
+  if (dgOrderPostId) {
+    await api(dgRenter1.cookie, 'POST', `/api/orders/${dgOrderPostId}/checkout`, { test_scenario: 'success', idempotency_key: `dg-checkout-post-${dgSuffix}` })
+    const { data: dgPostCommission } = await admin.from('affiliate_commissions').select('id').eq('order_id', dgOrderPostId).maybeSingle()
+    check('Downgrade-E. new sale payment after downgrade creates NO new affiliate commission', !dgPostCommission, dgPostCommission)
+  }
+
+  // F. new rental charge after downgrade -> NO new affiliate commission.
+  const dgBookingRes = await api(dgRenter1.cookie, 'POST', '/api/bookings', { listing_id: dgRentalListing.id, start_at: '2031-07-01T00:00:00.000Z', end_at: '2031-07-03T00:00:00.000Z', idempotency_key: `dg-booking-${dgSuffix}` })
+  const dgBookingId = dgBookingRes.json?.booking_id
+  check('Downgrade-F-precondition. a post-downgrade rental booking can be created', !!dgBookingId, dgBookingRes)
+  if (dgBookingId) {
+    await api(dgMerchant.cookie, 'POST', `/api/bookings/${dgBookingId}/accept`, { idempotency_key: `dg-accept-${dgSuffix}` })
+    await api(dgRenter1.cookie, 'POST', `/api/bookings/${dgBookingId}/checkout`, { test_scenario: 'success', idempotency_key: `dg-rental-checkout-${dgSuffix}` })
+    const { data: dgRentalCommission } = await admin.from('affiliate_commissions').select('id').eq('booking_id', dgBookingId).maybeSingle()
+    check('Downgrade-F. new rental charge after downgrade creates NO new affiliate commission', !dgRentalCommission, dgRentalCommission)
+  }
+
+  // D. attribution created while Pro is RETAINED (row still exists, untouched by downgrade).
+  const { data: dgAttrRowAfter } = await admin.from('affiliate_attributions').select('id, status').eq('id', dgAttrSale.json.attribution_id).maybeSingle()
+  check('Downgrade-D. the pre-downgrade attribution row is retained after downgrade', !!dgAttrRowAfter, dgAttrRowAfter)
+
+  // G. the PRE-downgrade commission row is retained, and its normal
+  // downstream lifecycle (admin hold/release) remains reachable --
+  // the plan gate only blocks CREATION of new rows, never services
+  // an already-created obligation.
+  const { data: dgPreCommissionAfter } = await admin.from('affiliate_commissions').select('id, status').eq('id', dgPreCommission.id).maybeSingle()
+  check('Downgrade-G. the pre-downgrade commission row is retained, unaffected by downgrade', dgPreCommissionAfter?.status === dgPreCommission.status, dgPreCommissionAfter)
+  const dgHoldRes = await api(adminCookie, 'POST', `/api/admin/affiliate-commissions/${dgPreCommission.id}/hold`, { reason: 'downgrade regression -- prove pre-existing obligation lifecycle still works', idempotency_key: `dg-hold-${dgSuffix}` })
+  check('Downgrade-G2. normal downstream lifecycle (admin hold) remains reachable for a pre-downgrade commission', dgHoldRes.status === 200, dgHoldRes)
+  await api(adminCookie, 'POST', `/api/admin/affiliate-commissions/${dgPreCommission.id}/release`, { idempotency_key: `dg-release-${dgSuffix}` })
+
+  // ---- Re-upgrade ----
+  await setPlan(dgMerchant.userId, 'pro')
+
+  // I. listing accepts_affiliates=false remains blocked regardless of plan.
+  const { data: dgDisabledListing } = await admin.from('listings').insert({
+    merchant_id: dgMerchant.userId, country_id: 'ZA', category: 'tech', condition: 'good',
+    listing_type: 'sale', sale_price: 200, quantity_available: 99, status: 'active',
+    risk_tier: 'low', ownership_verified: false, condition_confirmed: true,
+    accepts_affiliates: false, is_test: true,
+    title: `${QA_LISTING_MARKER} Affiliate Regression — Downgrade Disabled Listing ${dgSuffix}`,
+  }).select('id').single()
+  const dgDisabledAttr = await api(dgRenter2.cookie, 'POST', '/api/affiliate/attribution', { listing_id: dgDisabledListing.id, referral_code: affiliateACode, idempotency_key: `dg-attr-disabled-${dgSuffix}` })
+  check('Downgrade-I. listing accepts_affiliates=false blocks attribution even for a Pro merchant', dgDisabledAttr.status >= 400, dgDisabledAttr)
+
+  // B/H. Pro (re-upgraded) + still-enabled listing -> NEW attribution ALLOWED --
+  // this is also the re-upgrade proof: normal eligibility resumes under
+  // the existing listing settings/first-valid rules, with no invented
+  // second attribution mechanism.
+  const dgRenter3 = await dgDisposableUser('renter3')
+  const dgAttrAfterReupgrade = await api(dgRenter3.cookie, 'POST', '/api/affiliate/attribution', { listing_id: dgSaleListing.id, referral_code: affiliateACode, idempotency_key: `dg-attr-reupgrade-${dgSuffix}` })
+  check('Downgrade-B/H. after re-upgrading to Pro, a NEW attribution on the still-enabled listing succeeds', dgAttrAfterReupgrade.status === 200 && !!dgAttrAfterReupgrade.json?.attribution_id, dgAttrAfterReupgrade)
+
+  // C. Elite behaves identically to Pro for this gate (same affiliate_enabled=true flag).
+  await setPlan(dgMerchant.userId, 'elite')
+  const dgRenter4 = await dgDisposableUser('renter4')
+  const dgAttrElite = await api(dgRenter4.cookie, 'POST', '/api/affiliate/attribution', { listing_id: dgRentalListing.id, referral_code: affiliateACode, idempotency_key: `dg-attr-elite-${dgSuffix}` })
+  check('Downgrade-C. Elite + enabled listing -> new attribution ALLOWED', dgAttrElite.status === 200 && !!dgAttrElite.json?.attribution_id, dgAttrElite)
+
+  // J (regression parity): the earlier Scenario I plan-gate checks (Starter
+  // create/edit/direct-RPC blocked, Pro/Elite allowed) are unaffected by
+  // any of this -- already re-asserted above/before this block; not
+  // repeated here to avoid duplicating those checks.
+
+  for (const uid of [dgMerchant.userId, dgRenter1.userId, dgRenter2.userId, dgRenter3.userId, dgRenter4.userId]) {
+    await admin.auth.admin.deleteUser(uid)
+  }
+  console.log('  (downgrade regression fixtures cleaned up)')
+}
+
 console.log('\n=== SUMMARY ===')
 console.log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

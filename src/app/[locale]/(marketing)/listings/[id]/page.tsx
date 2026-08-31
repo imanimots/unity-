@@ -12,6 +12,7 @@ import { SaleSummaryCard } from '@/components/listings/sale-summary-card'
 import { ListingCard } from '@/components/listings/listing-card'
 import { CATEGORIES } from '@/types'
 import { AffiliateCookieSetter } from '@/components/listings/affiliate-cookie-setter'
+import { AffiliateAttributionRunner } from '@/components/listings/affiliate-attribution-runner'
 import { AffiliateButton } from '@/components/listings/affiliate-button'
 import { ProposeTradeButton } from '@/components/barter/propose-trade-button'
 import { getRequestProfile } from '@/lib/supabase/require-admin'
@@ -153,7 +154,13 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
         />
       )}
       {/* Set affiliate tracking cookie if ?ref= is present */}
-      {affiliateRef && <AffiliateCookieSetter affiliateRef={affiliateRef} />}
+      {affiliateRef && <AffiliateCookieSetter listingId={listing.id} affiliateRef={affiliateRef} />}
+      {/* Persist attribution the moment an authenticated visitor with a
+          valid, not-yet-consumed referral cookie entry views this listing
+          -- fires for a visitor who was already signed in when they
+          clicked the link, and for a returning visitor who has since
+          signed in. */}
+      <AffiliateAttributionRunner listingId={listing.id} isSignedIn={Boolean(viewer)} />
 
       {/* ── BACK LINK ── */}
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12 pt-8 pb-4">

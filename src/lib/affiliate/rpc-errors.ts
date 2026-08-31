@@ -26,6 +26,9 @@ export function mapAffiliateRpcError(message: string | undefined): { status: num
   if (m.includes('does not support a commissionable transaction type')) {
     return { status: 400, error: 'This listing does not support a commissionable transaction.' }
   }
+  if (m.includes('affiliate_requires_pro_or_elite')) {
+    return { status: 403, error: 'Enabling affiliates requires an active Pro or Elite subscription.' }
+  }
   if (m.includes('self-referral is not permitted')) {
     return { status: 403, error: 'You cannot use your own affiliate link.' }
   }

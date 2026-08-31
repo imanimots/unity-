@@ -28,6 +28,7 @@ export default function MerchantAffiliatesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<string | null>(null)
+  const [toggleError, setToggleError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -52,13 +53,19 @@ export default function MerchantAffiliatesPage() {
 
   async function toggle(listingId: string, enable: boolean) {
     setPending(listingId)
+    setToggleError(null)
     try {
       const res = await fetch(`/api/listings/${listingId}/affiliate/${enable ? 'enable' : 'disable'}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idempotency_key: crypto.randomUUID() }),
       })
-      if (res.ok) await load()
+      if (res.ok) {
+        await load()
+      } else {
+        const body = await res.json().catch(() => null)
+        setToggleError(body?.error ?? t('errorToggle'))
+      }
     } finally {
       setPending(null)
     }
@@ -87,6 +94,13 @@ export default function MerchantAffiliatesPage() {
           {t('infoNotice')}
         </p>
       </div>
+
+      {toggleError && (
+        <div className="flex gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 mb-8">
+          <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-red-700 dark:text-red-400">{toggleError}</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12">
         <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">

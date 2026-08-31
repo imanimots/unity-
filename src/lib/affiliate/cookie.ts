@@ -114,3 +114,17 @@ export function consumeAffiliateCookieEntry(payload: AffiliateCookiePayload, lis
 export function clearAffiliateCookie(): AffiliateCookiePayload {
   return {}
 }
+
+/** Browser-only. Reads the raw unity_affiliate_ref cookie value, or null if absent/SSR. */
+export function readAffiliateCookieRaw(): string | null {
+  if (typeof document === 'undefined') return null
+  const match = document.cookie.match(new RegExp(`(?:^|; )${AFFILIATE_COOKIE_NAME}=([^;]*)`))
+  return match ? decodeURIComponent(match[1]) : null
+}
+
+/** Browser-only, no-op during SSR. First-party only -- no Secure flag change from the original setter; SameSite=Lax as before. */
+export function writeAffiliateCookieRaw(payload: AffiliateCookiePayload): void {
+  if (typeof document === 'undefined') return
+  const expires = new Date(Date.now() + AFFILIATE_COOKIE_MAX_AGE_SECONDS * 1000)
+  document.cookie = `${AFFILIATE_COOKIE_NAME}=${encodeURIComponent(serializeAffiliateCookie(payload))}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`
+}

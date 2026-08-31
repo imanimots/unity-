@@ -1150,13 +1150,19 @@ function RequirementsStep({
 
 // ─── Step: Affiliates ─────────────────────────────────────────────────────────
 
-function AffiliatesStep({ onNext, onBack, defaults }: { onNext: (d: AffiliatesData) => void; onBack: () => void; defaults?: Partial<AffiliatesData> }) {
+function AffiliatesStep({ onNext, onBack, defaults, affiliateEnabled }: { onNext: (d: AffiliatesData) => void; onBack: () => void; defaults?: Partial<AffiliatesData>; affiliateEnabled: boolean }) {
   const t = useTranslations('merchant.listingCreation')
   const { register, handleSubmit, watch } = useForm<AffiliatesData>({
     resolver: zodResolver(affiliatesSchema),
+    // A grandfathered listing (accepts_affiliates already true from before
+    // a downgrade) still shows its existing state truthfully even when
+    // affiliateEnabled is now false -- only NEW enabling is blocked, not
+    // display of already-saved history (matches the server's own
+    // transition-only gate in save_listing_draft).
     defaultValues: { accepts_affiliates: false, ...defaults },
   })
   const acceptsAffiliates = watch('accepts_affiliates')
+  const wasAlreadyEnabled = defaults?.accepts_affiliates === true
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-5">
@@ -1167,14 +1173,26 @@ function AffiliatesStep({ onNext, onBack, defaults }: { onNext: (d: AffiliatesDa
         </p>
       </div>
 
+      {!affiliateEnabled && !wasAlreadyEnabled && (
+        <div className="bg-[#F2EDE8] dark:bg-[#2A1A1A] border border-[#E8E0D8] dark:border-[#3A2A2A] rounded-xl p-4">
+          <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('affiliates.requiresUpgrade')}</p>
+          <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-1">{t('affiliates.requiresUpgradeDesc')}</p>
+        </div>
+      )}
+
       <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('affiliates.acceptAffiliates')}</p>
+            <p className={`text-sm font-semibold ${affiliateEnabled || wasAlreadyEnabled ? 'text-[#1A0A0A] dark:text-[#F5F0ED]' : 'text-[#9B8B85]'}`}>{t('affiliates.acceptAffiliates')}</p>
             <p className="text-xs text-[#9B8B85] mt-0.5">{t('affiliates.acceptAffiliatesDesc')}</p>
           </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" {...register('accepts_affiliates')} className="sr-only peer" />
+          <label className={`relative inline-flex items-center ${affiliateEnabled || wasAlreadyEnabled ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
+            <input
+              type="checkbox"
+              {...register('accepts_affiliates')}
+              disabled={!affiliateEnabled && !wasAlreadyEnabled}
+              className="sr-only peer"
+            />
             <div className="w-11 h-6 bg-[#F2EDE8] dark:bg-[#2A1A1A] rounded-full peer peer-checked:bg-[#8B1A1A] transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5" />
           </label>
         </div>
@@ -1417,7 +1435,7 @@ function listingToAffiliates(l: Listing): AffiliatesData {
   return { accepts_affiliates: l.accepts_affiliates, affiliate_commission_rate: l.affiliate_commission_rate || undefined }
 }
 
-export function CreateListingFlow({ draft }: { draft?: ListingDraft }) {
+export function CreateListingFlow({ draft, affiliateEnabled = false }: { draft?: ListingDraft; affiliateEnabled?: boolean }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const t = useTranslations('merchant.listingCreation')
@@ -1756,7 +1774,7 @@ export function CreateListingFlow({ draft }: { draft?: ListingDraft }) {
         />
       )}
       {currentStep.id === 'affiliates' && (
-        <AffiliatesStep onNext={(d) => { setAffiliates(d); goNext() }} onBack={goBack} defaults={affiliates} />
+        <AffiliatesStep onNext={(d) => { setAffiliates(d); goNext() }} onBack={goBack} defaults={affiliates} affiliateEnabled={affiliateEnabled} />
       )}
       {currentStep.id === 'review' && (
         <ReviewStep

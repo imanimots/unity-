@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
   isValidAffiliateCodeFormat,
   parseAffiliateCookie,
@@ -7,6 +7,9 @@ import {
   upsertAffiliateCookieEntry,
   getAffiliateCookieEntry,
   consumeAffiliateCookieEntry,
+  readAffiliateCookieRaw,
+  writeAffiliateCookieRaw,
+  AFFILIATE_COOKIE_NAME,
   AFFILIATE_COOKIE_MAX_AGE_SECONDS,
 } from '../cookie'
 
@@ -94,5 +97,74 @@ describe('pruneExpiredEntries / consumeAffiliateCookieEntry (category: Attributi
     const consumed = consumeAffiliateCookieEntry(payload, 'listing-A')
     expect(getAffiliateCookieEntry(consumed, 'listing-A', now)).toBeNull()
     expect(getAffiliateCookieEntry(consumed, 'listing-B', now)?.code).toBe('AFC-BBBB')
+  })
+})
+
+// Minimal cookie-jar stub -- real browser document.cookie semantics
+// (setting one cookie upserts it into the jar without clobbering others,
+// reading returns the full "name=value; name2=value2" string) rather than
+// a plain string property, so this genuinely exercises
+// readAffiliateCookieRaw/writeAffiliateCookieRaw's parsing/serialization,
+// not just a mock returning canned data.
+function installCookieJarStub() {
+  const jar = new Map<string, string>()
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      get cookie() {
+        return Array.from(jar.entries()).map(([k, v]) => `${k}=${v}`).join('; ')
+      },
+      set cookie(setString: string) {
+        const [pair] = setString.split(';')
+        const eq = pair.indexOf('=')
+        jar.set(pair.slice(0, eq), pair.slice(eq + 1))
+      },
+    },
+  })
+  return jar
+}
+
+describe('readAffiliateCookieRaw / writeAffiliateCookieRaw (category: Attribution -- browser I/O)', () => {
+  const originalDocument = globalThis.document
+
+  beforeEach(() => {
+    installCookieJarStub()
+  })
+  afterEach(() => {
+    Object.defineProperty(globalThis, 'document', { configurable: true, value: originalDocument })
+  })
+
+  it('13. reads null when no cookie is set', () => {
+    expect(readAffiliateCookieRaw()).toBeNull()
+  })
+
+  it('14. round-trips a payload through write then read', () => {
+    const now = new Date('2026-08-01T00:00:00.000Z')
+    const payload = upsertAffiliateCookieEntry({}, 'listing-A', 'AFC-AAAA', now)
+    writeAffiliateCookieRaw(payload)
+    expect(parseAffiliateCookie(readAffiliateCookieRaw())).toEqual(payload)
+  })
+
+  it('15. writing the affiliate cookie does not clobber an unrelated cookie already present', () => {
+    // Simulate an unrelated cookie already in the jar (e.g. a Supabase auth cookie).
+    document.cookie = 'sb-other-cookie=some-session-value'
+    writeAffiliateCookieRaw(upsertAffiliateCookieEntry({}, 'listing-A', 'AFC-AAAA', new Date()))
+    expect(document.cookie).toContain('sb-other-cookie=some-session-value')
+    expect(document.cookie).toContain(`${AFFILIATE_COOKIE_NAME}=`)
+  })
+
+  it('16. consuming an entry and writing back correctly drops just that listing on the next read', () => {
+    const now = new Date('2026-08-01T00:00:00.000Z')
+    let payload = upsertAffiliateCookieEntry({}, 'listing-A', 'AFC-AAAA', now)
+    payload = upsertAffiliateCookieEntry(payload, 'listing-B', 'AFC-BBBB', now)
+    writeAffiliateCookieRaw(payload)
+
+    const readBack = parseAffiliateCookie(readAffiliateCookieRaw())
+    const afterConsume = consumeAffiliateCookieEntry(readBack, 'listing-A')
+    writeAffiliateCookieRaw(afterConsume)
+
+    const final = parseAffiliateCookie(readAffiliateCookieRaw())
+    expect(getAffiliateCookieEntry(final, 'listing-A', now)).toBeNull()
+    expect(getAffiliateCookieEntry(final, 'listing-B', now)?.code).toBe('AFC-BBBB')
   })
 })

@@ -186,7 +186,8 @@
     "disabled": "Disabled",
     "footerNotice": "The commission rate for each listing is set in the listing editor.",
     "learnMore": "Learn more about the Ambassador program →",
-    "errorLoad": "Could not load your listings"
+    "errorLoad": "Could not load your listings",
+    "errorToggle": "Could not update this listing's affiliate setting"
   },
   "rtbTerms": {
     "heading": "Rent-to-Buy Terms",
@@ -610,7 +611,9 @@
       "commissionRate": "Commission rate (%)",
       "commissionRatePlaceholder": "e.g. 10",
       "commissionRateHint": "1–50%. Commission is deducted from your rental fee after the booking is completed.",
-      "reviewListing": "Review listing"
+      "reviewListing": "Review listing",
+      "requiresUpgrade": "Affiliates are a Pro/Elite feature",
+      "requiresUpgradeDesc": "Upgrade your subscription to let others earn a commission referring renters to your listings."
     },
     "review": {
       "submitNotice": "Submitting sends your listing for review — it won't go live until Unity confirms it meets the requirements for its risk tier. You can save as a draft and come back any time before then.",

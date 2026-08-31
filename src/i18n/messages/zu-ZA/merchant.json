@@ -186,7 +186,8 @@
     "disabled": "Akuvunyelwe",
     "footerNotice": "Izinga lekhomishini leyunithi ngayinye ohlwini lisethwa kusihleli sohlu.",
     "learnMore": "Funda kabanzi ngohlelo lwe-Ambassador →",
-    "errorLoad": "Ayikwazanga ukulayisha izinto zakho ohlwini"
+    "errorLoad": "Ayikwazanga ukulayisha izinto zakho ohlwini",
+    "errorToggle": "Ayikwazanga ukubuyekeza isilungiselelo sabahlanganyeli salolu hlu"
   },
   "rtbTerms": {
     "heading": "Imigomo Yokuqasha-Ukuze-Uthenge",
@@ -610,7 +611,9 @@
       "commissionRate": "Izinga lekhomishini (%)",
       "commissionRatePlaceholder": "isb. 10",
       "commissionRateHint": "1–50%. Ikhomishini iyasuswa kwimali yakho yokuqashisa ngemuva kokuba ukubhukha sekuqediwe.",
-      "reviewListing": "Buyekeza uhlu"
+      "reviewListing": "Buyekeza uhlu",
+      "requiresUpgrade": "Abahlanganyeli bawumsebenzi we-Pro/Elite",
+      "requiresUpgradeDesc": "Thuthukisa ukubhalisela kwakho ukuze uvumele abanye ukuba bathole ikhomishini ngokudlulisela abaqashi ohlwini lwakho."
     },
     "review": {
       "submitNotice": "Ukuthumela kuthumela uhlu lwakho ukuze lubuyekezwe — ngeke lusebenze kuze kube yilapho i-Unity iqinisekisa ukuthi luhlangabezana nezidingo zezinga laso lengozi. Ungagcina njengohlaka bese ubuya noma nini ngaphambi kwalokho.",

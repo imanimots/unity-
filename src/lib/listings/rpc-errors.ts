@@ -58,6 +58,9 @@ export function mapListingRpcError(message: string | undefined): { status: numbe
   if (m.includes('publication_frozen_pending_keep_set')) {
     return { status: 409, error: 'Resolve your downgrade selection before resuming this listing.' }
   }
+  if (m.includes('affiliate_requires_pro_or_elite')) {
+    return { status: 403, error: 'Enabling affiliates requires an active Pro or Elite subscription.' }
+  }
 
   return { status: 500, error: 'Could not save your listing — please try again' }
 }

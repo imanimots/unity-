@@ -186,7 +186,8 @@
     "disabled": "Gedeaktiveer",
     "footerNotice": "Die kommissiekoers vir elke lysing word in die lysing-redigeerder ingestel.",
     "learnMore": "Leer meer oor die Ambassadeur-program →",
-    "errorLoad": "Kon nie jou lysings laai nie"
+    "errorLoad": "Kon nie jou lysings laai nie",
+    "errorToggle": "Kon nie hierdie lysing se filiaalinstelling opdateer nie"
   },
   "rtbTerms": {
     "heading": "Huur-om-te-Koop Voorwaardes",
@@ -610,7 +611,9 @@
       "commissionRate": "Kommissiekoers (%)",
       "commissionRatePlaceholder": "bv. 10",
       "commissionRateHint": "1–50%. Kommissie word van jou verhuringsfooi afgetrek nadat die bespreking voltooi is.",
-      "reviewListing": "Hersien lysing"
+      "reviewListing": "Hersien lysing",
+      "requiresUpgrade": "Filiale is 'n Pro/Elite-funksie",
+      "requiresUpgradeDesc": "Gradeer jou subskripsie op om ander toe te laat om kommissie te verdien deur huurders na jou lysings te verwys."
     },
     "review": {
       "submitNotice": "Indiening stuur jou lysing vir hersiening — dit gaan nie lewend totdat Unity bevestig dat dit aan die vereistes vir sy risikovlak voldoen nie. Jy kan as konsep stoor en enige tyd voor dan terugkom.",
