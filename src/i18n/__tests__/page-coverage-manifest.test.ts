@@ -37,10 +37,10 @@ describe('page coverage manifest', () => {
 
   it('4. current real coverage documented as ground truth (update when genuinely changed, not to force this to pass)', () => {
     const s = summarizePageCoverage()
-    expect(s.total).toBe(66)
-    expect(s.wired).toBe(54)
+    expect(s.total).toBe(68)
+    expect(s.wired).toBe(56)
     expect(s.sharedLayout).toBe(12)
-    expect(s.localizedTotal).toBe(66)
+    expect(s.localizedTotal).toBe(68)
   })
 
   it('5. page localization is genuinely, truthfully complete: zero unwired entries remain', () => {

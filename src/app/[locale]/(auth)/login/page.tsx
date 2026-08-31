@@ -23,6 +23,7 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirectTo') ?? '/'
+  const passwordReset = searchParams.get('passwordReset') === '1'
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -100,6 +101,11 @@ function LoginForm() {
 
       {/* Form card */}
       <div className="w-full max-w-md mx-auto">
+        {passwordReset && (
+          <div className="mb-5 border border-[#2F7D4F]/25 bg-[#2F7D4F]/5 rounded-lg px-4 py-3 text-sm text-[#2F7D4F]">
+            {t('passwordResetSuccess')}
+          </div>
+        )}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* Email */}
           <div>

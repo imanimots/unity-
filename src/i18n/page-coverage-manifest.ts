@@ -37,6 +37,8 @@ export const PAGE_COVERAGE_MANIFEST: PageCoverageEntry[] = [
   { path: '(auth)/login/page.tsx', status: 'wired' },
   { path: '(auth)/register/page.tsx', status: 'wired' },
   { path: '(auth)/verify/page.tsx', status: 'wired' },
+  { path: '(auth)/forgot-password/page.tsx', status: 'wired' },
+  { path: '(auth)/reset-password/page.tsx', status: 'wired' },
 
   // ---------------- DASHBOARD (renter/shared) ----------------
   { path: '(dashboard)/dashboard/affiliate/page.tsx', status: 'wired' },
