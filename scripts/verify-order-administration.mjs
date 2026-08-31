@@ -153,6 +153,12 @@ const { cookie: renterACookie, userId: buyerId } = await cookieFor(creds.account
 const { cookie: merchantACookie } = await cookieFor(creds.accounts.merchantA.email, creds.accounts.merchantA.password)
 const { cookie: adminCookie } = await cookieFor(creds.accounts.admin.email, creds.accounts.admin.password)
 
+// renterA must be KYC-approved to create the orders this script depends
+// on throughout -- self-heal to the documented QA baseline regardless of
+// incoming state (matches the proven pattern in
+// verify-transaction-verification-hardening.mjs).
+await admin.from('profiles').update({ kyc_status: 'approved' }).eq('id', buyerId)
+
 console.log('=== Full lifecycle: create -> pay -> ship -> deliver, admin monitoring + emails (Scenarios A, B, F) ===')
 let lifecycleOrderId
 {

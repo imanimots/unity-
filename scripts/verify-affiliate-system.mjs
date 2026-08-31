@@ -169,6 +169,12 @@ const { cookie: adminCookie } = await cookieFor(creds.accounts.admin.email, cred
 const affiliateACode = await ensureAffiliateActivated(affiliateACookie)
 const affiliateBCode = await ensureAffiliateActivated(affiliateBCookie)
 
+// renterA must be KYC-approved to create the bookings/orders Scenarios
+// C/D/F/G depend on -- self-heal to the documented QA baseline
+// regardless of incoming state (matches the proven pattern in
+// verify-transaction-verification-hardening.mjs).
+await admin.from('profiles').update({ kyc_status: 'approved' }).eq('id', buyerId)
+
 console.log('=== Scenario A: Listing enablement ===')
 {
   const listingA = await insertBaseListing(merchantA.id, { title: `${QA_LISTING_MARKER} Affiliate Regression — Listing A`, category: 'tools', sale_price: 500, accepts_affiliates: true, affiliate_commission_rate: 10 })

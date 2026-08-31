@@ -113,6 +113,24 @@ function check(label, cond, detail) {
   else { failures++; console.error(`  FAIL ${label}`, JSON.stringify(detail ?? {}).slice(0, 500)) }
 }
 
+// Fixture-safety: a permanent QA account's kyc_status must never be left
+// in a temporary test state if an assertion/HTTP call throws mid-block --
+// this is the exact mechanism that previously stranded renterA at
+// 'rejected' for an extended period (no try/finally around the old
+// inline mutate-then-restore code). Matches the same pattern already
+// proven safe in verify-transaction-verification-hardening.mjs and
+// verify-reviews-v2.mjs: capture the GENUINE prior value (never assume
+// 'approved'), then always restore it in finally.
+async function withKycStatus(userId, status, fn) {
+  const { data: before } = await admin.from('profiles').select('kyc_status').eq('id', userId).single()
+  await admin.from('profiles').update({ kyc_status: status }).eq('id', userId)
+  try {
+    return await fn()
+  } finally {
+    await admin.from('profiles').update({ kyc_status: before.kyc_status }).eq('id', userId)
+  }
+}
+
 const merchantA = await cookieFor(creds.accounts.merchantA.email, creds.accounts.merchantA.password)
 const merchantB = await cookieFor(creds.accounts.merchantB.email, creds.accounts.merchantB.password)
 const renterA = await cookieFor(creds.accounts.renterA.email, creds.accounts.renterA.password)
@@ -123,10 +141,14 @@ for (const id of [merchantA.userId, merchantB.userId, renterA.userId, suspendedU
 const PRIVATE_PHONE_MARKER = '0821234999'
 await admin.from('profiles').update({ phone: PRIVATE_PHONE_MARKER }).eq('id', merchantA.userId)
 await admin.from('profiles').update({ kyc_status: 'approved', account_status: 'active' }).eq('id', merchantA.userId)
-await admin.from('profiles').update({ kyc_status: 'rejected' }).eq('id', renterA.userId)
 
 console.log('=== PUBLIC CORE ===')
-{
+// renterA is deliberately rejected only for check 5 below -- wrapped in
+// withKycStatus so the restore is guaranteed (try/finally) even if any
+// check/html() call in this block throws, instead of the previous
+// unprotected inline mutate-then-restore that could strand renterA
+// permanently rejected on any interruption.
+await withKycStatus(renterA.userId, 'rejected', async () => {
   const p1 = await html(null, `/profile/${merchantA.userId}`)
   check('1. public profile loads for valid normal user', p1.status === 200, { status: p1.status })
 
@@ -143,14 +165,7 @@ console.log('=== PUBLIC CORE ===')
   check('5. unverified user does not leak raw KYC state', p5.status === 200 && !/rejected|AML|manual review|verification reason/i.test(p5.text), { status: p5.status })
 
   check('6. member-since behavior correct if implemented', p1.text.includes('Member since'), {})
-}
-
-// renterA's kyc_status was deliberately rejected only for check 5 above --
-// restore it now so every later section (which needs renterA to create
-// real bookings/requests) is not accidentally blocked by the platform's
-// own transaction-time KYC re-verification (a separate, already-shipped
-// hardening pass this script must not fight against).
-await admin.from('profiles').update({ kyc_status: 'approved' }).eq('id', renterA.userId)
+})
 
 console.log('=== PRIVACY ===')
 {
@@ -291,10 +306,10 @@ console.log('=== SECURITY ===')
   const selfReport = await api(merchantA.cookie, 'POST', `/api/profile/${merchantA.userId}/report`, { reason: 'spam', idempotency_key: `cp-selfreport-${RUN_ID}` })
   check('38. another user cannot modify profile through public endpoint (self-report rejected, and no mutation endpoint exists on the profile itself)', selfReport.status === 403, selfReport)
 
-  await admin.from('profiles').update({ kyc_status: 'rejected' }).eq('id', merchantA.userId)
-  const forgedVerifyCheck = await html(null, `/profile/${merchantA.userId}`)
-  check('39. user cannot forge verification badge/state (badge reflects live kyc_status, not a client-suppliable value)', !forgedVerifyCheck.text.includes('Verified'), {})
-  await admin.from('profiles').update({ kyc_status: 'approved' }).eq('id', merchantA.userId)
+  await withKycStatus(merchantA.userId, 'rejected', async () => {
+    const forgedVerifyCheck = await html(null, `/profile/${merchantA.userId}`)
+    check('39. user cannot forge verification badge/state (badge reflects live kyc_status, not a client-suppliable value)', !forgedVerifyCheck.text.includes('Verified'), {})
+  })
 
   await admin.from('profiles').update({ account_status: 'suspended' }).eq('id', suspendedUser.userId)
   const suspendedPage = await html(null, `/profile/${suspendedUser.userId}`)

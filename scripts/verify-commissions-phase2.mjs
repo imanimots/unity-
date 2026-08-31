@@ -232,6 +232,13 @@ console.log('=== Baseline reset ===')
 await resetToStarter(merchantAId, adminId)
 await resetToStarter(merchantBId, adminId)
 console.log(`  merchantA (${merchantAId}) and merchantB (${merchantBId}) reset to Starter`)
+// renterA must be KYC-approved to create the bookings/orders this script
+// depends on throughout -- self-heal to the documented QA baseline
+// regardless of incoming state (matches the proven pattern already used
+// in verify-transaction-verification-hardening.mjs), rather than assuming
+// a shared permanent fixture is always in the state a prior script left it.
+await admin.from('profiles').update({ kyc_status: 'approved' }).eq('id', renterAId)
+console.log(`  renterA (${renterAId}) kyc_status ensured approved`)
 
 console.log('=== Scenario A: Rental commission -- plan-aware, ledger platform_fee, deposit exclusion ===')
 let scenarioABookingId, scenarioAPaymentId, scenarioACommission
