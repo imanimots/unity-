@@ -125,6 +125,35 @@ function countEmails(rows, orderId, eventType) {
   return rows.filter((r) => r.related_entity_id === orderId && r.event_type === eventType).length
 }
 
+/**
+ * Pages through a bounded admin list endpoint via its opaque nextCursor
+ * (Admin Orders + Financial Operations Relational Filtering & Cursor
+ * Pagination Remediation) until `matchFn` finds a row or the list is
+ * exhausted -- a permanent, indefinitely-reused QA fixture will always
+ * rank further and further back as unrelated real/QA rows accumulate, so
+ * asserting it's reachable on *some* page (not necessarily page 1) is
+ * the only assertion that stays correct over the fixture's entire
+ * lifetime. `pageLimit` is deliberately larger than the admin UI's
+ * default page size purely to keep this loop's round-trip count low;
+ * `maxPages` is a sanity guard against an infinite loop, not a
+ * real-world pagination limit.
+ */
+async function findAcrossPages(cookie, basePath, itemsKey, matchFn, { pageLimit = 500, maxPages = 20 } = {}) {
+  let cursor = null
+  const sep = basePath.includes('?') ? '&' : '?'
+  for (let page = 0; page < maxPages; page++) {
+    const path = `${basePath}${sep}limit=${pageLimit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
+    const res = await api(cookie, 'GET', path)
+    if (res.status !== 200) return { found: null, res, pagesVisited: page + 1 }
+    const items = res.json?.[itemsKey] ?? []
+    const found = items.find(matchFn)
+    if (found) return { found, res, pagesVisited: page + 1 }
+    if (!res.json?.hasMore || !res.json?.nextCursor) return { found: null, res, pagesVisited: page + 1, exhausted: true }
+    cursor = res.json.nextCursor
+  }
+  return { found: null, res: null, pagesVisited: maxPages, maxPagesExceeded: true }
+}
+
 let failures = 0
 function check(label, cond, detail) {
   if (cond) console.log(`  ok ${label}`)
@@ -191,9 +220,18 @@ let lifecycleOrderId
   // GET /api/admin/orders/[id] via the real admin route (not a direct
   // service-role query from this script).
   const list = await api(adminCookie, 'GET', `/api/admin/orders?search=${encodeURIComponent(listingId)}`)
-  const listByStatus = await api(adminCookie, 'GET', '/api/admin/orders?status=delivered')
   check('admin order list responds 200', list.status === 200, list)
-  check('admin order list (status filter) includes the fixture', listByStatus.status === 200 && (listByStatus.json?.orders ?? []).some((o) => o.id === lifecycleOrderId), listByStatus)
+
+  // Correction (Cursor Pagination Remediation): the fixture ages out of
+  // page 1 as unrelated delivered orders accumulate -- page through real
+  // cursors (never widen the page size to force it onto page 1) until
+  // it's found or the list is genuinely exhausted.
+  const statusPaged = await findAcrossPages(adminCookie, '/api/admin/orders?status=delivered', 'orders', (o) => o.id === lifecycleOrderId)
+  check(
+    'admin order list (status filter) includes the fixture, reachable via cursor pagination',
+    !!statusPaged.found,
+    { pagesVisited: statusPaged.pagesVisited, exhausted: statusPaged.exhausted, maxPagesExceeded: statusPaged.maxPagesExceeded }
+  )
 
   const detail = await api(adminCookie, 'GET', `/api/admin/orders/${lifecycleOrderId}`)
   check('admin order detail responds 200', detail.status === 200, detail)
@@ -220,10 +258,17 @@ let lifecycleOrderId
   check('a delivered order cannot be shipped again', reshipRes.status >= 400, reshipRes)
 
   // Correction 8: financial-operations identifies the row as an order, never a booking with null fields.
+  // Correction (Cursor Pagination Remediation): the fixture payment ages
+  // out of page 1 as unrelated captured payments accumulate -- page
+  // through real cursors until it's found.
   const { data: paymentRow } = await admin.from('payments').select('id').eq('order_id', lifecycleOrderId).eq('payment_type', 'order_payment').single()
-  const finOps = await api(adminCookie, 'GET', '/api/admin/financial-operations?status=captured')
-  const finOpsRow = (finOps.json?.operations ?? []).find((r) => r.paymentId === paymentRow.id)
-  check('financial-operations shows a real orderReference for an order-linked payment (Part E fix)', !!finOpsRow && finOpsRow.orderId === lifecycleOrderId && !!finOpsRow.orderReference && finOpsRow.bookingId === null, finOpsRow)
+  const finOpsPaged = await findAcrossPages(adminCookie, '/api/admin/financial-operations?status=captured', 'operations', (r) => r.paymentId === paymentRow.id)
+  const finOpsRow = finOpsPaged.found
+  check(
+    'financial-operations shows a real orderReference for an order-linked payment, reachable via cursor pagination (Part E fix)',
+    !!finOpsRow && finOpsRow.orderId === lifecycleOrderId && !!finOpsRow.orderReference && finOpsRow.bookingId === null,
+    { finOpsRow, pagesVisited: finOpsPaged.pagesVisited, exhausted: finOpsPaged.exhausted, maxPagesExceeded: finOpsPaged.maxPagesExceeded }
+  )
 
   // Correction 16: admin detail's MESSAGES section resolves through the audited path.
   const { count: auditCountBefore } = await admin.from('admin_message_access_log').select('id', { count: 'exact', head: true }).eq('order_id', lifecycleOrderId)
@@ -377,6 +422,158 @@ console.log('\n=== Disputed order: freezes cancel/ship/deliver, dispute link sur
   const exceptions = await api(adminCookie, 'GET', '/api/admin/exceptions')
   const disputedException = (exceptions.json?.exceptions ?? []).find((e) => e.type === 'order_disputed' && e.entityId === orderId)
   check("exception queue surfaces 'order_disputed' for this order", !!disputedException, disputedException)
+}
+
+console.log('\n=== Cursor Pagination + Relational Filtering (Admin Orders + Financial Operations Remediation) ===')
+{
+  // These fixtures exist purely to exercise the admin list/pagination/
+  // filter layer -- they don't need to exercise POST /api/orders' own
+  // create_order RPC path (that's already covered by the lifecycle/
+  // cancel/payment-failure/disputed sections above). So the order ROW
+  // itself is inserted directly via the service-role client -- bypassing
+  // the create-order rate limit entirely rather than waiting it out --
+  // while checkout/dispute-opening below still go through the real
+  // authoritative routes (neither route cares how the order row came to
+  // exist, only that it belongs to the caller and is in the right
+  // status, confirmed by reading src/app/api/orders/[id]/checkout/route.ts),
+  // so paymentStatus/disputed fixtures still reach their state through
+  // real product logic, not hand-rolled payments/disputes rows.
+  async function createPinnedOrder(title, salePrice, createdAt) {
+    const listingId = await insertBaseListing(merchantA.id, {
+      title, description: 'Permanent regression fixture for verify-order-administration.mjs — do not delete.',
+      category: 'tools', sale_price: salePrice,
+    })
+    const { data: existing } = await admin.from('orders').select('id').eq('listing_id', listingId).eq('buyer_id', buyerId).maybeSingle()
+    if (existing) return existing.id
+    const { data, error } = await admin
+      .from('orders')
+      .insert({ listing_id: listingId, buyer_id: buyerId, seller_id: merchantA.id, quantity: 1, unit_price: salePrice, total_amount: salePrice, created_at: createdAt })
+      .select('id')
+      .single()
+    if (error) throw new Error(`createPinnedOrder failed for "${title}": ${error.message}`)
+    return data.id
+  }
+
+  // ── Part 8: deterministic paging (3 fixtures, limit=2) -- page1=2, page2=1, no dup/gap, id-tiebreak between two equal timestamps ──
+  const cpA = await createPinnedOrder('[QA] Order-Admin Cursor-Test CursorPageMarker A', 111, '2020-01-01T00:00:03.000Z')
+  const cpB = await createPinnedOrder('[QA] Order-Admin Cursor-Test CursorPageMarker B', 112, '2020-01-01T00:00:02.000Z')
+  const cpC = await createPinnedOrder('[QA] Order-Admin Cursor-Test CursorPageMarker C', 113, '2020-01-01T00:00:02.000Z')
+  // B and C intentionally share a timestamp -- the tiebreak must be id DESC, computed from the real ids rather than assumed.
+  const tieWinner = cpB > cpC ? cpB : cpC
+  const tieLoser = cpB > cpC ? cpC : cpB
+
+  const cpPage1 = await api(adminCookie, 'GET', '/api/admin/orders?search=CursorPageMarker&limit=2')
+  const page1Ids = (cpPage1.json?.orders ?? []).map((o) => o.id)
+  check('page 1 (limit=2) returns exactly [A, tiebreak-winner] in order', cpPage1.status === 200 && JSON.stringify(page1Ids) === JSON.stringify([cpA, tieWinner]), { page1Ids, expected: [cpA, tieWinner] })
+  check('page 1 reports hasMore=true with a nextCursor', cpPage1.json?.hasMore === true && !!cpPage1.json?.nextCursor, cpPage1.json)
+
+  const cpPage2 = await api(adminCookie, 'GET', `/api/admin/orders?search=CursorPageMarker&limit=2&cursor=${encodeURIComponent(cpPage1.json?.nextCursor ?? '')}`)
+  const page2Ids = (cpPage2.json?.orders ?? []).map((o) => o.id)
+  check('page 2 returns exactly [tiebreak-loser], no duplicate/skip vs page 1', cpPage2.status === 200 && JSON.stringify(page2Ids) === JSON.stringify([tieLoser]), { page2Ids, expected: [tieLoser] })
+  check('page 2 is the end of results (hasMore=false, nextCursor=null)', cpPage2.json?.hasMore === false && cpPage2.json?.nextCursor === null, cpPage2.json)
+
+  // ── Part 5: malformed cursor -> safe 400, never a crash ──
+  const malformed = await api(adminCookie, 'GET', '/api/admin/orders?search=CursorPageMarker&cursor=not-a-real-cursor')
+  check('a malformed cursor is rejected with 400, not a 5xx/crash', malformed.status === 400, malformed)
+
+  // ── Part 5: a cursor minted under one filter context is rejected when replayed against a changed filter context ──
+  const crossContext = await api(adminCookie, 'GET', `/api/admin/orders?status=delivered&cursor=${encodeURIComponent(cpPage1.json?.nextCursor ?? '')}`)
+  check('a cursor minted under different filters is rejected (400), never silently spliced onto a new filter', crossContext.status === 400, crossContext)
+
+  // ── Part 9: paymentStatus AND disputed are genuine DB-side predicates, not bounded-fetch-then-filter -- small limit, newer non-matching + older matching.
+  // One shared pair covers both: dbFilterOlder is captured AND disputed; dbFilterNewer is neither -- keeps total order-creation calls within the
+  // shared POST /api/orders rate-limit budget instead of spending 2 fresh orders per filter.
+  const dbFilterNewer = await createPinnedOrder('[QA] Order-Admin Cursor-Test DbFilterProof Newer', 121, '2020-01-01T00:10:00.000Z')
+  const dbFilterOlder = await createPinnedOrder('[QA] Order-Admin Cursor-Test DbFilterProof Older', 122, '2020-01-01T00:09:00.000Z')
+  const { data: dbFilterOlderBefore } = await admin.from('orders').select('status').eq('id', dbFilterOlder).single()
+  if (dbFilterOlderBefore.status === 'pending') {
+    await api(renterACookie, 'POST', `/api/orders/${dbFilterOlder}/checkout`, { test_scenario: 'success', idempotency_key: 'order-admin-cursor-dbfilter-older-checkout' })
+  }
+  await openOrReuseDispute(
+    renterACookie,
+    { order_id: dbFilterOlder, title: 'Cursor pagination regression fixture dispute', description: 'Permanent regression fixture.', requested_resolution: 'n/a' },
+    dbFilterOlder, 'order-admin-cursor-dbfilter-older-dispute'
+  )
+
+  const payStatusRes = await api(adminCookie, 'GET', '/api/admin/orders?search=DbFilterProof&paymentStatus=captured&limit=1')
+  const payStatusIds = (payStatusRes.json?.orders ?? []).map((o) => o.id)
+  check(
+    'paymentStatus filter finds the older captured order even with limit=1 and a newer non-matching row present (proves DB-side filtering, not bounded-then-filtered)',
+    payStatusRes.status === 200 && JSON.stringify(payStatusIds) === JSON.stringify([dbFilterOlder]),
+    { payStatusIds, expected: [dbFilterOlder], dbFilterNewer }
+  )
+
+  const disputedRes = await api(adminCookie, 'GET', '/api/admin/orders?search=DbFilterProof&disputed=true&limit=1')
+  const disputedIds = (disputedRes.json?.orders ?? []).map((o) => o.id)
+  check(
+    'disputed filter finds the older disputed order even with limit=1 and a newer non-disputed row present (proves DB-side filtering)',
+    disputedRes.status === 200 && JSON.stringify(disputedIds) === JSON.stringify([dbFilterOlder]),
+    { disputedIds, expected: [dbFilterOlder], dbFilterNewer }
+  )
+
+  // ── Part 9: search is a genuine DB-side predicate -- small limit, newer row that does NOT match the search term + older row that does ──
+  const searchNewer = await createPinnedOrder('[QA] Order-Admin Cursor-Test Unrelated Newer', 141, '2020-01-01T00:10:00.000Z')
+  const searchOlder = await createPinnedOrder('[QA] Order-Admin Cursor-Test SearchProofXYZ Older', 142, '2020-01-01T00:09:00.000Z')
+  const searchRes = await api(adminCookie, 'GET', '/api/admin/orders?search=SearchProofXYZ&limit=1')
+  const searchIds = (searchRes.json?.orders ?? []).map((o) => o.id)
+  check(
+    'search filter finds the older matching order even with limit=1 and a newer non-matching row present (proves DB-side ILIKE, not bounded-then-filtered)',
+    searchRes.status === 200 && JSON.stringify(searchIds) === JSON.stringify([searchOlder]),
+    { searchIds, expected: [searchOlder], searchNewer }
+  )
+
+  // ── Financial Operations: deterministic paging (3 payment fixtures, limit=2) + malformed cursor + end-of-results ──
+  async function createPinnedCapturedPayment(title, salePrice, requestedAt, idemKeyPrefix) {
+    const orderId = await createPinnedOrder(title, salePrice, requestedAt)
+    const { data: before } = await admin.from('orders').select('status').eq('id', orderId).single()
+    if (before.status === 'pending') {
+      await api(renterACookie, 'POST', `/api/orders/${orderId}/checkout`, { test_scenario: 'success', idempotency_key: `${idemKeyPrefix}-checkout` })
+    }
+    const { data: paymentRow } = await admin.from('payments').select('id').eq('order_id', orderId).eq('payment_type', 'order_payment').single()
+    await admin.from('payments').update({ requested_at: requestedAt }).eq('id', paymentRow.id)
+    return { orderId, paymentId: paymentRow.id }
+  }
+
+  // financial-operations has no search/marker filter to scope a subset by
+  // content -- pinned to the far future instead of the past so these 3
+  // fixtures are deterministically the newest `status=captured` rows in
+  // the whole table, making an unscoped small-limit page 1/page 2 fully
+  // deterministic without touching any real data.
+  const finA = await createPinnedCapturedPayment('[QA] Order-Admin Cursor-Test FinOpsPageMarker A', 151, '2099-01-01T00:00:03.000Z', 'order-admin-cursor-finops-a')
+  const finB = await createPinnedCapturedPayment('[QA] Order-Admin Cursor-Test FinOpsPageMarker B', 152, '2099-01-01T00:00:02.000Z', 'order-admin-cursor-finops-b')
+  const finC = await createPinnedCapturedPayment('[QA] Order-Admin Cursor-Test FinOpsPageMarker C', 153, '2099-01-01T00:00:01.000Z', 'order-admin-cursor-finops-c')
+
+  const finPage1 = await api(adminCookie, 'GET', '/api/admin/financial-operations?status=captured&limit=2')
+  const finPage1Ids = (finPage1.json?.operations ?? []).map((r) => r.paymentId)
+  check('financial-operations page 1 (limit=2) returns exactly [A, B], the two newest captured payments', finPage1.status === 200 && JSON.stringify(finPage1Ids) === JSON.stringify([finA.paymentId, finB.paymentId]), { finPage1Ids, expected: [finA.paymentId, finB.paymentId] })
+  check('financial-operations page 1 reports hasMore=true with a nextCursor', finPage1.json?.hasMore === true && !!finPage1.json?.nextCursor, finPage1.json)
+
+  const finPage2 = await api(adminCookie, 'GET', `/api/admin/financial-operations?status=captured&limit=2&cursor=${encodeURIComponent(finPage1.json?.nextCursor ?? '')}`)
+  const finPage2Ids = (finPage2.json?.operations ?? []).map((r) => r.paymentId)
+  check('financial-operations page 2 starts with C, no duplicate of A/B from page 1', finPage2.status === 200 && finPage2Ids[0] === finC.paymentId && !finPage2Ids.includes(finA.paymentId) && !finPage2Ids.includes(finB.paymentId), { finPage2Ids, expectedFirst: finC.paymentId })
+
+  const finMalformed = await api(adminCookie, 'GET', '/api/admin/financial-operations?status=captured&cursor=not-a-real-cursor')
+  check('financial-operations: a malformed cursor is rejected with 400, not a 5xx/crash', finMalformed.status === 400, finMalformed)
+
+  const finCrossContext = await api(adminCookie, 'GET', `/api/admin/financial-operations?status=failed&cursor=${encodeURIComponent(finPage1.json?.nextCursor ?? '')}`)
+  check('financial-operations: a cursor minted under a different status filter is rejected (400)', finCrossContext.status === 400, finCrossContext)
+}
+
+console.log('\n=== Security: pagination surfaces (Admin Orders + Financial Operations Remediation) ===')
+{
+  const anonFinOps = await api(null, 'GET', '/api/admin/financial-operations')
+  check('anonymous is blocked from the financial-operations list', anonFinOps.status === 401, anonFinOps)
+
+  const nonAdminFinOps = await api(renterACookie, 'GET', '/api/admin/financial-operations')
+  check('an ordinary authenticated user is blocked from the financial-operations list', nonAdminFinOps.status === 401, nonAdminFinOps)
+
+  // The new _admin_list_orders_page RPC must be unreachable to anon/authenticated Postgrest clients -- only service_role has EXECUTE.
+  const anonRpc = await fetch(`${SUPABASE_URL}/rest/v1/rpc/_admin_list_orders_page`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` },
+    body: JSON.stringify({ p_limit: 1 }),
+  })
+  check('the _admin_list_orders_page RPC is not callable with the anon key (PostgREST 401/403/404, never 200)', anonRpc.status === 401 || anonRpc.status === 403 || anonRpc.status === 404, { status: anonRpc.status })
 }
 
 console.log('\n=== Security (Scenario E) ===')

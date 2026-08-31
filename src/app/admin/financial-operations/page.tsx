@@ -44,9 +44,15 @@ const FAILURE_STYLES: Record<string, string> = {
 export default function AdminFinancialOperationsPage() {
   const [rows, setRows] = useState<AdminFinancialRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState('all')
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(false)
 
+  // A status change always starts over from page 1 -- a cursor is only
+  // ever valid as a continuation of the exact filter state it was minted
+  // under (enforced server-side too, see decodeAndValidateCursor).
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -60,12 +66,37 @@ export default function AdminFinancialOperationsPage() {
       }
       const body = await res.json()
       setRows(body.operations ?? [])
+      setNextCursor(body.nextCursor ?? null)
+      setHasMore(!!body.hasMore)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load financial operations')
     } finally {
       setLoading(false)
     }
   }, [statusFilter])
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor) return
+    setLoadingMore(true)
+    try {
+      const params = new URLSearchParams()
+      if (statusFilter !== 'all') params.set('status', statusFilter)
+      params.set('cursor', nextCursor)
+      const res = await fetch(`/api/admin/financial-operations?${params.toString()}`)
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}))
+        throw new Error(b.error ?? 'Could not load more financial operations')
+      }
+      const body = await res.json()
+      setRows((prev) => [...prev, ...(body.operations ?? [])])
+      setNextCursor(body.nextCursor ?? null)
+      setHasMore(!!body.hasMore)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load more financial operations')
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [statusFilter, nextCursor])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -136,6 +167,13 @@ export default function AdminFinancialOperationsPage() {
             </tbody>
           </table>
         </div>
+        {hasMore && (
+          <div className="flex justify-center py-4 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
+            <button type="button" onClick={loadMore} disabled={loadingMore} className={secondaryButtonClass}>
+              {loadingMore ? 'Loading…' : 'Load more'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

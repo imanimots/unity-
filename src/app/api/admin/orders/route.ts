@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminForRoute, getAdminServiceClient } from '@/lib/admin/route-helpers'
-import { listAdminOrders, ORDER_CSV_COLUMNS } from '@/lib/admin/orders-service'
+import { requireAdminForRoute, getAdminServiceClient, parseListLimit } from '@/lib/admin/route-helpers'
+import { listAdminOrders, exportAdminOrdersCsv, ORDER_CSV_COLUMNS } from '@/lib/admin/orders-service'
 import { csvResponse } from '@/lib/admin/csv'
+import { InvalidCursorError } from '@/lib/admin/cursor'
 
 /** GET /api/admin/orders -- real data, read-only monitoring, no mutating actions on this route. */
 export async function GET(request: NextRequest) {
@@ -22,17 +23,22 @@ export async function GET(request: NextRequest) {
     buyerId: searchParams.get('buyerId') ?? undefined,
     sellerId: searchParams.get('sellerId') ?? undefined,
     search: searchParams.get('search') ?? undefined,
+    cursor: searchParams.get('cursor') ?? undefined,
+    limit: parseListLimit(searchParams.get('limit')),
   }
 
   try {
-    const orders = await listAdminOrders(admin, filters)
-
     if (searchParams.get('format') === 'csv') {
+      const orders = await exportAdminOrdersCsv(admin, filters)
       return csvResponse('orders.csv', ORDER_CSV_COLUMNS, orders)
     }
 
-    return NextResponse.json({ orders })
+    const { orders, hasMore, nextCursor } = await listAdminOrders(admin, filters)
+    return NextResponse.json({ orders, hasMore, nextCursor })
   } catch (err) {
+    if (err instanceof InvalidCursorError) {
+      return NextResponse.json({ error: 'Invalid or expired pagination cursor' }, { status: 400 })
+    }
     console.error('[admin.orders.list] error', err)
     return NextResponse.json({ error: 'Could not load orders' }, { status: 500 })
   }

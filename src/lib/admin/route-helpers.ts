@@ -42,3 +42,17 @@ export async function getAdminServiceClient(): Promise<SupabaseClient | null> {
 export function isValidUuid(value: string): boolean {
   return /^[0-9a-f-]{36}$/i.test(value)
 }
+
+/**
+ * Parses an optional caller-supplied `?limit=` for the keyset-paginated
+ * admin list routes -- a malformed/out-of-range value falls back to
+ * undefined (letting the service layer apply its own default) rather
+ * than ever passing a NaN/negative/absurdly large value through to the
+ * query layer.
+ */
+export function parseListLimit(raw: string | null, max = 1000): number | undefined {
+  if (!raw) return undefined
+  const n = Number(raw)
+  if (!Number.isInteger(n) || n <= 0 || n > max) return undefined
+  return n
+}

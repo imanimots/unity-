@@ -1,6 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { decodeAndValidateCursor, encodeKeysetCursor, computeCursorContextHash } from '@/lib/admin/cursor'
 
 const DEFAULT_LIMIT = 100
+const CURSOR_ENTITY = 'admin_orders'
 
 export type OrderFinancialReadiness = 'awaiting_payment' | 'financially_ready' | 'payment_failed'
 
@@ -54,27 +56,76 @@ export interface AdminOrderFilters {
   sellerId?: string
   search?: string
   limit?: number
+  /** Opaque keyset cursor from a prior page's nextCursor -- see src/lib/admin/cursor.ts. */
+  cursor?: string
+}
+
+export interface AdminOrderPage {
+  orders: AdminOrderRow[]
+  hasMore: boolean
+  nextCursor: string | null
+}
+
+interface AdminOrderPageRow {
+  id: string
+  order_reference: string
+  listing_id: string
+  buyer_id: string
+  seller_id: string
+  status: string
+  total_amount: number
+  created_at: string
+}
+
+/** The exact filter fields that participate in cursor context-binding -- must match 1:1 with what the RPC call below filters on, so a filter change always invalidates a stale cursor. */
+function orderCursorContextParams(filters: AdminOrderFilters) {
+  return {
+    status: filters.status ?? null,
+    paymentStatus: filters.paymentStatus ?? null,
+    disputed: filters.disputed ?? null,
+    buyerId: filters.buyerId ?? null,
+    sellerId: filters.sellerId ?? null,
+    search: filters.search ?? null,
+  }
 }
 
 /**
- * Mirrors listAdminBarterAgreements/listAdminDisputes' exact shape: one
- * base query + Promise.all of related-table lookups + in-memory joins +
- * in-memory search filter, no separate "service class".
+ * Bounded, relational, keyset-paginated via the _admin_list_orders_page
+ * RPC (20260904000026) -- status/buyerId/sellerId/paymentStatus/disputed/
+ * search are all now genuine SQL WHERE predicates applied before the
+ * LIMIT, replacing the prior bounded-fetch-then-Node-filter behavior for
+ * paymentStatus/disputed/search. The existing batched hydration
+ * (profiles/listings/payments/history/disputes/email_deliveries) is
+ * unchanged -- the RPC only replaces the base `orders` row fetch.
  */
-export async function listAdminOrders(admin: SupabaseClient, filters: AdminOrderFilters): Promise<AdminOrderRow[]> {
-  let query = admin
-    .from('orders')
-    .select('id, order_reference, listing_id, buyer_id, seller_id, status, total_amount, created_at')
-    .order('created_at', { ascending: false })
-    .limit(filters.limit ?? DEFAULT_LIMIT)
+export async function listAdminOrders(admin: SupabaseClient, filters: AdminOrderFilters): Promise<AdminOrderPage> {
+  const contextParams = orderCursorContextParams(filters)
+  const cursor = filters.cursor ? decodeAndValidateCursor(filters.cursor, CURSOR_ENTITY, contextParams) : null
 
-  if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status)
-  if (filters.buyerId) query = query.eq('buyer_id', filters.buyerId)
-  if (filters.sellerId) query = query.eq('seller_id', filters.sellerId)
+  const requestedLimit = filters.limit ?? DEFAULT_LIMIT
+  const { data: pageRows, error: rpcError }: { data: AdminOrderPageRow[] | null; error: { message: string } | null } = await admin.rpc('_admin_list_orders_page', {
+    p_status: filters.status ?? null,
+    p_buyer_id: filters.buyerId ?? null,
+    p_seller_id: filters.sellerId ?? null,
+    p_payment_status: filters.paymentStatus ?? null,
+    p_disputed: filters.disputed ?? null,
+    p_search: filters.search ?? null,
+    p_cursor_created_at: cursor?.ts ?? null,
+    p_cursor_id: cursor?.id ?? null,
+    // Fetch one extra row to detect "more pages exist" without relying on
+    // "returned length === limit" (which is ambiguous when exactly the
+    // remaining rows equal the page size).
+    p_limit: requestedLimit + 1,
+  })
+  if (rpcError) throw rpcError
 
-  const { data: rows, error } = await query
-  if (error) throw error
-  if (!rows || rows.length === 0) return []
+  const hasMore = (pageRows?.length ?? 0) > requestedLimit
+  const rows = (pageRows ?? []).slice(0, requestedLimit)
+  const nextCursor = hasMore && rows.length > 0
+    ? encodeKeysetCursor({ ts: rows[rows.length - 1].created_at, id: rows[rows.length - 1].id, contextHash: computeCursorContextHash(CURSOR_ENTITY, contextParams) })
+    : null
+
+  if (rows.length === 0) return { orders: [], hasMore: false, nextCursor: null }
 
   const userIds = Array.from(new Set(rows.flatMap((r) => [r.buyer_id, r.seller_id])))
   const listingIds = Array.from(new Set(rows.map((r) => r.listing_id)))
@@ -100,7 +151,9 @@ export async function listAdminOrders(admin: SupabaseClient, filters: AdminOrder
     if (!latestEventByOrder.has(h.order_id)) latestEventByOrder.set(h.order_id, h.event_type)
   }
 
-  let results: AdminOrderRow[] = rows.map((r) => {
+  // paymentStatus/disputed/search are already applied server-side by
+  // _admin_list_orders_page -- no post-limit Node filtering here anymore.
+  const results: AdminOrderRow[] = rows.map((r) => {
     const listing = listingById.get(r.listing_id) ?? null
     const paymentStatus = paymentStatusByOrder.get(r.id) ?? null
     return {
@@ -124,25 +177,7 @@ export async function listAdminOrders(admin: SupabaseClient, filters: AdminOrder
     }
   })
 
-  if (filters.paymentStatus && filters.paymentStatus !== 'all') {
-    results = results.filter((r) => r.paymentStatus === filters.paymentStatus)
-  }
-  if (filters.disputed !== undefined) {
-    results = results.filter((r) => r.disputed === filters.disputed)
-  }
-
-  if (filters.search && filters.search.trim()) {
-    const q = filters.search.trim().toLowerCase()
-    results = results.filter(
-      (o) =>
-        o.orderReference.toLowerCase().includes(q) ||
-        (o.listingTitle ?? '').toLowerCase().includes(q) ||
-        (o.buyerName ?? '').toLowerCase().includes(q) ||
-        (o.sellerName ?? '').toLowerCase().includes(q)
-    )
-  }
-
-  return results
+  return { orders: results, hasMore, nextCursor }
 }
 
 export interface AdminOrderDetail {
@@ -290,10 +325,13 @@ const CSV_COLUMNS: (keyof AdminOrderRow)[] = [
  * Safe-fields-only export -- no email, no KYC document fields, no
  * addresses, no provider payloads, no banking details, no service-role
  * information. Reuses the existing toCsv()/csvResponse() helpers
- * unchanged.
+ * unchanged. Exports the first page only (same bound CSV export has
+ * always had) -- unlike before, that first page is now genuinely
+ * filtered server-side rather than filtered-then-truncated.
  */
 export async function exportAdminOrdersCsv(admin: SupabaseClient, filters: AdminOrderFilters): Promise<AdminOrderRow[]> {
-  return listAdminOrders(admin, filters)
+  const { orders } = await listAdminOrders(admin, filters)
+  return orders
 }
 
 export const ORDER_CSV_COLUMNS = CSV_COLUMNS

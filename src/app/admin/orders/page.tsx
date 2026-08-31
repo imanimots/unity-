@@ -35,32 +35,66 @@ const STATUS_STYLES: Record<string, string> = {
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrderRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [disputedOnly, setDisputedOnly] = useState(false)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(false)
 
+  const buildParams = useCallback(() => {
+    const params = new URLSearchParams()
+    if (statusFilter !== 'all') params.set('status', statusFilter)
+    if (search.trim()) params.set('search', search.trim())
+    if (disputedOnly) params.set('disputed', 'true')
+    return params
+  }, [statusFilter, search, disputedOnly])
+
+  // Filter/search changes always reset to page 1 -- a cursor is only ever
+  // valid as a continuation of the exact filter state it was minted
+  // under (enforced server-side too, see decodeAndValidateCursor).
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams()
-      if (statusFilter !== 'all') params.set('status', statusFilter)
-      if (search.trim()) params.set('search', search.trim())
-      if (disputedOnly) params.set('disputed', 'true')
-      const res = await fetch(`/api/admin/orders?${params.toString()}`)
+      const res = await fetch(`/api/admin/orders?${buildParams().toString()}`)
       if (!res.ok) {
         const b = await res.json().catch(() => ({}))
         throw new Error(b.error ?? 'Could not load orders')
       }
       const body = await res.json()
       setOrders(body.orders ?? [])
+      setNextCursor(body.nextCursor ?? null)
+      setHasMore(!!body.hasMore)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load orders')
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, search, disputedOnly])
+  }, [buildParams])
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor) return
+    setLoadingMore(true)
+    try {
+      const params = buildParams()
+      params.set('cursor', nextCursor)
+      const res = await fetch(`/api/admin/orders?${params.toString()}`)
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}))
+        throw new Error(b.error ?? 'Could not load more orders')
+      }
+      const body = await res.json()
+      setOrders((prev) => [...prev, ...(body.orders ?? [])])
+      setNextCursor(body.nextCursor ?? null)
+      setHasMore(!!body.hasMore)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load more orders')
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [buildParams, nextCursor])
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -151,6 +185,13 @@ export default function AdminOrdersPage() {
             </tbody>
           </table>
         </div>
+        {hasMore && (
+          <div className="flex justify-center py-4 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
+            <button type="button" onClick={loadMore} disabled={loadingMore} className={secondaryButtonClass}>
+              {loadingMore ? 'Loading…' : 'Load more'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

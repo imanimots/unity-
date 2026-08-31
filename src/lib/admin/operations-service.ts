@@ -1,8 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadBookingFinancialState } from '@/lib/checkout/load-financial-state'
 import { deriveFinancialReadiness } from '@/lib/checkout/financial-readiness'
+import { decodeAndValidateCursor, encodeKeysetCursor, computeCursorContextHash } from '@/lib/admin/cursor'
 
 const DEFAULT_LIMIT = 100
+const FIN_OPS_CURSOR_ENTITY = 'admin_financial_operations'
 
 export interface AdminBookingRow {
   id: string
@@ -227,18 +229,59 @@ export interface AdminFinancialRow {
  * never queried for, always `'not_applicable'`, not left to fall
  * through to a lookup that can never match.
  */
-export async function listFinancialOperations(admin: SupabaseClient, filters: { status?: string; limit?: number }): Promise<AdminFinancialRow[]> {
+export interface AdminFinancialOperationsFilters {
+  status?: string
+  limit?: number
+  /** Opaque keyset cursor from a prior page's nextCursor -- see src/lib/admin/cursor.ts. */
+  cursor?: string
+}
+
+export interface AdminFinancialOperationsPage {
+  operations: AdminFinancialRow[]
+  hasMore: boolean
+  nextCursor: string | null
+}
+
+/**
+ * Bounded keyset pagination on top of the SAME `payments` query and the
+ * SAME `bookings(booking_reference)`/`orders(order_reference)` embedded
+ * joins as before (confirmed correct by the diagnosis phase -- the
+ * financial-operations defect was pure boundedness, never a join/
+ * hydration bug, so the relation itself is deliberately unchanged here).
+ */
+export async function listFinancialOperations(admin: SupabaseClient, filters: AdminFinancialOperationsFilters): Promise<AdminFinancialOperationsPage> {
+  const contextParams = { status: filters.status ?? null }
+  const cursor = filters.cursor ? decodeAndValidateCursor(filters.cursor, FIN_OPS_CURSOR_ENTITY, contextParams) : null
+
+  const requestedLimit = filters.limit ?? DEFAULT_LIMIT
   let query = admin
     .from('payments')
-    .select('id, booking_id, order_id, payment_type, status, amount, currency, failure_reason, bookings(booking_reference), orders(order_reference)')
+    .select('id, booking_id, order_id, payment_type, status, amount, currency, failure_reason, requested_at, bookings(booking_reference), orders(order_reference)')
     .order('requested_at', { ascending: false })
-    .limit(filters.limit ?? DEFAULT_LIMIT)
+    .order('id', { ascending: false })
+    // Fetch one extra row to detect "more pages exist" without relying on
+    // "returned length === limit" (ambiguous when exactly that many rows remain).
+    .limit(requestedLimit + 1)
 
   if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status)
+  if (cursor) {
+    query = query.or(`requested_at.lt.${cursor.ts},and(requested_at.eq.${cursor.ts},id.lt.${cursor.id})`)
+  }
 
-  const { data: payments, error } = await query
+  const { data: pagePayments, error } = await query
   if (error) throw error
-  if (!payments || payments.length === 0) return []
+
+  const hasMore = (pagePayments?.length ?? 0) > requestedLimit
+  const payments = (pagePayments ?? []).slice(0, requestedLimit)
+  const nextCursor = hasMore && payments.length > 0
+    ? encodeKeysetCursor({
+        ts: (payments[payments.length - 1] as { requested_at: string }).requested_at,
+        id: payments[payments.length - 1].id,
+        contextHash: computeCursorContextHash(FIN_OPS_CURSOR_ENTITY, contextParams),
+      })
+    : null
+
+  if (payments.length === 0) return { operations: [], hasMore: false, nextCursor: null }
 
   const bookingIds = Array.from(new Set(payments.map((p) => p.booking_id).filter((id): id is string => !!id)))
   const paymentIds = payments.map((p) => p.id)
@@ -256,7 +299,7 @@ export async function listFinancialOperations(admin: SupabaseClient, filters: { 
     ledgerCountByPayment.set(l.payment_id, (ledgerCountByPayment.get(l.payment_id) ?? 0) + 1)
   }
 
-  return payments.map((p) => {
+  const operations: AdminFinancialRow[] = payments.map((p) => {
     if (p.order_id) {
       const failureCategory: AdminFinancialRow['failureCategory'] = p.status === 'failed' ? 'failed' : null
       return {
@@ -297,4 +340,6 @@ export async function listFinancialOperations(admin: SupabaseClient, filters: { 
       payoutStatus: p.booking_id ? (payoutByBooking.get(p.booking_id) ?? null) : null,
     }
   })
+
+  return { operations, hasMore, nextCursor }
 }
