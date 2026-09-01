@@ -225,7 +225,26 @@ async function ensurePublished(ownerSession, title, overrides = {}) {
 }
 
 // Fixtures deliberately created with is_test:false to prove real public
-// visibility -- swept back to is_test:true in the final cleanup section.
+// visibility -- swept back to is_test:true in the final cleanup section
+// (tracked-set based, see publicFixtureListingIds etc. below) for a
+// normally-completing run. Startup hygiene (immediately below) covers
+// the complementary case: a PRIOR run that was interrupted/crashed
+// before reaching that final cleanup, whose public fixture would
+// otherwise linger indefinitely. Scoped to the M-Cell1 "Item + Available"
+// browse fixture specifically -- the one public-visibility fixture in
+// this script whose title is stable/predictable enough to safely match
+// without a tracked id (title-derived from insertBaseListing's lookup-by-
+// title key itself, RUN_TAG-suffixed per invocation -- see its creation
+// below). Changes ONLY is_test; never status/merchant/price/category or
+// any other field, and never touches rows outside this exact pattern.
+async function quarantineOrphanedStbM1Fixtures() {
+  const { data: orphaned } = await admin.from('listings').select('id').ilike('title', `${QA_MARKER} STB-M Item Available%`).eq('is_test', false)
+  if ((orphaned ?? []).length > 0) {
+    await admin.from('listings').update({ is_test: true }).in('id', orphaned.map((l) => l.id))
+  }
+}
+await quarantineOrphanedStbM1Fixtures()
+
 const publicFixturePostIds = new Set()
 const publicFixtureListingIds = new Set()
 const publicFixtureRequestIds = new Set()
@@ -1280,7 +1299,28 @@ console.log('\n=== M. Six-cell Barter browse matrix ===')
   }
 
   // Fixtures -- one per cell, is_test:false so they're genuinely public.
-  const mItemAvailableId = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} STB-M Item Available fixture`, is_test: false })
+  //
+  // M-Cell1 specifically uses a RUN_TAG-suffixed title (fresh row every
+  // run) rather than insertBaseListing's usual fixed-title reuse pattern.
+  // Root cause (confirmed live, not assumed): the browse route
+  // (getListingsPage) is cursor-paginated and defaults to newest-first
+  // when no query/sort is given (src/lib/search/cursor.ts's
+  // resolveDefaultSort); a single fixed-title row created back on
+  // 2026-08-14 aged out of the default 24-item first page as ~41 newer
+  // real is_test=false listings accumulated elsewhere in this shared dev
+  // database -- is_test was already being correctly restored to false by
+  // insertBaseListing's own existing self-repair on every run (confirmed
+  // live), so the bounded-fetch-then-nothing-to-find-it pattern, not an
+  // is_test lifecycle bug, was the actual failure. A fresh row every run
+  // is always the newest-created row for its own kind, so it always
+  // lands on page 1 regardless of how much unrelated content accumulates
+  // -- the same fix this session has repeatedly applied to other
+  // permanently-reused, ranking-bound QA fixtures. The title keeps the
+  // literal substring "STB-M Item Available fixture" so the existing
+  // check below (a plain .includes() match) needs no change, and so
+  // quarantineOrphanedStbM1Fixtures()'s pattern above continues to catch
+  // it (and the original fixed-title row) uniformly.
+  const mItemAvailableId = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} STB-M Item Available fixture ${RUN_TAG}`, is_test: false })
   publicFixtureListingIds.add(mItemAvailableId)
 
   const { data: existingReq } = await admin.from('marketplace_requests').select('id, status').eq('title', `${QA_MARKER} STB-M Item LookingFor fixture`).maybeSingle()
