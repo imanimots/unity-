@@ -225,26 +225,54 @@ console.log('=== LOOKING FOR ===')
 console.log('=== REVIEWS ===')
 let reviewBookingId
 {
-  const listingForReview = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} ReviewBooking ${RUN_ID}`, listing_type: 'rental', sale_price: null, daily_rate: 100, min_rental_days: 1 })
+  // is_test=true -- this listing only needs to back a real completed
+  // booking for the review fixture below; nothing asserts it publicly, so
+  // keeping it out of merchantA's real active-supply count is free.
+  const listingForReview = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} ReviewBooking ${RUN_ID}`, listing_type: 'rental', sale_price: null, daily_rate: 100, min_rental_days: 1, is_test: true })
   const created = await api(renterA.cookie, 'POST', '/api/bookings', { listing_id: listingForReview, start_at: '2030-06-01T00:00:00.000Z', end_at: '2030-06-04T00:00:00.000Z' })
   reviewBookingId = created.json?.booking_id
   if (reviewBookingId) {
-    await admin.from('bookings').update({ status: 'completed' }).eq('id', reviewBookingId)
+    // submit_review() only treats a booking as review-eligible when
+    // completed_at is set (and >= the Reviews V2 cutover) -- status alone
+    // isn't enough, matching verify-reviews-v2.mjs's own fixture convention.
+    await admin.from('bookings').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', reviewBookingId)
   }
 
-  const { data: existingReview } = await admin.from('reviews').select('id').eq('booking_id', reviewBookingId).eq('reviewer_id', renterA.userId).maybeSingle()
-  if (!existingReview) {
-    const { error } = await admin.from('reviews').insert({
-      booking_id: reviewBookingId, reviewer_id: renterA.userId, reviewee_id: merchantA.userId, rating: 5, comment: `${QA_MARKER} genuine review ${RUN_ID}`,
+  // Reviews V2 has real schema (domain/context_label/header_snapshot/
+  // eligible_at/review_deadline_at, none defaulted) and a real creation
+  // path -- submit_review(), not a bare table insert (which crashed on
+  // the NOT NULL `domain` column; the schema has grown considerably since
+  // this fixture was first written). submit_review() also double-blind
+  // publishes a review only once BOTH parties have reviewed each other
+  // (see supabase/migrations -- reviews RLS "public read published
+  // valid" requires published_at IS NOT NULL), so a single one-sided
+  // renterA review would never actually become publicly visible -- the
+  // reciprocal merchantA review below is what makes checks 23-27
+  // genuinely exercise the real, current publish mechanism.
+  const renterReview = await admin.rpc('submit_review', {
+    p_actor_user_id: renterA.userId, p_domain: 'rent', p_transaction_id: reviewBookingId,
+    p_rating: 5, p_comment: `${QA_MARKER} genuine review ${RUN_ID}`, p_idempotency_key: `cp-review-renter-${RUN_ID}`,
+  })
+  if (renterReview.error) throw new Error(`submit_review (renter) failed: ${renterReview.error.message}`)
+  if (!renterReview.data?.both_now_published) {
+    const merchantReview = await admin.rpc('submit_review', {
+      p_actor_user_id: merchantA.userId, p_domain: 'rent', p_transaction_id: reviewBookingId,
+      p_rating: 4, p_comment: `${QA_MARKER} reciprocal review ${RUN_ID}`, p_idempotency_key: `cp-review-merchant-${RUN_ID}`,
     })
-    if (error) throw new Error(`review insert failed: ${error.message}`)
+    if (merchantReview.error) throw new Error(`submit_review (merchant) failed: ${merchantReview.error.message}`)
   }
 
   const p = await html(null, `/profile/${merchantA.userId}`)
   check('23. genuine review appears', p.text.includes(`${QA_MARKER} genuine review ${RUN_ID}`), {})
 
-  const { data: merchantRow } = await admin.from('profiles').select('unity_score').eq('id', merchantA.userId).single()
-  check('24. correct rating aggregate', p.text.includes(Number(merchantRow.unity_score).toFixed(1)), { unity_score: merchantRow.unity_score })
+  // The public rating aggregate is computed fresh from published reviews
+  // via the real _review_public_aggregate RPC (src/lib/data/profiles.ts's
+  // own comment: "NEVER from profiles.unity_score, which is a separate,
+  // deliberately decoupled objective trust score... no longer updated by
+  // review submission at all") -- asserting against unity_score was
+  // asserting the wrong field entirely, not merely stale.
+  const { data: aggregate } = await admin.rpc('_review_public_aggregate', { p_reviewee_id: merchantA.userId }).maybeSingle()
+  check('24. correct rating aggregate', aggregate?.average_rating != null && p.text.includes(Number(aggregate.average_rating).toFixed(1)), { aggregate })
 
   const pZero = await html(null, `/profile/${merchantB.userId}`)
   const { count: merchantBReviewCount } = await admin.from('reviews').select('id', { count: 'exact', head: true }).eq('reviewee_id', merchantB.userId)
@@ -281,9 +309,30 @@ console.log('=== CLICKABILITY ===')
 
 console.log('=== MESSAGE ===')
 {
-  // renterA and merchantA share the review booking fixture above -- a real transaction exists between them.
+  // renterA and merchantA are permanent shared fixtures reused by dozens of
+  // verifier scripts across this whole session, some of which pin
+  // transaction created_at values into the far future for unrelated
+  // pagination testing -- the Message action always links to whichever
+  // shared transaction is genuinely MOST RECENT across bookings/orders/
+  // barter agreements (src/lib/profiles/messaging.ts's
+  // getMostRecentSharedTransaction), which is not guaranteed to be this
+  // run's own review-booking fixture. Compute the same "most recent"
+  // answer directly so this assertion tracks real behavior instead of
+  // assuming this fixture always wins that race against other fixtures.
+  const [{ data: recentBookings }, { data: recentOrders }, { data: recentBarters }] = await Promise.all([
+    admin.from('bookings').select('id, created_at').or(`and(renter_id.eq.${renterA.userId},merchant_id.eq.${merchantA.userId}),and(renter_id.eq.${merchantA.userId},merchant_id.eq.${renterA.userId})`).order('created_at', { ascending: false }).limit(1),
+    admin.from('orders').select('id, created_at').or(`and(buyer_id.eq.${renterA.userId},seller_id.eq.${merchantA.userId}),and(buyer_id.eq.${merchantA.userId},seller_id.eq.${renterA.userId})`).order('created_at', { ascending: false }).limit(1),
+    admin.from('barter_agreements').select('id, created_at').or(`and(party_a_id.eq.${renterA.userId},party_b_id.eq.${merchantA.userId}),and(party_a_id.eq.${merchantA.userId},party_b_id.eq.${renterA.userId})`).order('created_at', { ascending: false }).limit(1),
+  ])
+  const mostRecentShared = [
+    ...(recentBookings ?? []).map((b) => ({ type: 'booking', id: b.id, createdAt: b.created_at })),
+    ...(recentOrders ?? []).map((o) => ({ type: 'order', id: o.id, createdAt: o.created_at })),
+    ...(recentBarters ?? []).map((a) => ({ type: 'barter', id: a.id, createdAt: a.created_at })),
+  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+  const expectedMessageHref = mostRecentShared ? `/chat?${mostRecentShared.type}=${mostRecentShared.id}` : null
+
   const p = await html(renterA.cookie, `/profile/${merchantA.userId}`)
-  check('33. authenticated other-user Message action uses existing chat', p.text.includes(`/chat?booking=${reviewBookingId}`), { hasLink: p.text.includes('/chat?booking=') })
+  check('33. authenticated other-user Message action uses existing chat', !!expectedMessageHref && p.text.includes(expectedMessageHref), { expectedMessageHref, hasAnyChatLink: p.text.includes('/chat?') })
 
   const selfP = await html(merchantA.cookie, `/profile/${merchantA.userId}`)
   check('34. self profile does not show self-message', !selfP.text.includes('>Message<'), {})

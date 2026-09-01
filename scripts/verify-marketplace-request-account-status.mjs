@@ -45,6 +45,7 @@ import { createClient } from '@supabase/supabase-js'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { randomBytes } from 'node:crypto'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = join(__dirname, '..')
@@ -105,9 +106,7 @@ async function api(cookie, method, path, body) {
 async function createRequest(cookie, body, idKey) {
   return api(cookie, 'POST', '/api/marketplace/requests', { ...body, idempotency_key: idKey })
 }
-async function publishRequest(cookie, requestId) {
-  return api(cookie, 'POST', `/api/marketplace/requests/${requestId}/publish`, {})
-}
+// publishRequest is defined further below, after ensureAccountStatus/withAccountStatus -- it needs `admin` for is_test marking, already in scope, but is kept next to the fresh-QA-merchant helper it's documented alongside.
 
 let failures = 0
 function check(label, cond, detail) {
@@ -160,6 +159,96 @@ async function withAccountStatus(userId, action, fn) {
     await api(adminAuth.cookie, 'POST', `/api/admin/users/${userId}/restore`, { user_reason: 'regression test cleanup', idempotency_key: key2 })
   }
 }
+
+/**
+ * merchantA is a permanent shared fixture reused by every verifier script
+ * in this codebase (listings, marketplace requests, barter listings, ...).
+ * Its real (is_test=false) active-supply count has, over many historical
+ * runs, exceeded its subscription's active_publication_limit -- this
+ * script's own account-status assertions have nothing to do with that cap,
+ * but every publish call in this script routes through the SAME
+ * publish_marketplace_request RPC that also enforces it, so a
+ * cap-exhausted merchantA would make nearly every check here fail with
+ * "active publication limit reached" instead of exercising the
+ * account-status logic under test.
+ *
+ * merchantA's merchant_subscriptions row is READ-ONLY from this verifier --
+ * ZERO INSERT/UPDATE/UPSERT/DELETE against it, full stop (two prior
+ * designs violated this: one temporarily elevated merchantA's plan and
+ * restored it in `finally`; another kept the PUBLICATION_FROZEN
+ * interaction toggling merchantA's `publication_frozen` flag in
+ * `finally`. Both rejected -- `finally` is exception-safe, not hard-kill
+ * safe: SIGKILL/OOM/host-crash/CI-cancellation never runs it, which could
+ * permanently strand the permanent shared fixture on the wrong plan or
+ * frozen state). Instead: every request this script publishes is marked
+ * is_test=true immediately before the real publish RPC runs
+ * (service-role, prerequisite-only -- publish_marketplace_request
+ * structurally skips its cap check entirely for is_test rows), and any
+ * scenario needing a real merchant_subscriptions mutation (the
+ * publication_frozen toggle) or real public visibility (is_test=false)
+ * uses its own dedicated, per-run disposable QA merchant instead of
+ * merchantA -- see createDisposableQaMerchant() below.
+ */
+async function publishRequest(cookie, requestId, opts = {}) {
+  if (!opts.skipMarkTest) {
+    await admin.from('marketplace_requests').update({ is_test: true }).eq('id', requestId)
+  }
+  return api(cookie, 'POST', `/api/marketplace/requests/${requestId}/publish`, {})
+}
+
+/**
+ * A TRUE per-run disposable QA merchant. RUN_ID + `purpose`-scoped email
+ * -- always a brand-new auth user, never looked up or reused across runs
+ * or between the two scenarios that need one (a prior version reused one
+ * fixed permanent account across runs, self-healed by cleanup at the end;
+ * that still had the same class of hard-interruption risk this whole
+ * remediation exists to eliminate -- if the process died before that
+ * cleanup ran, the *same* account would carry leftover real state into
+ * every subsequent run). No merchant_subscriptions row is created here by
+ * default, so _get_effective_merchant_plan_id() naturally defaults a
+ * fresh account to 'starter' (cap 5) -- zero prior supply, so a real
+ * publish succeeds within that cap on its own, no elevation needed.
+ * `withSubscriptionRow` additionally gives the account its OWN
+ * merchant_subscriptions row for the one scenario (publication_frozen)
+ * that genuinely needs to mutate that table -- always safe, since it is
+ * that disposable account's own row, never merchantA's, never reused.
+ */
+async function createDisposableQaMerchant(purpose, { withSubscriptionRow = false } = {}) {
+  const email = `qa-mr-acctstatus-${purpose}-${RUN_ID}@unitytest.internal`
+  // Random, never persisted anywhere (not even in memory beyond this
+  // function) -- this account is used and discarded within this same run.
+  const password = `Qa${randomBytes(18).toString('base64url')}!1`
+  const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true })
+  if (error) throw new Error(`createDisposableQaMerchant(${purpose}): createUser failed: ${error.message}`)
+  const userId = data.user.id
+  await admin.from('profiles').update({ role: 'merchant', kyc_status: 'approved', account_status: 'active' }).eq('id', userId)
+  if (withSubscriptionRow) {
+    // Every column defaults to exactly what's wanted (current_plan_id
+    // 'starter', publication_frozen false, status 'active') -- this
+    // account's OWN row, safe to mutate freely, never merchantA's.
+    await admin.from('merchant_subscriptions').insert({ merchant_id: userId })
+  }
+  return cookieFor(email, password)
+}
+
+/**
+ * Startup hygiene (NOT a correctness dependency -- see the doc comment on
+ * the ALREADY-PUBLISHED REQUEST scenario below): quarantines any
+ * abandoned prior-run public-visibility fixture -- from a hard-killed run
+ * of THIS script, or the old fixed-email disposable account this design
+ * superseded -- back into is_test QA inventory. Scoped narrowly to the
+ * exact, stable title pattern that ONE scenario produces; touches ONLY
+ * is_test, never status/offers/requester/timestamps/lifecycle.
+ */
+async function quarantineOrphanedPublicFixtures() {
+  const { data: orphaned } = await admin.from('marketplace_requests').select('id').ilike('title', `${QA_MARKER} already-published-%`).eq('is_test', false)
+  if ((orphaned ?? []).length > 0) {
+    await admin.from('marketplace_requests').update({ is_test: true }).in('id', orphaned.map((r) => r.id))
+  }
+}
+await quarantineOrphanedPublicFixtures()
+
+const freshMerchant = await createDisposableQaMerchant('public')
 
 // ══════════════════════════════════════════════════════════════
 console.log('=== PUBLISH: Buy/Rent/Barter Looking For ===')
@@ -331,26 +420,57 @@ console.log('=== EXISTING TRANSACTION SERVICING: a rent request accepted via mar
 console.log('=== ALREADY-PUBLISHED REQUEST: stays exactly as-is after the owner is later restricted (confirmed product decision) ===')
 // ══════════════════════════════════════════════════════════════
 {
-  const created = await createRequest(merchantA.cookie, { transaction_type: 'buy', title: `${QA_MARKER} already-published-${RUN_ID}` }, `already-published-create-${RUN_ID}`)
-  const published = await publishRequest(merchantA.cookie, created.json.request_id)
+  // Uses freshMerchant, not merchantA -- this is the one scenario in this
+  // script that needs a genuinely real (is_test=false), anonymously
+  // readable request (see the fresh-QA-merchant doc comment above).
+  // is_test=false is required here (the assertion below is exactly about
+  // real public visibility) -- QA-identifiability instead comes from
+  // non-behavioral fields only: the [QA] title marker, the RUN_ID suffix,
+  // the description, and the disposable account's own @unitytest.internal
+  // QA email domain.
+  const created = await createRequest(
+    freshMerchant.cookie,
+    { transaction_type: 'buy', title: `${QA_MARKER} already-published-${RUN_ID}`, description: `Disposable per-run QA regression fixture for verify-marketplace-request-account-status.mjs (run ${RUN_ID}) -- safe to ignore, not real demand.` },
+    `already-published-create-${RUN_ID}`
+  )
+  const published = await publishRequest(freshMerchant.cookie, created.json.request_id, { skipMarkTest: true })
   check('request published while owner still active', published.status === 200, published)
   const requestId = created.json.request_id
 
-  await withAccountStatus(merchantA.userId, 'restrict', async () => {
-    const { data: stillActive } = await admin.from('marketplace_requests').select('status').eq('id', requestId).single()
-    check('the already-published request stays status=active after its owner is later restricted -- no retroactive mechanism exists or was added', stillActive.status === 'active', stillActive)
+  // TEST CORRECTNESS (must complete with the request genuinely
+  // is_test=false, or the public-visibility assertion means nothing) is
+  // strictly separated from POST-TEST QA HYGIENE (the `finally` below).
+  // Correctness never depends on the hygiene step running -- see
+  // quarantineOrphanedPublicFixtures()'s doc comment: if this process is
+  // killed before the `finally` executes, the request simply stays real
+  // and public until the NEXT run's startup sweep quarantines it; no
+  // future run's correctness is affected either way, because every run
+  // uses a brand-new disposable merchant with independent, zero, prior
+  // supply.
+  try {
+    await withAccountStatus(freshMerchant.userId, 'restrict', async () => {
+      const { data: stillActive } = await admin.from('marketplace_requests').select('status').eq('id', requestId).single()
+      check('the already-published request stays status=active after its owner is later restricted -- no retroactive mechanism exists or was added', stillActive.status === 'active', stillActive)
 
-    const publicRead = await api(null, 'GET', `/api/marketplace/requests/${requestId}`, undefined)
-    check('the already-published request remains publicly readable after its owner is later restricted', publicRead.status === 200, publicRead)
+      const publicRead = await api(null, 'GET', `/api/marketplace/requests/${requestId}`, undefined)
+      check('the already-published request remains publicly readable after its owner is later restricted', publicRead.status === 200, publicRead)
 
-    // Another user can still submit a commercial offer against it -- the
-    // REQUEST OWNER'S restriction does not retroactively freeze new
-    // offers from OTHER users (confirmed product decision: "stays
-    // exactly as-is", no new offer-blocking mechanism keyed off the
-    // request owner's status was added this phase).
-    const offerAgainstRestrictedOwner = await api(renterA.cookie, 'POST', `/api/marketplace/requests/${requestId}/offers`, { offer_type: 'private_offer', amount: 10, idempotency_key: `already-published-offer-${RUN_ID}` })
-    check('another (unrestricted) user can still submit an offer against a request whose owner is now restricted', offerAgainstRestrictedOwner.status === 201, offerAgainstRestrictedOwner)
-  })
+      // Another user can still submit a commercial offer against it -- the
+      // REQUEST OWNER'S restriction does not retroactively freeze new
+      // offers from OTHER users (confirmed product decision: "stays
+      // exactly as-is", no new offer-blocking mechanism keyed off the
+      // request owner's status was added this phase).
+      const offerAgainstRestrictedOwner = await api(renterA.cookie, 'POST', `/api/marketplace/requests/${requestId}/offers`, { offer_type: 'private_offer', amount: 10, idempotency_key: `already-published-offer-${RUN_ID}` })
+      check('another (unrestricted) user can still submit an offer against a request whose owner is now restricted', offerAgainstRestrictedOwner.status === 201, offerAgainstRestrictedOwner)
+    })
+  } finally {
+    // Best-effort QA hygiene ONLY -- changes is_test alone. Never touches
+    // status/offers/requester/timestamps, so the request's real,
+    // legitimately-produced lifecycle (e.g. offers_received from the
+    // offer submitted just above) is preserved exactly as-is, just no
+    // longer publicly discoverable.
+    await admin.from('marketplace_requests').update({ is_test: true }).eq('id', requestId)
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -372,12 +492,29 @@ console.log('=== REAPPROVAL: publish works again once restored, provided KYC/cap
 console.log('=== PUBLICATION_FROZEN interaction: freeze still blocks even an unrestricted account, independent of the new check ===')
 // ══════════════════════════════════════════════════════════════
 {
-  const created = await createRequest(merchantA.cookie, { transaction_type: 'buy', title: `${QA_MARKER} frozen-${RUN_ID}` }, `frozen-create-${RUN_ID}`)
-  await admin.from('merchant_subscriptions').update({ publication_frozen: true }).eq('merchant_id', merchantA.userId)
-  const publishWhileFrozen = await publishRequest(merchantA.cookie, created.json.request_id)
+  // Audit: _assert_not_publication_frozen() (and the request/publish
+  // paths around it) reads only the actor's own merchant_subscriptions
+  // row -- no dependency anywhere on merchantA's specific identity, its
+  // Pro plan, its historical/pre-existing supply, or any other prior
+  // transaction. Safe to move to an independent disposable merchant, so
+  // merchantA's merchant_subscriptions row is never written at all (not
+  // even inside a try/finally -- see the doc comment above
+  // createDisposableQaMerchant). A SEPARATE disposable merchant from the
+  // public-visibility one (freshMerchant) is used here deliberately, even
+  // though nothing currently would conflict -- independent actors mean
+  // this scenario's account-status/lifecycle state can never interact
+  // with that one's, now or if either scenario changes in the future.
+  const frozenTestMerchant = await createDisposableQaMerchant('frozen', { withSubscriptionRow: true })
+  const created = await createRequest(frozenTestMerchant.cookie, { transaction_type: 'buy', title: `${QA_MARKER} frozen-${RUN_ID}` }, `frozen-create-${RUN_ID}`)
+  // This disposable merchant's OWN merchant_subscriptions row -- never
+  // merchantA's, never reused across runs, so no try/finally is needed
+  // for hard-kill safety: an abandoned run's frozen flag on THIS account
+  // has no bearing on any future run, which always creates a different one.
+  await admin.from('merchant_subscriptions').update({ publication_frozen: true }).eq('merchant_id', frozenTestMerchant.userId)
+  const publishWhileFrozen = await publishRequest(frozenTestMerchant.cookie, created.json.request_id)
   check('publish denied while publication_frozen=true (unrelated to account_status, still enforced)', publishWhileFrozen.status === 409, publishWhileFrozen)
-  await admin.from('merchant_subscriptions').update({ publication_frozen: false }).eq('merchant_id', merchantA.userId)
-  const publishAfterUnfreeze = await publishRequest(merchantA.cookie, created.json.request_id)
+  await admin.from('merchant_subscriptions').update({ publication_frozen: false }).eq('merchant_id', frozenTestMerchant.userId)
+  const publishAfterUnfreeze = await publishRequest(frozenTestMerchant.cookie, created.json.request_id)
   check('publish succeeds once unfrozen (account_status check did not block or bypass the freeze gate)', publishAfterUnfreeze.status === 200, publishAfterUnfreeze)
 }
 
@@ -389,6 +526,16 @@ console.log('=== CLEANUP ===')
   if ((leaked ?? []).length > 0) {
     await admin.from('listings').update({ is_test: true }).in('id', leaked.map((l) => l.id))
   }
+  // No exclusion needed here for the ALREADY-PUBLISHED REQUEST fixture --
+  // its own `finally` (above) already quarantines it (is_test=true)
+  // immediately after its public-visibility assertions complete, so by
+  // the time this general sweep runs it's already handled. This section
+  // is now a plain, unconditional catch-all for every other
+  // merchantA/renterA-owned leaked fixture, matching every other
+  // verifier's convention in this codebase. (If a hard kill ever skips
+  // that scenario's own `finally`, quarantineOrphanedPublicFixtures() at
+  // the NEXT run's startup catches it instead -- this section doesn't
+  // need to know about that case either.)
   const { data: leakedRequests } = await admin.from('marketplace_requests').select('id').ilike('title', `${QA_MARKER}%`).eq('is_test', false)
   if ((leakedRequests ?? []).length > 0) {
     await admin.from('marketplace_requests').update({ is_test: true }).in('id', leakedRequests.map((r) => r.id))
@@ -409,6 +556,15 @@ console.log('=== CLEANUP ===')
   const { data: rA } = await admin.from('profiles').select('account_status').eq('id', renterA.userId).single()
   check('merchantA restored to active after all temporary toggles', mA.account_status === 'active', mA)
   check('renterA restored to active after all temporary toggles', rA.account_status === 'active', rA)
+
+  // Deliberately NO cleanup for freshMerchant/its request: this is a true
+  // per-run disposable identity (see createDisposableQaMerchant's doc
+  // comment) -- correctness of the NEXT run must never depend on this
+  // run's cleanup having executed. Its one real (is_test=false) request
+  // is allowed to remain as ordinary historical QA data; the next run
+  // creates an entirely different RUN_ID-scoped account with independent,
+  // zero, prior active supply, so an abandoned/killed run here can never
+  // affect it.
 }
 
 console.log('')

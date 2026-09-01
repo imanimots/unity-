@@ -89,10 +89,26 @@ async function insertBaseListing(merchantId, overrides) {
   if (error) throw new Error(`insertBaseListing failed: ${error.message}`)
   return data.id
 }
-async function createAndPublishRequest(cookie, body, idKey) {
+/**
+ * `opts.isTest` marks the request is_test=true (service-role, prerequisite
+ * setup only) BEFORE publishing -- for the two merchantA-owned fixtures in
+ * this script (ownRequest, otherUserRequest) whose assertions never
+ * require public (is_test=false) visibility. merchantA is a permanent
+ * shared fixture whose real active-supply count (listings + requests
+ * accumulated by every verifier script that has ever run against it) can
+ * exceed its subscription's active_publication_limit, which makes
+ * publish_marketplace_request fail into a silent no-op (request stays
+ * 'draft') -- is_test rows are structurally exempt from that cap check
+ * (see publish_marketplace_request's `if not v_request.is_test` guard),
+ * so this is a permanent fix, not a one-time workaround.
+ */
+async function createAndPublishRequest(cookie, body, idKey, opts = {}) {
   const created = await api(cookie, 'POST', '/api/marketplace/requests', { ...body, idempotency_key: idKey })
   if (created.status !== 201) return { created }
   const requestId = created.json.request_id
+  if (opts.isTest) {
+    await admin.from('marketplace_requests').update({ is_test: true }).eq('id', requestId)
+  }
   const published = await api(cookie, 'POST', `/api/marketplace/requests/${requestId}/publish`, {})
   return { created, requestId, published }
 }
@@ -220,7 +236,8 @@ let linkOfferId, privateOfferId, messageOfferId
   check('15. unverified user cannot commercially respond (server-side)', unverifiedCommercial.status === 403, unverifiedCommercial)
   await admin.from('profiles').update({ kyc_status: renterAProfile.kyc_status }).eq('id', renterA.userId)
 
-  const ownRequest = await createAndPublishRequest(merchantA.cookie, { transaction_type: 'buy', title: `${QA_MARKER} Own Request ${RUN_ID}` }, `p4-own-${RUN_ID}`)
+  const ownRequest = await createAndPublishRequest(merchantA.cookie, { transaction_type: 'buy', title: `${QA_MARKER} Own Request ${RUN_ID}` }, `p4-own-${RUN_ID}`, { isTest: true })
+  if (ownRequest.published?.status !== 200) throw new Error(`ownRequest fixture failed to publish -- cannot continue check 16: ${JSON.stringify(ownRequest)}`)
   const selfOffer = await api(merchantA.cookie, 'POST', `/api/marketplace/requests/${ownRequest.requestId}/offers`, { offer_type: 'private_offer', amount: 100, idempotency_key: `p4-self-${RUN_ID}` })
   check('16. owner cannot offer against their own request', selfOffer.status === 403, selfOffer)
 
@@ -311,11 +328,18 @@ console.log('=== FINANCIAL: request/offer alone never trigger commission/escrow;
 
 console.log('=== SECURITY ===')
 {
-  const otherUserRequest = await createAndPublishRequest(merchantA.cookie, { transaction_type: 'buy', title: `${QA_MARKER} Security Owner ${RUN_ID}` }, `p4-sec-owner-${RUN_ID}`)
+  const otherUserRequest = await createAndPublishRequest(merchantA.cookie, { transaction_type: 'buy', title: `${QA_MARKER} Security Owner ${RUN_ID}` }, `p4-sec-owner-${RUN_ID}`, { isTest: true })
+  if (otherUserRequest.published?.status !== 200) throw new Error(`otherUserRequest fixture failed to publish -- cannot continue Security section: ${JSON.stringify(otherUserRequest)}`)
   const forgedUpdate = await api(merchantB.cookie, 'PATCH', `/api/marketplace/requests/${otherUserRequest.requestId}`, { title: 'hacked' })
   check('36. cross-user request mutation is rejected', forgedUpdate.status === 403, forgedUpdate)
 
   const secOffer = await api(merchantB.cookie, 'POST', `/api/marketplace/requests/${otherUserRequest.requestId}/offers`, { offer_type: 'private_offer', amount: 50, idempotency_key: `p4-sec-off-${RUN_ID}` })
+  // Explicit guard (Part 5): if the offer wasn't actually created, fail
+  // here with a clear message instead of letting `secOffer.json.offer_id`
+  // silently flow through as `undefined` into the next query -- that
+  // previously surfaced as a cryptic "invalid input syntax for type uuid:
+  // \"undefined\"" error deep inside a direct-database RLS check below.
+  if (!secOffer.json?.offer_id) throw new Error(`secOffer fixture failed to create an offer -- cannot continue Security section: ${JSON.stringify(secOffer)}`)
   // A genuinely uninvolved third party -- renterA is neither otherUserRequest's
   // requester (merchantA) nor secOffer's responder (merchantB). Using the
   // request owner here would legitimately be allowed to read (by design,

@@ -321,6 +321,17 @@ console.log('\n=== Payment failure: order.payment_failed email, order stays pend
     description: 'Permanent regression fixture for verify-order-administration.mjs — do not delete.',
     category: 'tools', sale_price: 400,
   })
+  // Self-heal at startup, matching this script's own renterA-KYC precedent
+  // (line ~160): this listing is a shared merchantA fixture, and merchantA's
+  // active-supply count (real listings + requests) has repeatedly exceeded
+  // the subscription-downgrade auto-pause threshold from unrelated
+  // subscription/cap tests -- apply_due_merchant_subscription_changes()
+  // pauses excess *is_test=false* active listings on downgrade. Marking
+  // this fixture is_test=true is a permanent, structural fix: it's
+  // completely excluded from that pause candidate query AND from every
+  // active-supply cap count (never needs public/is_test=false visibility --
+  // create_order() only checks status='active', never is_test).
+  await admin.from('listings').update({ status: 'active', is_test: true }).eq('id', listingId)
 
   const created = await api(renterACookie, 'POST', '/api/orders', { listing_id: listingId, quantity: 1, idempotency_key: 'order-admin-regression-failure-create' })
   const orderId = created.json?.order_id
@@ -363,6 +374,9 @@ console.log('\n=== Payment failure: order.payment_failed email, order stays pend
     description: 'Permanent regression fixture for verify-order-administration.mjs — do not delete.',
     category: 'tools', sale_price: 400,
   })
+  // Same self-heal as the fixture above -- both blocks resolve to the same
+  // shared listing row via insertBaseListing's title lookup.
+  await admin.from('listings').update({ status: 'active', is_test: true }).eq('id', listingId)
   const runSuffix = Date.now()
 
   const created = await api(renterACookie, 'POST', '/api/orders', { listing_id: listingId, quantity: 1, idempotency_key: `order-admin-regression-failure-retry-create-${runSuffix}` })

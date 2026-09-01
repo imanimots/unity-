@@ -153,16 +153,32 @@ async function insertBaseListing(merchantId, overrides) {
   return data.id
 }
 
+/**
+ * RUN_ID-scoped titles (fresh listings every run) + is_test=true --
+ * previously these listings used FIXED titles, reused indefinitely across
+ * every run. Each run's baseline/scenario blocks propose (and often
+ * counter) a barter agreement against the SAME pair without ever
+ * accepting or cancelling it, so barter_locked_listings accumulated one
+ * more unresolved lock per listing per historical run -- eventually
+ * propose_barter's own item-locking guard ("this listing is currently
+ * committed to a barter agreement") rejects EVERY new proposal against
+ * them, including the very first baseline check. Fresh per-run listings
+ * structurally can't carry a lock from a prior run. is_test=true is safe
+ * (propose_barter/counter_barter_offer never reference listings.is_test)
+ * and keeps these fixtures out of merchantA/merchantB's real active-supply
+ * cap count -- consistent with Part 12/13's "no accumulated cap
+ * exhaustion" bar rather than just moving the same problem elsewhere.
+ */
 async function listingPair(label) {
   const a = await insertBaseListing(merchantA.userId, {
-    title: `${QA_LISTING_MARKER} CounterAcctStatus Regression — ${label} A`,
+    title: `${QA_LISTING_MARKER} CounterAcctStatus Regression — ${label} A ${RUN_ID}`,
     description: 'Permanent regression fixture for verify-barter-counter-offer-account-status.mjs — do not delete.',
-    category: 'tech',
+    category: 'tech', is_test: true,
   })
   const b = await insertBaseListing(merchantB.userId, {
-    title: `${QA_LISTING_MARKER} CounterAcctStatus Regression — ${label} B`,
+    title: `${QA_LISTING_MARKER} CounterAcctStatus Regression — ${label} B ${RUN_ID}`,
     description: 'Permanent regression fixture for verify-barter-counter-offer-account-status.mjs — do not delete.',
-    category: 'outdoor',
+    category: 'outdoor', is_test: true,
   })
   return [a, b]
 }
