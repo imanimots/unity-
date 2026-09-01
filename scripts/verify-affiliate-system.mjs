@@ -106,12 +106,25 @@ async function internalApi(path, body) {
   return { status: res.status, json }
 }
 
+// None of Scenarios A-H's product routes (attribution, orders, bookings,
+// barter, the qualification RPCs) ever filter on is_test -- confirmed by
+// source inspection. The one route that does (/api/affiliate/listings,
+// an affiliate's own link-shopping list) is only ever asserted against
+// for an ABSENCE check in this file (Scenario E), which already holds
+// via accepts_affiliates=false regardless of is_test. So every fixture
+// this helper creates defaults to is_test:true from the moment it's
+// created -- never public-eligible at any point, never dependent on a
+// cleanup step running -- rather than created public and swept up
+// later. This is hard-kill safe by construction: there is no window,
+// however small, where one of these listings is public.
 async function insertBaseListing(merchantId, overrides) {
   const { data: existing } = await admin.from('listings').select('id').eq('merchant_id', merchantId).eq('title', overrides.title).maybeSingle()
   if (existing) {
     // Re-assert the fixture's own settings every run, in case a prior
-    // test run's toggle actions (enable/disable) changed accepts_affiliates.
-    await admin.from('listings').update({ accepts_affiliates: overrides.accepts_affiliates ?? true, affiliate_commission_rate: overrides.affiliate_commission_rate ?? 10, status: 'active' }).eq('id', existing.id)
+    // test run's toggle actions (enable/disable) changed accepts_affiliates
+    // -- also re-asserts is_test:true defensively, in case any row
+    // predates this default (e.g. one that shipped before this fix).
+    await admin.from('listings').update({ accepts_affiliates: overrides.accepts_affiliates ?? true, affiliate_commission_rate: overrides.affiliate_commission_rate ?? 10, status: 'active', is_test: true }).eq('id', existing.id)
     return existing.id
   }
   const base = {
@@ -119,10 +132,50 @@ async function insertBaseListing(merchantId, overrides) {
     listing_type: 'sale', quantity_available: 99, status: 'active',
     risk_tier: 'low', ownership_verified: false, condition_confirmed: true,
     accepts_affiliates: true, affiliate_commission_rate: 10,
+    is_test: true,
   }
   const { data, error } = await admin.from('listings').insert({ ...base, ...overrides }).select('id').single()
   if (error) throw new Error(`insertBaseListing failed: ${error.message}`)
   return data.id
+}
+
+// Shared plan-writer -- used ONLY on disposable per-run actors from this
+// point forward (see Scenario I below). Never called with merchantA.id
+// or merchantB.id anywhere in this file.
+async function setPlan(merchantId, planId) {
+  await admin.from('merchant_subscriptions').upsert(
+    { merchant_id: merchantId, current_plan_id: planId, current_plan_effective_at: new Date().toISOString(), pending_plan_id: null, pending_plan_effective_at: null },
+    { onConflict: 'merchant_id' }
+  )
+}
+
+// Fresh, disposable, per-run auth user -- never reused across runs, never
+// restored/reset (safe to abandon in any state, including mid-plan-
+// transition, since no future run's correctness depends on it). Used for
+// every scenario that needs to mutate a merchant's OWN subscription plan,
+// so that a hard kill can never leave a PERMANENT shared QA fixture
+// (merchantA/merchantB/affiliateA/affiliateB) on the wrong plan.
+const DISPOSABLE_USER_PASSWORD = 'DowngradeRegress123!'
+async function createDisposableUser(label, suffix, extraProfileFields = {}) {
+  const email = `qa-affiliate-dg-${label}-${suffix}@unitytest.internal`
+  const { data: user } = await admin.auth.admin.createUser({ email, password: DISPOSABLE_USER_PASSWORD, email_confirm: true })
+  await admin.from('profiles').update({ kyc_status: 'approved', ...extraProfileFields }).eq('id', user.user.id)
+  const { cookie } = await cookieFor(email, DISPOSABLE_USER_PASSWORD)
+  return { userId: user.user.id, cookie, email, password: DISPOSABLE_USER_PASSWORD }
+}
+
+// Immediately quarantines a real-API-created listing to is_test:true --
+// used after the plan-gate scenarios below, since save_listing_draft has
+// no client-settable is_test parameter (by design: real merchants can
+// never self-flag their own listing as test data), so these few rows
+// cannot be created is_test:true directly the way insertBaseListing's
+// fixtures are. The window between creation and this call is the
+// smallest possible; combined with always running on a disposable
+// actor (never merchantA), a crash inside that window only ever
+// strands a throwaway account's listing, never a permanent shared one.
+async function quarantineListing(listingId) {
+  if (!listingId) return
+  await admin.from('listings').update({ is_test: true }).eq('id', listingId)
 }
 
 let failures = 0
@@ -174,6 +227,41 @@ const affiliateBCode = await ensureAffiliateActivated(affiliateBCookie)
 // regardless of incoming state (matches the proven pattern in
 // verify-transaction-verification-hardening.mjs).
 await admin.from('profiles').update({ kyc_status: 'approved' }).eq('id', buyerId)
+
+// merchantA is a PERMANENT, shared QA fixture reused by many other
+// verifiers in this repo -- self-heal it to its canonical baseline
+// unconditionally at the start of every run, regardless of what any
+// prior run (including a crashed one) left behind. This is the root fix
+// for Scenario F's "Enabling affiliates requires an active Pro or Elite
+// subscription" 403: a prior run's Scenario I used to mutate merchantA's
+// own plan directly and could be interrupted before restoring it. Every
+// plan mutation in this script now happens on a disposable per-run actor
+// instead (see Scenario I below) -- this self-heal is the ONLY place
+// merchantA's subscription is ever written, so it always converges to
+// the same canonical value no matter the starting state.
+await admin.from('profiles').update({ account_status: 'active', kyc_status: 'approved' }).eq('id', merchantA.id)
+await admin.from('merchant_subscriptions').upsert(
+  { merchant_id: merchantA.id, current_plan_id: 'pro', current_plan_effective_at: new Date().toISOString(), pending_plan_id: null, pending_plan_effective_at: null, publication_frozen: false, status: 'active' },
+  { onConflict: 'merchant_id' }
+)
+
+// Narrow, defense-in-depth startup hygiene, scoped ONLY to this script's
+// own "Affiliate Regression —" title prefix (never a global `[QA]%`
+// sweep) -- NOT relied on for correctness (every fixture this script
+// creates is now either is_test:true from the moment of creation, via
+// insertBaseListing, or quarantined immediately after creation via
+// quarantineListing(), for the handful of real-API-created plan-gate
+// listings that have no client-settable is_test field). This only
+// exists to catch the narrowest possible residue window: a hard kill
+// landing between a plan-gate listing's creation and its immediate
+// quarantine call. Mutates is_test only, never status/title/owner.
+{
+  const { data: orphaned } = await admin.from('listings').select('id').ilike('title', `${QA_LISTING_MARKER} Affiliate Regression —%`).eq('is_test', false)
+  if (orphaned && orphaned.length > 0) {
+    await admin.from('listings').update({ is_test: true }).in('id', orphaned.map((l) => l.id))
+    console.log(`  (startup hygiene: quarantined ${orphaned.length} abandoned Affiliate Regression fixture(s) from a prior interrupted run)`)
+  }
+}
 
 console.log('=== Scenario A: Listing enablement ===')
 {
@@ -530,63 +618,70 @@ console.log('\n=== Scenario I: Plan-gate enforcement (P1 remediation) ===')
 {
   // save_listing_draft/enable_listing_affiliate previously enforced the
   // Pro/Elite gate inconsistently -- this scenario proves every path
-  // that can set accepts_affiliates=true agrees. merchantA's live plan
-  // is captured and restored at the end so scenarios A-H (which run
-  // before this one, against whatever tier merchantA already has) and
-  // any later run of this script are unaffected by the tier changes
-  // made here.
-  const { data: originalSub } = await admin.from('merchant_subscriptions').select('current_plan_id').eq('merchant_id', merchantA.id).maybeSingle()
-  const originalPlanId = originalSub?.current_plan_id ?? 'starter'
+  // that can set accepts_affiliates=true agrees.
+  //
+  // Runs entirely against a FRESH, DISPOSABLE per-run merchant, never
+  // merchantA -- this scenario's own assertions (I-A through I-G) only
+  // ever depend on the ACTING merchant's plan tier, never on
+  // merchantA's specific identity, history, or shared fixture graph, so
+  // there is no reason to risk the permanent shared account. This also
+  // means there is nothing to "capture and restore": a disposable actor
+  // can be abandoned mid-plan-transition by a hard kill with zero effect
+  // on any future run (see this phase's report, Hard-Kill Plan Matrix).
+  const pgSuffix = `${Date.now()}pg`
+  const planGateMerchant = await createDisposableUser('plangate', pgSuffix, { role: 'merchant' })
 
-  async function setPlan(merchantId, planId) {
-    await admin.from('merchant_subscriptions').upsert(
-      { merchant_id: merchantId, current_plan_id: planId, current_plan_effective_at: new Date().toISOString(), pending_plan_id: null, pending_plan_effective_at: null },
-      { onConflict: 'merchant_id' }
-    )
-  }
-
-  const runSuffix = Date.now()
+  // I-H/I-H2 (from the pre-fix version of this script) are intentionally
+  // NOT reproduced here: "historical commissions survive downgrade" and
+  // "a Pro-created listing stays grandfathered after downgrade" are the
+  // exact same product assertions the Downgrade-authority correction
+  // block below already proves, more rigorously (exact row/status
+  // identity, not just a count), against its own disposable actor
+  // (dgMerchant). Keeping both would test the identical code path
+  // twice under two different disposable actors for no additional
+  // coverage.
 
   // A. Starter creating a listing with accepts_affiliates=true is rejected.
-  await setPlan(merchantA.id, 'starter')
-  const starterCreate = await api(merchantACookie, 'POST', '/api/listings', {
+  await setPlan(planGateMerchant.userId, 'starter')
+  const starterCreate = await api(planGateMerchant.cookie, 'POST', '/api/listings', {
     listing: {
-      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Starter Create ${runSuffix}`,
+      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Starter Create ${pgSuffix}`,
       description: 'Plan gate regression fixture listing used to prove the affiliate entitlement gate is enforced consistently.', category: 'tech', condition: 'good',
       listing_type: 'rental', daily_rate: 100, accepts_affiliates: true, affiliate_commission_rate: 10,
     },
     requirements: {}, media: [],
-    idempotency_key: `affiliate-regression-plangate-starter-create-${runSuffix}`,
+    idempotency_key: `affiliate-regression-plangate-starter-create-${pgSuffix}`,
   })
   check('I-A. Starter create with accepts_affiliates=true is rejected (403)', starterCreate.status === 403, starterCreate)
   check('I-A2. no listing was actually created', !starterCreate.json?.listing_id, starterCreate)
 
   // B. Starter editing a draft from false -> true is blocked.
-  const starterDraft = await api(merchantACookie, 'POST', '/api/listings', {
+  const starterDraft = await api(planGateMerchant.cookie, 'POST', '/api/listings', {
     listing: {
-      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Starter Edit ${runSuffix}`,
+      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Starter Edit ${pgSuffix}`,
       description: 'Plan gate regression fixture listing used to prove the affiliate entitlement gate is enforced consistently.', category: 'tech', condition: 'good',
       listing_type: 'rental', daily_rate: 100, accepts_affiliates: false,
     },
     requirements: {}, media: [],
-    idempotency_key: `affiliate-regression-plangate-starter-draft-${runSuffix}`,
+    idempotency_key: `affiliate-regression-plangate-starter-draft-${pgSuffix}`,
   })
   const starterDraftId = starterDraft.json?.listing_id
   check('starter draft fixture (affiliates off) created', !!starterDraftId, starterDraft)
+  await quarantineListing(starterDraftId)
 
   // save_listing_draft always re-validates category (looks it up fresh on
   // every call, create or edit -- a pre-existing property of the RPC,
   // unrelated to this remediation), so every call below resends the full
   // required field set, matching how the real listing wizard accumulates
   // and resends full form state on every step rather than true partial patches.
-  const starterEdit = await api(merchantACookie, 'POST', '/api/listings', {
+  const starterEdit = await api(planGateMerchant.cookie, 'POST', '/api/listings', {
     listing_id: starterDraftId,
     listing: {
       category: 'tech', description: 'Plan gate regression fixture listing used to prove the affiliate entitlement gate is enforced consistently.',
       accepts_affiliates: true, affiliate_commission_rate: 10,
     },
     requirements: {}, media: [],
-    idempotency_key: `affiliate-regression-plangate-starter-edit-${runSuffix}`,
+    idempotency_key: `affiliate-regression-plangate-starter-edit-${pgSuffix}`,
   })
   check('I-B. Starter editing a draft from false -> true is blocked (403)', starterEdit.status === 403, starterEdit)
   const { data: starterDraftAfter } = await admin.from('listings').select('accepts_affiliates').eq('id', starterDraftId).single()
@@ -595,95 +690,82 @@ console.log('\n=== Scenario I: Plan-gate enforcement (P1 remediation) ===')
   // Re-saving the SAME draft without touching accepts_affiliates (still
   // false -> false) must succeed normally -- the gate only fires on an
   // actual transition into true, not on every save by a Starter merchant.
-  const starterNoopSave = await api(merchantACookie, 'POST', '/api/listings', {
+  const starterNoopSave = await api(planGateMerchant.cookie, 'POST', '/api/listings', {
     listing_id: starterDraftId,
     listing: {
       category: 'tech', description: 'Plan gate regression fixture listing, description updated without touching affiliate settings at all.',
       listing_type: 'rental', daily_rate: 100,
     },
     requirements: {}, media: [],
-    idempotency_key: `affiliate-regression-plangate-starter-noop-${runSuffix}`,
+    idempotency_key: `affiliate-regression-plangate-starter-noop-${pgSuffix}`,
   })
   check('I-B3. Starter can still save a draft that does not touch accepts_affiliates', starterNoopSave.status === 200, starterNoopSave)
 
   // C. Starter calling save_listing_draft directly (bypassing the route) is blocked server-side.
-  const merchantAClient = createClient(SUPABASE_URL, ANON_KEY)
-  await merchantAClient.auth.signInWithPassword({ email: creds.accounts.merchantA.email, password: creds.accounts.merchantA.password })
-  const directRpc = await merchantAClient.rpc('save_listing_draft', {
+  const planGateClient = createClient(SUPABASE_URL, ANON_KEY)
+  await planGateClient.auth.signInWithPassword({ email: planGateMerchant.email, password: planGateMerchant.password })
+  const directRpc = await planGateClient.rpc('save_listing_draft', {
     p_listing_id: null,
     p_listing: {
-      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Direct RPC ${runSuffix}`,
+      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Direct RPC ${pgSuffix}`,
       description: 'Plan gate regression fixture listing used to prove the affiliate entitlement gate is enforced consistently.', category: 'tech', condition: 'good',
       listing_type: 'rental', daily_rate: 100, accepts_affiliates: true, affiliate_commission_rate: 10,
     },
     p_requirements: {}, p_media: [],
-    p_idempotency_key: `affiliate-regression-plangate-direct-rpc-${runSuffix}`,
+    p_idempotency_key: `affiliate-regression-plangate-direct-rpc-${pgSuffix}`,
   })
   check('I-C. Starter calling save_listing_draft directly is blocked server-side', !!directRpc.error && /affiliate_requires_pro_or_elite/.test(directRpc.error.message), directRpc)
 
   // D. Starter calling enable_listing_affiliate on their own listing is blocked (the already-gated path, confirmed still gated for the caller's OWN listing, not just a different merchant's).
-  const dedicatedEnable = await api(merchantACookie, 'POST', `/api/listings/${starterDraftId}/affiliate/enable`, { idempotency_key: `affiliate-regression-plangate-dedicated-${runSuffix}` })
+  const dedicatedEnable = await api(planGateMerchant.cookie, 'POST', `/api/listings/${starterDraftId}/affiliate/enable`, { idempotency_key: `affiliate-regression-plangate-dedicated-${pgSuffix}` })
   check('I-D. Starter calling the dedicated enable route on their own listing is blocked', dedicatedEnable.status === 403, dedicatedEnable)
 
   // E. Pro merchant create/save with affiliates enabled is allowed.
-  await setPlan(merchantA.id, 'pro')
-  const proCreate = await api(merchantACookie, 'POST', '/api/listings', {
+  await setPlan(planGateMerchant.userId, 'pro')
+  const proCreate = await api(planGateMerchant.cookie, 'POST', '/api/listings', {
     listing: {
-      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Pro Create ${runSuffix}`,
+      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Pro Create ${pgSuffix}`,
       description: 'Plan gate regression fixture listing used to prove the affiliate entitlement gate is enforced consistently.', category: 'tech', condition: 'good',
       listing_type: 'rental', daily_rate: 100, accepts_affiliates: true, affiliate_commission_rate: 10,
     },
     requirements: {}, media: [],
-    idempotency_key: `affiliate-regression-plangate-pro-create-${runSuffix}`,
+    idempotency_key: `affiliate-regression-plangate-pro-create-${pgSuffix}`,
   })
   check('I-E. Pro create with accepts_affiliates=true is allowed', proCreate.status === 200 && !!proCreate.json?.listing_id, proCreate)
+  await quarantineListing(proCreate.json?.listing_id)
 
   // F. Elite merchant create/save with affiliates enabled is allowed.
-  await setPlan(merchantA.id, 'elite')
-  const eliteCreate = await api(merchantACookie, 'POST', '/api/listings', {
+  await setPlan(planGateMerchant.userId, 'elite')
+  const eliteCreate = await api(planGateMerchant.cookie, 'POST', '/api/listings', {
     listing: {
-      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Elite Create ${runSuffix}`,
+      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Elite Create ${pgSuffix}`,
       description: 'Plan gate regression fixture listing used to prove the affiliate entitlement gate is enforced consistently.', category: 'tech', condition: 'good',
       listing_type: 'rental', daily_rate: 100, accepts_affiliates: true, affiliate_commission_rate: 10,
     },
     requirements: {}, media: [],
-    idempotency_key: `affiliate-regression-plangate-elite-create-${runSuffix}`,
+    idempotency_key: `affiliate-regression-plangate-elite-create-${pgSuffix}`,
   })
   check('I-F. Elite create with accepts_affiliates=true is allowed', eliteCreate.status === 200 && !!eliteCreate.json?.listing_id, eliteCreate)
+  await quarantineListing(eliteCreate.json?.listing_id)
 
-  // G. Downgrade to Starter blocks future/new affiliate participation --
-  // an already-existing grandfathered listing (proCreate above, enabled
-  // while Pro) is deliberately left untouched by downgrade (matches
-  // docs/AFFILIATE_SYSTEM.md's grandfathering rule -- see the final
-  // report's Downgrade Behavior section for why this is not treated as
-  // part of this remediation); only a NEW transition into true is
-  // re-blocked once back on Starter.
-  await setPlan(merchantA.id, 'starter')
-  const afterDowngradeNewEnable = await api(merchantACookie, 'POST', '/api/listings', {
+  // G. Downgrade to Starter blocks future/new affiliate participation.
+  await setPlan(planGateMerchant.userId, 'starter')
+  const afterDowngradeNewEnable = await api(planGateMerchant.cookie, 'POST', '/api/listings', {
     listing: {
-      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Post-Downgrade ${runSuffix}`,
+      title: `${QA_LISTING_MARKER} Affiliate Regression — Plan Gate Post-Downgrade ${pgSuffix}`,
       description: 'Plan gate regression fixture listing used to prove the affiliate entitlement gate is enforced consistently.', category: 'tech', condition: 'good',
       listing_type: 'rental', daily_rate: 100, accepts_affiliates: true, affiliate_commission_rate: 10,
     },
     requirements: {}, media: [],
-    idempotency_key: `affiliate-regression-plangate-postdowngrade-${runSuffix}`,
+    idempotency_key: `affiliate-regression-plangate-postdowngrade-${pgSuffix}`,
   })
   check('I-G. after downgrading to Starter, a NEW affiliate-enabled listing is blocked', afterDowngradeNewEnable.status === 403, afterDowngradeNewEnable)
+  await quarantineListing(afterDowngradeNewEnable.json?.listing_id)
 
-  // H. Historical commission/attribution rows survive the downgrade --
-  // Scenario C/D's commissions (created earlier in this same run, for
-  // merchantA regardless of its tier at the time) must still be present
-  // and unchanged after merchantA is back on Starter.
-  const { count: survivingCommissions } = await admin.from('affiliate_commissions').select('id', { count: 'exact', head: true }).eq('merchant_id', merchantA.id)
-  check('I-H. historical commission rows still exist after downgrade', (survivingCommissions ?? 0) > 0, { survivingCommissions })
-  const { data: grandfatheredListing } = await admin.from('listings').select('accepts_affiliates').eq('id', proCreate.json.listing_id).single()
-  check('I-H2. a listing enabled while Pro remains accepts_affiliates=true after downgrade (grandfathered, untouched)', grandfatheredListing.accepts_affiliates === true, grandfatheredListing)
-
-  // Restore merchantA's original plan so this script's own repeated runs,
-  // and every other verifier that assumes today's live baseline, are unaffected.
-  await setPlan(merchantA.id, originalPlanId)
-  const { data: restoredSub } = await admin.from('merchant_subscriptions').select('current_plan_id').eq('merchant_id', merchantA.id).maybeSingle()
-  check('merchantA plan restored to its original value', restoredSub?.current_plan_id === originalPlanId, restoredSub)
+  // planGateMerchant is disposable and never reused -- deleted alongside
+  // the downgrade-scenario's own disposable actors at the end of this
+  // block (see the shared cleanup loop below). No plan restore needed:
+  // nothing about this account's final state can affect any future run.
 
   // ---- Downgrade-authority correction: grandfathered listing config
   // must NOT equal current merchant entitlement for NEW attribution/
@@ -694,13 +776,7 @@ console.log('\n=== Scenario I: Plan-gate enforcement (P1 remediation) ===')
   // separately-tracked KYC state.
   console.log('\n=== Scenario I continued: current-plan gate for NEW attribution/commission across downgrade ===')
   const dgSuffix = `${Date.now()}dg`
-  async function dgDisposableUser(label, extraProfileFields = {}) {
-    const email = `qa-affiliate-dg-${label}-${dgSuffix}@unitytest.internal`
-    const { data: user } = await admin.auth.admin.createUser({ email, password: 'DowngradeRegress123!', email_confirm: true })
-    await admin.from('profiles').update({ kyc_status: 'approved', ...extraProfileFields }).eq('id', user.user.id)
-    const { cookie } = await cookieFor(email, 'DowngradeRegress123!')
-    return { userId: user.user.id, cookie }
-  }
+  const dgDisposableUser = (label, extraProfileFields) => createDisposableUser(label, dgSuffix, extraProfileFields)
 
   const dgMerchant = await dgDisposableUser('merchant', { role: 'merchant' })
   await setPlan(dgMerchant.userId, 'pro')
@@ -821,10 +897,11 @@ console.log('\n=== Scenario I: Plan-gate enforcement (P1 remediation) ===')
   // any of this -- already re-asserted above/before this block; not
   // repeated here to avoid duplicating those checks.
 
-  for (const uid of [dgMerchant.userId, dgRenter1.userId, dgRenter2.userId, dgRenter3.userId, dgRenter4.userId]) {
+  console.log(`  disposable actor ids this run: planGateMerchant=${planGateMerchant.userId} dgMerchant=${dgMerchant.userId} dgRenter1=${dgRenter1.userId} dgRenter2=${dgRenter2.userId} dgRenter3=${dgRenter3.userId} dgRenter4=${dgRenter4.userId}`)
+  for (const uid of [planGateMerchant.userId, dgMerchant.userId, dgRenter1.userId, dgRenter2.userId, dgRenter3.userId, dgRenter4.userId]) {
     await admin.auth.admin.deleteUser(uid)
   }
-  console.log('  (downgrade regression fixtures cleaned up)')
+  console.log('  (plan-gate + downgrade regression fixtures cleaned up)')
 }
 
 console.log('\n=== SUMMARY ===')
