@@ -8,9 +8,12 @@
  * idempotency key (RUN_ID suffix) for genuinely new fixtures, or is
  * explicitly designed to be safely re-driven from live state (mirroring
  * createCompletedBooking()'s state-guarded steps from
- * verify-merchant-payout-workflow.mjs). merchantA/merchantB are reset to
- * a known Starter baseline via admin_correct_merchant_subscription()
- * (Phase 1) at the start of every run.
+ * verify-merchant-payout-workflow.mjs). Every plan-dependent scenario
+ * uses a fresh, disposable, per-run merchant (created via
+ * createDisposableMerchant() below) via admin_correct_merchant_
+ * subscription() (Phase 1) -- the permanent shared merchantA/merchantB
+ * QA fixtures are never touched by this script at all, so a hard kill at
+ * any point can never leave them on the wrong plan for a later suite.
  *
  * SAFETY: same gate as every other verify-*.mjs script.
  * Usage: node scripts/verify-commissions-phase2.mjs
@@ -213,6 +216,26 @@ async function getCommissionByPayment(paymentId) {
   return data
 }
 
+// Fresh, disposable, per-run merchant -- never reused across runs, never
+// restored, safe to abandon in any plan state. Every plan-dependent
+// scenario in this script uses one of these instead of the permanent
+// shared merchantA/merchantB fixtures (see this phase's report for why:
+// the pre-fix script's own "reset to Starter" at the end of every run
+// was a confirmed, reproducible no-op -- it reused the exact same
+// idempotency key as the START-of-run reset, so admin_correct_merchant_
+// subscription() just replayed the cached start-of-run result instead of
+// actually re-applying Starter, silently leaving both permanent merchants
+// on whatever plan the last real setPlan() call left them on, every
+// single successful run, not just interrupted ones).
+const DISPOSABLE_MERCHANT_PASSWORD = 'CommissionRegress123!'
+async function createDisposableMerchant(label) {
+  const email = `qa-commission-${label}-${RUN_ID}@unitytest.internal`
+  const { data: user } = await admin.auth.admin.createUser({ email, password: DISPOSABLE_MERCHANT_PASSWORD, email_confirm: true })
+  await admin.from('profiles').update({ role: 'merchant', kyc_status: 'approved', account_status: 'active' }).eq('id', user.user.id)
+  const signedIn = await signIn(email, DISPOSABLE_MERCHANT_PASSWORD)
+  return { userId: user.user.id, cookie: signedIn.cookie, client: signedIn.client }
+}
+
 // ── Load QA accounts ──
 let creds
 try {
@@ -222,29 +245,59 @@ try {
   process.exit(1)
 }
 
-const { cookie: merchantACookie, userId: merchantAId, client: merchantAClient } = await signIn(creds.accounts.merchantA.email, creds.accounts.merchantA.password)
-const { userId: merchantBId } = await signIn(creds.accounts.merchantB.email, creds.accounts.merchantB.password)
 const { cookie: renterACookie, userId: renterAId } = await signIn(creds.accounts.renterA.email, creds.accounts.renterA.password)
 const { userId: affiliateAId } = await signIn(creds.accounts.affiliateA.email, creds.accounts.affiliateA.password)
 const { cookie: adminCookie, userId: adminId } = await signIn(creds.accounts.admin.email, creds.accounts.admin.password)
 
-console.log('=== Baseline reset ===')
-await resetToStarter(merchantAId, adminId)
-await resetToStarter(merchantBId, adminId)
-console.log(`  merchantA (${merchantAId}) and merchantB (${merchantBId}) reset to Starter`)
 // renterA must be KYC-approved to create the bookings/orders this script
 // depends on throughout -- self-heal to the documented QA baseline
 // regardless of incoming state (matches the proven pattern already used
 // in verify-transaction-verification-hardening.mjs), rather than assuming
 // a shared permanent fixture is always in the state a prior script left it.
+// This is a pure self-heal (idempotent, no later transition, no
+// restore-at-end dependency) -- categorically different from a temporary
+// plan mutation, which is why renterA's KYC status needs no disposable
+// actor of its own.
 await admin.from('profiles').update({ kyc_status: 'approved' }).eq('id', renterAId)
+
+console.log('=== Disposable commission-scenario merchants ===')
+// Rental: starts Starter (Scenario A), transitions to Pro mid-run
+// (Scenario C) -- the transition itself is under test (a historical
+// commission snapshot must survive a later upgrade), so this scenario
+// pair shares ONE disposable actor across the transition rather than two
+// plan-stable ones, per this phase's "keep the real transition, just on
+// a disposable actor" guidance.
+const commissionRentalMerchant = await createDisposableMerchant('rental')
+await resetToStarter(commissionRentalMerchant.userId, adminId)
+// Sale: same before/after-upgrade pattern as rental, for the sale-side
+// plan-aware rate assertions (Scenario D).
+const commissionSaleMerchant = await createDisposableMerchant('sale')
+await resetToStarter(commissionSaleMerchant.userId, adminId)
+// High-value sale (Scenario E) only ever needs "a merchant on Pro" -- no
+// transition is under test here, so it gets its own plan-STABLE
+// disposable actor instead of reusing/coupling to commissionSaleMerchant.
+const commissionHighValueMerchant = await createDisposableMerchant('highvalue')
+await setPlan(commissionHighValueMerchant.userId, adminId, 'pro')
+// Affiliate + Unity commission coexistence (Scenario G) likewise only
+// needs "a merchant on Pro" -- decoupled from Scenario C's transition.
+const commissionAffiliateMerchant = await createDisposableMerchant('affiliate')
+await setPlan(commissionAffiliateMerchant.userId, adminId, 'pro')
+// Refund/dispute/payout/large-pool scenarios (H, I, J, L, M) never assert
+// a specific plan or rate value -- they check refund/dispute/payout
+// mechanics against whatever rate the commission was originally
+// qualified at, so one shared plan-agnostic disposable actor covers all
+// of them (kept on Starter for simplicity; the specific value is
+// irrelevant to what these scenarios check).
+const commissionAuxMerchant = await createDisposableMerchant('aux')
+await resetToStarter(commissionAuxMerchant.userId, adminId)
+console.log(`  rental=${commissionRentalMerchant.userId} sale=${commissionSaleMerchant.userId} highvalue=${commissionHighValueMerchant.userId} affiliate=${commissionAffiliateMerchant.userId} aux=${commissionAuxMerchant.userId}`)
 console.log(`  renterA (${renterAId}) kyc_status ensured approved`)
 
 console.log('=== Scenario A: Rental commission -- plan-aware, ledger platform_fee, deposit exclusion ===')
 let scenarioABookingId, scenarioAPaymentId, scenarioACommission
 {
-  const listingId = await insertRentalListing(merchantAId, `${QA_LISTING_MARKER} — Rental A`, { deposit_required: true, deposit_amount: 500 })
-  const { bookingId, paymentId, amount } = await chargeBookingOnly(renterACookie, merchantACookie, listingId, `rental-a-${RUN_ID}`)
+  const listingId = await insertRentalListing(commissionRentalMerchant.userId, `${QA_LISTING_MARKER} — Rental A`, { deposit_required: true, deposit_amount: 500 })
+  const { bookingId, paymentId, amount } = await chargeBookingOnly(renterACookie, commissionRentalMerchant.cookie, listingId, `rental-a-${RUN_ID}`)
   scenarioABookingId = bookingId
   scenarioAPaymentId = paymentId
 
@@ -277,13 +330,13 @@ console.log('=== Scenario B: Idempotent duplicate qualification event ===')
 
 console.log('=== Scenario C: Historical plan snapshot survives a later upgrade ===')
 {
-  await setPlan(merchantAId, adminId, 'pro')
+  await setPlan(commissionRentalMerchant.userId, adminId, 'pro')
 
   const { data: commissionAfterUpgrade } = await admin.from('unity_commissions').select('merchant_plan_id, standard_rate_bps, commission_amount').eq('id', scenarioACommission.id).single()
   check('C1. an already-qualified commission keeps its original Starter plan/rate after the merchant upgrades', commissionAfterUpgrade.merchant_plan_id === 'starter' && commissionAfterUpgrade.standard_rate_bps === 1200, commissionAfterUpgrade)
 
-  const listingId = await insertRentalListing(merchantAId, `${QA_LISTING_MARKER} — Rental C (Pro)`)
-  const { paymentId, amount } = await chargeBookingOnly(renterACookie, merchantACookie, listingId, `rental-c-${RUN_ID}`)
+  const listingId = await insertRentalListing(commissionRentalMerchant.userId, `${QA_LISTING_MARKER} — Rental C (Pro)`)
+  const { paymentId, amount } = await chargeBookingOnly(renterACookie, commissionRentalMerchant.cookie, listingId, `rental-c-${RUN_ID}`)
   const newCommission = await getCommissionByPayment(paymentId)
   const expectedProCommission = Math.round(amount * 10) / 100 // Pro rental 10%
   check('C2. a NEW booking qualified after the upgrade correctly uses the new Pro rate', !!newCommission && newCommission.standard_rate_bps === 1000 && Number(newCommission.commission_amount) === expectedProCommission, { newCommission, expectedProCommission })
@@ -291,13 +344,13 @@ console.log('=== Scenario C: Historical plan snapshot survives a later upgrade =
 
 console.log('=== Scenario D: Sale commission -- plan-aware ===')
 {
-  const listingId = await insertSaleListing(merchantBId, `${QA_LISTING_MARKER} — Sale D (Starter)`, 1000)
+  const listingId = await insertSaleListing(commissionSaleMerchant.userId, `${QA_LISTING_MARKER} — Sale D (Starter)`, 1000)
   const { paymentId } = await completeOrderPurchase(renterACookie, listingId, `sale-d-starter-${RUN_ID}`)
   const commission = await getCommissionByPayment(paymentId)
   check('D1. sale commission qualifies with the Starter rate (6%)', !!commission && commission.standard_rate_bps === 600 && Number(commission.commission_amount) === 60, commission)
 
-  await setPlan(merchantBId, adminId, 'pro')
-  const listingId2 = await insertSaleListing(merchantBId, `${QA_LISTING_MARKER} — Sale D (Pro)`, 1000)
+  await setPlan(commissionSaleMerchant.userId, adminId, 'pro')
+  const listingId2 = await insertSaleListing(commissionSaleMerchant.userId, `${QA_LISTING_MARKER} — Sale D (Pro)`, 1000)
   const { paymentId: paymentId2 } = await completeOrderPurchase(renterACookie, listingId2, `sale-d-pro-${RUN_ID}`)
   const commission2 = await getCommissionByPayment(paymentId2)
   check('D2. a sale after upgrading to Pro correctly uses the new rate (5%)', !!commission2 && commission2.standard_rate_bps === 500 && Number(commission2.commission_amount) === 50, commission2)
@@ -305,7 +358,7 @@ console.log('=== Scenario D: Sale commission -- plan-aware ===')
 
 console.log('=== Scenario E: High-value sale (R250,000, merchant on Pro) ===')
 {
-  const listingId = await insertSaleListing(merchantBId, `${QA_LISTING_MARKER} — Sale E (High-value)`, 250_000)
+  const listingId = await insertSaleListing(commissionHighValueMerchant.userId, `${QA_LISTING_MARKER} — Sale E (High-value)`, 250_000)
   const { paymentId } = await completeOrderPurchase(renterACookie, listingId, `sale-e-highvalue-${RUN_ID}`)
   const commission = await getCommissionByPayment(paymentId)
   check('E1. R250,000 sale on Pro produces exactly R6,500 commission', !!commission && Number(commission.commission_amount) === 6500, commission)
@@ -340,7 +393,7 @@ console.log('=== Scenario F: Barter is structurally excluded from Unity commissi
 
 console.log('=== Scenario G: Affiliate + Unity commission coexistence, and merchant payout integration ===')
 {
-  const listingId = await insertRentalListing(merchantAId, `${QA_LISTING_MARKER} — Rental G (Affiliate)`, { accepts_affiliates: true, affiliate_commission_rate: 10 })
+  const listingId = await insertRentalListing(commissionAffiliateMerchant.userId, `${QA_LISTING_MARKER} — Rental G (Affiliate)`, { accepts_affiliates: true, affiliate_commission_rate: 10 })
 
   // Real attribution via the actual RPC (mirrors the app's own open_affiliate_attribution call site).
   await admin.rpc('open_affiliate_attribution', {
@@ -351,12 +404,12 @@ console.log('=== Scenario G: Affiliate + Unity commission coexistence, and merch
     p_idempotency_key: `commission-regression-attribution-${RUN_ID}`,
   })
 
-  const { bookingId, paymentId, amount } = await createCompletedBooking(renterACookie, merchantACookie, listingId, `rental-g-${RUN_ID}`)
+  const { bookingId, paymentId, amount } = await createCompletedBooking(renterACookie, commissionAffiliateMerchant.cookie, listingId, `rental-g-${RUN_ID}`)
 
   const unityCommission = await getCommissionByPayment(paymentId)
   const { data: affiliateCommission } = await admin.from('affiliate_commissions').select('*').eq('payment_id', paymentId).maybeSingle()
 
-  const expectedUnityCommission = Math.round(amount * 10) / 100 // merchantA is on Pro from Scenario C
+  const expectedUnityCommission = Math.round(amount * 10) / 100 // commissionAffiliateMerchant is a dedicated disposable Pro-tier actor
   const expectedAffiliateReward = Math.round(amount * 10) / 100 // 10% affiliate rate set above
 
   check('G1. Unity commission qualifies independently of the affiliate commission', !!unityCommission && Number(unityCommission.commission_amount) === expectedUnityCommission, unityCommission)
@@ -370,7 +423,7 @@ console.log('=== Scenario G: Affiliate + Unity commission coexistence, and merch
 
 console.log('=== Scenario H: Full refund -> commission voided ===')
 {
-  const listingId = await insertSaleListing(merchantBId, `${QA_LISTING_MARKER} — Sale H (Full refund)`, 1000)
+  const listingId = await insertSaleListing(commissionAuxMerchant.userId, `${QA_LISTING_MARKER} — Sale H (Full refund)`, 1000)
   const { paymentId } = await completeOrderPurchase(renterACookie, listingId, `sale-h-fullrefund-${RUN_ID}`)
   const commissionBefore = await getCommissionByPayment(paymentId)
   check('H1. commission qualified before the refund', commissionBefore?.status === 'pending', commissionBefore)
@@ -396,7 +449,7 @@ console.log('=== Scenario H: Full refund -> commission voided ===')
 
 console.log('=== Scenario I: Partial refund -> proportional adjustment, idempotent on retry ===')
 {
-  const listingId = await insertSaleListing(merchantBId, `${QA_LISTING_MARKER} — Sale I (Partial refund)`, 1000)
+  const listingId = await insertSaleListing(commissionAuxMerchant.userId, `${QA_LISTING_MARKER} — Sale I (Partial refund)`, 1000)
   const { paymentId } = await completeOrderPurchase(renterACookie, listingId, `sale-i-partialrefund-${RUN_ID}`)
   const commissionBefore = await getCommissionByPayment(paymentId)
 
@@ -407,10 +460,10 @@ console.log('=== Scenario I: Partial refund -> proportional adjustment, idempote
   await internalApi('/api/internal/commissions/reconcile-refunds')
   const commissionAfter = await getCommissionByPayment(paymentId)
   // Derived from the commission's own rate snapshot, not a hardcoded
-  // plan assumption -- merchantB's plan at this point in the script
-  // depends on which earlier scenarios already ran (D/E upgrade it to
-  // Pro). Refunded R400 of R1000 (40%) -> remaining eligible base R600,
-  // commission recomputed on R600 at the ORIGINAL snapshot rate.
+  // plan assumption -- commissionAuxMerchant is plan-agnostic by design
+  // (kept on Starter, see setup above; the specific rate is irrelevant to
+  // this check). Refunded R400 of R1000 (40%) -> remaining eligible base
+  // R600, commission recomputed on R600 at the ORIGINAL snapshot rate.
   const expectedEffective = Math.round(600 * commissionBefore.standard_rate_bps) / 10000
   const { data: adjustments } = await admin.from('unity_commission_adjustments').select('amount').eq('commission_id', commissionBefore.id)
   const effectiveAmount = Number(commissionBefore.commission_amount) + (adjustments ?? []).reduce((sum, a) => sum + Number(a.amount), 0)
@@ -424,8 +477,8 @@ console.log('=== Scenario I: Partial refund -> proportional adjustment, idempote
 
 console.log('=== Scenario J: Dispute hold and release ===')
 {
-  const listingId = await insertRentalListing(merchantAId, `${QA_LISTING_MARKER} — Rental J (Dispute)`)
-  const { bookingId, paymentId } = await chargeBookingOnly(renterACookie, merchantACookie, listingId, `rental-j-${RUN_ID}`)
+  const listingId = await insertRentalListing(commissionAuxMerchant.userId, `${QA_LISTING_MARKER} — Rental J (Dispute)`)
+  const { bookingId, paymentId } = await chargeBookingOnly(renterACookie, commissionAuxMerchant.cookie, listingId, `rental-j-${RUN_ID}`)
 
   const { data: existingDispute } = await admin.from('disputes').select('id, status').eq('booking_id', bookingId).not('status', 'in', '(resolved,closed,cancelled)').maybeSingle()
   let disputeId = existingDispute?.id
@@ -456,21 +509,21 @@ console.log('=== Scenario J: Dispute hold and release ===')
 
 console.log('=== Scenario K: Security -- unauthorized writes, merchant visibility, admin access ===')
 {
-  const { error: directRpcError } = await merchantAClient.rpc('qualify_rental_payment_unity_commission', {
+  const { error: directRpcError } = await commissionRentalMerchant.client.rpc('qualify_rental_payment_unity_commission', {
     p_booking_id: scenarioABookingId, p_payment_id: scenarioAPaymentId, p_idempotency_key: `commission-regression-forged-${RUN_ID}`,
   })
   const rpcBlocked = !!directRpcError && (directRpcError.message.includes('not authorized') || directRpcError.message.includes('permission denied'))
   check('K1. calling the qualification RPC directly (not via service role) is rejected', rpcBlocked, directRpcError)
 
   const beforeWrite = await getCommissionByPayment(scenarioAPaymentId)
-  await merchantAClient.from('unity_commissions').update({ commission_amount: 0 }).eq('id', scenarioACommission.id)
+  await commissionRentalMerchant.client.from('unity_commissions').update({ commission_amount: 0 }).eq('id', scenarioACommission.id)
   const afterWrite = await getCommissionByPayment(scenarioAPaymentId)
   check('K2. a direct table write to unity_commissions has no effect -- zero client write policies', Number(afterWrite?.commission_amount) === Number(beforeWrite?.commission_amount), { beforeWrite, afterWrite })
 
-  const { data: crossTenantRead } = await merchantAClient.from('unity_commissions').select('*').eq('merchant_id', merchantBId)
+  const { data: crossTenantRead } = await commissionRentalMerchant.client.from('unity_commissions').select('*').eq('merchant_id', commissionSaleMerchant.userId)
   check('K3. RLS blocks a merchant from reading another merchant\'s commission rows directly', (crossTenantRead ?? []).length === 0, crossTenantRead)
 
-  const meRes = await api(merchantACookie, 'GET', '/api/commissions/me')
+  const meRes = await api(commissionRentalMerchant.cookie, 'GET', '/api/commissions/me')
   const ownRow = (meRes.json?.commissions ?? []).find((c) => c.id === scenarioACommission.id)
   check('K4. a merchant can read their own commission via GET /api/commissions/me', meRes.status === 200 && !!ownRow, { status: meRes.status, found: !!ownRow })
 
@@ -499,8 +552,8 @@ console.log('=== Scenario L: Merchant payout reads the EFFECTIVE Unity commissio
   // admin CAN void/adjust a commission before the booking ever completes,
   // with no refund involved at all. Fixed in create-merchant-payout.ts to
   // read unity_commissions (+ adjustments) directly.
-  const listingId = await insertRentalListing(merchantAId, `${QA_LISTING_MARKER} — Rental L (Admin void before completion)`)
-  const { bookingId, paymentId, amount } = await chargeBookingOnly(renterACookie, merchantACookie, listingId, `rental-l-${RUN_ID}`)
+  const listingId = await insertRentalListing(commissionAuxMerchant.userId, `${QA_LISTING_MARKER} — Rental L (Admin void before completion)`)
+  const { bookingId, paymentId, amount } = await chargeBookingOnly(renterACookie, commissionAuxMerchant.cookie, listingId, `rental-l-${RUN_ID}`)
   const commissionBefore = await getCommissionByPayment(paymentId)
 
   const voidRes = await api(adminCookie, 'POST', `/api/admin/commissions/${commissionBefore.id}/void`, {
@@ -515,7 +568,7 @@ console.log('=== Scenario L: Merchant payout reads the EFFECTIVE Unity commissio
   await backdateToStartable(bookingId)
   const startRes = await api(renterACookie, 'POST', `/api/bookings/${bookingId}/start`, { idempotency_key: `commission-regression-l-start-${RUN_ID}` })
   const returnRes = await api(renterACookie, 'POST', `/api/bookings/${bookingId}/return`, { idempotency_key: `commission-regression-l-return-${RUN_ID}` })
-  const confirmRes = await api(merchantACookie, 'POST', `/api/bookings/${bookingId}/confirm-return`, { idempotency_key: `commission-regression-l-confirm-${RUN_ID}` })
+  const confirmRes = await api(commissionAuxMerchant.cookie, 'POST', `/api/bookings/${bookingId}/confirm-return`, { idempotency_key: `commission-regression-l-confirm-${RUN_ID}` })
   check('L3. booking completes normally despite the voided commission', startRes.status < 400 && returnRes.status < 400 && confirmRes.status < 400, { startRes, returnRes, confirmRes })
 
   const { data: payout } = await admin.from('merchant_payouts').select('amount').eq('booking_id', bookingId).maybeSingle()
@@ -545,7 +598,7 @@ console.log('=== Scenario M: Large-pool (150+) reconciliation -- full coverage, 
   const shortfall = Math.max(0, TARGET_POOL_SIZE - (poolBefore ?? 0))
 
   if (shortfall > 0) {
-    const fillerListingId = await insertSaleListing(merchantBId, `${QA_LISTING_MARKER} — M Filler`, 50)
+    const fillerListingId = await insertSaleListing(commissionAuxMerchant.userId, `${QA_LISTING_MARKER} — M Filler`, 50)
     const CONCURRENCY = 10
     for (let i = 0; i < shortfall; i += CONCURRENCY) {
       const batch = []
@@ -558,7 +611,7 @@ console.log('=== Scenario M: Large-pool (150+) reconciliation -- full coverage, 
 
   // Three tail-ordinal actionable fixtures, created last so they sort
   // after every other candidate by created_at.
-  const disputeListingId = await insertSaleListing(merchantBId, `${QA_LISTING_MARKER} — M DisputeHold`, 500)
+  const disputeListingId = await insertSaleListing(commissionAuxMerchant.userId, `${QA_LISTING_MARKER} — M DisputeHold`, 500)
   const { orderId: disputeOrderId, paymentId: disputePaymentId } = await completeOrderPurchase(renterACookie, disputeListingId, `m-dispute-${RUN_ID}`)
   const disputeOpenRes = await api(renterACookie, 'POST', '/api/disputes', {
     order_id: disputeOrderId, title: 'Large-pool regression dispute', description: 'Scenario M fixture', requested_resolution: 'N/A',
@@ -566,13 +619,13 @@ console.log('=== Scenario M: Large-pool (150+) reconciliation -- full coverage, 
   })
   check('M1. dispute opens against the tail-ordinal order fixture', disputeOpenRes.status === 201, disputeOpenRes)
 
-  const fullRefundListingId = await insertSaleListing(merchantBId, `${QA_LISTING_MARKER} — M FullRefund`, 1000)
+  const fullRefundListingId = await insertSaleListing(commissionAuxMerchant.userId, `${QA_LISTING_MARKER} — M FullRefund`, 1000)
   const { paymentId: fullRefundPaymentId } = await completeOrderPurchase(renterACookie, fullRefundListingId, `m-fullrefund-${RUN_ID}`)
   const { data: fullRefundResult } = await admin.rpc('create_refund', { p_payment_id: fullRefundPaymentId, p_amount: 1000, p_reason: 'Scenario M full refund', p_idempotency_key: `commission-regression-m-fullrefund-${RUN_ID}` })
   await admin.from('refunds').update({ status: 'completed' }).eq('id', fullRefundResult.refund_id)
   await admin.rpc('transition_payment_status', { p_payment_id: fullRefundPaymentId, p_new_status: 'refunded', p_actor_type: 'system' })
 
-  const partialRefundListingId = await insertSaleListing(merchantBId, `${QA_LISTING_MARKER} — M PartialRefund`, 1000)
+  const partialRefundListingId = await insertSaleListing(commissionAuxMerchant.userId, `${QA_LISTING_MARKER} — M PartialRefund`, 1000)
   const { paymentId: partialRefundPaymentId } = await completeOrderPurchase(renterACookie, partialRefundListingId, `m-partialrefund-${RUN_ID}`)
   const partialRefundCommissionBefore = await getCommissionByPayment(partialRefundPaymentId)
   const { data: partialRefundResult } = await admin.rpc('create_refund', { p_payment_id: partialRefundPaymentId, p_amount: 400, p_reason: 'Scenario M partial refund', p_idempotency_key: `commission-regression-m-partialrefund-${RUN_ID}` })
@@ -615,10 +668,19 @@ console.log('=== Scenario M: Large-pool (150+) reconciliation -- full coverage, 
   check('M13. full-refund fixture unchanged on the second run (still voided, no duplicate void)', fullRefundCommissionAfterRun2?.status === 'voided', fullRefundCommissionAfterRun2)
 }
 
-console.log('=== Final cleanup ===')
-await resetToStarter(merchantAId, adminId)
-await resetToStarter(merchantBId, adminId)
-console.log('  merchantA and merchantB reset to Starter')
+// No plan restore for the disposable commission-scenario merchants --
+// unlike the old merchantA/merchantB reset (which was a confirmed no-op
+// on every run, see the disposable-merchant comment above), there is
+// nothing to restore: these accounts are never reused by any future run,
+// so whatever plan state they're left on is irrelevant to this script's
+// or any other suite's correctness. Their auth users are deleted purely
+// for housekeeping (avoiding indefinite QA-account accumulation), never
+// for correctness -- a hard kill before this point leaves harmless
+// orphaned disposable accounts, not a contamination risk.
+for (const uid of [commissionRentalMerchant.userId, commissionSaleMerchant.userId, commissionHighValueMerchant.userId, commissionAffiliateMerchant.userId, commissionAuxMerchant.userId]) {
+  await admin.auth.admin.deleteUser(uid)
+}
+console.log('  (disposable commission-scenario merchants cleaned up)')
 
 console.log('')
 console.log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`)
