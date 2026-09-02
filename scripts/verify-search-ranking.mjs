@@ -72,11 +72,34 @@ try {
   console.error('verify-search-ranking aborted -- .qa-credentials.local.json not found. Run scripts/qa-seed.mjs first.')
   process.exit(1)
 }
-const { data: allUsers } = await admin.auth.admin.listUsers()
-const merchantAId = allUsers.users.find((u) => u.email === creds.accounts.merchantA.email)?.id
-const renterAId = allUsers.users.find((u) => u.email === creds.accounts.renterA.email)?.id
-if (!merchantAId) throw new Error('could not resolve merchantA id')
-if (!renterAId) throw new Error('could not resolve renterA id')
+// admin.auth.admin.listUsers() with no args returns only its first page
+// (50 users) -- this dev database's QA auth-account pool has grown well
+// past that (124+ at time of writing, from the many disposable per-run
+// accounts other verify-*.mjs scripts create), so a bare unpaginated
+// call can silently fail to find a permanent fixture account like
+// merchantA. This helper walks every page by explicit email match
+// (never by position/order/index, which is never guaranteed stable)
+// until found or genuinely exhausted, with a generous but finite page
+// bound so a lookup failure is a loud, descriptive error -- never a
+// silent infinite loop.
+const LIST_USERS_PAGE_SIZE = 100
+const LIST_USERS_MAX_PAGES = 100 // generous bound: up to 10,000 auth users: far beyond any realistic QA pool size, so a real account is never missed, while a genuinely-absent email still fails fast rather than looping forever.
+async function findAuthUserByEmail(email) {
+  for (let page = 1; page <= LIST_USERS_MAX_PAGES; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: LIST_USERS_PAGE_SIZE })
+    if (error) throw new Error(`listUsers page ${page} failed while resolving ${email}: ${error.message}`)
+    const found = data.users.find((u) => u.email === email)
+    if (found) {
+      console.log(`  (auth lookup: ${email} found on page ${page} of ${LIST_USERS_PAGE_SIZE}-per-page results)`)
+      return found
+    }
+    if (data.users.length < LIST_USERS_PAGE_SIZE) break // last page was short -- pool is exhausted, nothing more to check
+  }
+  throw new Error(`could not resolve auth user for ${email} within ${LIST_USERS_MAX_PAGES} pages (perPage=${LIST_USERS_PAGE_SIZE}) -- run scripts/qa-seed.mjs first, or the QA auth pool may have grown beyond this bound`)
+}
+
+const merchantAId = (await findAuthUserByEmail(creds.accounts.merchantA.email)).id
+const renterAId = (await findAuthUserByEmail(creds.accounts.renterA.email)).id
 
 const anonAsRenterA = createClient(SUPABASE_URL, ANON_KEY)
 const { error: renterSignInError } = await anonAsRenterA.auth.signInWithPassword({ email: creds.accounts.renterA.email, password: creds.accounts.renterA.password })
