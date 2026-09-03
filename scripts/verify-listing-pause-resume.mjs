@@ -118,24 +118,18 @@ async function insertListing(merchantId, title, overrides = {}) {
   if (error) throw new Error(`insertListing failed: ${error.message}`)
   return data.id
 }
-async function clearMerchantActiveListings(merchantId) {
-  // Ensures cap-boundary tests start from a known, controlled count --
-  // every OTHER active listing this merchant already owns (from a prior
-  // section, or leftover QA fixtures) is paused first so the test's own
-  // fixture count is authoritative.
-  await admin.from('listings').update({ status: 'paused' }).eq('merchant_id', merchantId).eq('status', 'active')
-}
 async function getActiveSupplyBaseline(merchantId) {
   // Reads the SAME combined-supply count the product RPCs themselves use
   // (_lock_and_count_active_supply: real active listings + real active
   // available Skill/Task posts), rather than re-deriving it from a
-  // `listings`-only query. clearMerchantActiveListings() only pauses this
-  // merchant's *listings* -- if this shared QA account also carries any
-  // other real (is_test=false) active supply from an unrelated feature's
-  // fixtures, a listings-only assumption of "0 before my fixtures" would
-  // silently be wrong and produce a false cap-boundary failure. Calling
-  // the authoritative RPC directly makes the boundary math correct
-  // regardless of what else contributes to this merchant's live count.
+  // `listings`-only query. Every cap-boundary scenario in this file now
+  // runs against a fresh disposable merchant (see createDisposableMerchant()
+  // below) whose baseline should always measure 0 -- calling the
+  // authoritative RPC directly here, rather than assuming 0, is defense
+  // in depth: it keeps the boundary math correct even in the
+  // unexpected case that a disposable account's supply isn't genuinely
+  // zero, without ever needing to broadly pause a shared account's
+  // pre-existing inventory to find out.
   const { data, error } = await admin.rpc('_lock_and_count_active_supply', { p_user_id: merchantId })
   if (error) throw new Error(`getActiveSupplyBaseline failed for ${merchantId}: ${error.message}`)
   return data
@@ -163,30 +157,44 @@ const merchantB = await signIn(creds.accounts.merchantB.email, creds.accounts.me
 const adminAuth = await signIn(creds.accounts.admin.email, creds.accounts.admin.password)
 for (const id of [merchantA.userId, merchantB.userId, adminAuth.userId]) qaFixtureAccountIds.add(id)
 
-console.log('=== BASELINE RESET ===')
-await setPlan(merchantA.userId, adminAuth.userId, 'starter')
-await setPlan(merchantB.userId, adminAuth.userId, 'starter')
-await clearMerchantActiveListings(merchantA.userId)
-await clearMerchantActiveListings(merchantB.userId)
-console.log(`  merchantA (${merchantA.userId}) and merchantB (${merchantB.userId}) reset to Starter, all active listings paused`)
+// No BASELINE RESET step -- merchantA/merchantB's subscription (plan,
+// pending_plan, publication_frozen) is never read or written anywhere in
+// this file. Every plan-sensitive scenario below runs against its own
+// fresh disposable merchant (see createDisposableMerchant() above),
+// which starts at a known baseline by construction, so there is nothing
+// for a startup reset to prepare on the permanent shared accounts. This
+// is a deliberate omission, not an oversight -- see this phase's report
+// for the empirical proof (an adversarial run with merchantA forced onto
+// Starter still passes 52/52 and leaves merchantA on Starter, unread and
+// unwritten by this script).
 
 console.log('=== BASIC SINGLE LISTING (per tier) ===')
 {
+  // Real per-tier plan transitions are genuinely under test here (each
+  // tier must independently allow pause/resume), so this keeps ONE actor
+  // across the Starter->Pro->Elite loop and performs the real
+  // transitions -- exactly the "if testing a real plan transition, use a
+  // disposable merchant and perform the real transition" guidance. A
+  // fresh disposable actor starts at zero active supply, so every
+  // resume() in this loop has natural cap headroom regardless of what
+  // merchantA's own real historical inventory looks like.
+  const basicMerchant = await createDisposableMerchant('basic')
+  console.log(`  disposable basic-tier owner this run: ${basicMerchant.userId}`)
+  qaFixtureAccountIds.add(basicMerchant.userId)
   for (const [tierName, planId] of [['Starter', 'starter'], ['Pro', 'pro'], ['Elite', 'elite']]) {
-    await setPlan(merchantA.userId, adminAuth.userId, planId)
-    const listingId = await insertListing(merchantA.userId, `${QA_MARKER} ${tierName} Basic ${RUN_ID}`)
+    await setPlan(basicMerchant.userId, adminAuth.userId, planId)
+    const listingId = await insertListing(basicMerchant.userId, `${QA_MARKER} ${tierName} Basic ${RUN_ID}`)
 
-    const pauseRes = await api(merchantA.cookie, 'POST', `/api/listings/${listingId}/pause`, {})
+    const pauseRes = await api(basicMerchant.cookie, 'POST', `/api/listings/${listingId}/pause`, {})
     const { data: afterPause } = await admin.from('listings').select('status').eq('id', listingId).single()
     check(`${tierName}: owner pauses own active listing`, pauseRes.status === 200 && afterPause?.status === 'paused', { pauseRes, afterPause })
 
-    const resumeRes = await api(merchantA.cookie, 'POST', `/api/listings/${listingId}/resume`, {})
+    const resumeRes = await api(basicMerchant.cookie, 'POST', `/api/listings/${listingId}/resume`, {})
     const { data: afterResume } = await admin.from('listings').select('status').eq('id', listingId).single()
     check(`${tierName}: owner resumes own paused listing`, resumeRes.status === 200 && afterResume?.status === 'active', { resumeRes, afterResume })
 
-    await admin.from('listings').update({ status: 'paused' }).eq('id', listingId) // keep supply clean for the next tier
+    await admin.from('listings').update({ status: 'paused', is_test: true }).eq('id', listingId) // keep supply clean for the next tier; quarantine immediately
   }
-  await setPlan(merchantA.userId, adminAuth.userId, 'starter')
 }
 
 console.log('=== AUTHORIZATION ===')
@@ -215,28 +223,33 @@ console.log('=== AUTHORIZATION ===')
 
 console.log('=== BULK MANAGEMENT REMAINS PRO/ELITE-ONLY ===')
 {
-  await setPlan(merchantA.userId, adminAuth.userId, 'starter')
-  const listingId = await insertListing(merchantA.userId, `${QA_MARKER} BulkStarter ${RUN_ID}`)
-  const starterBulk = await api(merchantA.cookie, 'POST', '/api/listings/bulk', { action: 'pause', listingIds: [listingId] })
+  // Same reasoning as BASIC SINGLE LISTING -- real Starter/Pro/Elite
+  // transitions on one disposable actor, never merchantA.
+  const bulkMerchant = await createDisposableMerchant('bulk')
+  console.log(`  disposable bulk-tier owner this run: ${bulkMerchant.userId}`)
+  qaFixtureAccountIds.add(bulkMerchant.userId)
+
+  await setPlan(bulkMerchant.userId, adminAuth.userId, 'starter')
+  const listingId = await insertListing(bulkMerchant.userId, `${QA_MARKER} BulkStarter ${RUN_ID}`)
+  const starterBulk = await api(bulkMerchant.cookie, 'POST', '/api/listings/bulk', { action: 'pause', listingIds: [listingId] })
   check('Starter denied bulk pause', starterBulk.status === 403, starterBulk)
   const { data: afterStarterBulk } = await admin.from('listings').select('status').eq('id', listingId).single()
   check('Starter bulk denial did not mutate listing state', afterStarterBulk?.status === 'active', afterStarterBulk)
 
-  await setPlan(merchantA.userId, adminAuth.userId, 'pro')
-  const proBulk = await api(merchantA.cookie, 'POST', '/api/listings/bulk', { action: 'pause', listingIds: [listingId] })
+  await setPlan(bulkMerchant.userId, adminAuth.userId, 'pro')
+  const proBulk = await api(bulkMerchant.cookie, 'POST', '/api/listings/bulk', { action: 'pause', listingIds: [listingId] })
   const { data: afterProBulk } = await admin.from('listings').select('status').eq('id', listingId).single()
   check('Pro retains bulk pause access', proBulk.status === 200 && afterProBulk?.status === 'paused', { proBulk, afterProBulk })
 
-  const proBulkResume = await api(merchantA.cookie, 'POST', '/api/listings/bulk', { action: 'resume', listingIds: [listingId] })
+  const proBulkResume = await api(bulkMerchant.cookie, 'POST', '/api/listings/bulk', { action: 'resume', listingIds: [listingId] })
   check('Pro retains bulk resume access', proBulkResume.status === 200, proBulkResume)
 
-  await setPlan(merchantA.userId, adminAuth.userId, 'elite')
+  await setPlan(bulkMerchant.userId, adminAuth.userId, 'elite')
   await admin.from('listings').update({ status: 'paused' }).eq('id', listingId)
-  const eliteBulk = await api(merchantA.cookie, 'POST', '/api/listings/bulk', { action: 'resume', listingIds: [listingId] })
+  const eliteBulk = await api(bulkMerchant.cookie, 'POST', '/api/listings/bulk', { action: 'resume', listingIds: [listingId] })
   check('Elite retains bulk resume access', eliteBulk.status === 200, eliteBulk)
 
-  await setPlan(merchantA.userId, adminAuth.userId, 'starter')
-  await clearMerchantActiveListings(merchantA.userId)
+  await admin.from('listings').update({ status: 'paused', is_test: true }).eq('id', listingId)
 }
 
 console.log('=== INDIVIDUAL PATH NEVER REQUIRES THE BULK ENTITLEMENT (source check) ===')
@@ -254,78 +267,103 @@ console.log('=== INDIVIDUAL PATH NEVER REQUIRES THE BULK ENTITLEMENT (source che
 
 console.log('=== SUBSCRIPTION CAP REVALIDATION ON RESUME ===')
 {
-  // Starter cap = 5. Measure the true live baseline via the same RPC the
-  // product code uses (rather than assuming a clean 0) so this boundary
-  // math is correct even if this shared QA merchant carries some other
-  // real active-supply contribution from an unrelated feature area.
-  await setPlan(merchantA.userId, adminAuth.userId, 'starter')
-  await clearMerchantActiveListings(merchantA.userId)
-  const starterBaseline = await getActiveSupplyBaseline(merchantA.userId)
+  // Starter cap = 5, on a fresh disposable actor. Baseline is measured
+  // via the same RPC the product code uses (rather than hardcoding 0) as
+  // defense-in-depth -- a brand-new actor should always measure 0, but
+  // this keeps the exact same relative-baseline math/check labels the
+  // section always used, just against an actor whose real supply is
+  // never mixed with merchantA's unrelated historical inventory.
+  const starterCapMerchant = await createDisposableMerchant('startercap')
+  console.log(`  disposable Starter-cap owner this run: ${starterCapMerchant.userId}`)
+  qaFixtureAccountIds.add(starterCapMerchant.userId)
+  await setPlan(starterCapMerchant.userId, adminAuth.userId, 'starter')
+  const starterBaseline = await getActiveSupplyBaseline(starterCapMerchant.userId)
   const starterToCreate = Math.max(0, 5 - 1 - starterBaseline)
   const starterActives = []
-  for (let i = 0; i < starterToCreate; i++) starterActives.push(await insertListing(merchantA.userId, `${QA_MARKER} StarterCapActive${i} ${RUN_ID}`))
-  const starterPaused = await insertListing(merchantA.userId, `${QA_MARKER} StarterCapPaused ${RUN_ID}`, { status: 'paused' })
+  for (let i = 0; i < starterToCreate; i++) starterActives.push(await insertListing(starterCapMerchant.userId, `${QA_MARKER} StarterCapActive${i} ${RUN_ID}`))
+  const starterPaused = await insertListing(starterCapMerchant.userId, `${QA_MARKER} StarterCapPaused ${RUN_ID}`, { status: 'paused' })
 
-  const resumeUnderCap = await api(merchantA.cookie, 'POST', `/api/listings/${starterPaused}/resume`, {})
-  const countAfterUnderCap = await getActiveSupplyBaseline(merchantA.userId)
+  const resumeUnderCap = await api(starterCapMerchant.cookie, 'POST', `/api/listings/${starterPaused}/resume`, {})
+  const countAfterUnderCap = await getActiveSupplyBaseline(starterCapMerchant.userId)
   check(`Starter: ${starterBaseline + starterToCreate} active + 1 paused -> resume succeeds -> ${starterBaseline + starterToCreate + 1}`, resumeUnderCap.status === 200 && countAfterUnderCap === starterBaseline + starterToCreate + 1, { resumeUnderCap, countAfterUnderCap, starterBaseline, starterToCreate })
 
-  const starterExtraPaused = await insertListing(merchantA.userId, `${QA_MARKER} StarterCapExtra ${RUN_ID}`, { status: 'paused' })
-  const resumeAtCap = await api(merchantA.cookie, 'POST', `/api/listings/${starterExtraPaused}/resume`, {})
+  const starterExtraPaused = await insertListing(starterCapMerchant.userId, `${QA_MARKER} StarterCapExtra ${RUN_ID}`, { status: 'paused' })
+  const resumeAtCap = await api(starterCapMerchant.cookie, 'POST', `/api/listings/${starterExtraPaused}/resume`, {})
   const { data: extraAfterDenied } = await admin.from('listings').select('status').eq('id', starterExtraPaused).single()
-  const countAfterAtCap = await getActiveSupplyBaseline(merchantA.userId)
+  const countAfterAtCap = await getActiveSupplyBaseline(starterCapMerchant.userId)
   check('Starter: at cap (5) + 1 paused -> resume denied -> remains at cap', resumeAtCap.status === 422 && extraAfterDenied?.status === 'paused' && countAfterAtCap === 5, { resumeAtCap, extraAfterDenied, countAfterAtCap })
   check('Starter at-cap denial uses the normal capacity error, not a generic 500', resumeAtCap.json?.error?.toLowerCase().includes('publication limit'), resumeAtCap.json)
+  await admin.from('listings').update({ is_test: true }).in('id', [...starterActives, starterPaused, starterExtraPaused])
 
-  // Pro cap = 20. Same baseline-relative approach.
-  await setPlan(merchantB.userId, adminAuth.userId, 'pro')
-  await clearMerchantActiveListings(merchantB.userId)
-  const proBaseline = await getActiveSupplyBaseline(merchantB.userId)
+  // Pro cap = 20, then Elite (unlimited) -- kept on ONE disposable actor
+  // across the transition, since "the SAME previously-denied listing now
+  // resumes after upgrading" is a genuine plan-TRANSITION assertion, not
+  // just a plan-stable one (matches "if testing a real plan transition,
+  // use a disposable merchant and perform the real transition").
+  const proEliteCapMerchant = await createDisposableMerchant('proelitecap')
+  console.log(`  disposable Pro/Elite-cap owner this run: ${proEliteCapMerchant.userId}`)
+  qaFixtureAccountIds.add(proEliteCapMerchant.userId)
+  await setPlan(proEliteCapMerchant.userId, adminAuth.userId, 'pro')
+  const proBaseline = await getActiveSupplyBaseline(proEliteCapMerchant.userId)
   const proToCreate = Math.max(0, 20 - 1 - proBaseline)
   const proActives = []
-  for (let i = 0; i < proToCreate; i++) proActives.push(await insertListing(merchantB.userId, `${QA_MARKER} ProCapActive${i} ${RUN_ID}`))
-  const proPaused = await insertListing(merchantB.userId, `${QA_MARKER} ProCapPaused ${RUN_ID}`, { status: 'paused' })
-  const proResumeUnderCap = await api(merchantB.cookie, 'POST', `/api/listings/${proPaused}/resume`, {})
-  const proCountAfter = await getActiveSupplyBaseline(merchantB.userId)
+  for (let i = 0; i < proToCreate; i++) proActives.push(await insertListing(proEliteCapMerchant.userId, `${QA_MARKER} ProCapActive${i} ${RUN_ID}`))
+  const proPaused = await insertListing(proEliteCapMerchant.userId, `${QA_MARKER} ProCapPaused ${RUN_ID}`, { status: 'paused' })
+  const proResumeUnderCap = await api(proEliteCapMerchant.cookie, 'POST', `/api/listings/${proPaused}/resume`, {})
+  const proCountAfter = await getActiveSupplyBaseline(proEliteCapMerchant.userId)
   check(`Pro: ${proBaseline + proToCreate} active + 1 paused -> resume succeeds -> ${proBaseline + proToCreate + 1}`, proResumeUnderCap.status === 200 && proCountAfter === proBaseline + proToCreate + 1, { proResumeUnderCap, proCountAfter, proBaseline, proToCreate })
 
-  const proExtraPaused = await insertListing(merchantB.userId, `${QA_MARKER} ProCapExtra ${RUN_ID}`, { status: 'paused' })
-  const proResumeAtCap = await api(merchantB.cookie, 'POST', `/api/listings/${proExtraPaused}/resume`, {})
-  const proCountAtCap = await getActiveSupplyBaseline(merchantB.userId)
+  const proExtraPaused = await insertListing(proEliteCapMerchant.userId, `${QA_MARKER} ProCapExtra ${RUN_ID}`, { status: 'paused' })
+  const proResumeAtCap = await api(proEliteCapMerchant.cookie, 'POST', `/api/listings/${proExtraPaused}/resume`, {})
+  const proCountAtCap = await getActiveSupplyBaseline(proEliteCapMerchant.userId)
   check('Pro: at cap (20) + 1 paused -> resume denied -> remains at cap', proResumeAtCap.status === 422 && proCountAtCap === 20, { proResumeAtCap, proCountAtCap })
 
   // Elite: unlimited.
-  await setPlan(merchantB.userId, adminAuth.userId, 'elite')
-  const eliteResume = await api(merchantB.cookie, 'POST', `/api/listings/${proExtraPaused}/resume`, {})
+  await setPlan(proEliteCapMerchant.userId, adminAuth.userId, 'elite')
+  const eliteResume = await api(proEliteCapMerchant.cookie, 'POST', `/api/listings/${proExtraPaused}/resume`, {})
   check('Elite: no subscription publication cap (the same previously-denied listing now resumes)', eliteResume.status === 200, eliteResume)
-
-  await setPlan(merchantB.userId, adminAuth.userId, 'starter')
-  await clearMerchantActiveListings(merchantB.userId)
-  await setPlan(merchantA.userId, adminAuth.userId, 'starter')
-  await clearMerchantActiveListings(merchantA.userId)
+  await admin.from('listings').update({ is_test: true }).in('id', [...proActives, proPaused, proExtraPaused])
 }
 
 console.log('=== PUBLICATION FREEZE ===')
 {
-  const listingId = await insertListing(merchantA.userId, `${QA_MARKER} Freeze ${RUN_ID}`)
+  // publication_frozen is subscription-level, permanent-shared-actor
+  // state, not just a listing status -- freezing/unfreezing merchantA's
+  // REAL subscription row would be exactly the class of shared-actor
+  // mutation this hardening phase removes, and the final resume-after-
+  // unfreeze call needs cap headroom too. A disposable actor sidesteps
+  // both concerns at once.
+  const freezeMerchant = await createDisposableMerchant('freeze')
+  console.log(`  disposable freeze-test owner this run: ${freezeMerchant.userId}`)
+  qaFixtureAccountIds.add(freezeMerchant.userId)
+  await setPlan(freezeMerchant.userId, adminAuth.userId, 'starter')
+  const listingId = await insertListing(freezeMerchant.userId, `${QA_MARKER} Freeze ${RUN_ID}`)
 
-  await admin.from('merchant_subscriptions').update({ publication_frozen: true }).eq('merchant_id', merchantA.userId)
-  const pauseWhileFrozen = await api(merchantA.cookie, 'POST', `/api/listings/${listingId}/pause`, {})
+  await admin.from('merchant_subscriptions').update({ publication_frozen: true }).eq('merchant_id', freezeMerchant.userId)
+  const pauseWhileFrozen = await api(freezeMerchant.cookie, 'POST', `/api/listings/${listingId}/pause`, {})
   check('frozen merchant may still pause an existing active listing', pauseWhileFrozen.status === 200, pauseWhileFrozen)
 
-  const resumeWhileFrozen = await api(merchantA.cookie, 'POST', `/api/listings/${listingId}/resume`, {})
+  const resumeWhileFrozen = await api(freezeMerchant.cookie, 'POST', `/api/listings/${listingId}/resume`, {})
   check('frozen merchant cannot resume while frozen', resumeWhileFrozen.status === 409 && resumeWhileFrozen.json?.error?.toLowerCase().includes('downgrade'), resumeWhileFrozen)
 
-  await admin.from('merchant_subscriptions').update({ publication_frozen: false }).eq('merchant_id', merchantA.userId)
-  const resumeAfterUnfreeze = await api(merchantA.cookie, 'POST', `/api/listings/${listingId}/resume`, {})
+  await admin.from('merchant_subscriptions').update({ publication_frozen: false }).eq('merchant_id', freezeMerchant.userId)
+  const resumeAfterUnfreeze = await api(freezeMerchant.cookie, 'POST', `/api/listings/${listingId}/resume`, {})
   check('resume succeeds once freeze is cleared (all other eligibility passes)', resumeAfterUnfreeze.status === 200, resumeAfterUnfreeze)
 
-  await admin.from('listings').update({ status: 'paused' }).eq('id', listingId)
+  await admin.from('listings').update({ status: 'paused', is_test: true }).eq('id', listingId)
 }
 
 console.log('=== IDEMPOTENCY / CONCURRENCY ===')
 {
-  const listingId = await insertListing(merchantA.userId, `${QA_MARKER} Concurrency ${RUN_ID}`)
+  // resume-twice below needs cap headroom -- a fresh disposable actor
+  // rather than merchantA (whose real historical active-supply is
+  // uncontrolled; a prior phase's diagnosis measured it already over the
+  // Starter cap from unrelated residue at one point in this session).
+  const concurrencyMerchant = await createDisposableMerchant('concurrency')
+  console.log(`  disposable concurrency owner this run: ${concurrencyMerchant.userId}`)
+  qaFixtureAccountIds.add(concurrencyMerchant.userId)
+  await setPlan(concurrencyMerchant.userId, adminAuth.userId, 'starter')
+  const listingId = await insertListing(concurrencyMerchant.userId, `${QA_MARKER} Concurrency ${RUN_ID}`)
 
   // merchant_pause_listing/merchant_resume_listing originally took no row
   // lock on the target listing and their closing UPDATE had no status
@@ -340,8 +378,8 @@ console.log('=== IDEMPOTENCY / CONCURRENCY ===')
   // domain error instead. This now gives a hard single-winner contract:
   // exactly one 200, exactly one listing_history row, no 500.
   const pauseTwice = await Promise.all([
-    api(merchantA.cookie, 'POST', `/api/listings/${listingId}/pause`, {}),
-    api(merchantA.cookie, 'POST', `/api/listings/${listingId}/pause`, {}),
+    api(concurrencyMerchant.cookie, 'POST', `/api/listings/${listingId}/pause`, {}),
+    api(concurrencyMerchant.cookie, 'POST', `/api/listings/${listingId}/pause`, {}),
   ])
   const pauseWinners = pauseTwice.filter((r) => r.status === 200).length
   const { data: afterPauseTwice } = await admin.from('listings').select('status').eq('id', listingId).single()
@@ -349,35 +387,38 @@ console.log('=== IDEMPOTENCY / CONCURRENCY ===')
   check('pause called twice concurrently -- exactly one succeeds, final state is paused, exactly one history row, no 500', pauseWinners === 1 && afterPauseTwice?.status === 'paused' && pauseHistoryCount === 1 && pauseTwice.every((r) => r.status === 200 || r.status === 409), { pauseTwice: pauseTwice.map((r) => r.status), afterPauseTwice, pauseHistoryCount })
 
   const resumeTwice = await Promise.all([
-    api(merchantA.cookie, 'POST', `/api/listings/${listingId}/resume`, {}),
-    api(merchantA.cookie, 'POST', `/api/listings/${listingId}/resume`, {}),
+    api(concurrencyMerchant.cookie, 'POST', `/api/listings/${listingId}/resume`, {}),
+    api(concurrencyMerchant.cookie, 'POST', `/api/listings/${listingId}/resume`, {}),
   ])
   const resumeWinners = resumeTwice.filter((r) => r.status === 200).length
   const { data: afterResumeTwice } = await admin.from('listings').select('status').eq('id', listingId).single()
   const { count: resumeHistoryCount } = await admin.from('listing_history').select('id', { count: 'exact', head: true }).eq('listing_id', listingId).eq('change_reason', 'merchant_resumed')
   check('resume called twice concurrently -- exactly one succeeds, final state is active, exactly one history row, no 500', resumeWinners === 1 && afterResumeTwice?.status === 'active' && resumeHistoryCount === 1 && resumeTwice.every((r) => r.status === 200 || r.status === 409), { resumeTwice: resumeTwice.map((r) => r.status), afterResumeTwice, resumeHistoryCount })
+  await admin.from('listings').update({ is_test: true }).eq('id', listingId)
 
   // Two simultaneous resumes at the cap boundary, on TWO DIFFERENT listings
   // -- this is the scenario that actually determines cap safety. Final
   // active supply must never exceed the cap, regardless of how many of the
-  // two calls report success.
-  await setPlan(merchantB.userId, adminAuth.userId, 'starter')
-  await clearMerchantActiveListings(merchantB.userId)
-  const capRaceBaseline = await getActiveSupplyBaseline(merchantB.userId)
+  // two calls report success. Own disposable actor -- independent of the
+  // concurrency actor above and of merchantB.
+  const capRaceMerchant = await createDisposableMerchant('caprace')
+  console.log(`  disposable cap-race owner this run: ${capRaceMerchant.userId}`)
+  qaFixtureAccountIds.add(capRaceMerchant.userId)
+  await setPlan(capRaceMerchant.userId, adminAuth.userId, 'starter')
+  const capRaceBaseline = await getActiveSupplyBaseline(capRaceMerchant.userId)
   const capRaceToCreate = Math.max(0, 5 - 1 - capRaceBaseline)
-  for (let i = 0; i < capRaceToCreate; i++) await insertListing(merchantB.userId, `${QA_MARKER} CapRaceActive${i} ${RUN_ID}`)
-  const capRaceA = await insertListing(merchantB.userId, `${QA_MARKER} CapRaceA ${RUN_ID}`, { status: 'paused' })
-  const capRaceB = await insertListing(merchantB.userId, `${QA_MARKER} CapRaceB ${RUN_ID}`, { status: 'paused' })
+  const capRaceActives = []
+  for (let i = 0; i < capRaceToCreate; i++) capRaceActives.push(await insertListing(capRaceMerchant.userId, `${QA_MARKER} CapRaceActive${i} ${RUN_ID}`))
+  const capRaceA = await insertListing(capRaceMerchant.userId, `${QA_MARKER} CapRaceA ${RUN_ID}`, { status: 'paused' })
+  const capRaceB = await insertListing(capRaceMerchant.userId, `${QA_MARKER} CapRaceB ${RUN_ID}`, { status: 'paused' })
   const capRaceResults = await Promise.all([
-    api(merchantB.cookie, 'POST', `/api/listings/${capRaceA}/resume`, {}),
-    api(merchantB.cookie, 'POST', `/api/listings/${capRaceB}/resume`, {}),
+    api(capRaceMerchant.cookie, 'POST', `/api/listings/${capRaceA}/resume`, {}),
+    api(capRaceMerchant.cookie, 'POST', `/api/listings/${capRaceB}/resume`, {}),
   ])
   const capRaceWinners = capRaceResults.filter((r) => r.status === 200).length
-  const finalActiveSupply = await getActiveSupplyBaseline(merchantB.userId)
+  const finalActiveSupply = await getActiveSupplyBaseline(capRaceMerchant.userId)
   check('two simultaneous resumes at the Starter cap boundary -- exactly one succeeds, final supply never exceeds cap', capRaceWinners === 1 && finalActiveSupply === 5, { capRaceResults: capRaceResults.map((r) => r.status), finalActiveSupply, capRaceBaseline, capRaceToCreate })
-
-  await setPlan(merchantB.userId, adminAuth.userId, 'starter')
-  await clearMerchantActiveListings(merchantB.userId)
+  await admin.from('listings').update({ is_test: true }).in('id', [...capRaceActives, capRaceA, capRaceB])
 }
 
 console.log('=== EXISTING TRANSACTION PRESERVATION ===')
@@ -558,8 +599,8 @@ console.log('=== CLEANUP ===')
   const { count: stillLeaked } = await admin.from('listings').select('id', { count: 'exact', head: true }).ilike('title', `${QA_MARKER}%`).eq('is_test', false)
   check('cleanup succeeds (no real listing fixture of any status left behind after this run)', (stillLeaked ?? 0) === 0, { stillLeaked })
 
-  await setPlan(merchantA.userId, adminAuth.userId, 'starter')
-  await setPlan(merchantB.userId, adminAuth.userId, 'starter')
+  // No merchantA/merchantB plan reset here -- their subscription is never
+  // touched by this script (see the note where they're signed in, above).
 }
 
 console.log('')
