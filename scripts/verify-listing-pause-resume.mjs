@@ -141,6 +141,23 @@ async function getActiveSupplyBaseline(merchantId) {
   return data
 }
 
+// Fresh, disposable, per-run merchant -- never reused across runs, never
+// mutated, safe to abandon in any state. Used for scenarios that only
+// need SOME valid merchant to own a listing, never merchantA/merchantB's
+// specific identity or history (matches the same isolation pattern
+// already applied to the Affiliate and Commissions verifiers). Starts
+// with zero active supply by construction, so it never needs a broad
+// clearMerchantActiveListings()-style mutation of a permanent shared
+// actor's pre-existing inventory to have cap headroom.
+const DISPOSABLE_MERCHANT_PASSWORD = 'PauseResumeRegress123!'
+async function createDisposableMerchant(label) {
+  const email = `qa-pauseresume-${label}-${RUN_ID}@unitytest.internal`
+  const { data: user } = await admin.auth.admin.createUser({ email, password: DISPOSABLE_MERCHANT_PASSWORD, email_confirm: true })
+  await admin.from('profiles').update({ role: 'merchant', account_status: 'active', kyc_status: 'approved' }).eq('id', user.user.id)
+  const signedIn = await signIn(email, DISPOSABLE_MERCHANT_PASSWORD)
+  return { userId: user.user.id, cookie: signedIn.cookie, client: signedIn.client }
+}
+
 const merchantA = await signIn(creds.accounts.merchantA.email, creds.accounts.merchantA.password)
 const merchantB = await signIn(creds.accounts.merchantB.email, creds.accounts.merchantB.password)
 const adminAuth = await signIn(creds.accounts.admin.email, creds.accounts.admin.password)
@@ -391,7 +408,23 @@ console.log('=== EXISTING TRANSACTION PRESERVATION ===')
 
 console.log('=== PUBLIC VISIBILITY ===')
 {
-  const listingId = await insertListing(merchantA.userId, `${QA_MARKER} Visibility ${RUN_ID}`)
+  // This scenario never needed merchantA's specific identity or history --
+  // only SOME merchant, active/approved, owning one listing, with a
+  // non-owner reader. Using a fresh disposable merchant instead of the
+  // permanent shared merchantA removes any need to touch merchantA's
+  // pre-existing inventory at all: a brand-new actor starts at zero
+  // active supply by construction, so it has natural Starter-cap headroom
+  // (0 -> 1, cap 5) without any clearMerchantActiveListings()-style broad
+  // mutation of a shared account. merchantB remains the non-owner reader
+  // (read-only here, so reusing the permanent shared account carries no
+  // contamination risk).
+  const visibilityMerchant = await createDisposableMerchant('visibility')
+  console.log(`  disposable visibility owner this run: ${visibilityMerchant.userId}`)
+  qaFixtureAccountIds.add(visibilityMerchant.userId) // keeps the QA HYGIENE section's ownership check accurate for this disposable actor's fixture
+  await setPlan(visibilityMerchant.userId, adminAuth.userId, 'starter')
+  const supplyBeforeFixture = await getActiveSupplyBaseline(visibilityMerchant.userId)
+
+  const listingId = await insertListing(visibilityMerchant.userId, `${QA_MARKER} Visibility ${RUN_ID}`)
 
   const beforePause = await getHtml(null, `/listings/${listingId}`)
   check('active listing is publicly visible before pause', beforePause.status === 200, { status: beforePause.status })
@@ -399,23 +432,47 @@ console.log('=== PUBLIC VISIBILITY ===')
   const { data: publicReadBefore } = await merchantB.client.from('listings').select('id').eq('id', listingId).maybeSingle()
   check('another authenticated user can read the active listing directly (RLS)', !!publicReadBefore, publicReadBefore)
 
-  await api(merchantA.cookie, 'POST', `/api/listings/${listingId}/pause`, {})
+  const pauseRes = await api(visibilityMerchant.cookie, 'POST', `/api/listings/${listingId}/pause`, {})
+  check('pause call itself succeeds', pauseRes.status === 200, pauseRes)
 
   const { data: publicReadAfter } = await merchantB.client.from('listings').select('id').eq('id', listingId).maybeSingle()
   check('paused listing is excluded from public/other-user visibility at the RLS layer', !publicReadAfter, publicReadAfter)
 
-  const { data: ownerReadAfter } = await merchantA.client.from('listings').select('id, status').eq('id', listingId).maybeSingle()
+  const { data: ownerReadAfter } = await visibilityMerchant.client.from('listings').select('id, status').eq('id', listingId).maybeSingle()
   check('owner can still read their own paused listing', ownerReadAfter?.status === 'paused', ownerReadAfter)
 
   const browseResults = await api(null, 'GET', `/api/search/listings?q=${encodeURIComponent(`${QA_MARKER} Visibility ${RUN_ID}`)}`)
   const browseIds = Array.isArray(browseResults.json?.listings) ? browseResults.json.listings.map((l) => l.id) : (Array.isArray(browseResults.json) ? browseResults.json.map((l) => l.id) : [])
   check('paused listing excluded from search results (or search endpoint unreachable this way -- informational)', browseResults.status !== 200 || !browseIds.includes(listingId), { status: browseResults.status, includesId: browseIds.includes(listingId) })
 
-  await api(merchantA.cookie, 'POST', `/api/listings/${listingId}/resume`, {})
+  const supplyBeforeResume = await getActiveSupplyBaseline(visibilityMerchant.userId)
+
+  // Assert the resume call's own response BEFORE asserting its expected
+  // side effect -- a denied resume (e.g. cap/freeze) must surface as its
+  // own clear failure here, never silently fall through to a confusing
+  // "visibility" failure caused by a listing that never actually resumed.
+  const resumeRes = await api(visibilityMerchant.cookie, 'POST', `/api/listings/${listingId}/resume`, {})
+  check('resume call itself succeeds (prerequisite for the visibility assertion below) -- a fresh disposable owner has natural cap headroom, so this is never a legitimate denial', resumeRes.status === 200, { resumeRes, supplyBeforeFixture, supplyBeforeResume })
+
   const { data: publicReadAfterResume } = await merchantB.client.from('listings').select('id').eq('id', listingId).maybeSingle()
   check('resumed listing regains public visibility', !!publicReadAfterResume, publicReadAfterResume)
 
-  await admin.from('listings').update({ status: 'paused' }).eq('id', listingId)
+  const browseAfterResume = await api(null, 'GET', `/api/search/listings?q=${encodeURIComponent(`${QA_MARKER} Visibility ${RUN_ID}`)}`)
+  const browseIdsAfterResume = Array.isArray(browseAfterResume.json?.listings) ? browseAfterResume.json.listings.map((l) => l.id) : (Array.isArray(browseAfterResume.json) ? browseAfterResume.json.map((l) => l.id) : [])
+  check('resumed listing is findable again through the canonical public search route (or search endpoint unreachable this way -- informational)', browseAfterResume.status !== 200 || browseIdsAfterResume.includes(listingId), { status: browseAfterResume.status, includesId: browseIdsAfterResume.includes(listingId) })
+
+  // Quarantine (is_test:true), never delete -- listings.merchant_id is
+  // `references profiles(id) on delete cascade`, and profiles.id is
+  // itself `references auth.users on delete cascade`, so deleting the
+  // disposable owner's auth user would CASCADE-DELETE this listing row.
+  // That would destroy real QA audit/history state, which this codebase
+  // never does (mutation is always is_test false->true, never a row
+  // delete). The disposable auth user is therefore deliberately left
+  // in place -- an orphaned, never-reused QA auth account costs nothing
+  // and is the same accepted housekeeping debt already established for
+  // the Affiliate/Commissions disposable actors; it is never deleted
+  // here specifically to keep the listing row itself intact.
+  await admin.from('listings').update({ status: 'paused', is_test: true }).eq('id', listingId)
 }
 
 console.log('=== PUBLIC-PROFILE ACTIVE LISTING COUNT ===')
@@ -475,7 +532,19 @@ console.log('=== ERROR MAPPING ===')
 
 console.log('=== QA HYGIENE ===')
 {
-  const { data: runListings } = await admin.from('listings').select('id, merchant_id').ilike('title', `${QA_MARKER}%`)
+  // Scoped to titles ending in THIS run's own RUN_ID (every fixture this
+  // file creates embeds it as the final title token -- confirmed across
+  // every insertListing() call site) rather than every historical
+  // "[QA] PauseResume%" row ever created. The unscoped query used to work
+  // by coincidence only because every fixture, across every run, was
+  // always owned by the same fixed set of permanent accounts (merchantA/
+  // merchantB/adminAuth) -- now that PUBLIC VISIBILITY uses a fresh
+  // disposable actor with a different id every run, an unscoped query
+  // would find PRIOR runs' disposable-actor-owned rows and fail against
+  // the CURRENT run's fresh qaFixtureAccountIds Set, which never
+  // contains a previous run's ids. This is what this check's own label
+  // ("...created this run...") already claimed to mean.
+  const { data: runListings } = await admin.from('listings').select('id, merchant_id').ilike('title', `${QA_MARKER}%${RUN_ID}`)
   const allOwnedByQaAccounts = (runListings ?? []).every((l) => qaFixtureAccountIds.has(l.merchant_id))
   check('all fixtures created this run are owned by dedicated QA accounts', (runListings ?? []).length > 0 && allOwnedByQaAccounts, { count: runListings?.length })
 }
