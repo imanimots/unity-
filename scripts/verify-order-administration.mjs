@@ -169,14 +169,27 @@ try {
   process.exit(1)
 }
 
-const { data: authUsers } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 })
-function findUser(email) {
-  const u = authUsers.users.find((x) => x.email === email)
-  if (!u) throw new Error(`QA account ${email} not found -- run scripts/qa-seed.mjs first`)
-  return u
+// Auth users are paginated -- a single fixed-page listUsers() call silently
+// stops finding known QA accounts once the shared dev auth pool grows past
+// that page size. Walk pages by exact email match instead (same pattern as
+// scripts/verify-search-ranking.mjs's findAuthUserByEmail).
+const LIST_USERS_PAGE_SIZE = 100
+const LIST_USERS_MAX_PAGES = 100 // generous bound: up to 10,000 auth users
+async function findAuthUserByEmail(email) {
+  for (let page = 1; page <= LIST_USERS_MAX_PAGES; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: LIST_USERS_PAGE_SIZE })
+    if (error) throw new Error(`listUsers page ${page} failed while resolving ${email}: ${error.message}`)
+    const found = data.users.find((u) => u.email === email)
+    if (found) {
+      console.log(`  (auth lookup: ${email} found on page ${page} of ${LIST_USERS_PAGE_SIZE}-per-page results)`)
+      return found
+    }
+    if (data.users.length < LIST_USERS_PAGE_SIZE) break // last page was short -- pool is exhausted
+  }
+  throw new Error(`could not resolve auth user for ${email} within ${LIST_USERS_MAX_PAGES} pages (perPage=${LIST_USERS_PAGE_SIZE}) -- run scripts/qa-seed.mjs first, or the QA auth pool may have grown beyond this bound`)
 }
-const merchantA = findUser(creds.accounts.merchantA.email)
-findUser(creds.accounts.renterA.email)
+const merchantA = await findAuthUserByEmail(creds.accounts.merchantA.email)
+await findAuthUserByEmail(creds.accounts.renterA.email)
 
 const { cookie: renterACookie, userId: buyerId } = await cookieFor(creds.accounts.renterA.email, creds.accounts.renterA.password)
 const { cookie: merchantACookie } = await cookieFor(creds.accounts.merchantA.email, creds.accounts.merchantA.password)
