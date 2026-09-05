@@ -56,8 +56,6 @@ const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0]
 const cookieName = `sb-${projectRef}-auth-token`
 const QA_MARKER = '[QA] ClickableProfiles'
 const RUN_ID = Date.now()
-const SCRIPT_START_AT = new Date().toISOString()
-const qaFixtureAccountIds = new Set()
 
 let creds
 try {
@@ -135,7 +133,26 @@ const merchantA = await cookieFor(creds.accounts.merchantA.email, creds.accounts
 const merchantB = await cookieFor(creds.accounts.merchantB.email, creds.accounts.merchantB.password)
 const renterA = await cookieFor(creds.accounts.renterA.email, creds.accounts.renterA.password)
 const suspendedUser = await cookieFor(creds.accounts.suspendedUser.email, creds.accounts.suspendedUser.password)
-for (const id of [merchantA.userId, merchantB.userId, renterA.userId, suspendedUser.userId]) qaFixtureAccountIds.add(id)
+
+// Startup orphan quarantine: if a prior run of this verifier crashed after
+// creating a real (is_test=false) ClickableProfiles fixture but before this
+// file's own end-of-run cleanup ran, that row would otherwise remain a
+// permanent is_test=false residue regardless of its lifecycle status (a
+// crashed run's title carries a different RUN_ID than this run's, so this
+// run's own cleanup -- scoped to ids it creates itself -- could never reach
+// it). Sweep any leftover QA_MARKER-titled row from ANY prior run at the
+// start of every run. is_test false->true ONLY -- never touches status,
+// ownership, or history.
+{
+  const { data: orphanListings } = await admin.from('listings').select('id').ilike('title', `${QA_MARKER}%`).eq('is_test', false)
+  if ((orphanListings ?? []).length > 0) {
+    await admin.from('listings').update({ is_test: true }).in('id', orphanListings.map((l) => l.id))
+  }
+  const { data: orphanRequests } = await admin.from('marketplace_requests').select('id').ilike('title', `${QA_MARKER}%`).eq('is_test', false)
+  if ((orphanRequests ?? []).length > 0) {
+    await admin.from('marketplace_requests').update({ is_test: true }).in('id', orphanRequests.map((r) => r.id))
+  }
+}
 
 // Give merchantA a distinctive, known phone value + confirm current kyc/account state -- used by the privacy checks below to prove it never leaks.
 const PRIVATE_PHONE_MARKER = '0821234999'
@@ -187,11 +204,22 @@ console.log('=== PRIVACY ===')
 
 console.log('=== LISTINGS ===')
 let activeListingId, draftListingId
+// Exact-ID tracking for this run's own listing fixtures -- final cleanup
+// below quarantines by id, never by status, so a fixture's lifecycle
+// status (active/draft/suspended/whatever) can never let it escape.
+const createdListingIds = new Set()
 {
   activeListingId = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} Active ${RUN_ID}`, status: 'active' })
-  draftListingId = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} Draft ${RUN_ID}`, status: 'draft' })
-  await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} Suspended ${RUN_ID}`, status: 'suspended' })
-  await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} TestFixture ${RUN_ID}`, status: 'active', is_test: true })
+  // Draft/Suspended never need real (is_test=false) data at any point --
+  // the assertions below only prove their non-active STATUS excludes them
+  // from the public profile, which holds identically whether or not
+  // is_test is true. Created is_test=true from the start so QA ownership
+  // is never ambiguous, even momentarily (Section 6: lifecycle status is
+  // not an acceptable substitute for is_test=true).
+  draftListingId = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} Draft ${RUN_ID}`, status: 'draft', is_test: true })
+  const suspendedListingId = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} Suspended ${RUN_ID}`, status: 'suspended', is_test: true })
+  const testFixtureListingId = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} TestFixture ${RUN_ID}`, status: 'active', is_test: true })
+  for (const id of [activeListingId, draftListingId, suspendedListingId, testFixtureListingId]) createdListingIds.add(id)
 
   const p = await html(null, `/profile/${merchantA.userId}`)
   check('14. active non-test public listing appears', p.text.includes(`${QA_MARKER} Active ${RUN_ID}`), {})
@@ -229,6 +257,7 @@ let reviewBookingId
   // booking for the review fixture below; nothing asserts it publicly, so
   // keeping it out of merchantA's real active-supply count is free.
   const listingForReview = await insertBaseListing(merchantA.userId, { title: `${QA_MARKER} ReviewBooking ${RUN_ID}`, listing_type: 'rental', sale_price: null, daily_rate: 100, min_rental_days: 1, is_test: true })
+  createdListingIds.add(listingForReview)
   const created = await api(renterA.cookie, 'POST', '/api/bookings', { listing_id: listingForReview, start_at: '2030-06-01T00:00:00.000Z', end_at: '2030-06-04T00:00:00.000Z' })
   reviewBookingId = created.json?.booking_id
   if (reviewBookingId) {
@@ -477,6 +506,13 @@ console.log('=== PRIVACY BOUNDARY: DIRECT DATABASE TESTS (mandatory corrective-p
   check('64. listings still show merchant name/avatar (listing detail renders merchant identity)', listingIdentityCheck.status === 200 && listingIdentityCheck.text.includes('Listed by'), {})
   check('65. listing detail still works end-to-end', listingIdentityCheck.status === 200, {})
 
+  // Section-local quarantine: this is the last assertion anywhere in this
+  // script that requires activeListingId to be real (is_test=false) public
+  // data. Quarantine it immediately rather than deferring correctness to
+  // the final cleanup section reaching the end of the script -- if the
+  // process dies between here and CLEANUP, this fixture is already safe.
+  await admin.from('listings').update({ is_test: true }).eq('id', activeListingId)
+
   const { data: lfReqForRegression } = await admin.from('marketplace_requests').select('id').eq('requester_id', renterA.userId).eq('title', `${QA_MARKER} LF Active ${RUN_ID}`).maybeSingle()
   const lfIdentityCheck = lfReqForRegression ? await html(null, `/looking-for/${lfReqForRegression.id}`) : { status: 0, text: '' }
   check('66. Looking For still shows requester identity', lfIdentityCheck.status === 200 && lfIdentityCheck.text.includes('Posted by'), {})
@@ -495,15 +531,22 @@ console.log('=== PRIVACY BOUNDARY: DIRECT DATABASE TESTS (mandatory corrective-p
   check('71. existing admin/KYC reads still work through their trusted (service-role) path', adminKycRead.data?.kyc_status === 'approved', adminKycRead)
 }
 
-console.log('=== CLEANUP: no real active listing fixture left behind ===')
+console.log('=== CLEANUP: no real listing fixture of any status left behind after this run ===')
 {
-  const fixtureOwnerIds = [...qaFixtureAccountIds]
-  const { data: toClean } = await admin.from('listings').select('id').in('merchant_id', fixtureOwnerIds).eq('status', 'active').eq('is_test', false).gte('created_at', SCRIPT_START_AT)
+  // Exact-ID, no status predicate -- this is what actually closes the
+  // draft/suspended residue bug: the old .eq('status','active') filter
+  // structurally could never reach a fixture that (correctly, by design)
+  // never became active. Quarantining by this run's own tracked ids means
+  // every status (active/draft/suspended/whatever future fixture is added)
+  // is reachable. Only is_test is written -- lifecycle status is never
+  // touched merely to hide QA data.
+  const listingIds = [...createdListingIds]
+  const { data: toClean } = await admin.from('listings').select('id').in('id', listingIds).eq('is_test', false)
   if ((toClean ?? []).length > 0) {
-    await admin.from('listings').update({ status: 'suspended', is_test: true }).in('id', toClean.map((l) => l.id))
+    await admin.from('listings').update({ is_test: true }).in('id', toClean.map((l) => l.id))
   }
-  const { count: stillLeaked } = await admin.from('listings').select('id', { count: 'exact', head: true }).in('merchant_id', fixtureOwnerIds).eq('status', 'active').eq('is_test', false).gte('created_at', SCRIPT_START_AT)
-  check('49. cleanup succeeds (no real active listing fixture left behind after this run)', (stillLeaked ?? 0) === 0, { cleanedCount: toClean?.length ?? 0, stillLeaked })
+  const { count: stillLeaked } = await admin.from('listings').select('id', { count: 'exact', head: true }).in('id', listingIds).eq('is_test', false)
+  check('49. cleanup succeeds (no real listing fixture of any status left behind after this run)', (stillLeaked ?? 0) === 0, { cleanedCount: toClean?.length ?? 0, stillLeaked })
 
   const { data: reqToClean } = await admin.from('marketplace_requests').select('id').eq('requester_id', renterA.userId).ilike('title', `${QA_MARKER}%`).eq('is_test', false)
   if ((reqToClean ?? []).length > 0) {
