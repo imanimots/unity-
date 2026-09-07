@@ -151,14 +151,31 @@ try {
   console.error('verify-advertising aborted -- .qa-credentials.local.json not found. Run scripts/qa-seed.mjs first.')
   process.exit(1)
 }
-const { data: allUsers } = await admin.auth.admin.listUsers()
-const findId = (email) => allUsers.users.find((u) => u.email === email)?.id
-const merchantAId = findId(creds.accounts.merchantA.email)
-const merchantBId = findId(creds.accounts.merchantB.email)
-const adminUserId = findId(creds.accounts.admin.email)
-if (!merchantAId) throw new Error('could not resolve merchantA id')
-if (!merchantBId) throw new Error('could not resolve merchantB id')
-if (!adminUserId) throw new Error('could not resolve admin id')
+// Auth users are paginated -- a single fixed/unpaginated listUsers() call
+// silently stops finding known QA accounts once the shared dev auth pool
+// grows past that page size (the no-args default returns only 50 users).
+// Walk pages by exact email match instead (same pattern as
+// scripts/verify-search-ranking.mjs's / scripts/verify-order-administration.mjs's
+// / scripts/verify-affiliate-system.mjs's / scripts/verify-dispute-locking.mjs's
+// findAuthUserByEmail).
+const LIST_USERS_PAGE_SIZE = 100
+const LIST_USERS_MAX_PAGES = 100 // generous bound: up to 10,000 auth users
+async function findAuthUserByEmail(email) {
+  for (let page = 1; page <= LIST_USERS_MAX_PAGES; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: LIST_USERS_PAGE_SIZE })
+    if (error) throw new Error(`listUsers page ${page} failed while resolving ${email}: ${error.message}`)
+    const found = data.users.find((u) => u.email === email)
+    if (found) {
+      console.log(`  (auth lookup: ${email} found on page ${page} of ${LIST_USERS_PAGE_SIZE}-per-page results)`)
+      return found
+    }
+    if (data.users.length < LIST_USERS_PAGE_SIZE) break // last page was short -- pool is exhausted
+  }
+  throw new Error(`could not resolve auth user for ${email} within ${LIST_USERS_MAX_PAGES} pages (perPage=${LIST_USERS_PAGE_SIZE}) -- run scripts/qa-seed.mjs first, or the QA auth pool may have grown beyond this bound`)
+}
+const merchantAId = (await findAuthUserByEmail(creds.accounts.merchantA.email)).id
+const merchantBId = (await findAuthUserByEmail(creds.accounts.merchantB.email)).id
+const adminUserId = (await findAuthUserByEmail(creds.accounts.admin.email)).id
 
 const anonAsMerchantA = createClient(SUPABASE_URL, ANON_KEY)
 const { error: aSignInErr } = await anonAsMerchantA.auth.signInWithPassword({ email: creds.accounts.merchantA.email, password: creds.accounts.merchantA.password })

@@ -6,6 +6,7 @@ import type { Locale } from '@/i18n/locales'
 import { Link } from '@/i18n/navigation'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { formatMoney } from '@/lib/i18n/format'
+import { coerceAdsAvailability } from '@/lib/advertising/availability'
 
 interface AdCampaign {
   id: string
@@ -39,6 +40,7 @@ export default function MerchantAdvertisingPage() {
   const [advertisers, setAdvertisers] = useState<AdAdvertiser[] | null>(null)
   const [campaigns, setCampaigns] = useState<AdCampaign[] | null>(null)
   const [loading, setLoading] = useState(true)
+  const [available, setAvailable] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -48,6 +50,7 @@ export default function MerchantAdvertisingPage() {
     ])
     setAdvertisers(advRes.advertisers ?? [])
     setCampaigns(campRes.campaigns ?? [])
+    setAvailable(coerceAdsAvailability(advRes.available))
     setLoading(false)
   }, [])
 
@@ -80,10 +83,16 @@ export default function MerchantAdvertisingPage() {
         <p className="text-sm text-[#9B8B85]">{tAd('dashboard.loading')}</p>
       ) : !advertisers || advertisers.length === 0 ? (
         <div className="text-center py-16 border border-dashed border-[#E8E0D8] dark:border-[#2A1A1A] rounded-2xl">
-          <p className="text-[#6B5B55] dark:text-[#9B8B85] mb-4">{tAd('dashboard.setupNotice')}</p>
-          <button onClick={createUnityAdvertiser} className="px-5 py-2.5 rounded-full text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors">
-            {tAd('dashboard.setupCta')}
-          </button>
+          {available ? (
+            <>
+              <p className="text-[#6B5B55] dark:text-[#9B8B85] mb-4">{tAd('dashboard.setupNotice')}</p>
+              <button onClick={createUnityAdvertiser} className="px-5 py-2.5 rounded-full text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors">
+                {tAd('dashboard.setupCta')}
+              </button>
+            </>
+          ) : (
+            <p className="text-[#6B5B55] dark:text-[#9B8B85]">{tAd('dashboard.unavailableNotice')}</p>
+          )}
         </div>
       ) : (
         <>
@@ -101,9 +110,13 @@ export default function MerchantAdvertisingPage() {
 
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{tAd('dashboard.yourCampaigns')}</h2>
-            <Link href="/dashboard/merchant/advertising/new" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors">
-              <Plus size={14} /> {tAd('dashboard.newCampaign')}
-            </Link>
+            {available ? (
+              <Link href="/dashboard/merchant/advertising/new" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors">
+                <Plus size={14} /> {tAd('dashboard.newCampaign')}
+              </Link>
+            ) : (
+              <span className="text-xs text-[#9B8B85]" title={tAd('dashboard.unavailableNotice')}>{tAd('dashboard.unavailableNotice')}</span>
+            )}
           </div>
 
           {!campaigns || campaigns.length === 0 ? (

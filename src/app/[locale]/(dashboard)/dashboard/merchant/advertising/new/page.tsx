@@ -6,6 +6,7 @@ import type { Locale } from '@/i18n/locales'
 import { useRouter, Link } from '@/i18n/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { formatMoney } from '@/lib/i18n/format'
+import { resolveAdsAvailability, coerceAdsAvailability } from '@/lib/advertising/availability'
 
 interface AdPackage {
   id: string
@@ -49,6 +50,7 @@ export default function NewAdCampaignPage() {
   const [packages, setPackages] = useState<AdPackage[]>([])
   const [listings, setListings] = useState<MerchantListing[]>([])
   const [loading, setLoading] = useState(true)
+  const [available, setAvailable] = useState(false)
 
   const [advertiserId, setAdvertiserId] = useState('')
   const [packageId, setPackageId] = useState('')
@@ -73,6 +75,7 @@ export default function NewAdCampaignPage() {
       if (adv.length > 0) setAdvertiserId(adv[0].id)
       setPackages(pkgRes.packages ?? [])
       setListings(listRes.listings ?? [])
+      setAvailable(coerceAdsAvailability(advRes.available))
       setLoading(false)
     }
     load()
@@ -123,8 +126,12 @@ export default function NewAdCampaignPage() {
         {t('description')}
       </p>
 
-      {loading ? (
+      {resolveAdsAvailability(loading, available) === 'loading' ? (
         <p className="text-sm text-[#9B8B85]">{t('loading')}</p>
+      ) : resolveAdsAvailability(loading, available) === 'unavailable' ? (
+        <p className="text-sm text-[#9B8B85]">
+          {t('unavailableNotice')}
+        </p>
       ) : advertisers.length === 0 ? (
         <p className="text-sm text-[#9B8B85]">
           {t('noAdvertiserNotice')}

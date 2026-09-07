@@ -88,5 +88,11 @@ export async function GET() {
 
   const shaped = advertisers.map((a) => ({ ...a, balance: balanceByAdvertiser.get(a.id) ?? null }))
 
-  return NextResponse.json({ advertisers: shaped })
+  // Surfaced so the client can proactively disable campaign
+  // creation/setup while the feature is off, instead of letting a
+  // merchant fill out a whole form the backend then rejects.
+  // isAdvertisingEnabled() itself stays server-only (no
+  // NEXT_PUBLIC_ variant) -- this is a one-way derived boolean, never
+  // the raw flag or any serving/spend authority.
+  return NextResponse.json({ advertisers: shaped, available: isAdvertisingEnabled() })
 }
