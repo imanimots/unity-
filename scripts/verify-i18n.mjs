@@ -115,6 +115,13 @@ console.log('\n--- DICTIONARIES ---')
   // still worth flagging).
   const ALLOWED_IDENTICAL = new Set([
     'Unity', 'CTR', 'CSV', 'R{amount}', 'POPIA', 'Filter', 'Platform', 'Item', 'Elite', 'Pro', 'Thabo Nkosi',
+    // common.profile.transactionKind.historical_qa_fixture -- a pure ICU
+    // placeholder with zero literal prose (unlike every other
+    // transactionKind entry, which wraps {title} in real translated
+    // words). The placeholder name "title" trips the letter-run
+    // heuristic even though there is nothing to translate; same category
+    // as 'R{amount}' above, not a missed translation.
+    '{title}',
     // Afrikaans cognates confirmed against this dictionary's own established
     // usage (e.g. "Betalingstatus" already compounds "status" unchanged) --
     // not translation gaps.
@@ -341,7 +348,7 @@ console.log('\n--- EMAIL COVERAGE MANIFEST (real, deterministic -- no broad skip
   check('48b. every template id is unique (no accidental duplicate/drift)', new Set(idMatches.map((m) => m[1])).size === totalTemplates)
   check(
     `48c. every catalogue template has real af-ZA/zu-ZA localeVariants -- full catalogue completion (${fullyCompleteCount}/${totalTemplates})`,
-    fullyCompleteCount === totalTemplates && totalTemplates === 87 && incompleteIds.length === 0
+    fullyCompleteCount === totalTemplates && totalTemplates === 91 && incompleteIds.length === 0
   )
   if (incompleteIds.length > 0) {
     console.log(`  INFO: ${incompleteIds.length} template ids remain en-ZA-only: ${incompleteIds.slice(0, 5).join(', ')}, …`)
@@ -887,7 +894,7 @@ console.log('\n--- GAP-CLOSURE PASS: 61/61 PAGE COMPLETION ---')
     const block = catalogueSrc2.slice(start, end)
     if (/localeVariants:[\s\S]*?'af-ZA':/.test(block) && /localeVariants:[\s\S]*?'zu-ZA':/.test(block)) fullyCompleteCount2++
   }
-  check(`87. email invariant remains intact: 87/87/87 (${fullyCompleteCount2}/${idMatches2.length} templates fully localized)`, idMatches2.length === 87 && fullyCompleteCount2 === 87)
+  check(`87. email invariant remains intact: 91/91/91 (${fullyCompleteCount2}/${idMatches2.length} templates fully localized)`, idMatches2.length === 91 && fullyCompleteCount2 === 91)
 }
 
 console.log('\n=== SUMMARY ===')

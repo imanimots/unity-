@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 import { MapPin, Clock } from 'lucide-react'
 
 export interface MarketplaceRequestSummary {

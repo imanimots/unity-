@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 
 /**
  * The one reusable "clickable customer identity" component. Wraps a
