@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from 'next-intl'
 import { Link } from '@/i18n/navigation'
 import { ArrowLeft, Users, TrendingUp, AlertCircle } from 'lucide-react'
 import { formatMoneyFromRands } from '@/lib/i18n/format'
+import { requestAffiliateToggle } from '@/lib/affiliate/toggle-client'
 import type { Locale } from '@/i18n/locales'
 
 interface MerchantAffiliateListing {
@@ -55,16 +56,11 @@ export default function MerchantAffiliatesPage() {
     setPending(listingId)
     setToggleError(null)
     try {
-      const res = await fetch(`/api/listings/${listingId}/affiliate/${enable ? 'enable' : 'disable'}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idempotency_key: crypto.randomUUID() }),
-      })
-      if (res.ok) {
+      const result = await requestAffiliateToggle(listingId, enable, t('errorToggle'))
+      if (result.ok) {
         await load()
       } else {
-        const body = await res.json().catch(() => null)
-        setToggleError(body?.error ?? t('errorToggle'))
+        setToggleError(result.error)
       }
     } finally {
       setPending(null)
