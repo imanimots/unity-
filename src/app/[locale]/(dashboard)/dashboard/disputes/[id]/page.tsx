@@ -74,6 +74,8 @@ export default async function DisputeDetailPage({ params }: PageProps) {
             couldNotUpload: t('couldNotUploadEvidence'),
             errorUnsupportedType: t('errorUnsupportedType'),
             errorTooLarge: t('errorTooLarge', { mb: MAX_EVIDENCE_SIZE_BYTES / 1024 / 1024 }),
+            viewEvidence: t('viewEvidence'),
+            couldNotAccess: t('couldNotAccessEvidence'),
           },
           timeline: {
             title: t('timeline'),

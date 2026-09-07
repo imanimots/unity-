@@ -141,6 +141,10 @@ async function tryRead(client, path) {
   const { data, error } = await client.storage.from('dispute-evidence').download(path)
   return { allowed: !error, size: data?.size, error }
 }
+async function tryUploadTo(bucket, client, path) {
+  const { error } = await client.storage.from(bucket).upload(path, tinyPng, { contentType: 'image/png', upsert: false })
+  return { allowed: !error, error }
+}
 
 let failures = 0
 function check(label, cond, detail) {
@@ -226,6 +230,103 @@ check('J. cross-dispute: real API rejects evidence registration by a non-partici
 // K. admin read -- ALLOW (admin's own JWT, not service role)
 const rdK = await tryRead(adminAuth.client, pathA)
 check('K. admin (own JWT, role-derived) read -> ALLOW', rdK.allowed, rdK)
+
+// register B's evidence metadata row too (upBraiser only wrote the storage object) -- needed for the access-route matrix below
+const regB = await api(merchantB.cookie, 'POST', `/api/disputes/${disputeBId}/evidence`, { storage_path: pathB, file_type: 'image', idempotency_key: `rtbdispute-b-${RUN_ID}` })
+check('registered evidence B via the real API route', regB.status === 201, regB)
+
+console.log('=== F3: authorized evidence access route -- GENERIC dispute evidence ===')
+const evidenceAId = regA.json?.id
+const evidenceA2Id = regA2.json?.id
+const evidenceBId = regB.json?.id
+
+// L. authorized raiser
+const accL = await api(renterA.cookie, 'POST', `/api/disputes/${disputeAId}/evidence/${evidenceAId}/access`)
+check('L. [generic] authorized raiser (renterA) access -> 200 + signed url', accL.status === 200 && !!accL.json?.url, accL)
+
+// M. authorized counterparty
+const accM = await api(merchantA.cookie, 'POST', `/api/disputes/${disputeAId}/evidence/${evidenceAId}/access`)
+check('M. [generic] authorized counterparty (merchantA) access -> 200 + signed url', accM.status === 200 && !!accM.json?.url, accM)
+
+// N. unrelated authenticated user
+const accN = await api(unrelatedUser.cookie, 'POST', `/api/disputes/${disputeAId}/evidence/${evidenceAId}/access`)
+check('N. [generic] unrelated authenticated user access -> DENY (no url)', accN.status !== 200 && !accN.json?.url, accN)
+
+// O. anonymous
+const accO = await api(null, 'POST', `/api/disputes/${disputeAId}/evidence/${evidenceAId}/access`)
+check('O. [generic] anonymous access -> DENY (401)', accO.status === 401, accO)
+
+// P. cross-dispute read (A-participant supplies B's dispute + B's real evidence id)
+const accP = await api(renterA.cookie, 'POST', `/api/disputes/${disputeBId}/evidence/${evidenceBId}/access`)
+check('P. [generic] cross-dispute: A-participant against B dispute+evidence -> DENY', accP.status !== 200 && !accP.json?.url, accP)
+
+// Q. parent/evidence-id mismatch: correct dispute (A), but evidence id belongs to a different dispute (B)
+const accQ = await api(renterA.cookie, 'POST', `/api/disputes/${disputeAId}/evidence/${evidenceBId}/access`)
+check('Q. [generic] parent/evidence mismatch (dispute A + evidence from B) -> DENY', accQ.status !== 200 && !accQ.json?.url, accQ)
+
+// R. admin
+const accR = await api(adminAuth.cookie, 'POST', `/api/disputes/${disputeAId}/evidence/${evidenceAId}/access`)
+check('R. [generic] admin access -> 200 + signed url', accR.status === 200 && !!accR.json?.url, accR)
+
+// S. signed object retrieval -- prove the URL actually works, using a plain fetch (not the Supabase SDK)
+if (accL.json?.url) {
+  const fetched = await fetch(accL.json.url)
+  check('S. [generic] signed URL retrieval actually returns the object (200)', fetched.status === 200, { status: fetched.status })
+} else {
+  check('S. [generic] signed URL retrieval actually returns the object (200)', false, { reason: 'no url from check L' })
+}
+
+console.log('=== F3: authorized evidence access route -- RTB-NATIVE evidence ===')
+const rtbEvidencePathA = `${agreementAId}/${merchantA.userId}/${RUN_ID}-rtb-a.png`
+const upRtbA = await tryUploadTo('rent-to-buy-evidence', merchantA.client, rtbEvidencePathA)
+check('setup: RTB merchant (merchantA) can upload their own agreement A handover evidence', upRtbA.allowed, upRtbA.error)
+const regRtbA = await api(merchantA.cookie, 'POST', `/api/rent-to-buy/agreements/${agreementAId}/evidence`, { storage_path: rtbEvidencePathA, file_type: 'image', evidence_type: 'pre_handover', idempotency_key: `rtbevidence-a-${RUN_ID}` })
+check('registered RTB-native evidence A via the real API route', regRtbA.status === 201, regRtbA)
+
+const rtbEvidencePathB = `${agreementBId}/${merchantB.userId}/${RUN_ID}-rtb-b.png`
+const upRtbB = await tryUploadTo('rent-to-buy-evidence', merchantB.client, rtbEvidencePathB)
+check('setup: RTB merchant (merchantB) can upload their own agreement B handover evidence', upRtbB.allowed, upRtbB.error)
+const regRtbB = await api(merchantB.cookie, 'POST', `/api/rent-to-buy/agreements/${agreementBId}/evidence`, { storage_path: rtbEvidencePathB, file_type: 'image', evidence_type: 'pre_handover', idempotency_key: `rtbevidence-b-${RUN_ID}` })
+check('registered RTB-native evidence B via the real API route', regRtbB.status === 201, regRtbB)
+
+const rtbEvidenceAId = regRtbA.json?.id
+const rtbEvidenceBId = regRtbB.json?.id
+
+// T. merchant (uploader)
+const accT = await api(merchantA.cookie, 'POST', `/api/rent-to-buy/agreements/${agreementAId}/evidence/${rtbEvidenceAId}/access`)
+check('T. [rtb-native] merchant (merchantA) access -> 200 + signed url', accT.status === 200 && !!accT.json?.url, accT)
+
+// U. customer (the other real party)
+const accU = await api(renterA.cookie, 'POST', `/api/rent-to-buy/agreements/${agreementAId}/evidence/${rtbEvidenceAId}/access`)
+check('U. [rtb-native] customer (renterA) access -> 200 + signed url', accU.status === 200 && !!accU.json?.url, accU)
+
+// V. unrelated authenticated user
+const accV = await api(unrelatedUser.cookie, 'POST', `/api/rent-to-buy/agreements/${agreementAId}/evidence/${rtbEvidenceAId}/access`)
+check('V. [rtb-native] unrelated authenticated user access -> DENY', accV.status !== 200 && !accV.json?.url, accV)
+
+// W. anonymous
+const accW = await api(null, 'POST', `/api/rent-to-buy/agreements/${agreementAId}/evidence/${rtbEvidenceAId}/access`)
+check('W. [rtb-native] anonymous access -> DENY (401)', accW.status === 401, accW)
+
+// X. cross-agreement: A-participant (renterA) against agreement B's evidence
+const accX = await api(renterA.cookie, 'POST', `/api/rent-to-buy/agreements/${agreementBId}/evidence/${rtbEvidenceBId}/access`)
+check('X. [rtb-native] cross-agreement: A-participant against B agreement+evidence -> DENY', accX.status !== 200 && !accX.json?.url, accX)
+
+// Y. parent/evidence-id mismatch: correct agreement (A), but evidence id belongs to agreement B
+const accY = await api(merchantA.cookie, 'POST', `/api/rent-to-buy/agreements/${agreementAId}/evidence/${rtbEvidenceBId}/access`)
+check('Y. [rtb-native] parent/evidence mismatch (agreement A + evidence from B) -> DENY', accY.status !== 200 && !accY.json?.url, accY)
+
+// Z. admin
+const accZ = await api(adminAuth.cookie, 'POST', `/api/rent-to-buy/agreements/${agreementAId}/evidence/${rtbEvidenceAId}/access`)
+check('Z. [rtb-native] admin access -> 200 + signed url', accZ.status === 200 && !!accZ.json?.url, accZ)
+
+// AA. signed object retrieval
+if (accT.json?.url) {
+  const fetchedRtb = await fetch(accT.json.url)
+  check('AA. [rtb-native] signed URL retrieval actually returns the object (200)', fetchedRtb.status === 200, { status: fetchedRtb.status })
+} else {
+  check('AA. [rtb-native] signed URL retrieval actually returns the object (200)', false, { reason: 'no url from check T' })
+}
 
 console.log('=== Control: DB metadata RLS unchanged (dispute_evidence table) ===')
 const metaMerchantA = await merchantA.client.from('dispute_evidence').select('id').eq('dispute_id', disputeAId)

@@ -69,11 +69,15 @@
     "requestRentToBuy": "Request Rent to Buy"
   },
   "errors": {
-    "generic": "Something went wrong"
+    "generic": "Something went wrong",
+    "couldNotAccessEvidence": "Could not open this evidence file — please try again"
   },
   "handoverEvidence": "Handover evidence",
   "preHandoverEvidence": "Pre-handover condition evidence",
   "receiptEvidence": "Receipt / condition evidence",
+  "submittedEvidence": "Submitted evidence",
+  "noEvidenceSubmitted": "No evidence submitted yet.",
+  "viewEvidence": "View evidence",
   "uploadEvidence": "Upload evidence",
   "evidenceRequiredMerchant": "Upload at least one photo/video of the item's condition before marking this agreement handed over.",
   "evidenceRequiredCustomer": "Upload at least one photo/video of the item's condition on receipt before confirming possession.",

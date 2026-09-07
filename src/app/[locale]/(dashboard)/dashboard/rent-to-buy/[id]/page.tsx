@@ -7,6 +7,7 @@ import { getRentToBuyAgreementDetail } from '@/lib/data/rent-to-buy'
 import { RentToBuyAgreementActions } from '@/components/rent-to-buy/agreement-detail-client'
 import { AmendmentRespondButtons } from '@/components/rent-to-buy/amendment-respond-buttons'
 import { RentToBuyEvidenceUpload } from '@/components/rent-to-buy/evidence-upload'
+import { EvidenceAccessButton } from '@/components/shared/evidence-access-button'
 import { formatDate } from '@/lib/i18n/format'
 import { withLocalePrefix, type Locale } from '@/i18n/locales'
 
@@ -62,7 +63,7 @@ export default async function RentToBuyAgreementPage({ params }: PageProps) {
   const detail = await getRentToBuyAgreementDetail(admin, id, requester.userId)
   if (!detail) notFound()
 
-  const { agreement, listing, installments, purchaseProgress, isMerchant, isCustomer, history, pendingAmendment } = detail
+  const { agreement, listing, installments, purchaseProgress, isMerchant, isCustomer, history, pendingAmendment, evidence } = detail
   const nextUnpaid = installments.find((i) => i.status === 'scheduled')
 
   const lastTerminationEvent = [...history].reverse().find((h) => h.event_type === 'mutual_termination_proposed' || h.event_type === 'mutual_termination_accepted')
@@ -151,6 +152,24 @@ export default async function RentToBuyAgreementPage({ params }: PageProps) {
           ))}
         </div>
       </div>
+
+      {(isMerchant || isCustomer) && (
+        <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-6 mb-6">
+          <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-4">{t('submittedEvidence')}</p>
+          {evidence.length === 0 ? (
+            <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85]">{t('noEvidenceSubmitted')}</p>
+          ) : (
+            <ul className="space-y-2">
+              {evidence.map((e: { id: string; evidence_type: string; file_type: string }) => (
+                <li key={e.id} className="flex items-center justify-between gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+                  <span className="truncate">{e.evidence_type} — {e.file_type}</span>
+                  <EvidenceAccessButton accessUrl={`/api/rent-to-buy/agreements/${agreement.id}/evidence/${e.id}/access`} label={t('viewEvidence')} errorLabel={t('errors.couldNotAccessEvidence')} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {isMerchant && agreement.possession_status === 'possession_eligible' && !agreement.handed_over_at && (
         <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-6 mb-6">

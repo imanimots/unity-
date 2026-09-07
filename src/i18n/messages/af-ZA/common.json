@@ -109,6 +109,8 @@
     "uploading": "Laai op…",
     "couldNotRegisterEvidence": "Kon nie hierdie bewyslêer registreer nie",
     "couldNotUploadEvidence": "Kon nie hierdie lêer oplaai nie — probeer asseblief weer",
+    "viewEvidence": "Bekyk bewys",
+    "couldNotAccessEvidence": "Kon nie hierdie bewyslêer oopmaak nie — probeer asseblief weer",
     "errorUnsupportedType": "Nie-ondersteunde lêertipe — gebruik JPG, PNG, WEBP, of PDF.",
     "errorTooLarge": "Lêer is te groot — maksimum {mb}MB.",
     "confirmations": "Voltooiingsbevestigings",

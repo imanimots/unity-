@@ -69,11 +69,15 @@
     "requestRentToBuy": "Versoek Huur om te Koop"
   },
   "errors": {
-    "generic": "Iets het verkeerd geloop"
+    "generic": "Iets het verkeerd geloop",
+    "couldNotAccessEvidence": "Kon nie hierdie bewyslêer oopmaak nie — probeer asseblief weer"
   },
   "handoverEvidence": "Bewys van oorhandiging",
   "preHandoverEvidence": "Bewys van toestand voor oorhandiging",
   "receiptEvidence": "Bewys van ontvangs / toestand",
+  "submittedEvidence": "Voorgelegde bewys",
+  "noEvidenceSubmitted": "Nog geen bewys voorgelê nie.",
+  "viewEvidence": "Bekyk bewys",
   "uploadEvidence": "Laai bewys op",
   "evidenceRequiredMerchant": "Laai ten minste een foto/video van die item se toestand op voordat jy hierdie ooreenkoms as oorhandig merk.",
   "evidenceRequiredCustomer": "Laai ten minste een foto/video van die item se toestand by ontvangs op voordat jy besit bevestig.",

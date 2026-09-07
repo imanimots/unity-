@@ -109,6 +109,8 @@
     "uploading": "Uploading…",
     "couldNotRegisterEvidence": "Could not register this evidence file",
     "couldNotUploadEvidence": "Could not upload this file — please try again",
+    "viewEvidence": "View evidence",
+    "couldNotAccessEvidence": "Could not open this evidence file — please try again",
     "errorUnsupportedType": "Unsupported file type — use JPG, PNG, WEBP, or PDF.",
     "errorTooLarge": "File is too large — maximum {mb}MB.",
     "confirmations": "Completion confirmations",

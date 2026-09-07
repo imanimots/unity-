@@ -69,11 +69,15 @@
     "requestRentToBuy": "Cela Ukuqasha ukuze Uthenge"
   },
   "errors": {
-    "generic": "Kukhona okungahambanga kahle"
+    "generic": "Kukhona okungahambanga kahle",
+    "couldNotAccessEvidence": "Ayikwazanga ukuvula leli fayela lobufakazi — sicela uzame futhi"
   },
   "handoverEvidence": "Ubufakazi bokudluliselwa",
   "preHandoverEvidence": "Ubufakazi besimo ngaphambi kokudluliselwa",
   "receiptEvidence": "Ubufakazi bokutholwa / isimo",
+  "submittedEvidence": "Ubufakazi obuthunyelwe",
+  "noEvidenceSubmitted": "Abukho ubufakazi obuthunyelwe okwamanje.",
+  "viewEvidence": "Buka ubufakazi",
   "uploadEvidence": "Layisha ubufakazi",
   "evidenceRequiredMerchant": "Layisha okungenani isithombe/ividiyo eyodwa yesimo sento ngaphambi kokuphawula lesi sivumelwano njengesidluliselwe.",
   "evidenceRequiredCustomer": "Layisha okungenani isithombe/ividiyo eyodwa yesimo sento ngesikhathi sokuyithola ngaphambi kokuqinisekisa ukuba nayo.",

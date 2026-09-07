@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/supabase/require-admin'
 import { getAdminRentToBuyAgreementDetail } from '@/lib/admin/rent-to-buy-service'
 import { AdminPageHeader } from '@/components/admin/ui'
 import { RentToBuyAdminActions } from '@/components/rent-to-buy/admin-actions-client'
+import { EvidenceAccessButton } from '@/components/shared/evidence-access-button'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -98,7 +99,12 @@ export default async function AdminRentToBuyDetailPage({ params }: PageProps) {
 
       <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-6">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-4">Evidence ({evidence.length}) / Amendments ({amendments.length})</p>
-        {evidence.map((e) => <div key={e.id} className="text-xs text-[#6B5B55] dark:text-[#9B8B85]">{e.evidence_type} — {e.file_type}</div>)}
+        {evidence.map((e) => (
+          <div key={e.id} className="flex items-center justify-between gap-2 text-xs text-[#6B5B55] dark:text-[#9B8B85]">
+            <span>{e.evidence_type} — {e.file_type}</span>
+            <EvidenceAccessButton accessUrl={`/api/rent-to-buy/agreements/${agreement.id}/evidence/${e.id}/access`} label="View evidence" errorLabel="Could not open this evidence file — please try again" />
+          </div>
+        ))}
         {amendments.map((a) => <div key={a.id} className="text-xs text-[#6B5B55] dark:text-[#9B8B85]">Amendment ({a.status}): {JSON.stringify(a.proposed_changes)}</div>)}
       </div>
 

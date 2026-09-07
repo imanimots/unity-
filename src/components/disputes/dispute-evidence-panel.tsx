@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FileText, Image as ImageIcon, Upload } from 'lucide-react'
 import { validateEvidenceFile, uploadDisputeEvidence, MAX_EVIDENCE_SIZE_BYTES } from '@/lib/disputes/evidence'
+import { EvidenceAccessButton } from '@/components/shared/evidence-access-button'
 import type { DisputeEvidence } from '@/types'
 
 interface DisputeEvidencePanelLabels {
@@ -15,6 +16,8 @@ interface DisputeEvidencePanelLabels {
   couldNotUpload: string
   errorUnsupportedType: string
   errorTooLarge: string
+  viewEvidence: string
+  couldNotAccess: string
 }
 
 const DEFAULT_LABELS: DisputeEvidencePanelLabels = {
@@ -26,6 +29,8 @@ const DEFAULT_LABELS: DisputeEvidencePanelLabels = {
   couldNotUpload: 'Could not upload this file — please try again',
   errorUnsupportedType: 'Unsupported file type — use JPG, PNG, WEBP, or PDF.',
   errorTooLarge: `File is too large — maximum ${MAX_EVIDENCE_SIZE_BYTES / 1024 / 1024}MB.`,
+  viewEvidence: 'View evidence',
+  couldNotAccess: 'Could not open this evidence file — please try again',
 }
 
 interface DisputeEvidencePanelProps {
@@ -94,7 +99,8 @@ export function DisputeEvidencePanel({ disputeId, currentUserId, evidence, canUp
           {evidence.map((item) => (
             <li key={item.id} className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
               {item.file_type === 'image' ? <ImageIcon size={14} className="text-[#9B8B85]" /> : <FileText size={14} className="text-[#9B8B85]" />}
-              <span className="truncate">{item.storage_path.split('/').pop()}</span>
+              <span className="truncate flex-1">{item.file_type}</span>
+              <EvidenceAccessButton accessUrl={`/api/disputes/${disputeId}/evidence/${item.id}/access`} label={l.viewEvidence} errorLabel={l.couldNotAccess} />
             </li>
           ))}
         </ul>

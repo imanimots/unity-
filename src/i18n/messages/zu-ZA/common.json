@@ -109,6 +109,8 @@
     "uploading": "Kuyalayishwa…",
     "couldNotRegisterEvidence": "Asikwazanga ukubhalisa leli fayela lobufakazi",
     "couldNotUploadEvidence": "Asikwazanga ukulayisha leli fayela — sicela uzame futhi",
+    "viewEvidence": "Buka ubufakazi",
+    "couldNotAccessEvidence": "Ayikwazanga ukuvula leli fayela lobufakazi — sicela uzame futhi",
     "errorUnsupportedType": "Uhlobo lwefayela olungasekelwe — sebenzisa i-JPG, PNG, WEBP, noma i-PDF.",
     "errorTooLarge": "Ifayela likhulu kakhulu — okumaksimamu okungu-{mb}MB.",
     "confirmations": "Ukuqinisekiswa kokuqedwa",
