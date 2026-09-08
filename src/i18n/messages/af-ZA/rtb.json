@@ -70,7 +70,9 @@
   },
   "errors": {
     "generic": "Iets het verkeerd geloop",
-    "couldNotAccessEvidence": "Kon nie hierdie bewyslêer oopmaak nie — probeer asseblief weer"
+    "couldNotAccessEvidence": "Kon nie hierdie bewyslêer oopmaak nie — probeer asseblief weer",
+    "unsupportedType": "Nie-ondersteunde lêertipe — gebruik JPG, PNG, WEBP, MP4, of PDF.",
+    "tooLarge": "Lêer is te groot — maksimum {mb}MB."
   },
   "handoverEvidence": "Bewys van oorhandiging",
   "preHandoverEvidence": "Bewys van toestand voor oorhandiging",

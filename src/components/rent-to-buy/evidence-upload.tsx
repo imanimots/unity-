@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
+import { validateRentToBuyEvidenceFile, ALLOWED_RTB_EVIDENCE_MIME_TYPES, MAX_RTB_EVIDENCE_SIZE_BYTES } from '@/lib/rent-to-buy/evidence-upload'
 
 interface Props {
   agreementId: string
@@ -26,6 +27,17 @@ export function RentToBuyEvidenceUpload({ agreementId, userId, evidenceType, lab
   const [error, setError] = useState<string | null>(null)
 
   const handleFile = async (file: File) => {
+    // Client-side pre-check only -- convenience/UX, never the security
+    // boundary (the bucket's own MIME allowlist/size limit remain
+    // authoritative). Rejected here means Storage upload and evidence
+    // registration are never called at all, and the loading state never
+    // flips on for a file that was always going to be rejected.
+    const validationError = validateRentToBuyEvidenceFile(file)
+    if (validationError) {
+      setError(validationError === 'unsupported_type' ? t('errors.unsupportedType') : t('errors.tooLarge', { mb: MAX_RTB_EVIDENCE_SIZE_BYTES / 1024 / 1024 }))
+      return
+    }
+
     setUploading(true)
     setError(null)
     try {
@@ -58,7 +70,7 @@ export function RentToBuyEvidenceUpload({ agreementId, userId, evidenceType, lab
       <label className="block text-xs font-semibold uppercase tracking-wide text-[#6B5B55] dark:text-[#9B8B85]">{label}</label>
       <input
         type="file"
-        accept="image/*,video/*,application/pdf"
+        accept={ALLOWED_RTB_EVIDENCE_MIME_TYPES.join(',')}
         disabled={uploading}
         onChange={(e) => {
           const file = e.target.files?.[0]
@@ -67,7 +79,7 @@ export function RentToBuyEvidenceUpload({ agreementId, userId, evidenceType, lab
         className="text-xs text-[#1A0A0A] dark:text-[#F5F0ED]"
       />
       {uploading && <p className="text-xs text-[#9B8B85]">{t('uploadEvidence')}…</p>}
-      {error && <p className="text-xs text-[#8B1A1A]">{error}</p>}
+      {error && <p role="alert" className="text-xs text-[#8B1A1A]">{error}</p>}
     </div>
   )
 }

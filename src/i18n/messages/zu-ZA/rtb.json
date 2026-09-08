@@ -70,7 +70,9 @@
   },
   "errors": {
     "generic": "Kukhona okungahambanga kahle",
-    "couldNotAccessEvidence": "Ayikwazanga ukuvula leli fayela lobufakazi — sicela uzame futhi"
+    "couldNotAccessEvidence": "Ayikwazanga ukuvula leli fayela lobufakazi — sicela uzame futhi",
+    "unsupportedType": "Uhlobo lwefayela olungasekelwe — sebenzisa i-JPG, PNG, WEBP, MP4, noma i-PDF.",
+    "tooLarge": "Ifayela likhulu kakhulu — okumaksimamu okungu-{mb}MB."
   },
   "handoverEvidence": "Ubufakazi bokudluliselwa",
   "preHandoverEvidence": "Ubufakazi besimo ngaphambi kokudluliselwa",
