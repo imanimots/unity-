@@ -238,7 +238,9 @@
       "couldNotSend": "Ayikwazanga ukuthumela lo mlayezo",
       "couldNotSendRetry": "Ayikwazanga ukuthumela lo mlayezo — sicela uzame futhi",
       "messagePlaceholder": "Thayipha umlayezo…",
-      "attachmentFallbackName": "isithasiselo"
+      "attachmentFallbackName": "isithasiselo",
+      "loadEarlierMessages": "Layisha imiyalezo yangaphambilini",
+      "couldNotLoadEarlier": "Ayikwazanga ukulayisha imiyalezo yangaphambilini — sicela uzame futhi"
     }
   },
   "home": {

@@ -147,6 +147,8 @@ function ChatUIInner({ conversations, currentUserId, locale }: { conversations: 
                 couldNotSendRetry: tThread('couldNotSendRetry'),
                 messagePlaceholder: tThread('messagePlaceholder'),
                 attachmentFallbackName: tThread('attachmentFallbackName'),
+                loadEarlierMessages: tThread('loadEarlierMessages'),
+                couldNotLoadEarlier: tThread('couldNotLoadEarlier'),
               }}
             />
           </>

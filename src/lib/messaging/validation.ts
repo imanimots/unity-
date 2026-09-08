@@ -29,7 +29,12 @@ export const sendMessageSchema = z
 export const listMessagesQuerySchema = z
   .object({
     ...threadRefFields,
-    before: z.string().datetime().optional(),
+    // Opaque (created_at, id) keyset cursor -- see src/lib/messaging/cursor.ts
+    // for why created_at alone can't safely order/paginate this table.
+    // Bounded the same way every other cursor in this repo is (2048-char
+    // cap enforced again in cursor.ts; malformed/oversized -> null ->
+    // InvalidMessagesCursorError -> 400, never a crash).
+    cursor: z.string().max(2048).optional(),
     limit: z.coerce.number().int().min(1).max(100).optional(),
   })
   .refine(exactlyOneThreadRef, THREAD_REF_ERROR)

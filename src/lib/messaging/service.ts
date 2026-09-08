@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { filterMessage } from '@/lib/chat-filter'
 import { resolveThread, type ResolveThreadInput, type ThreadRef } from './thread-resolution'
 import { notifyNewMessage } from './notify'
+import { decodeAndValidateMessagesCursor, encodeMessagesCursor, computeMessagesCursorContext, InvalidMessagesCursorError } from './cursor'
 
 /**
  * The one send/list implementation -- GET/POST /api/messages and the
@@ -111,11 +112,14 @@ export async function sendMessage(
 }
 
 export interface ListMessagesInput extends ResolveThreadInput {
-  before?: string
+  /** Opaque (created_at, id) keyset cursor from a prior page's nextCursor -- see ./cursor.ts. */
+  cursor?: string
   limit?: number
 }
 
-export type ListMessagesResult = { ok: true; messages: Record<string, unknown>[] } | { ok: false; status: number; error: string }
+export type ListMessagesResult =
+  | { ok: true; messages: Record<string, unknown>[]; nextCursor: string | null }
+  | { ok: false; status: number; error: string }
 
 export async function listMessages(session: SupabaseClient, input: ListMessagesInput): Promise<ListMessagesResult> {
   const thread = await resolveThread(session, {
@@ -126,20 +130,54 @@ export async function listMessages(session: SupabaseClient, input: ListMessagesI
   })
   if (!thread) return { ok: false, status: 404, error: 'Conversation not found' }
 
+  const column = threadColumn(thread.type)
+
+  let cursor: { ts: string; id: string } | null = null
+  if (input.cursor) {
+    try {
+      cursor = decodeAndValidateMessagesCursor(input.cursor, column, thread.id)
+    } catch (err) {
+      if (err instanceof InvalidMessagesCursorError) return { ok: false, status: 400, error: err.message }
+      throw err
+    }
+  }
+
+  // created_at alone is not a safe ORDER BY/keyset boundary -- Postgres
+  // now() is stable within a transaction, so two messages can legally
+  // share the exact same created_at (no UNIQUE constraint enforces
+  // otherwise). id is the deterministic tie-breaker, both in the sort
+  // and in the cursor predicate below, so a same-timestamp group that
+  // straddles a page boundary is never split unrecoverably between
+  // pages (a plain `created_at < cursor` would silently drop any
+  // same-timestamp row not already returned on the prior page).
   let query = session
     .from('messages')
     .select('*')
-    .eq(threadColumn(thread.type), thread.id)
+    .eq(column, thread.id)
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(input.limit ?? 50)
-  if (input.before) query = query.lt('created_at', input.before)
+
+  if (cursor) {
+    query = query.or(`created_at.lt.${cursor.ts},and(created_at.eq.${cursor.ts},id.lt.${cursor.id})`)
+  }
 
   const { data, error } = await query
   if (error) return { ok: false, status: 500, error: 'Could not load messages' }
 
-  const messages = (data ?? []).reverse()
+  const rows = data ?? []
+  const pageSize = input.limit ?? 50
+  const last = rows[rows.length - 1]
+  // Full page returned -- older history may exist. Fewer than a full
+  // page means this thread's beginning was reached, same convention as
+  // GET /api/messages already used before this cursor existed.
+  const nextCursor = last && rows.length === pageSize
+    ? encodeMessagesCursor({ ts: last.created_at as string, id: last.id as string, contextHash: computeMessagesCursorContext(column, thread.id) })
+    : null
+
+  const messages = rows.reverse()
   await attachAttachments(session, messages)
-  return { ok: true, messages }
+  return { ok: true, messages, nextCursor }
 }
 
 /** Batched, not N+1 -- one extra query for the whole page of messages, RLS-scoped by whichever client is passed in. */

@@ -238,7 +238,9 @@
       "couldNotSend": "Kon nie hierdie boodskap stuur nie",
       "couldNotSendRetry": "Kon nie hierdie boodskap stuur nie — probeer asseblief weer",
       "messagePlaceholder": "Tik 'n boodskap…",
-      "attachmentFallbackName": "aanhegsel"
+      "attachmentFallbackName": "aanhegsel",
+      "loadEarlierMessages": "Laai vroeëre boodskappe",
+      "couldNotLoadEarlier": "Kon nie vroeëre boodskappe laai nie — probeer asseblief weer"
     }
   },
   "home": {

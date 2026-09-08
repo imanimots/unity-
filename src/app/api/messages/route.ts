@@ -34,17 +34,18 @@ export async function GET(request: NextRequest) {
     orderId: parsed.data.order_id,
     barterAgreementId: parsed.data.barter_agreement_id,
     disputeId: parsed.data.dispute_id,
-    before: parsed.data.before,
+    cursor: parsed.data.cursor,
     limit: parsed.data.limit,
   })
 
   if (!result.ok) {
     if (result.status === 404) return NextResponse.json({ error: result.error }, { status: 404 })
+    if (result.status === 400) return NextResponse.json({ error: result.error }, { status: 400 })
     console.error('[messages.list] error', { userId: requester.userId, error: result.error })
     return NextResponse.json({ error: result.error }, { status: result.status })
   }
 
-  return NextResponse.json({ messages: result.messages })
+  return NextResponse.json({ messages: result.messages, nextCursor: result.nextCursor })
 }
 
 export async function POST(request: NextRequest) {

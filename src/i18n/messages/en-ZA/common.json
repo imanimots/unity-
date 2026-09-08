@@ -238,7 +238,9 @@
       "couldNotSend": "Could not send this message",
       "couldNotSendRetry": "Could not send this message — please try again",
       "messagePlaceholder": "Type a message…",
-      "attachmentFallbackName": "attachment"
+      "attachmentFallbackName": "attachment",
+      "loadEarlierMessages": "Load earlier messages",
+      "couldNotLoadEarlier": "Could not load earlier messages — please try again"
     }
   },
   "home": {

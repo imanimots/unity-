@@ -110,6 +110,8 @@ export default async function DisputeDetailPage({ params }: PageProps) {
             couldNotSendRetry: tChat('couldNotSendRetry'),
             messagePlaceholder: tChat('messagePlaceholder'),
             attachmentFallbackName: tChat('attachmentFallbackName'),
+            loadEarlierMessages: tChat('loadEarlierMessages'),
+            couldNotLoadEarlier: tChat('couldNotLoadEarlier'),
           },
           locale,
         }}

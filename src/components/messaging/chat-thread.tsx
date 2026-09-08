@@ -21,6 +21,8 @@ export interface ChatThreadLabels {
   couldNotSendRetry: string
   messagePlaceholder: string
   attachmentFallbackName: string
+  loadEarlierMessages: string
+  couldNotLoadEarlier: string
 }
 
 const DEFAULT_LABELS: ChatThreadLabels = {
@@ -36,6 +38,8 @@ const DEFAULT_LABELS: ChatThreadLabels = {
   couldNotSendRetry: 'Could not send this message — please try again',
   messagePlaceholder: 'Type a message…',
   attachmentFallbackName: 'attachment',
+  loadEarlierMessages: 'Load earlier messages',
+  couldNotLoadEarlier: 'Could not load earlier messages — please try again',
 }
 
 interface ChatThreadProps {
@@ -71,6 +75,10 @@ interface ThreadMessage extends Message {
 
 const PARAM_BY_TYPE: Record<ThreadType, string> = { booking: 'booking_id', order: 'order_id', barter: 'barter_agreement_id' }
 const HEARTBEAT_INTERVAL_MS = 25_000
+// Preserves the existing, already-canonical page size (GET /api/messages'
+// own default via listMessages()) -- not a new number invented for this
+// phase.
+const PAGE_SIZE = 50
 
 function formatTime(iso: string, locale: string) {
   return new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -105,10 +113,21 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
   const [fileError, setFileError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [hasMoreOlder, setHasMoreOlder] = useState(false)
+  const [loadingOlder, setLoadingOlder] = useState(false)
+  const [olderError, setOlderError] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const lastMessageIdRef = useRef<string | null>(null)
   const loadedIds = useRef<Set<string>>(new Set())
+  // Opaque (created_at, id) keyset cursor from the server's own
+  // nextCursor -- never hand-derived from messages[0].created_at, which
+  // cannot disambiguate same-timestamp messages at a page boundary (see
+  // src/lib/messaging/cursor.ts).
+  const nextCursorRef = useRef<string | null>(null)
 
   const fetchParam = PARAM_BY_TYPE[transactionType]
+  const endpoint = useAdminEndpoint ? '/api/admin/messages' : '/api/messages'
 
   // Load history first -- the realtime subscription (below) only opens
   // once this has finished, per review point 9: subscribing before
@@ -120,16 +139,24 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
     setLoading(true)
     setHistoryLoaded(false)
     setMessages([])
+    setHasMoreOlder(false)
+    setOlderError(null)
+    lastMessageIdRef.current = null
+    nextCursorRef.current = null
     loadedIds.current = new Set()
 
-    const endpoint = useAdminEndpoint ? '/api/admin/messages' : '/api/messages'
-    fetch(`${endpoint}?${fetchParam}=${transactionId}&limit=50`)
+    fetch(`${endpoint}?${fetchParam}=${transactionId}&limit=${PAGE_SIZE}`)
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return
         const history: Message[] = data.messages ?? []
         history.forEach((m) => loadedIds.current.add(m.id))
         setMessages(history)
+        // nextCursor is authoritative (server-derived from the actual
+        // page returned) -- absent entirely on the admin endpoint, which
+        // isn't paginated, so hasMoreOlder correctly stays false there.
+        nextCursorRef.current = data.nextCursor ?? null
+        setHasMoreOlder(!!data.nextCursor)
       })
       .finally(() => {
         if (cancelled) return
@@ -140,7 +167,52 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
     return () => {
       cancelled = true
     }
-  }, [transactionType, transactionId, fetchParam, useAdminEndpoint])
+  }, [transactionType, transactionId, fetchParam, endpoint])
+
+  // Loads the page of messages immediately older than the oldest one
+  // currently in state, via the same opaque keyset cursor GET
+  // /api/messages already supports (cursor=<...>, re-authorized by
+  // RLS/resolveThread() on every call, exactly like the initial page --
+  // pagination never weakens thread authorization; the cursor is also
+  // bound to this specific thread, so it can never be replayed against
+  // a different one). Uses the server's own nextCursorRef, never a
+  // hand-derived timestamp -- see src/lib/messaging/cursor.ts for why
+  // created_at alone can't disambiguate a same-timestamp group at a page
+  // boundary. De-dupes against loadedIds (the same Set the realtime
+  // subscription already uses) and prepends, never replacing
+  // already-loaded history. Preserves the user's scroll position by
+  // measuring scrollHeight before the fetch and restoring the
+  // equivalent offset after the DOM has repainted with the
+  // newly-prepended content, so older messages appear above without
+  // visually shifting whatever the user was already reading.
+  async function loadOlder() {
+    if (loadingOlder || !hasMoreOlder || !nextCursorRef.current) return
+    setLoadingOlder(true)
+    setOlderError(null)
+    const container = scrollContainerRef.current
+    const prevScrollHeight = container?.scrollHeight ?? 0
+    const cursor = nextCursorRef.current
+    try {
+      const res = await fetch(`${endpoint}?${fetchParam}=${transactionId}&limit=${PAGE_SIZE}&cursor=${encodeURIComponent(cursor)}`)
+      const data = await res.json()
+      if (!res.ok) {
+        setOlderError(data.error ?? labels.couldNotLoadEarlier)
+        return
+      }
+      const older: Message[] = (data.messages ?? []).filter((m: Message) => !loadedIds.current.has(m.id))
+      older.forEach((m) => loadedIds.current.add(m.id))
+      setMessages((prev) => [...older, ...prev])
+      nextCursorRef.current = data.nextCursor ?? null
+      setHasMoreOlder(!!data.nextCursor)
+      requestAnimationFrame(() => {
+        if (container) container.scrollTop = container.scrollHeight - prevScrollHeight
+      })
+    } catch {
+      setOlderError(labels.couldNotLoadEarlier)
+    } finally {
+      setLoadingOlder(false)
+    }
+  }
 
   // Subscribe to realtime inserts for this thread only after history has loaded.
   useEffect(() => {
@@ -199,8 +271,17 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
     }
   }, [canSend, currentUserId, transactionType, transactionId])
 
+  // Auto-scrolls only when a message is APPENDED at the end (a new send,
+  // retry, or realtime arrival -- the existing, unchanged behavior).
+  // Prepending an older page changes the FIRST messages but never the
+  // last one, so this intentionally does nothing when older history
+  // loads -- the user's reading position must not jump to the bottom.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const last = messages[messages.length - 1]
+    if (last && last.id !== lastMessageIdRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+    lastMessageIdRef.current = last?.id ?? null
   }, [messages])
 
   async function postMessage(content: string, tempId: string, file: File | null) {
@@ -323,13 +404,26 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
 
   return (
     <div className={`flex flex-col ${containerHeight}`}>
-      <div className={`flex-1 overflow-y-auto ${variant === 'embedded' ? 'space-y-3 py-2' : 'px-5 py-5 space-y-4 bg-[#FAF8F5] dark:bg-[#0F0A0A]'}`}>
+      <div ref={scrollContainerRef} className={`flex-1 overflow-y-auto ${variant === 'embedded' ? 'space-y-3 py-2' : 'px-5 py-5 space-y-4 bg-[#FAF8F5] dark:bg-[#0F0A0A]'}`}>
         {loading ? (
           <p className="text-sm text-[#9B8B85] text-center py-8">{labels.loadingMessages}</p>
         ) : messages.length === 0 ? (
           <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] text-center py-8">{labels.noMessagesYet}</p>
         ) : (
-          groups.map(({ date, items }) => (
+          <>
+            {hasMoreOlder && (
+              <div className="flex flex-col items-center gap-1.5 pb-2">
+                <button
+                  onClick={loadOlder}
+                  disabled={loadingOlder}
+                  className="text-xs font-semibold text-[#8B1A1A] hover:underline disabled:opacity-50 disabled:hover:no-underline"
+                >
+                  {loadingOlder ? '…' : labels.loadEarlierMessages}
+                </button>
+                {olderError && <span className="text-xs text-red-600 dark:text-red-400">{olderError}</span>}
+              </div>
+            )}
+            {groups.map(({ date, items }) => (
             <div key={date}>
               {variant === 'full' && (
                 <div className="flex items-center gap-3 my-5">
@@ -385,7 +479,8 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
                 })}
               </div>
             </div>
-          ))
+          ))}
+          </>
         )}
         <div ref={bottomRef} />
       </div>

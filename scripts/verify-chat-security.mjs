@@ -73,6 +73,8 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY)
 const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0]
 const cookieName = `sb-${projectRef}-auth-token`
 const QA_LISTING_MARKER = '[QA]'
+// Matches listMessages()'s own default page size (src/lib/messaging/service.ts: `input.limit ?? 50`).
+const PAGE_SIZE_FOR_TEST = 50
 
 async function clientFor(email, password) {
   const client = createClient(SUPABASE_URL, ANON_KEY)
@@ -400,6 +402,195 @@ if (adminSession) {
   check('admin cannot send as if a party (no admin write policy)', adminSend.status >= 400, adminSend)
 } else {
   console.log('  skipped -- no admin QA account in .qa-credentials.local.json')
+}
+
+// ── Stack 3 Phase A: >50-message pagination (opaque (created_at, id) keyset cursor) ──
+console.log('\n=== PAGINATION: >50-message thread ===')
+let paginationBookingId
+let paginationNextCursor
+{
+  const paginationListingId = await insertBaseListing(merchantA.userId, {
+    title: `${QA_LISTING_MARKER} Chat-Security Regression — Pagination`,
+    description: 'Permanent regression fixture for verify-chat-security.mjs pagination checks — do not delete.',
+  })
+  const paginationBookingCreate = await api(renterA.cookie, 'POST', '/api/bookings', {
+    listing_id: paginationListingId,
+    start_at: '2032-01-01T00:00:00.000Z',
+    end_at: '2032-01-04T00:00:00.000Z',
+    idempotency_key: 'chat-regression-pagination-booking-create-v1',
+  })
+  paginationBookingId = paginationBookingCreate.json?.booking_id
+  if (!paginationBookingId) {
+    const { data: existingBooking } = await admin.from('bookings').select('id').eq('listing_id', paginationListingId).eq('renter_id', renterA.userId).maybeSingle()
+    paginationBookingId = existingBooking?.id
+  }
+  check('pagination fixture booking created/replayed', !!paginationBookingId, paginationBookingCreate)
+
+  if (paginationBookingId) {
+    // Idempotent across re-runs -- top up to the target total rather than
+    // sending 75 fresh messages every single run (the thread would grow
+    // unboundedly otherwise).
+    const TARGET_TOTAL = PAGE_SIZE_FOR_TEST + 25
+    const { count: existingCount } = await admin.from('messages').select('id', { count: 'exact', head: true }).eq('booking_id', paginationBookingId)
+    const toSend = Math.max(0, TARGET_TOTAL - (existingCount ?? 0))
+    for (let i = 0; i < toSend; i++) {
+      const seq = (existingCount ?? 0) + i + 1
+      await api(renterA.cookie, 'POST', '/api/messages', {
+        booking_id: paginationBookingId,
+        content: `Pagination fixture message #${seq}`,
+        idempotency_key: `chat-regression-pagination-msg-${seq}`,
+      })
+    }
+    const { count: totalCount } = await admin.from('messages').select('id', { count: 'exact', head: true }).eq('booking_id', paginationBookingId)
+    check(`pagination fixture thread has at least ${TARGET_TOTAL} messages`, (totalCount ?? 0) >= TARGET_TOTAL, { totalCount })
+
+    // A. initial page (authorized participant) -- newest PAGE_SIZE_FOR_TEST
+    const initialPage = await api(renterA.cookie, 'GET', `/api/messages?booking_id=${paginationBookingId}&limit=${PAGE_SIZE_FOR_TEST}`)
+    const initialMessages = initialPage.json?.messages ?? []
+    check(`pagination: initial page returns exactly ${PAGE_SIZE_FOR_TEST} (authorized participant)`, initialPage.status === 200 && initialMessages.length === PAGE_SIZE_FOR_TEST, { status: initialPage.status, count: initialMessages.length })
+    paginationNextCursor = initialPage.json?.nextCursor ?? null
+    check('pagination: initial page returns a nextCursor (more history exists)', !!paginationNextCursor, { nextCursor: paginationNextCursor })
+
+    // B. older page via the opaque (created_at, id) keyset cursor (see
+    // src/lib/messaging/cursor.ts) -- already supported server-side by
+    // listMessages() -- no new route.
+    const olderPage = paginationNextCursor
+      ? await api(renterA.cookie, 'GET', `/api/messages?booking_id=${paginationBookingId}&limit=${PAGE_SIZE_FOR_TEST}&cursor=${encodeURIComponent(paginationNextCursor)}`)
+      : { status: 0, json: null }
+    const olderMessages = olderPage.json?.messages ?? []
+    check('pagination: older page loads successfully via cursor=', olderPage.status === 200, olderPage)
+
+    // C. combined unique -- 0 duplicates
+    const combinedIds = new Set([...initialMessages, ...olderMessages].map((m) => m.id))
+    check(
+      'pagination: combined unique count matches the sum of both pages (0 duplicates)',
+      combinedIds.size === initialMessages.length + olderMessages.length,
+      { combinedUnique: combinedIds.size, initial: initialMessages.length, older: olderMessages.length }
+    )
+
+    // D. 0 missing, relative to the true newest TARGET_TOTAL rows in the DB
+    const { data: allDbMessages } = await admin.from('messages').select('id').eq('booking_id', paginationBookingId).order('created_at', { ascending: false }).limit(TARGET_TOTAL)
+    const missing = (allDbMessages ?? []).filter((m) => !combinedIds.has(m.id)).length
+    check('pagination: 0 missing messages across both pages', missing === 0, { missing, dbTotal: (allDbMessages ?? []).length, combinedTotal: combinedIds.size })
+
+    // E. chronological order preserved within and across pages
+    const isChron = (arr) => arr.every((m, i) => i === 0 || new Date(arr[i - 1].created_at).getTime() <= new Date(m.created_at).getTime())
+    check('pagination: initial page is chronologically ordered', isChron(initialMessages), {})
+    check('pagination: older page is chronologically ordered', isChron(olderMessages), {})
+    check(
+      'pagination: the older page entirely precedes the initial page (correct boundary, no overlap/gap)',
+      olderMessages.length === 0 || new Date(olderMessages[olderMessages.length - 1].created_at).getTime() <= new Date(initialMessages[0].created_at).getTime(),
+      {}
+    )
+
+    // F. unrelated authenticated user DENY, both initial and older/cursor requests
+    const initialAsOutsider = await api(outsider.cookie, 'GET', `/api/messages?booking_id=${paginationBookingId}&limit=${PAGE_SIZE_FOR_TEST}`)
+    check('pagination: unrelated authenticated user DENY on initial page', initialAsOutsider.status === 404, initialAsOutsider)
+    const olderAsOutsider = paginationNextCursor
+      ? await api(outsider.cookie, 'GET', `/api/messages?booking_id=${paginationBookingId}&limit=${PAGE_SIZE_FOR_TEST}&cursor=${encodeURIComponent(paginationNextCursor)}`)
+      : { status: 404 }
+    check('pagination: unrelated authenticated user DENY on older/cursor page', olderAsOutsider.status === 404, olderAsOutsider)
+
+    // G. anonymous DENY
+    const initialAsAnon = await api(null, 'GET', `/api/messages?booking_id=${paginationBookingId}&limit=${PAGE_SIZE_FOR_TEST}`)
+    check('pagination: anonymous DENY', initialAsAnon.status === 401, initialAsAnon)
+
+    // H. cross-thread cursor -- a cursor minted for the pagination thread
+    // is bound to that thread's id (see computeMessagesCursorContext in
+    // src/lib/messaging/cursor.ts), so replaying it against a DIFFERENT
+    // thread -- even one renterA is legitimately a participant of -- is
+    // rejected outright (400), not silently substituted with that other
+    // thread's own page. Stronger than mere non-leakage: the cursor is
+    // never even accepted cross-thread.
+    const crossThreadCursor = paginationNextCursor
+      ? await api(renterA.cookie, 'GET', `/api/messages?booking_id=${bookingId}&limit=${PAGE_SIZE_FOR_TEST}&cursor=${encodeURIComponent(paginationNextCursor)}`)
+      : { status: 0, json: null }
+    check(
+      'pagination: a cursor minted for a different thread is rejected (400) even against a thread the caller legitimately participates in',
+      crossThreadCursor.status === 400,
+      crossThreadCursor
+    )
+
+    // I. invalid cursor -- safe error, no leakage/crash
+    const invalidCursor = await api(renterA.cookie, 'GET', `/api/messages?booking_id=${paginationBookingId}&cursor=not-a-real-cursor`)
+    check('pagination: invalid cursor value is rejected safely (400), not a 5xx/crash', invalidCursor.status === 400, invalidCursor)
+  }
+}
+
+// ── Stack 3 Phase A follow-up: equal created_at tie-breaker (adversarial) ──
+// created_at has no UNIQUE constraint (messages table, 20260613000001) --
+// Postgres now() is stable within a transaction, so distinct messages can
+// legally share an identical created_at. A plain created_at-only keyset
+// cursor silently drops any same-timestamp row not already returned on
+// the page it landed in, once that group straddles a page boundary.
+// Proven live pre-fix via a scratch probe using this exact fixture shape
+// (44 distinct-newer + 8 tied-at-T + 5 distinct-older = 57 total): the
+// created_at-only implementation returned only 55 of 57 (2 permanently
+// missing, page1=50/page2=5, 0 duplicates) -- confirming the defect via
+// the real API, not a synthetic unit test. This block is the permanent
+// regression form of that probe, run against the shipped composite
+// (created_at, id) keyset fix.
+console.log('\n=== PAGINATION: equal created_at tie-breaker (adversarial) ===')
+{
+  const tieListingId = await insertBaseListing(merchantA.userId, {
+    title: `${QA_LISTING_MARKER} Chat-Security Regression — Tie Breaker`,
+    description: 'Permanent regression fixture for verify-chat-security.mjs equal-created_at pagination checks — do not delete.',
+  })
+  const tieBookingCreate = await api(renterA.cookie, 'POST', '/api/bookings', {
+    listing_id: tieListingId,
+    start_at: '2033-01-01T00:00:00.000Z',
+    end_at: '2033-01-04T00:00:00.000Z',
+    idempotency_key: 'chat-regression-tiebreak-booking-create-v1',
+  })
+  let tieBookingId = tieBookingCreate.json?.booking_id
+  if (!tieBookingId) {
+    const { data: existing } = await admin.from('bookings').select('id').eq('listing_id', tieListingId).eq('renter_id', renterA.userId).maybeSingle()
+    tieBookingId = existing?.id
+  }
+  check('tie-breaker fixture booking created/replayed', !!tieBookingId, tieBookingCreate)
+
+  if (tieBookingId) {
+    // Deterministic, reproducible on every re-run -- replace the fixture
+    // set each time rather than accumulating (this is a fixed synthetic
+    // scenario, not organically-growing history like the other fixtures).
+    await admin.from('messages').delete().eq('booking_id', tieBookingId)
+
+    const T = new Date('2033-06-01T12:00:00.000Z')
+    const rows = []
+    for (let i = 44; i >= 1; i--) {
+      rows.push({ booking_id: tieBookingId, sender_id: renterA.userId, content: `newer-${i}`, created_at: new Date(T.getTime() + i * 1000).toISOString() })
+    }
+    for (let i = 1; i <= 8; i++) {
+      rows.push({ booking_id: tieBookingId, sender_id: renterA.userId, content: `tied-${i}`, created_at: T.toISOString() })
+    }
+    for (let i = 1; i <= 5; i++) {
+      rows.push({ booking_id: tieBookingId, sender_id: renterA.userId, content: `older-${i}`, created_at: new Date(T.getTime() - i * 1000).toISOString() })
+    }
+    const { data: tieInserted, error: tieInsertError } = await admin.from('messages').insert(rows).select('id')
+    check('tie-breaker fixture: 57 messages inserted (44 distinct-newer + 8 tied-at-T + 5 distinct-older, straddling the 50 boundary)', !tieInsertError && tieInserted?.length === 57, tieInsertError ?? { inserted: tieInserted?.length })
+
+    const expectedIds = new Set((tieInserted ?? []).map((m) => m.id))
+
+    const tiePage1 = await api(renterA.cookie, 'GET', `/api/messages?booking_id=${tieBookingId}&limit=${PAGE_SIZE_FOR_TEST}`)
+    const tiePage1Ids = (tiePage1.json?.messages ?? []).map((m) => m.id)
+    const tieCursor = tiePage1.json?.nextCursor ?? null
+
+    const tiePage2 = tieCursor
+      ? await api(renterA.cookie, 'GET', `/api/messages?booking_id=${tieBookingId}&limit=${PAGE_SIZE_FOR_TEST}&cursor=${encodeURIComponent(tieCursor)}`)
+      : { status: 0, json: null }
+    const tiePage2Ids = (tiePage2.json?.messages ?? []).map((m) => m.id)
+
+    const tieCombined = new Set([...tiePage1Ids, ...tiePage2Ids])
+    const tieMissing = [...expectedIds].filter((id) => !tieCombined.has(id))
+    const tieDuplicates = tiePage1Ids.length + tiePage2Ids.length - tieCombined.size
+
+    check('tie-breaker: expected 57, page1=50, page2=7', tiePage1Ids.length === 50 && tiePage2Ids.length === 57 - 50, {
+      expected: 57, page1: tiePage1Ids.length, page2: tiePage2Ids.length,
+    })
+    check('tie-breaker: 0 duplicates across both pages', tieDuplicates === 0, { duplicates: tieDuplicates })
+    check('tie-breaker: 0 missing across both pages (every id from the shared-timestamp group accounted for)', tieMissing.length === 0, { missing: tieMissing.length, missingIds: tieMissing })
+    check('tie-breaker: combined unique count is exactly 57', tieCombined.size === 57, { combinedUnique: tieCombined.size })
+  }
 }
 
 console.log('\n=== SUMMARY ===')
