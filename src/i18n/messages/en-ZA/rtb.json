@@ -72,7 +72,8 @@
     "generic": "Something went wrong",
     "couldNotAccessEvidence": "Could not open this evidence file — please try again",
     "unsupportedType": "Unsupported file type — use JPG, PNG, WEBP, MP4, or PDF.",
-    "tooLarge": "File is too large — maximum {mb}MB."
+    "tooLarge": "File is too large — maximum {mb}MB.",
+    "couldNotUpload": "Could not upload this file — please try again"
   },
   "handoverEvidence": "Handover evidence",
   "preHandoverEvidence": "Pre-handover condition evidence",

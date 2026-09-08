@@ -46,8 +46,15 @@ export function RentToBuyEvidenceUpload({ agreementId, userId, evidenceType, lab
       const ext = file.name.split('.').pop() ?? 'bin'
       const path = `${agreementId}/${userId}/${evidenceType}-${Date.now()}.${ext}`
 
+      // Storage failure never surfaces its raw provider message to the
+      // user (bucket/path/policy internals) -- a safe, generic message
+      // only, matching dispute-evidence-panel.tsx/milestone-evidence-panel.tsx's
+      // established bare-catch convention for this exact failure class.
       const { error: uploadError } = await supabase.storage.from('rent-to-buy-evidence').upload(path, file, { contentType: file.type })
-      if (uploadError) throw new Error(uploadError.message)
+      if (uploadError) {
+        setError(t('errors.couldNotUpload'))
+        return
+      }
 
       const res = await fetch(`/api/rent-to-buy/agreements/${agreementId}/evidence`, {
         method: 'POST',
@@ -55,11 +62,20 @@ export function RentToBuyEvidenceUpload({ agreementId, userId, evidenceType, lab
         body: JSON.stringify({ storage_path: path, file_type: fileType, evidence_type: evidenceType }),
       })
       const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body.error ?? t('errors.generic'))
+      // The registration route already returns only hand-authored,
+      // user-safe error strings (never raw DB/internal errors -- see
+      // src/app/api/rent-to-buy/agreements/[id]/evidence/route.ts) --
+      // shown as-is, unchanged from prior behavior.
+      if (!res.ok) {
+        setError(body.error ?? t('errors.generic'))
+        return
+      }
 
       router.refresh()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('errors.generic'))
+    } catch {
+      // Network/unexpected failures (e.g. a rejected fetch) -- same safe
+      // generic message as a Storage failure, never the raw error.
+      setError(t('errors.couldNotUpload'))
     } finally {
       setUploading(false)
     }

@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { validateRentToBuyEvidenceFile, MAX_RTB_EVIDENCE_SIZE_BYTES, ALLOWED_RTB_EVIDENCE_MIME_TYPES } from '../evidence-upload'
+import enZA from '@/i18n/messages/en-ZA/rtb.json'
+import afZA from '@/i18n/messages/af-ZA/rtb.json'
+import zuZA from '@/i18n/messages/zu-ZA/rtb.json'
 
 function makeFile(name: string, type: string, size: number): File {
   return new File([new Uint8Array(size)], name, { type })
@@ -60,5 +63,35 @@ describe('validateRentToBuyEvidenceFile', () => {
 
   it('exposes the exact byte boundary (20MB, 1024-based)', () => {
     expect(MAX_RTB_EVIDENCE_SIZE_BYTES).toBe(20 * 1024 * 1024)
+  })
+})
+
+describe('rtb.errors -- safe user-facing message content, all locales', () => {
+  for (const [locale, messages] of [['en-ZA', enZA], ['af-ZA', afZA], ['zu-ZA', zuZA]] as const) {
+    it(`${locale}: couldNotUpload/unsupportedType/tooLarge/generic all exist and are non-empty strings`, () => {
+      expect(typeof messages.errors.couldNotUpload).toBe('string')
+      expect(messages.errors.couldNotUpload.length).toBeGreaterThan(0)
+      expect(typeof messages.errors.unsupportedType).toBe('string')
+      expect(typeof messages.errors.tooLarge).toBe('string')
+      expect(typeof messages.errors.generic).toBe('string')
+    })
+
+    it(`${locale}: couldNotUpload never contains raw provider/technical vocabulary`, () => {
+      const lower = messages.errors.couldNotUpload.toLowerCase()
+      for (const forbidden of ['supabase', 'storage', 'bucket', 'rls', 'policy', 'rent-to-buy-evidence', 'row-level security']) {
+        expect(lower).not.toContain(forbidden)
+      }
+    })
+
+    it(`${locale}: the Storage-failure message stays distinct from the client-validation messages (never collapsed together)`, () => {
+      const { couldNotUpload, unsupportedType, tooLarge } = messages.errors
+      expect(couldNotUpload).not.toBe(unsupportedType)
+      expect(couldNotUpload).not.toBe(tooLarge)
+      expect(unsupportedType).not.toBe(tooLarge)
+    })
+  }
+
+  it('en-ZA: couldNotUpload matches the established cross-domain wording (dispute/barter evidence panels)', () => {
+    expect(enZA.errors.couldNotUpload).toBe('Could not upload this file — please try again')
   })
 })
