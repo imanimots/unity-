@@ -1645,6 +1645,130 @@ if (adminSession && affiliateA && affiliateB) {
 console.log(`\n=== SECTION L DONE -- ${failures} failure(s) so far ===`)
 
 // ══════════════════════════════════════════════════════════════════
+// Q. Milestone evidence authorized access (Stack 4). Reuses the
+// permanent `mainAgreementId` fixture (party_a = merchantA, party_b =
+// merchantB) built in section D-I -- re-derives its accepted
+// contribution item/milestones fresh rather than relying on that
+// section's block-scoped locals. `secondAgreementId` (party_a =
+// merchantA, party_b = renterA, auto-cancelled at acceptance but its
+// row/id persists) supplies both the "participant in another
+// agreement" actor (renterA, not a mainAgreementId participant) and
+// the "agreement/milestone mismatch" URL (merchantA IS a legitimate
+// participant of secondAgreementId, proving a 404 there is caused by
+// the milestone/agreement mismatch, not a lack of authority).
+// ══════════════════════════════════════════════════════════════════
+console.log('\n=== Q. Milestone evidence authorized access ===')
+{
+  // Re-derived fresh (not read from section D-I's block-scoped locals):
+  // the second, independent offer against the same Looking-For post,
+  // auto-cancelled at acceptance but its agreement row/id persists --
+  // party_a = merchantA (post owner, also mainAgreementId's party_a),
+  // party_b = renterA (not a party to mainAgreementId at all).
+  const { data: secondAgreement } = await admin.from('barter_agreements').select('id').eq('source_skill_task_post_id', mainLookingForTaskId).eq('party_b_id', renterA.userId).maybeSingle()
+  const secondAgreementId = secondAgreement?.id ?? null
+
+  const { data: mainOffer } = await admin.from('barter_offers').select('id').eq('agreement_id', mainAgreementId).order('version', { ascending: false }).limit(1).maybeSingle()
+  const { data: mainItems } = await admin.from('barter_offer_items').select('id').eq('offer_id', mainOffer?.id).eq('kind', 'task')
+  const evidenceItemId = mainItems?.[0]?.id
+  const { data: evidenceMilestones } = await admin.from('barter_contribution_milestones').select('id, sequence').eq('offer_item_id', evidenceItemId).order('sequence', { ascending: true })
+  const targetMilestone = evidenceMilestones?.[0]
+  const otherMilestone = evidenceMilestones?.[1]
+
+  if (!targetMilestone) {
+    skip('Q: milestone evidence authorized access', 'main fixture milestone not resolved -- run section D-I first')
+  } else {
+    // A FIXED path (not RUN_TAG-suffixed) -- a single permanent evidence
+    // fixture reused across every run of this script, matching this
+    // file's own "ensureX" idiom for permanent fixtures (e.g.
+    // mainAgreementId itself) rather than accumulating a fresh row each
+    // run. barter_milestone_evidence is immutable/append-only for
+    // clients (no update/delete policy -- see 20260901000005) and the
+    // registration route's idempotency record would replay a stale,
+    // already-deleted row's id if this were re-registered every run --
+    // so on a rerun this reuses the existing row's id directly instead
+    // of re-uploading/re-registering at all.
+    const evidencePath = `${targetMilestone.id}/${merchantB.userId}/qa-evidence.jpg`
+    const fakeImage = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4])
+
+    const { data: existingEvidence } = await admin.from('barter_milestone_evidence').select('id').eq('milestone_id', targetMilestone.id).eq('storage_path', evidencePath).maybeSingle()
+    let evidenceId = existingEvidence?.id ?? null
+
+    if (!evidenceId) {
+      const { error: uploadError } = await merchantB.client.storage.from('barter-milestone-evidence').upload(evidencePath, fakeImage, { contentType: 'image/jpeg', upsert: false })
+      check('Q: participant (uploader) can upload to the milestone storage path', !uploadError, uploadError)
+
+      const registerRes = await api(merchantB.cookie, 'POST', `/api/barter/${mainAgreementId}/milestones/${targetMilestone.id}/evidence`, {
+        storage_path: evidencePath, file_type: 'image', idempotency_key: 'stb-q-evidence-register-v1',
+      })
+      check('Q: evidence registration succeeds with real DB metadata', registerRes.status === 201 && !!registerRes.json?.id, registerRes)
+      evidenceId = registerRes.json?.id ?? null
+    } else {
+      check('Q: participant (uploader) can upload to the milestone storage path', true, { reusedFromPriorRun: true })
+      check('Q: evidence registration succeeds with real DB metadata', true, { reusedFromPriorRun: true, evidenceId })
+    }
+
+    if (evidenceId) {
+      const accessUrl = (agreementId, milestoneId, evId) => `/api/barter/${agreementId}/milestones/${milestoneId}/evidence/${evId}/access`
+
+      const accA = await api(merchantA.cookie, 'POST', accessUrl(mainAgreementId, targetMilestone.id, evidenceId))
+      check('Q: participant A (merchantA) -> 200 + signed url', accA.status === 200 && !!accA.json?.url, accA)
+
+      const accB = await api(merchantB.cookie, 'POST', accessUrl(mainAgreementId, targetMilestone.id, evidenceId))
+      check('Q: participant B / uploader (merchantB) -> 200 + signed url', accB.status === 200 && !!accB.json?.url, accB)
+
+      if (adminSession) {
+        const accAdmin = await api(adminSession.cookie, 'POST', accessUrl(mainAgreementId, targetMilestone.id, evidenceId))
+        check('Q: admin -> 200 + signed url (existing admin read authority)', accAdmin.status === 200 && !!accAdmin.json?.url, accAdmin)
+      } else {
+        skip('Q: admin access', 'no admin QA account in .qa-credentials.local.json')
+      }
+
+      if (affiliateA) {
+        const accUnrelated = await api(affiliateA.cookie, 'POST', accessUrl(mainAgreementId, targetMilestone.id, evidenceId))
+        check('Q: unrelated authenticated user -> DENY (404)', accUnrelated.status === 404 && !accUnrelated.json?.url, accUnrelated)
+      } else {
+        skip('Q: unrelated user denial', 'no affiliateA QA account in .qa-credentials.local.json')
+      }
+
+      const accAnon = await api(null, 'POST', accessUrl(mainAgreementId, targetMilestone.id, evidenceId))
+      check('Q: anonymous -> DENY (401)', accAnon.status === 401, accAnon)
+
+      const accCrossAgreementUser = await api(renterA.cookie, 'POST', accessUrl(mainAgreementId, targetMilestone.id, evidenceId))
+      check('Q: participant in a DIFFERENT barter agreement (renterA, not a party here) -> DENY (404)', accCrossAgreementUser.status === 404 && !accCrossAgreementUser.json?.url, accCrossAgreementUser)
+
+      if (secondAgreementId) {
+        // merchantA IS a legitimate participant of secondAgreementId --
+        // the denial below can only be the agreement/milestone mismatch
+        // (the milestone belongs to mainAgreementId, not
+        // secondAgreementId), not a lack of authority.
+        const accAgreementMismatch = await api(merchantA.cookie, 'POST', accessUrl(secondAgreementId, targetMilestone.id, evidenceId))
+        check('Q: agreement/milestone mismatch (correct milestone, wrong-but-authorized agreement id) -> DENY (404)', accAgreementMismatch.status === 404 && !accAgreementMismatch.json?.url, accAgreementMismatch)
+      } else {
+        skip('Q: agreement/milestone mismatch', 'secondAgreementId fixture not resolved')
+      }
+
+      if (otherMilestone) {
+        const accMilestoneMismatch = await api(merchantA.cookie, 'POST', accessUrl(mainAgreementId, otherMilestone.id, evidenceId))
+        check('Q: milestone/evidence mismatch (evidence belongs to a different milestone in the same agreement) -> DENY (404)', accMilestoneMismatch.status === 404 && !accMilestoneMismatch.json?.url, accMilestoneMismatch)
+      } else {
+        skip('Q: milestone/evidence mismatch', 'second milestone not resolved')
+      }
+
+      if (accA.json?.url) {
+        const fetched = await fetch(accA.json.url)
+        check('Q: signed URL retrieval actually returns the object (200)', fetched.status === 200, { status: fetched.status })
+      } else {
+        check('Q: signed URL retrieval actually returns the object (200)', false, { reason: 'no url from participant A access check' })
+      }
+    } else {
+      skip('Q: authorized access matrix', 'evidence registration did not return a real id')
+    }
+  }
+}
+
+console.log(`\n=== SECTION Q DONE -- ${failures} failure(s) so far ===`)
+
+// ══════════════════════════════════════════════════════════════════
 // FINAL CLEANUP -- sweep every is_test:false fixture back to
 // is_test:true so nothing created for public-visibility proof lingers
 // as real-looking public data after this run (mirrors

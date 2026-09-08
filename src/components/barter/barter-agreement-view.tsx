@@ -168,6 +168,8 @@ export function BarterAgreementView({
     couldNotUpload: tCommon('couldNotUploadEvidence'),
     errorUnsupportedType: tCommon('errorUnsupportedType'),
     errorTooLarge: tCommon('errorTooLarge', { mb: MAX_MILESTONE_EVIDENCE_SIZE_BYTES / 1024 / 1024 }),
+    viewEvidence: tCommon('viewEvidence'),
+    couldNotAccessEvidence: tCommon('couldNotAccessEvidence'),
   }
 
   const milestonesPanelLabels = {

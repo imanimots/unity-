@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FileText, Image as ImageIcon, Upload } from 'lucide-react'
 import { validateMilestoneEvidenceFile, uploadMilestoneEvidence } from '@/lib/barter/skill-task-evidence'
+import { EvidenceAccessButton } from '@/components/shared/evidence-access-button'
 import type { BarterMilestoneEvidence } from '@/types'
 
 export interface MilestoneEvidencePanelLabels {
@@ -16,6 +17,8 @@ export interface MilestoneEvidencePanelLabels {
   couldNotUpload: string
   errorUnsupportedType: string
   errorTooLarge: string
+  viewEvidence: string
+  couldNotAccessEvidence: string
 }
 
 interface MilestoneEvidencePanelProps {
@@ -92,7 +95,13 @@ export function MilestoneEvidencePanel({ agreementId, milestoneId, currentUserId
           {evidence.map((item) => (
             <li key={item.id} className="flex items-center gap-2 text-xs text-[#1A0A0A] dark:text-[#F5F0ED]">
               {item.file_type === 'image' ? <ImageIcon size={12} className="text-[#9B8B85]" /> : <FileText size={12} className="text-[#9B8B85]" />}
-              <span className="truncate">{item.storage_path.split('/').pop()}</span>
+              <span className="truncate">{item.file_type}</span>
+              <EvidenceAccessButton
+                accessUrl={`/api/barter/${agreementId}/milestones/${milestoneId}/evidence/${item.id}/access`}
+                label={labels?.viewEvidence ?? 'View evidence'}
+                errorLabel={labels?.couldNotAccessEvidence ?? 'Could not open this evidence file — please try again'}
+                className="text-xs font-semibold text-[#8B1A1A] underline decoration-dotted disabled:opacity-50"
+              />
             </li>
           ))}
         </ul>
