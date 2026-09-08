@@ -203,7 +203,7 @@ async function checkAttachments(cfg) {
   })
   const messageId = sendRes.json?.id
   check(`${cfg.label}: attachment probe message sent`, sendRes.status === 201, sendRes)
-  if (!messageId) return
+  if (!messageId) return null
 
   // Attachments are immutable/append-only by design (no update/delete
   // client policy -- see 20260815000001_message_attachments.sql), so a
@@ -244,6 +244,8 @@ async function checkAttachments(cfg) {
   const listAsB = await api(cfg.partyB.cookie, 'GET', `/api/messages?${cfg.fetchParam}=${cfg.transactionId}`)
   const withAttachment = (listAsB.json?.messages ?? []).find((m) => m.id === messageId)
   check(`${cfg.label}: registered attachment is visible to the other party`, (withAttachment?.attachments ?? []).length > 0, withAttachment)
+
+  return { messageId, attachmentId: registerRes.json?.id ?? null }
 }
 
 async function checkRealtime(cfg) {
@@ -338,9 +340,10 @@ const bookingCfg = { label: 'BOOKING', type: 'booking', fetchParam: 'booking_id'
 const orderCfg = { label: 'ORDER', type: 'order', fetchParam: 'order_id', transactionId: orderId, partyA: renterA, partyB: merchantA }
 const barterCfg = { label: 'BARTER', type: 'barter', fetchParam: 'barter_agreement_id', transactionId: barterId, partyA: merchantB, partyB: merchantA }
 
+const attachmentProbes = {}
 for (const cfg of [bookingCfg, orderCfg, barterCfg]) {
   await checkThreadSecurity(cfg)
-  await checkAttachments(cfg)
+  attachmentProbes[cfg.type] = await checkAttachments(cfg)
   await checkRealtime(cfg)
 }
 
@@ -590,6 +593,108 @@ console.log('\n=== PAGINATION: equal created_at tie-breaker (adversarial) ===')
     check('tie-breaker: 0 duplicates across both pages', tieDuplicates === 0, { duplicates: tieDuplicates })
     check('tie-breaker: 0 missing across both pages (every id from the shared-timestamp group accounted for)', tieMissing.length === 0, { missing: tieMissing.length, missingIds: tieMissing })
     check('tie-breaker: combined unique count is exactly 57', tieCombined.size === 57, { combinedUnique: tieCombined.size })
+  }
+}
+
+// ── Stack 3 Phase B: authorized signed attachment viewing ──
+console.log('\n=== ATTACHMENT ACCESS: authorized signed viewing ===')
+{
+  const bookingProbe = attachmentProbes.booking
+  const orderProbe = attachmentProbes.order
+
+  if (bookingProbe?.messageId && bookingProbe?.attachmentId) {
+    const { messageId, attachmentId } = bookingProbe
+
+    const accSender = await api(bookingCfg.partyA.cookie, 'POST', `/api/messages/${messageId}/attachments/${attachmentId}/access`)
+    check('attachment access: sender (uploader) -> 200 + signed url', accSender.status === 200 && !!accSender.json?.url, accSender)
+
+    const accParticipant = await api(bookingCfg.partyB.cookie, 'POST', `/api/messages/${messageId}/attachments/${attachmentId}/access`)
+    check('attachment access: other thread participant -> 200 + signed url', accParticipant.status === 200 && !!accParticipant.json?.url, accParticipant)
+
+    const accOutsider = await api(outsider.cookie, 'POST', `/api/messages/${messageId}/attachments/${attachmentId}/access`)
+    check('attachment access: unrelated authenticated user -> DENY (404)', accOutsider.status === 404 && !accOutsider.json?.url, accOutsider)
+
+    const accAnon = await api(null, 'POST', `/api/messages/${messageId}/attachments/${attachmentId}/access`)
+    check('attachment access: anonymous -> DENY (401)', accAnon.status === 401, accAnon)
+
+    if (adminSession) {
+      const accAdmin = await api(adminSession.cookie, 'POST', `/api/messages/${messageId}/attachments/${attachmentId}/access`)
+      check('attachment access: admin -> 200 + signed url', accAdmin.status === 200 && !!accAdmin.json?.url, accAdmin)
+    }
+
+    if (accSender.json?.url) {
+      const fetched = await fetch(accSender.json.url)
+      check('attachment access: signed URL retrieval actually returns the object (200)', fetched.status === 200, { status: fetched.status })
+    } else {
+      check('attachment access: signed URL retrieval actually returns the object (200)', false, { reason: 'no url from sender access check' })
+    }
+
+    // message/attachment mismatch: renterA is a genuine participant in
+    // BOTH the booking and order threads, so a denial here is
+    // attributable specifically to the (id, message_id) mismatch, not to
+    // renterA lacking thread membership.
+    if (orderProbe?.messageId) {
+      const crossMismatch = await api(bookingCfg.partyA.cookie, 'POST', `/api/messages/${orderProbe.messageId}/attachments/${attachmentId}/access`)
+      check(
+        'attachment access: message/attachment mismatch (order message + booking attachment, same authorized user) -> DENY (404)',
+        crossMismatch.status === 404 && !crossMismatch.json?.url,
+        crossMismatch
+      )
+    }
+  } else {
+    check('attachment access matrix: booking attachment probe fixture available', false, bookingProbe)
+  }
+}
+
+// ── Stack 3 integration: >50-message thread + attachments on both pages ──
+console.log('\n=== INTEGRATED: >50-message thread + attachments across both pages ===')
+{
+  if (paginationBookingId) {
+    const { data: oldestMsg } = await admin.from('messages').select('id').eq('booking_id', paginationBookingId).order('created_at', { ascending: true }).limit(1).single()
+    const { data: newestMsg } = await admin.from('messages').select('id').eq('booking_id', paginationBookingId).order('created_at', { ascending: false }).limit(1).single()
+    const fakeImage = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4])
+
+    async function attachTo(msgId, tag) {
+      const path = `booking/${paginationBookingId}/${renterA.userId}/pagination-${tag}.jpg`
+      await admin.storage.from('chat-attachments').remove([path])
+      await admin.from('message_attachments').delete().eq('storage_path', path)
+      await renterA.client.storage.from('chat-attachments').upload(path, fakeImage, { contentType: 'image/jpeg', upsert: false })
+      const reg = await api(renterA.cookie, 'POST', `/api/messages/${msgId}/attachments`, { storage_path: path, file_type: 'image', idempotency_key: `chat-regression-pagination-attach-${tag}-${Date.now()}` })
+      return reg.json?.id ?? null
+    }
+
+    const newestAttachmentId = newestMsg ? await attachTo(newestMsg.id, 'newest') : null
+    const oldestAttachmentId = oldestMsg ? await attachTo(oldestMsg.id, 'oldest') : null
+    check('integrated: attachment on newest (initial-page) message registered', !!newestAttachmentId, {})
+    check('integrated: attachment on oldest (older-page) message registered', !!oldestAttachmentId, {})
+
+    const initialWithAttach = await api(renterA.cookie, 'GET', `/api/messages?booking_id=${paginationBookingId}&limit=${PAGE_SIZE_FOR_TEST}`)
+    const initialMsgs2 = initialWithAttach.json?.messages ?? []
+    const newestInInitial = initialMsgs2.find((m) => m.id === newestMsg?.id)
+    check('integrated: newest-page attachment metadata is present in the initial page response', (newestInInitial?.attachments ?? []).length > 0, newestInInitial)
+
+    const initialWithAttachCursor = initialWithAttach.json?.nextCursor ?? null
+    const olderWithAttach = initialWithAttachCursor
+      ? await api(renterA.cookie, 'GET', `/api/messages?booking_id=${paginationBookingId}&limit=${PAGE_SIZE_FOR_TEST}&cursor=${encodeURIComponent(initialWithAttachCursor)}`)
+      : { json: null }
+    const oldestInOlder = (olderWithAttach.json?.messages ?? []).find((m) => m.id === oldestMsg?.id)
+    check('integrated: older-page attachment metadata is preserved across pagination (never omitted)', (oldestInOlder?.attachments ?? []).length > 0, oldestInOlder)
+
+    if (newestAttachmentId && newestMsg) {
+      const accNewest = await api(renterA.cookie, 'POST', `/api/messages/${newestMsg.id}/attachments/${newestAttachmentId}/access`)
+      check('integrated: newest-page attachment is viewable by an authorized participant', accNewest.status === 200 && !!accNewest.json?.url, accNewest)
+    }
+    if (oldestAttachmentId && oldestMsg) {
+      const accOldest = await api(renterA.cookie, 'POST', `/api/messages/${oldestMsg.id}/attachments/${oldestAttachmentId}/access`)
+      check('integrated: older-page attachment is viewable by an authorized participant (no access difference by page)', accOldest.status === 200 && !!accOldest.json?.url, accOldest)
+    }
+
+    const { count: newestAttachCount } = await admin.from('message_attachments').select('id', { count: 'exact', head: true }).eq('message_id', newestMsg?.id)
+    check('integrated: no duplicate attachment rows on the newest-page message', (newestAttachCount ?? 0) === 1, { newestAttachCount })
+
+    console.log(
+      '  NOTE: realtime message INSERT events never carry attachment metadata by design -- attachments are registered in a separate follow-up call after the message row exists, and there is no message_attachments realtime subscription anywhere in this codebase. Attachment metadata always requires a fresh GET (initial load, pagination, or thread switch). This is the existing, correct mechanism -- preserved as-is, not changed by this phase.'
+    )
   }
 }
 

@@ -240,7 +240,9 @@
       "messagePlaceholder": "Type a message…",
       "attachmentFallbackName": "attachment",
       "loadEarlierMessages": "Load earlier messages",
-      "couldNotLoadEarlier": "Could not load earlier messages — please try again"
+      "couldNotLoadEarlier": "Could not load earlier messages — please try again",
+      "viewAttachment": "View attachment",
+      "couldNotAccessAttachment": "Could not open this attachment — please try again"
     }
   },
   "home": {

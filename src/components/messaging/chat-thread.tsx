@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Send, ShieldAlert, Paperclip, X, FileText, Image as ImageIcon, RotateCw } from 'lucide-react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { validateAttachmentFile, uploadChatAttachment } from '@/lib/messaging/attachments'
+import { EvidenceAccessButton } from '@/components/shared/evidence-access-button'
 import type { Message, MessageAttachment } from '@/types'
 
 type ThreadType = 'booking' | 'order' | 'barter'
@@ -23,6 +24,8 @@ export interface ChatThreadLabels {
   attachmentFallbackName: string
   loadEarlierMessages: string
   couldNotLoadEarlier: string
+  viewAttachment: string
+  couldNotAccessAttachment: string
 }
 
 const DEFAULT_LABELS: ChatThreadLabels = {
@@ -40,6 +43,8 @@ const DEFAULT_LABELS: ChatThreadLabels = {
   attachmentFallbackName: 'attachment',
   loadEarlierMessages: 'Load earlier messages',
   couldNotLoadEarlier: 'Could not load earlier messages — please try again',
+  viewAttachment: 'View attachment',
+  couldNotAccessAttachment: 'Could not open this attachment — please try again',
 }
 
 interface ChatThreadProps {
@@ -88,13 +93,20 @@ function dateSep(iso: string, locale: string) {
   return new Date(iso).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
-function AttachmentChip({ attachment, fallbackName }: { attachment: MessageAttachment; fallbackName: string }) {
-  const filename = attachment.storage_path.split('/').pop() ?? fallbackName
+function AttachmentChip({ attachment, messageId, viewLabel, couldNotAccessLabel }: { attachment: MessageAttachment; messageId: string; viewLabel: string; couldNotAccessLabel: string }) {
   const Icon = attachment.file_type === 'image' ? ImageIcon : FileText
   return (
     <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1 rounded-lg bg-black/10 text-xs">
       <Icon size={12} className="shrink-0" />
-      <span className="truncate">{filename}</span>
+      <span className="truncate">{attachment.file_type}</span>
+      {attachment.id ? (
+        <EvidenceAccessButton
+          accessUrl={`/api/messages/${messageId}/attachments/${attachment.id}/access`}
+          label={viewLabel}
+          errorLabel={couldNotAccessLabel}
+          className="text-xs font-semibold underline decoration-dotted disabled:opacity-50"
+        />
+      ) : null}
     </div>
   )
 }
@@ -307,13 +319,22 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
     if (file) {
       try {
         const { path, fileType } = await uploadChatAttachment(transactionType, transactionId, currentUserId, file)
-        await fetch(`/api/messages/${data.id}/attachments`, {
+        const attachRes = await fetch(`/api/messages/${data.id}/attachments`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ storage_path: path, file_type: fileType, idempotency_key: crypto.randomUUID() }),
         })
+        const attachData = await attachRes.json()
+        if (!attachRes.ok) {
+          setFileError(labels.attachmentUploadFailed)
+          return
+        }
+        // Uses the real registered row (with its real id) rather than the
+        // locally-known path/type -- without a real id, the "View
+        // attachment" action below has nothing to build a signed-access
+        // request from until the next full history refresh.
         setMessages((prev) =>
-          prev.map((m) => (m.id === data.id ? { ...m, attachments: [...(m.attachments ?? []), { file_type: fileType, storage_path: path } as MessageAttachment] } : m))
+          prev.map((m) => (m.id === data.id ? { ...m, attachments: [...(m.attachments ?? []), attachData as MessageAttachment] } : m))
         )
       } catch {
         setFileError(labels.attachmentUploadFailed)
@@ -460,7 +481,7 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
                         >
                           {msg.content}
                           {(msg.attachments ?? []).map((a, i) => (
-                            <AttachmentChip key={a.id ?? i} attachment={a} fallbackName={labels.attachmentFallbackName} />
+                            <AttachmentChip key={a.id ?? i} attachment={a} messageId={msg.id} viewLabel={labels.viewAttachment} couldNotAccessLabel={labels.couldNotAccessAttachment} />
                           ))}
                         </div>
                         <div className={`flex items-center gap-1.5 mt-1 ${isMine ? 'justify-end' : 'justify-start'}`}>

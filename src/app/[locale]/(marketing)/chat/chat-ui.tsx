@@ -149,6 +149,8 @@ function ChatUIInner({ conversations, currentUserId, locale }: { conversations: 
                 attachmentFallbackName: tThread('attachmentFallbackName'),
                 loadEarlierMessages: tThread('loadEarlierMessages'),
                 couldNotLoadEarlier: tThread('couldNotLoadEarlier'),
+                viewAttachment: tThread('viewAttachment'),
+                couldNotAccessAttachment: tThread('couldNotAccessAttachment'),
               }}
             />
           </>

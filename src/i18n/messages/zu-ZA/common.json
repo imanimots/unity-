@@ -240,7 +240,9 @@
       "messagePlaceholder": "Thayipha umlayezo…",
       "attachmentFallbackName": "isithasiselo",
       "loadEarlierMessages": "Layisha imiyalezo yangaphambilini",
-      "couldNotLoadEarlier": "Ayikwazanga ukulayisha imiyalezo yangaphambilini — sicela uzame futhi"
+      "couldNotLoadEarlier": "Ayikwazanga ukulayisha imiyalezo yangaphambilini — sicela uzame futhi",
+      "viewAttachment": "Buka isithasiselo",
+      "couldNotAccessAttachment": "Ayikwazanga ukuvula lesi sithasiselo — sicela uzame futhi"
     }
   },
   "home": {

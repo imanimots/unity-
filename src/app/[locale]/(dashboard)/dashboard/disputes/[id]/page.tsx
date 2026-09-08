@@ -112,6 +112,8 @@ export default async function DisputeDetailPage({ params }: PageProps) {
             attachmentFallbackName: tChat('attachmentFallbackName'),
             loadEarlierMessages: tChat('loadEarlierMessages'),
             couldNotLoadEarlier: tChat('couldNotLoadEarlier'),
+            viewAttachment: tChat('viewAttachment'),
+            couldNotAccessAttachment: tChat('couldNotAccessAttachment'),
           },
           locale,
         }}

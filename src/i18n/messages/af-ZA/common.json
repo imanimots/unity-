@@ -240,7 +240,9 @@
       "messagePlaceholder": "Tik 'n boodskap…",
       "attachmentFallbackName": "aanhegsel",
       "loadEarlierMessages": "Laai vroeëre boodskappe",
-      "couldNotLoadEarlier": "Kon nie vroeëre boodskappe laai nie — probeer asseblief weer"
+      "couldNotLoadEarlier": "Kon nie vroeëre boodskappe laai nie — probeer asseblief weer",
+      "viewAttachment": "Bekyk aanhegsel",
+      "couldNotAccessAttachment": "Kon nie hierdie aanhegsel oopmaak nie — probeer asseblief weer"
     }
   },
   "home": {
