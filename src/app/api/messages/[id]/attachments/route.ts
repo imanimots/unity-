@@ -4,6 +4,7 @@ import { checkRateLimit, getClientKey } from '@/lib/rate-limit'
 import { attachmentRegisterSchema } from '@/lib/messaging/validation'
 import { isUnderAttachmentLimit } from '@/lib/messaging/attachments'
 import { computeRegisterAttachmentHash, checkIdempotentReplay } from '@/lib/messaging/idempotency'
+import { cleanupUnregisteredUpload } from '@/lib/storage-cleanup'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -94,11 +95,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Attachment file does not belong to the caller' }, { status: 403 })
     }
 
+    // Unlike the other three evidence-registration routes, path
+    // ownership can only be proven here (above), after the message
+    // lookup -- the expected prefix depends on the message's own thread
+    // type/id, which isn't known until that lookup runs. So only
+    // failures from this point on may attempt cleanup; the
+    // message-not-found/not-a-participant/idempotency-conflict branches
+    // above this point never had a validated path in scope and must not
+    // attempt it (residual scenario, by design).
+    const cleanup = () => cleanupUnregisteredUpload({
+      admin, bucket: 'chat-attachments', storagePath: parsed.data.storage_path,
+      metadataTable: 'message_attachments', metadataPathColumn: 'storage_path', domain: 'chat-attachments',
+    })
+
     const { count } = await admin
       .from('message_attachments')
       .select('id', { count: 'exact', head: true })
       .eq('message_id', messageId)
     if (!isUnderAttachmentLimit(count ?? 0)) {
+      await cleanup()
       return NextResponse.json({ error: 'This message already has the maximum number of attachments' }, { status: 409 })
     }
 
@@ -115,9 +130,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (insertError) {
       if (insertError.code === '23505') {
+        // message_attachments has exactly one unique constraint --
+        // message_attachments_message_path_uniq on (message_id,
+        // storage_path) (20260815000001) -- confirmed both in the
+        // migration source and live (a direct insert probe against the
+        // dev database: re-inserting the identical (message_id,
+        // storage_path) pair raises this exact constraint by name;
+        // inserting the same storage_path under a *different*
+        // message_id succeeds, proving the constraint is scoped to the
+        // pair, not to storage_path alone). This insert supplies
+        // exactly (messageId, parsed.data.storage_path) -- the same
+        // pair a 23505 here re-uses -- so this violation can only occur
+        // if a row with this exact storage_path already exists. No
+        // separate cleanup call is needed: cleanupUnregisteredUpload()'s
+        // own storage_path existence check would independently reach
+        // the same "already registered, never delete" conclusion.
         return NextResponse.json({ error: 'This file has already been attached to this message' }, { status: 409 })
       }
       console.error('[messages.attachments] insert error', { userId: requester.userId, messageId, error: insertError })
+      await cleanup()
       return NextResponse.json({ error: 'Could not register this attachment' }, { status: 500 })
     }
 
@@ -135,6 +166,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json(row, { status: 201 })
   } catch (err) {
     console.error('[messages.attachments] unexpected error', { userId: requester.userId, messageId, err })
+    // Deliberately no cleanup attempt here, unlike the other three
+    // evidence-registration routes: this try block spans code that runs
+    // both before AND after path ownership is established (the prefix
+    // check happens partway through, after the message lookup), so an
+    // exception caught here cannot be assumed to have a validated path
+    // in scope. Residual orphan scenario -- see the Phase A report.
     return NextResponse.json({ error: 'Could not register this attachment — please try again' }, { status: 500 })
   }
 }

@@ -4,6 +4,7 @@ import { checkRateLimit, getClientKey } from '@/lib/rate-limit'
 import { disputeEvidenceRegisterSchema } from '@/lib/disputes/validation'
 import { computeRegisterDisputeEvidenceHash, checkIdempotentReplay } from '@/lib/disputes/idempotency'
 import { notifyDisputeParties } from '@/lib/disputes/notify'
+import { cleanupUnregisteredUpload } from '@/lib/storage-cleanup'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -63,20 +64,31 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { createClient: createServiceClient } = await import('@supabase/supabase-js')
     const admin = createServiceClient(url, serviceKey)
 
+    // From here on, storage_path has already been proven to belong to
+    // the authenticated caller and to this route's disputeId (the
+    // prefix check above) -- safe for best-effort cleanup on failure.
+    const cleanup = () => cleanupUnregisteredUpload({
+      admin, bucket: 'dispute-evidence', storagePath: parsed.data.storage_path,
+      metadataTable: 'dispute_evidence', metadataPathColumn: 'storage_path', domain: 'dispute-evidence',
+    })
+
     if (parsed.data.idempotency_key) {
       const hash = computeRegisterDisputeEvidenceHash(disputeId, parsed.data.storage_path, parsed.data.file_type)
       const replay = await checkIdempotentReplay(admin, requester.userId, 'register_dispute_evidence', parsed.data.idempotency_key, hash)
       if (replay.status === 'replay') return NextResponse.json(replay.result, { status: 201 })
       if (replay.status === 'conflict') {
+        await cleanup()
         return NextResponse.json({ error: 'This request was already submitted with different data. Please refresh and try again.' }, { status: 409 })
       }
     }
 
     const { data: dispute } = await admin.from('disputes').select('id, raised_by, status').eq('id', disputeId).maybeSingle()
     if (!dispute) {
+      await cleanup()
       return NextResponse.json({ error: 'Dispute not found' }, { status: 404 })
     }
     if (['resolved', 'closed', 'cancelled'].includes(dispute.status)) {
+      await cleanup()
       return NextResponse.json({ error: 'This dispute is no longer active' }, { status: 409 })
     }
 
@@ -85,6 +97,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       p_user_id: requester.userId,
     })
     if (!isParticipant) {
+      await cleanup()
       return NextResponse.json({ error: 'You are not a party to this dispute' }, { status: 403 })
     }
 
@@ -102,6 +115,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (insertError) {
       console.error('[disputes.evidence] insert error', { userId: requester.userId, disputeId, error: insertError })
+      await cleanup()
       return NextResponse.json({ error: 'Could not register this evidence file' }, { status: 500 })
     }
 
@@ -136,6 +150,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json(row, { status: 201 })
   } catch (err) {
     console.error('[disputes.evidence] unexpected error', { userId: requester.userId, disputeId, err })
+    // Everything inside the try block runs strictly after the
+    // path-ownership check, so cleanup is safe here too.
+    try {
+      const { createClient: createServiceClient } = await import('@supabase/supabase-js')
+      await cleanupUnregisteredUpload({
+        admin: createServiceClient(url, serviceKey), bucket: 'dispute-evidence', storagePath: parsed.data.storage_path,
+        metadataTable: 'dispute_evidence', metadataPathColumn: 'storage_path', domain: 'dispute-evidence',
+      })
+    } catch { /* best-effort -- never let cleanup mask the original error below */ }
     return NextResponse.json({ error: 'Could not register this evidence file — please try again' }, { status: 500 })
   }
 }

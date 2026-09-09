@@ -4,6 +4,7 @@ import { getRequestProfile } from '@/lib/supabase/require-admin'
 import { checkRateLimit, getClientKey } from '@/lib/rate-limit'
 import { registerMilestoneEvidenceSchema } from '@/lib/barter/skill-task-validation'
 import { checkIdempotentReplay } from '@/lib/bookings/idempotency'
+import { cleanupUnregisteredUpload } from '@/lib/storage-cleanup'
 
 interface RouteParams {
   params: Promise<{ id: string; milestoneId: string }>
@@ -60,12 +61,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { createClient: createServiceClient } = await import('@supabase/supabase-js')
     const admin = createServiceClient(url, serviceKey)
 
+    // From here on, storage_path has already been proven to belong to
+    // the authenticated caller and to this route's milestoneId (the
+    // prefix check above) -- safe for best-effort cleanup on failure.
+    const cleanup = () => cleanupUnregisteredUpload({
+      admin, bucket: 'barter-milestone-evidence', storagePath: parsed.data.storage_path,
+      metadataTable: 'barter_milestone_evidence', metadataPathColumn: 'storage_path', domain: 'barter-milestone-evidence',
+    })
+
     const hash = createHash('md5').update(`${milestoneId}|${parsed.data.storage_path}|${parsed.data.file_type}`).digest('hex')
 
     if (parsed.data.idempotency_key) {
       const replay = await checkIdempotentReplay(admin, requester.userId, 'register_barter_milestone_evidence', parsed.data.idempotency_key, hash)
       if (replay.status === 'replay') return NextResponse.json(replay.result, { status: 201 })
       if (replay.status === 'conflict') {
+        await cleanup()
         return NextResponse.json({ error: 'This request was already submitted with different data. Please refresh and try again.' }, { status: 409 })
       }
     }
@@ -76,6 +86,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .eq('id', milestoneId)
       .maybeSingle()
     if (!milestone) {
+      await cleanup()
       return NextResponse.json({ error: 'Milestone not found' }, { status: 404 })
     }
 
@@ -84,6 +95,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       p_user_id: requester.userId,
     })
     if (!isParticipant) {
+      await cleanup()
       return NextResponse.json({ error: 'You are not a party to this agreement' }, { status: 403 })
     }
 
@@ -95,6 +107,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // the complete/schedule/schedule-confirm RPCs already enforce.
     const { data: offerItem } = await admin.from('barter_offer_items').select('offer_id').eq('id', milestone.offer_item_id).maybeSingle()
     if (!agreement?.accepted_offer_id || offerItem?.offer_id !== agreement.accepted_offer_id) {
+      await cleanup()
       return NextResponse.json({ error: 'This milestone does not belong to the accepted offer' }, { status: 409 })
     }
 
@@ -112,6 +125,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (insertError) {
       console.error('[barter.milestone.evidence] insert error', { userId: requester.userId, milestoneId, error: insertError })
+      await cleanup()
       return NextResponse.json({ error: 'Could not register this evidence file' }, { status: 500 })
     }
 
@@ -140,6 +154,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json(row, { status: 201 })
   } catch (err) {
     console.error('[barter.milestone.evidence] unexpected error', { userId: requester.userId, milestoneId, err })
+    // Everything inside the try block runs strictly after the
+    // path-ownership check, so cleanup is safe here too.
+    try {
+      const { createClient: createServiceClient } = await import('@supabase/supabase-js')
+      await cleanupUnregisteredUpload({
+        admin: createServiceClient(url, serviceKey), bucket: 'barter-milestone-evidence', storagePath: parsed.data.storage_path,
+        metadataTable: 'barter_milestone_evidence', metadataPathColumn: 'storage_path', domain: 'barter-milestone-evidence',
+      })
+    } catch { /* best-effort -- never let cleanup mask the original error below */ }
     return NextResponse.json({ error: 'Could not register this evidence file — please try again' }, { status: 500 })
   }
 }

@@ -3,6 +3,7 @@ import { getRequestProfile } from '@/lib/supabase/require-admin'
 import { checkRateLimit, getClientKey } from '@/lib/rate-limit'
 import { rentToBuyEvidenceRegisterSchema } from '@/lib/rent-to-buy/validation'
 import { computeRegisterRentToBuyEvidenceHash, checkIdempotentReplay } from '@/lib/rent-to-buy/idempotency'
+import { cleanupUnregisteredUpload } from '@/lib/storage-cleanup'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -60,26 +61,42 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { createClient: createServiceClient } = await import('@supabase/supabase-js')
     const admin = createServiceClient(url, serviceKey)
 
+    // From this point on, storage_path has already been proven to belong
+    // to the authenticated caller and to this route's own agreementId
+    // (the prefix check above) -- every failure branch below this point
+    // may safely attempt best-effort cleanup of the just-uploaded
+    // object, since cleanupUnregisteredUpload() independently re-proves
+    // the path is genuinely unregistered before ever deleting anything.
+    const cleanup = () => cleanupUnregisteredUpload({
+      admin, bucket: 'rent-to-buy-evidence', storagePath: parsed.data.storage_path,
+      metadataTable: 'rent_to_buy_evidence', metadataPathColumn: 'storage_path', domain: 'rent-to-buy-evidence',
+    })
+
     if (parsed.data.idempotency_key) {
       const hash = computeRegisterRentToBuyEvidenceHash(agreementId, parsed.data.storage_path, parsed.data.file_type, parsed.data.evidence_type)
       const replay = await checkIdempotentReplay(admin, requester.userId, 'register_rent_to_buy_evidence', parsed.data.idempotency_key, hash)
       if (replay.status === 'replay') return NextResponse.json(replay.result, { status: 201 })
       if (replay.status === 'conflict') {
+        await cleanup()
         return NextResponse.json({ error: 'This request was already submitted with different data. Please refresh and try again.' }, { status: 409 })
       }
     }
 
     const { data: agreement } = await admin.from('rent_to_buy_agreements').select('id, merchant_id, customer_id').eq('id', agreementId).maybeSingle()
     if (!agreement) {
+      await cleanup()
       return NextResponse.json({ error: 'Agreement not found' }, { status: 404 })
     }
     if (agreement.merchant_id !== requester.userId && agreement.customer_id !== requester.userId) {
+      await cleanup()
       return NextResponse.json({ error: 'You are not a party to this agreement' }, { status: 403 })
     }
     if (parsed.data.evidence_type === 'pre_handover' && agreement.merchant_id !== requester.userId) {
+      await cleanup()
       return NextResponse.json({ error: 'Only the merchant can upload pre-handover evidence' }, { status: 403 })
     }
     if (parsed.data.evidence_type === 'post_handover_receipt' && agreement.customer_id !== requester.userId) {
+      await cleanup()
       return NextResponse.json({ error: 'Only the customer can upload receipt evidence' }, { status: 403 })
     }
 
@@ -98,6 +115,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (insertError) {
       console.error('[rent-to-buy.evidence] insert error', { userId: requester.userId, agreementId, error: insertError })
+      await cleanup()
       return NextResponse.json({ error: 'Could not register this evidence file' }, { status: 500 })
     }
 
@@ -115,6 +133,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json(row, { status: 201 })
   } catch (err) {
     console.error('[rent-to-buy.evidence] unexpected error', { userId: requester.userId, agreementId, err })
+    // Everything inside the try block above runs strictly after the
+    // path-ownership check, so storage_path is safe to attempt cleanup
+    // on here too -- a fresh service-role client (construction only,
+    // no network call) since the one created inside the try block is
+    // out of scope at this point.
+    try {
+      const { createClient: createServiceClient } = await import('@supabase/supabase-js')
+      await cleanupUnregisteredUpload({
+        admin: createServiceClient(url, serviceKey), bucket: 'rent-to-buy-evidence', storagePath: parsed.data.storage_path,
+        metadataTable: 'rent_to_buy_evidence', metadataPathColumn: 'storage_path', domain: 'rent-to-buy-evidence',
+      })
+    } catch { /* best-effort -- never let cleanup mask the original error below */ }
     return NextResponse.json({ error: 'Could not register this evidence file — please try again' }, { status: 500 })
   }
 }
