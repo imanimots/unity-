@@ -50,3 +50,21 @@ export const documentUploadRecordSchema = z.object({
   mime_type: z.enum(ALLOWED_KYC_DOCUMENT_MIME_TYPES),
   file_size: z.number().int().positive().max(MAX_KYC_DOCUMENT_SIZE_BYTES),
 })
+
+/**
+ * Orphan Cleanup Phase B3A -- staged upload intent creation. Deliberately
+ * excludes storage_path/user_id/expires_at/status: the path is
+ * server-generated (buildKycDocumentPath), the user comes from the
+ * authenticated session, expiry/status are server-owned lifecycle state --
+ * none of these are ever client-supplied.
+ */
+export const documentUploadIntentCreateSchema = z.object({
+  document_type: z.enum(['identity_document', 'proof_of_address']),
+  mime_type: z.enum(ALLOWED_KYC_DOCUMENT_MIME_TYPES),
+  file_size: z.number().int().positive().max(MAX_KYC_DOCUMENT_SIZE_BYTES),
+})
+
+/** The new, intent-backed shape for POST /api/verification/documents. */
+export const documentUploadFinalizeSchema = z.object({
+  intent_id: z.string().uuid(),
+})

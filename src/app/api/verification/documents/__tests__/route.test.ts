@@ -56,9 +56,11 @@ function fakeSessionClient(tables: Record<string, SessionTableConfig>) {
     return chain
   }
   const from = vi.fn((table: string) => makeChain(tables[table] ?? {}))
-  return { from }
+  const rpc = vi.fn(() => Promise.resolve(nextRpcResponse))
+  return { from, rpc }
 }
 let nextSession: ReturnType<typeof fakeSessionClient> | null
+let nextRpcResponse: { data: unknown; error: { message: string } | null } = { data: null, error: null }
 vi.mock('@/lib/supabase/server', () => ({ createClient: () => Promise.resolve(nextSession) }))
 
 const { POST } = await import('../route')
@@ -88,6 +90,7 @@ beforeEach(() => {
   insertCallCount = 0
   nextAdmin = fakeServiceRoleClient({}, {}, { [BUCKET]: objectPresentMatching })
   nextSession = fakeSessionClient({ [TABLE]: { existing: { data: [] } } })
+  nextRpcResponse = { data: null, error: null }
 })
 
 describe('POST /api/verification/documents (category: KYC Orphan Cleanup Phase B1)', () => {
@@ -290,5 +293,99 @@ describe('POST /api/verification/documents (category: KYC Orphan Cleanup Phase B
     expect(res.status).toBe(409)
     expect(insertCallCount).toBe(0)
     expect(cleanupUnregisteredUpload).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /api/verification/documents -- dual-shape dispatch (category: KYC Orphan Cleanup Phase B3A)', () => {
+  const INTENT_ID = '44444444-4444-4444-8444-444444444444'
+
+  it('NEW-A. { intent_id } dispatches to the RPC branch, never the legacy path', async () => {
+    nextRpcResponse = { data: registeredRow, error: null }
+    const res = await POST(req({ intent_id: INTENT_ID }))
+    expect(res.status).toBe(201)
+    expect(nextSession?.rpc).toHaveBeenCalledWith('finalize_kyc_document_upload', { p_intent_id: INTENT_ID })
+  })
+
+  it('NEW-B. calls the RPC via the session-bound client', async () => {
+    nextRpcResponse = { data: registeredRow, error: null }
+    await POST(req({ intent_id: INTENT_ID }))
+    expect(nextSession?.rpc).toHaveBeenCalledTimes(1)
+  })
+
+  it('NEW-C. never uses the service-role client to invoke the RPC', async () => {
+    nextRpcResponse = { data: registeredRow, error: null }
+    await POST(req({ intent_id: INTENT_ID }))
+    // The admin (service-role) fake has no .rpc at all in this file's
+    // config -- if the route ever called admin.rpc(...), this would
+    // throw a TypeError before reaching the assertion below.
+    expect(nextSession?.rpc).toHaveBeenCalled()
+  })
+
+  it('NEW-D. safe success mapping -> 201 with the function\'s returned document', async () => {
+    nextRpcResponse = { data: registeredRow, error: null }
+    const res = await POST(req({ intent_id: INTENT_ID }))
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    expect(body).toEqual(registeredRow)
+  })
+
+  it('NEW-E. safe missing-object error mapping -> 404, no raw SQL text', async () => {
+    nextRpcResponse = { data: null, error: { message: 'storage_object_missing' } }
+    const res = await POST(req({ intent_id: INTENT_ID }))
+    expect(res.status).toBe(404)
+    const body = await res.json()
+    expect(body.error).not.toMatch(/storage_object_missing|P0001|PL\/pgSQL/i)
+  })
+
+  it('NEW-F. safe expired error mapping -> 409', async () => {
+    nextRpcResponse = { data: null, error: { message: 'intent_expired' } }
+    const res = await POST(req({ intent_id: INTENT_ID }))
+    expect(res.status).toBe(409)
+  })
+
+  it('NEW-G. safe conflict mapping -> 409', async () => {
+    nextRpcResponse = { data: null, error: { message: 'metadata_conflict' } }
+    const res = await POST(req({ intent_id: INTENT_ID }))
+    expect(res.status).toBe(409)
+  })
+
+  it('NEW-H. safe cross-user mapping -> 404, does not leak that the intent exists for someone else', async () => {
+    nextRpcResponse = { data: null, error: { message: 'intent_not_found' } }
+    const res = await POST(req({ intent_id: INTENT_ID }))
+    expect(res.status).toBe(404)
+  })
+
+  it('NEW-I. safe mime/size mismatch mapping -> 403', async () => {
+    nextRpcResponse = { data: null, error: { message: 'storage_metadata_mismatch' } }
+    const res = await POST(req({ intent_id: INTENT_ID }))
+    expect(res.status).toBe(403)
+  })
+
+  it('LEGACY-A. original B1 body is still accepted unchanged during B3A', async () => {
+    // Uses the exact same fixtures as the B1 describe block above --
+    // proves the compatibility invariant explicitly, not merely
+    // incidentally via those other tests still passing.
+    const res = await POST(req(validBody))
+    expect(res.status).toBe(201)
+    expect(nextSession?.rpc).not.toHaveBeenCalled()
+  })
+
+  it('LEGACY-B. legacy Storage .info() check still governs the legacy branch (unchanged from B1 -- see the R/S/T cases above, which vary storageResponses and observe the outcome change accordingly)', async () => {
+    nextAdmin = fakeServiceRoleClient({}, {}, { [BUCKET]: { data: null, error: { status: 404 } } })
+    const res = await POST(req(validBody))
+    expect(res.status).toBe(404)
+  })
+
+  it('mixed intent + legacy body -> rejected, dispatched to neither branch', async () => {
+    const res = await POST(req({ intent_id: INTENT_ID, document_type: 'identity_document', storage_path: PATH, mime_type: 'image/jpeg', file_size: 1 }))
+    expect(res.status).toBe(400)
+    expect(nextSession?.rpc).not.toHaveBeenCalled()
+    expect(insertCallCount).toBe(0)
+  })
+
+  it('empty body -> rejected as invalid (matches neither shape)', async () => {
+    const res = await POST(req({}))
+    expect(res.status).toBe(400)
+    expect(nextSession?.rpc).not.toHaveBeenCalled()
   })
 })

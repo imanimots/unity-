@@ -1,0 +1,35 @@
+-- ============================================================
+-- Fix-forward: finalize_kyc_document_upload EXECUTE grants
+-- ============================================================
+-- 20260909133312's `revoke all on function ... from public` did not
+-- close the gap it intended to. Live-verified after that migration
+-- applied: this project's default-privilege configuration grants
+-- EXECUTE on every newly created function directly to `anon` and
+-- `service_role` (not merely via the PUBLIC pseudo-role) -- the same
+-- mechanism already confirmed for table-level grants (every table,
+-- including identity_verification_documents, gets full anon/
+-- authenticated/service_role table privileges by default; RLS, not
+-- REVOKE, is what actually restricts table access here). For a
+-- function, there is no RLS equivalent -- an EXECUTE grant is the only
+-- gate -- so unlike the intents table (correctly closed by RLS alone,
+-- confirmed live), this function's grant must be corrected explicitly.
+--
+-- Confirmed live before this fix: anon and service_role both had
+-- EXECUTE despite the prior migration's REVOKE ... FROM PUBLIC.
+-- Per the fix-forward rule, 20260909133312 is never edited -- this
+-- migration corrects it going forward.
+--
+-- Least privilege, matching the original design intent exactly:
+-- only `authenticated` may call this function (it derives real caller
+-- identity from auth.uid() itself and is safe against direct
+-- invocation by design -- see 20260909133312's header). `anon` has no
+-- legitimate reason to call it (auth.uid() would be null, the function
+-- already rejects that, but removing the grant closes the door at the
+-- earlier PostgREST layer too). `service_role` is not required --
+-- nothing in this design ever calls this function as service_role.
+-- Apply via: Supabase Dashboard -> SQL Editor -> Run
+-- ============================================================
+
+revoke execute on function public.finalize_kyc_document_upload(uuid) from anon;
+revoke execute on function public.finalize_kyc_document_upload(uuid) from service_role;
+-- `authenticated`'s existing grant (already correct) is left untouched.

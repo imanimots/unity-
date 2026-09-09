@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestProfile } from '@/lib/supabase/require-admin'
 import { getAdminServiceClient } from '@/lib/admin/route-helpers'
-import { documentUploadRecordSchema, MIME_TO_EXTENSION } from '@/lib/identity-verification/validation'
+import { documentUploadRecordSchema, documentUploadFinalizeSchema, MIME_TO_EXTENSION } from '@/lib/identity-verification/validation'
 import { parseKycDocumentPath } from '@/lib/identity-verification/document-access'
 import { cleanupUnregisteredUpload } from '@/lib/storage-cleanup'
 
@@ -10,34 +10,29 @@ const METADATA_TABLE = 'identity_verification_documents'
 
 /**
  * POST /api/verification/documents -- registers an already-uploaded KYC
- * document as an identity_verification_documents row. Replaces the
- * direct client insert kyc-flow.tsx used to perform itself (owner-insert
- * RLS on the table is unchanged and stays the real write authority --
- * this route inserts via the caller's own session, never service role,
- * per the approved Phase B design).
+ * document. Orphan Cleanup Phase B3A: this route now accepts TWO body
+ * shapes during the compatibility window.
  *
- * Storage upload itself stays a direct browser->Storage call under the
- * existing 'own upload' policy (20260804000001) -- this route never
- * proxies document bytes.
+ *   NEW  -- { intent_id }          -> finalize_kyc_document_upload() RPC
+ *   LEGACY -- { document_type, storage_path, mime_type, file_size }
+ *                                   -> today's unmodified B1 logic
  *
- * Order (each step only reachable after the previous one passes):
- *   1. auth                                          -- pre-T2
- *   2. body parse + schema                            -- pre-T2
- *   3. exact path grammar + MIME/extension consistency -- establishes T2
- *   4. existing-row lookup (session-bound, RLS-scoped) -- registered
- *      evidence is authoritative and immutable: same metadata -> return
- *      it; conflicting metadata -> 409. Neither branch ever inserts or
- *      cleans up.
- *   5. only for a genuinely new path: verify the Storage object itself
- *      exists (info(), metadata-only, never downloads bytes) and that
- *      its actual size/content-type match the claim
- *   6. insert (session-bound client, RLS-authorized)
- *   7. insert failure -> guarded compensating cleanup (service role,
- *      reused unmodified from Phase A)
+ * The legacy branch exists ONLY so an already-open browser tab running
+ * pre-B3A JS keeps working after this deploys -- it is completely
+ * unmodified from B1, byte-for-byte the same behavior, and stays until
+ * a separate, later, evidence-gated phase (B3B) retires it. Client code
+ * shipped from this point forward always uses the new shape.
  *
- * Never calls submit/resubmit, never calls a verification provider,
- * never touches identity_verifications.status or verification history --
- * this route only ever replaces the metadata insert.
+ * Dispatch is strict: a body carrying `intent_id` together with any
+ * legacy field is rejected outright rather than guessing which shape
+ * was intended.
+ *
+ * The NEW branch's RPC is the authoritative security boundary (Phase B3
+ * Final Database-Authority Gate) -- this route does not re-verify
+ * Storage/MIME/size itself for that branch; it only calls the function
+ * via the session-bound client (never service-role, so auth.uid()
+ * inside the function resolves to the real caller) and maps its typed
+ * errors to safe responses.
  */
 export async function POST(request: NextRequest) {
   const requester = await getRequestProfile()
@@ -52,6 +47,101 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
+  const looksLikeIntentBody = typeof body === 'object' && body !== null && 'intent_id' in body
+  const looksLikeLegacyBody =
+    typeof body === 'object' &&
+    body !== null &&
+    ('document_type' in body || 'storage_path' in body || 'mime_type' in body || 'file_size' in body)
+
+  if (looksLikeIntentBody && looksLikeLegacyBody) {
+    return NextResponse.json({ error: 'Invalid document' }, { status: 400 })
+  }
+
+  if (looksLikeIntentBody) {
+    return finalizeViaIntent(body)
+  }
+
+  return finalizeViaLegacyBody(body, requester.userId)
+}
+
+/**
+ * NEW branch -- Orphan Cleanup Phase B3A. Takes no userId: identity is
+ * derived entirely inside finalize_kyc_document_upload() from its own
+ * auth.uid() (the session-bound RPC call below carries the real
+ * caller's session, never a parameter) -- this route never needs to
+ * know or pass along who the caller is for this branch.
+ */
+async function finalizeViaIntent(body: unknown) {
+  const parsed = documentUploadFinalizeSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid document', fieldErrors: parsed.error.flatten().fieldErrors }, { status: 400 })
+  }
+
+  const { createClient: createSessionClient } = await import('@/lib/supabase/server')
+  const session = await createSessionClient()
+  if (!session) {
+    return NextResponse.json({ error: 'Verification storage is not configured' }, { status: 503 })
+  }
+
+  // Session-bound client, never service-role -- auth.uid() inside the
+  // function must resolve to this real caller (the entire point of the
+  // Phase B3 authority model).
+  const { data, error } = await session.rpc('finalize_kyc_document_upload', { p_intent_id: parsed.data.intent_id })
+
+  if (error) {
+    return NextResponse.json({ error: mapFinalizeErrorMessage(error.message) }, { status: statusForFinalizeError(error.message) })
+  }
+
+  // Observability only -- distinguishes intent-backed vs legacy
+  // finalizations for the future B3B cutover decision. That decision
+  // only needs occurrence counts (did any legacy finalization happen
+  // at all), never who -- no userId, storage path, document content,
+  // or any other identity detail.
+  console.log('[verification.documents] kyc_document_finalize_intent')
+
+  return NextResponse.json(data, { status: 201 })
+}
+
+function statusForFinalizeError(message: string): number {
+  switch (message) {
+    case 'not_authenticated':
+      return 401
+    case 'intent_not_found':
+      return 404
+    case 'storage_object_missing':
+      return 404
+    case 'intent_expired':
+    case 'metadata_conflict':
+      return 409
+    case 'storage_metadata_mismatch':
+      return 403
+    default:
+      return 500
+  }
+}
+
+function mapFinalizeErrorMessage(message: string): string {
+  switch (message) {
+    case 'not_authenticated':
+      return 'You must be signed in to upload a document'
+    case 'intent_not_found':
+      return 'This upload could not be found — please start again'
+    case 'intent_expired':
+      return 'This upload has expired — please upload the document again'
+    case 'storage_object_missing':
+      return 'No uploaded file was found for this upload'
+    case 'storage_metadata_mismatch':
+      return 'The uploaded file does not match the submitted document details'
+    case 'metadata_conflict':
+      return 'This document path is already registered with different details'
+    default:
+      return 'Could not register this document — please try again'
+  }
+}
+
+/** LEGACY branch -- unmodified from B1, kept for the B3A compatibility
+ * window only (an already-open browser tab running pre-B3A JS). */
+async function finalizeViaLegacyBody(body: unknown, userId: string) {
   const parsed = documentUploadRecordSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid document', fieldErrors: parsed.error.flatten().fieldErrors }, { status: 400 })
@@ -59,7 +149,7 @@ export async function POST(request: NextRequest) {
   const { document_type: documentType, storage_path: storagePath, mime_type: mimeType, file_size: fileSize } = parsed.data
 
   // ── Establish T2: exact path grammar, not prefix-only. ──
-  const pathResult = parseKycDocumentPath(storagePath, requester.userId, documentType)
+  const pathResult = parseKycDocumentPath(storagePath, userId, documentType)
   if (!pathResult.ok) {
     return NextResponse.json({ error: 'This document does not belong to you' }, { status: 403 })
   }
@@ -96,12 +186,12 @@ export async function POST(request: NextRequest) {
     const { data: existingRows, error: existingError } = await session
       .from(METADATA_TABLE)
       .select('id, document_type, storage_path, mime_type, file_size, uploaded_at')
-      .eq('user_id', requester.userId)
+      .eq('user_id', userId)
       .eq('storage_path', storagePath)
       .order('uploaded_at', { ascending: false })
 
     if (existingError) {
-      console.error('[verification.documents] existing-row lookup failed', { userId: requester.userId })
+      console.error('[verification.documents] existing-row lookup failed', { userId })
       return NextResponse.json({ error: 'Could not register this document — please try again' }, { status: 500 })
     }
 
@@ -113,6 +203,7 @@ export async function POST(request: NextRequest) {
         // Registered evidence is authoritative and immutable -- a
         // same-metadata replay (e.g. a lost response, client retried the
         // same POST) is an idempotent success. No insert, no cleanup.
+        console.log('[verification.documents] kyc_document_finalize_legacy')
         return NextResponse.json(existingRows[0], { status: 200 })
       }
       // At least one existing row at this exact path disagrees with the
@@ -138,7 +229,7 @@ export async function POST(request: NextRequest) {
       // verify" is not the same claim as "definitely absent", so this
       // must not be treated as a registerable or a cleanup-eligible
       // state either.
-      console.error('[verification.documents] storage existence check failed ambiguously', { userId: requester.userId, status })
+      console.error('[verification.documents] storage existence check failed ambiguously', { userId, status })
       return NextResponse.json({ error: 'Could not verify your uploaded document — please try again' }, { status: 500 })
     }
 
@@ -156,7 +247,7 @@ export async function POST(request: NextRequest) {
     const { data: row, error: insertError } = await session
       .from(METADATA_TABLE)
       .insert({
-        user_id: requester.userId,
+        user_id: userId,
         document_type: documentType,
         storage_path: storagePath,
         mime_type: mimeType,
@@ -166,14 +257,15 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (insertError) {
-      console.error('[verification.documents] insert error', { userId: requester.userId, error: insertError })
+      console.error('[verification.documents] insert error', { userId, error: insertError })
       await runCleanup()
       return NextResponse.json({ error: 'Could not register this document — please try again' }, { status: 500 })
     }
 
+    console.log('[verification.documents] kyc_document_finalize_legacy')
     return NextResponse.json(row, { status: 201 })
   } catch (err) {
-    console.error('[verification.documents] unexpected error', { userId: requester.userId, err })
+    console.error('[verification.documents] unexpected error', { userId, err })
     return NextResponse.json({ error: 'Could not register this document — please try again' }, { status: 500 })
   }
 }

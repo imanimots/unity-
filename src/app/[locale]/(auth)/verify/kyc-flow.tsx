@@ -18,16 +18,23 @@ import { createClient } from '@/lib/supabase/client'
  * wording says so explicitly) -- see docs/IDENTITY_VERIFICATION.md
  * "Test-mode wording".
  *
- * Document upload goes straight from the browser to the private
- * 'kyc-documents' Storage bucket using the user's own authenticated
- * session (folder-scoped RLS -- 20260804000001). Metadata registration
- * (the identity_verification_documents row) goes through
- * POST /api/verification/documents instead of a direct client insert
- * (Orphan Cleanup Phase B1) -- that route re-validates the exact path,
- * confirms the Storage object genuinely exists, and inserts via the
- * caller's own session (owner-insert RLS remains the real write
- * authority, unchanged). The separate final submit/resubmit call goes
- * through a service-role RPC, unaffected by this.
+ * Document upload (Orphan Cleanup Phase B3A): for each document, the
+ * client first creates a staged upload intent
+ * (POST /api/verification/documents/intents) -- the server generates
+ * the authoritative Storage path and binds the claimed document_type/
+ * mime_type/file_size before any upload happens. Only then does the
+ * browser upload straight to the private 'kyc-documents' Storage
+ * bucket using the user's own authenticated session (folder-scoped RLS
+ * -- 20260804000001, unchanged: the server-generated path still starts
+ * with the caller's own user id). Finalization
+ * (POST /api/verification/documents with { intent_id }) calls the
+ * finalize_kyc_document_upload() database function, which independently
+ * re-verifies the real Storage object and registers the
+ * identity_verification_documents row and the intent's own finalized
+ * state together in one transaction -- see that function's own header
+ * comment (20260909133312) for why it is safe even if called directly,
+ * bypassing this app's own route. The separate final submit/resubmit
+ * call goes through a service-role RPC, unaffected by any of this.
  */
 
 type DocType = 'identity_document' | 'proof_of_address'
@@ -47,8 +54,6 @@ interface MeResponse {
   reviewCount: number
   documents: { documentType: DocType; uploadedAt: string }[]
 }
-
-const MIME_EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf' }
 
 function UploadZone({ label, file, onFile, uploaded }: { label: string; file: File | null; onFile: (f: File) => void; uploaded: boolean }) {
   const t = useTranslations('auth.verify.documents')
@@ -206,18 +211,31 @@ function KycFlowInner() {
 
   async function uploadDocument(file: File, documentType: DocType) {
     if (!user) throw new Error(tErrors('notSignedIn'))
-    const supabase = createClient()
-    const ext = MIME_EXT[file.type] ?? 'bin'
-    const path = `${user.id}/${documentType}/${crypto.randomUUID()}.${ext}`
     const docTypeLabel = tDocTypes(documentType)
 
+    // Orphan Cleanup Phase B3A -- create a staged upload intent BEFORE
+    // touching Storage. The server generates the authoritative path
+    // (buildKycDocumentPath) and binds document_type/mime_type/file_size
+    // up front; the client never chooses or generates the path itself.
+    const intentRes = await fetch('/api/verification/documents/intents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ document_type: documentType, mime_type: file.type, file_size: file.size }),
+    })
+    if (!intentRes.ok) throw new Error(tErrors('couldNotUploadDoc', { docType: docTypeLabel }))
+    const { intent_id: intentId, storage_path: path } = await intentRes.json()
+
+    const supabase = createClient()
     const { error: uploadError } = await supabase.storage.from('kyc-documents').upload(path, file, { contentType: file.type })
     if (uploadError) throw new Error(tErrors('couldNotUploadDoc', { docType: docTypeLabel }))
 
+    // Finalize by intent id only -- the server loads the path/claimed
+    // metadata from the intent itself and independently verifies the
+    // real Storage object before ever registering anything.
     const res = await fetch('/api/verification/documents', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ document_type: documentType, storage_path: path, mime_type: file.type, file_size: file.size }),
+      body: JSON.stringify({ intent_id: intentId }),
     })
     if (!res.ok) throw new Error(tErrors('couldNotRecordDoc', { docType: docTypeLabel }))
   }

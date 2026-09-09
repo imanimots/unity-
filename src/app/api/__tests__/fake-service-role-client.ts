@@ -30,7 +30,7 @@ export function fakeServiceRoleClient(
     const chain: Record<string, unknown> = {
       select: () => chain,
       eq: () => chain,
-      insert: () => chain,
+      insert: vi.fn(() => chain),
       order: () => chain,
       limit: () => chain,
       in: () => chain,
