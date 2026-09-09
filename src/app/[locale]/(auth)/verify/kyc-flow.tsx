@@ -20,12 +20,14 @@ import { createClient } from '@/lib/supabase/client'
  *
  * Document upload goes straight from the browser to the private
  * 'kyc-documents' Storage bucket using the user's own authenticated
- * session (folder-scoped RLS -- 20260804000001), then inserts the
- * identity_verification_documents metadata row directly (also
- * RLS-scoped to the caller's own user_id) -- the same direct-client
- * pattern Phase 2A already established for listing_media. No server
- * route exists for upload itself; only the final submit/resubmit call
- * goes through a service-role RPC.
+ * session (folder-scoped RLS -- 20260804000001). Metadata registration
+ * (the identity_verification_documents row) goes through
+ * POST /api/verification/documents instead of a direct client insert
+ * (Orphan Cleanup Phase B1) -- that route re-validates the exact path,
+ * confirms the Storage object genuinely exists, and inserts via the
+ * caller's own session (owner-insert RLS remains the real write
+ * authority, unchanged). The separate final submit/resubmit call goes
+ * through a service-role RPC, unaffected by this.
  */
 
 type DocType = 'identity_document' | 'proof_of_address'
@@ -212,10 +214,12 @@ function KycFlowInner() {
     const { error: uploadError } = await supabase.storage.from('kyc-documents').upload(path, file, { contentType: file.type })
     if (uploadError) throw new Error(tErrors('couldNotUploadDoc', { docType: docTypeLabel }))
 
-    const { error: insertError } = await supabase
-      .from('identity_verification_documents')
-      .insert({ user_id: user.id, document_type: documentType, storage_path: path, mime_type: file.type, file_size: file.size })
-    if (insertError) throw new Error(tErrors('couldNotRecordDoc', { docType: docTypeLabel }))
+    const res = await fetch('/api/verification/documents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ document_type: documentType, storage_path: path, mime_type: file.type, file_size: file.size }),
+    })
+    if (!res.ok) throw new Error(tErrors('couldNotRecordDoc', { docType: docTypeLabel }))
   }
 
   async function handleSubmit() {

@@ -12,8 +12,19 @@ import { vi } from 'vitest'
  *
  * This mocks the DATA LAYER only -- every real `if` check, and every
  * real `cleanup()` call, in the route under test still runs unmocked.
+ *
+ * Optional third param, `storageResponses`, keyed by bucket name --
+ * added for POST /api/verification/documents (KYC Phase B1), which is
+ * the first route in this family to call `.storage.from(bucket).info()`
+ * directly (Storage object existence/metadata verification, not just
+ * table queries). Purely additive: callers that don't pass it never
+ * touch `.storage` at all, so every existing caller is unaffected.
  */
-export function fakeServiceRoleClient(tableResponses: Record<string, { data: unknown; error?: unknown; count?: number }>, rpcResponses: Record<string, { data: unknown; error?: unknown }> = {}) {
+export function fakeServiceRoleClient(
+  tableResponses: Record<string, { data: unknown; error?: unknown; count?: number }>,
+  rpcResponses: Record<string, { data: unknown; error?: unknown }> = {},
+  storageResponses: Record<string, { data: unknown; error?: unknown }> = {}
+) {
   function makeChain(resolved: { data: unknown; error?: unknown; count?: number }) {
     const value = { data: resolved.data ?? null, error: resolved.error ?? null, count: resolved.count }
     const chain: Record<string, unknown> = {
@@ -32,5 +43,8 @@ export function fakeServiceRoleClient(tableResponses: Record<string, { data: unk
 
   const from = vi.fn((table: string) => makeChain(tableResponses[table] ?? { data: null, error: null }))
   const rpc = vi.fn((fnName: string) => Promise.resolve(rpcResponses[fnName] ?? { data: null, error: null }))
-  return { from, rpc }
+  const storageInfo = vi.fn((bucket: string) => Promise.resolve(storageResponses[bucket] ?? { data: null, error: { status: 404, message: 'not found' } }))
+  const storageRemove = vi.fn(() => Promise.resolve({ data: null, error: null }))
+  const storage = { from: (bucket: string) => ({ info: () => storageInfo(bucket), remove: storageRemove }) }
+  return { from, rpc, storage }
 }
