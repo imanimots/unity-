@@ -97,17 +97,31 @@ console.log('=== Function: finalize_kyc_document_upload ===')
   check('authenticated EXECUTE granted', grants.includes('authenticated'), grants)
 }
 
-console.log('=== Untouched by this phase ===')
+console.log('=== identity_verification_documents write surface (KYC B2L) ===')
 {
-  const identityDocsPolicies = dbQuery(
-    "select policyname from pg_policies where tablename='identity_verification_documents' order by policyname;"
-  ).map((r) => r.policyname)
+  const [rls] = dbQuery("select relrowsecurity from pg_class where relname='identity_verification_documents';")
+  check('RLS still enabled', rls?.relrowsecurity === true, rls)
+
+  const rows = dbQuery(
+    "select policyname, cmd from pg_policies where schemaname='public' and tablename='identity_verification_documents' order by policyname;"
+  )
+  const names = rows.map((r) => r.policyname)
+  check('exactly 2 policies remain (owner read + admin read)', rows.length === 2, names)
+  check('both remaining policies are SELECT', rows.every((r) => r.cmd === 'SELECT'), rows)
   check(
-    'identity_verification_documents RLS policies unchanged (owner read/insert + admin read, B2 out of scope)',
-    identityDocsPolicies.length === 3,
-    identityDocsPolicies
+    'NO INSERT policy -- authenticated/anon direct INSERT is denied (B2L removed "owner insert")',
+    !names.includes('identity_verification_documents: owner insert') && !rows.some((r) => r.cmd === 'INSERT'),
+    names
   )
 
+  const [trig] = dbQuery(
+    "select tgname from pg_trigger where tgrelid = 'public.identity_verification_documents'::regclass and tgname = 'identity_verification_documents_immutable';"
+  )
+  check('immutability trigger unchanged (append-only preserved)', trig?.tgname === 'identity_verification_documents_immutable', trig)
+}
+
+console.log('=== Untouched by this phase ===')
+{
   const kycBucketPolicies = dbQuery(
     "select policyname from pg_policies where schemaname='storage' and tablename='objects' and policyname like '%kyc-documents%' order by policyname;"
   ).map((r) => r.policyname)

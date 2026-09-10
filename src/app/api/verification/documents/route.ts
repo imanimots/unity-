@@ -139,8 +139,25 @@ function mapFinalizeErrorMessage(message: string): string {
   }
 }
 
-/** LEGACY branch -- unmodified from B1, kept for the B3A compatibility
- * window only (an already-open browser tab running pre-B3A JS). */
+/**
+ * LEGACY branch -- kept for the B3A compatibility window only (an
+ * already-open browser tab running pre-B3A JS, whose uploads carry
+ * self-generated random paths with no intent row).
+ *
+ * B2L: two changes from the original B1 behaviour, both narrowing
+ * authority, neither weakening a check:
+ *   1. Any request whose exact storage_path belongs to a
+ *      kyc_document_upload_intents row is rejected (409) before any
+ *      metadata read/insert or RPC -- the privileged legacy writer must
+ *      never be able to register an intent-backed path (that is the
+ *      ghost-row race B3C's cleaner must be safe against). Rejected
+ *      regardless of the intent's status. A genuine stale pre-B3A tab
+ *      never hits this -- its paths have no intent.
+ *   2. The final metadata insert (for a true no-intent path) goes
+ *      through the service-role client, since B2L drops the
+ *      "identity_verification_documents: owner insert" RLS policy. Every
+ *      preceding B1 check is unchanged and still runs first.
+ */
 async function finalizeViaLegacyBody(body: unknown, userId: string) {
   const parsed = documentUploadRecordSchema.safeParse(body)
   if (!parsed.success) {
@@ -157,11 +174,6 @@ async function finalizeViaLegacyBody(body: unknown, userId: string) {
     return NextResponse.json({ error: 'Document type does not match the uploaded file' }, { status: 403 })
   }
 
-  const { createClient: createSessionClient } = await import('@/lib/supabase/server')
-  const session = await createSessionClient()
-  if (!session) {
-    return NextResponse.json({ error: 'Verification storage is not configured' }, { status: 503 })
-  }
   const admin = await getAdminServiceClient()
   if (!admin) {
     return NextResponse.json({ error: 'Verification storage is not configured' }, { status: 503 })
@@ -178,12 +190,35 @@ async function finalizeViaLegacyBody(body: unknown, userId: string) {
     })
 
   try {
+    // ── B2L intent gate. Path ownership is already established (T2
+    // above), so this lookup is not a cross-user existence oracle. If
+    // the exact path belongs to ANY upload intent, the legacy authority
+    // surface must not touch it -- the intent-backed flow
+    // (finalize_kyc_document_upload) is the only path that may register
+    // it. storage_path is UNIQUE on the intents table, so this is a
+    // one-row existence check. Fail closed: a lookup error is NOT
+    // "no intent". ──
+    const { data: intentRows, error: intentLookupError } = await admin
+      .from('kyc_document_upload_intents')
+      .select('id')
+      .eq('storage_path', storagePath)
+
+    if (intentLookupError) {
+      console.error('[verification.documents] legacy intent-gate lookup failed', { userId })
+      return NextResponse.json({ error: 'Could not register this document — please try again' }, { status: 500 })
+    }
+    if (intentRows && intentRows.length > 0) {
+      return NextResponse.json(
+        { error: 'This upload belongs to the newer verification flow — please refresh and try again' },
+        { status: 409 }
+      )
+    }
+
     // ── Existing-row lookup, BOTH user_id and storage_path (never rely
-    // on the path alone to imply ownership) -- session-bound, so
-    // owner-read RLS is the actual scoping authority, this .eq is
-    // defense-in-depth on top of it. No uniqueness assumption: fetch
-    // every row at this exact path. ──
-    const { data: existingRows, error: existingError } = await session
+    // on the path alone to imply ownership) -- service-role (B2L), so
+    // the .eq('user_id', ...) is the explicit scoping authority. No
+    // uniqueness assumption: fetch every row at this exact path. ──
+    const { data: existingRows, error: existingError } = await admin
       .from(METADATA_TABLE)
       .select('id, document_type, storage_path, mime_type, file_size, uploaded_at')
       .eq('user_id', userId)
@@ -241,10 +276,13 @@ async function finalizeViaLegacyBody(body: unknown, userId: string) {
       return NextResponse.json({ error: 'The uploaded file does not match the submitted document details' }, { status: 403 })
     }
 
-    // ── Object confirmed present and matching -- insert via the
-    // caller's own session so owner-insert RLS remains the real write
-    // authority (never service role for this insert). ──
-    const { data: row, error: insertError } = await session
+    // ── True no-intent path, object confirmed present and matching --
+    // insert via the service-role client (B2L: the owner-insert RLS
+    // policy is gone). Every preceding check -- caller auth, exact path
+    // ownership, doc-type/MIME consistency, no owning intent, Storage
+    // object existence, real MIME/size match, replay/conflict -- has
+    // already run; this is the controlled server write, not a bypass. ──
+    const { data: row, error: insertError } = await admin
       .from(METADATA_TABLE)
       .insert({
         user_id: userId,

@@ -1,0 +1,40 @@
+-- ============================================================
+-- KYC B2L -- remove ordinary authenticated-owner direct INSERT
+-- authority on identity_verification_documents
+-- ============================================================
+-- Closes the final metadata-writer race that otherwise makes B3C's
+-- Storage cleanup structurally unsafe (KYC B3C "Final Direct-Insert /
+-- Delete-Race Authority Gate" + the B2L amendment gate).
+--
+-- The "identity_verification_documents: owner insert" policy
+-- (20260804000001, `for insert with check (auth.uid() = user_id)`) let
+-- any authenticated user insert an arbitrary metadata row directly from
+-- the browser -- live-proven this phase by a rolled-back INSERT. That
+-- is a permanent ghost-evidence vector: a direct INSERT for an intent's
+-- storage_path, landing between a B3C cleaner's `pending -> expired`
+-- claim and its Storage delete, leaves an immutable row pointing at a
+-- deleted object (identity_verification_documents can never be updated
+-- or deleted -- prevent_row_mutation trigger, unchanged here).
+--
+-- After this migration, identity_verification_documents has NO INSERT
+-- policy at all. The only remaining writers are:
+--   1. finalize_kyc_document_upload() -- SECURITY DEFINER as `postgres`
+--      (table owner, bypassrls, FORCE RLS off -- all live-confirmed),
+--      so it bypasses RLS and needs no INSERT policy. It cannot
+--      register a non-pending intent's path (raises intent_expired).
+--   2. finalizeViaLegacyBody() -- its metadata insert moves to the
+--      service-role client in the same change set, AND it gains a
+--      service-role gate: any request whose storage_path belongs to a
+--      kyc_document_upload_intents row is rejected (409) before any
+--      insert, so the privileged legacy writer can never target an
+--      intent-backed path.
+--
+-- SELECT policies (owner read, admin read) and the immutability trigger
+-- are untouched. No table/column/trigger/Storage/intent-table/function
+-- change. `finalize_kyc_document_upload()`'s ACL is untouched (it never
+-- depended on this policy).
+-- Apply via: Supabase Dashboard -> SQL Editor -> Run
+-- ============================================================
+
+drop policy if exists "identity_verification_documents: owner insert"
+  on public.identity_verification_documents;

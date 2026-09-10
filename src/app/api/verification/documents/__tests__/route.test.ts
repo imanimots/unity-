@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { fakeServiceRoleClient } from '@/app/api/__tests__/fake-service-role-client'
 
 process.env.NEXT_PUBLIC_SUPABASE_URL ||= 'https://fake-project.supabase.co'
 process.env.SUPABASE_SERVICE_ROLE_KEY ||= 'fake-service-role-key'
@@ -12,31 +11,32 @@ vi.mock('@/lib/supabase/require-admin', () => ({ getRequestProfile: (...args: un
 const cleanupUnregisteredUpload = vi.fn()
 vi.mock('@/lib/storage-cleanup', () => ({ cleanupUnregisteredUpload: (...args: unknown[]) => cleanupUnregisteredUpload(...args) }))
 
-// ── Admin (service-role) client -- only ever used by this route for
-// storage.from(bucket).info(), plus (mocked away above) cleanup. Reused
-// from the shared Phase A fake's new optional `storageResponses` param.
-let nextAdmin: ReturnType<typeof fakeServiceRoleClient>
-vi.mock('@/lib/admin/route-helpers', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/admin/route-helpers')>()
-  return { ...actual, getAdminServiceClient: () => Promise.resolve(nextAdmin) }
-})
-
-// ── Session-bound (RLS) client -- the real write/read authority for
-// this route (insert never uses service role, per the approved design).
-// A single table (identity_verification_documents) is used for BOTH an
-// existing-row lookup (array, resolved via a plain awaited query) and,
-// on a genuinely new path, an insert (single row, resolved via
-// .select().single()) -- the shared Phase A fake can't express two
-// different responses for one table name, so this route gets its own
-// small local fake that distinguishes the two by whether .insert() was
-// called on that specific chain instance.
-interface SessionTableConfig {
+// ── One chainable fake covering everything both branches of this route
+// touch: `.from(table)` (a lookup resolved via a plain awaited query, and
+// an insert resolved via .select().single() -- distinguished per chain
+// instance by whether .insert() was called, so a single table name can
+// return an "existing rows" array and a different "after insert" row),
+// `.rpc()` (the NEW intent branch), and `.storage.from(bucket).info()`
+// (the legacy branch's Storage existence check).
+//
+// B2L: the legacy branch now performs ALL of its DB work -- the
+// kyc_document_upload_intents gate lookup, the existing-row lookup, and
+// the final insert -- through the service-role (`admin`) client, since
+// the "identity_verification_documents: owner insert" RLS policy is
+// dropped. So `nextAdmin` is the legacy branch's authority; `nextSession`
+// now matters only for the NEW branch's `.rpc()`.
+interface ChainTableConfig {
   existing?: { data: unknown; error?: unknown }
   afterInsert?: { data: unknown; error?: unknown }
 }
 let insertCallCount = 0
-function fakeSessionClient(tables: Record<string, SessionTableConfig>) {
-  function makeChain(config: SessionTableConfig) {
+let nextRpcResponse: { data: unknown; error: { message: string } | null } = { data: null, error: null }
+
+function fakeChainClient(
+  tables: Record<string, ChainTableConfig>,
+  storageResponses: Record<string, { data: unknown; error?: unknown }> = {}
+) {
+  function makeChain(config: ChainTableConfig) {
     let insertCalled = false
     const existing = { data: config.existing?.data ?? [], error: config.existing?.error ?? null }
     const afterInsert = { data: config.afterInsert?.data ?? null, error: config.afterInsert?.error ?? null }
@@ -57,11 +57,18 @@ function fakeSessionClient(tables: Record<string, SessionTableConfig>) {
   }
   const from = vi.fn((table: string) => makeChain(tables[table] ?? {}))
   const rpc = vi.fn(() => Promise.resolve(nextRpcResponse))
-  return { from, rpc }
+  const storageInfo = vi.fn((bucket: string) => Promise.resolve(storageResponses[bucket] ?? { data: null, error: { status: 404, message: 'not found' } }))
+  const storage = { from: (bucket: string) => ({ info: () => storageInfo(bucket), remove: vi.fn(() => Promise.resolve({ data: null, error: null })) }) }
+  return { from, rpc, storage }
 }
-let nextSession: ReturnType<typeof fakeSessionClient> | null
-let nextRpcResponse: { data: unknown; error: { message: string } | null } = { data: null, error: null }
+
+let nextAdmin: ReturnType<typeof fakeChainClient>
+let nextSession: ReturnType<typeof fakeChainClient> | null
 vi.mock('@/lib/supabase/server', () => ({ createClient: () => Promise.resolve(nextSession) }))
+vi.mock('@/lib/admin/route-helpers', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/admin/route-helpers')>()
+  return { ...actual, getAdminServiceClient: () => Promise.resolve(nextAdmin) }
+})
 
 const { POST } = await import('../route')
 
@@ -70,11 +77,25 @@ const OTHER_USER_ID = '99999999-9999-9999-9999-999999999999'
 const LEAF_UUID = '33333333-3333-3333-3333-333333333333'
 const PATH = `${USER_ID}/identity_document/${LEAF_UUID}.jpg`
 const TABLE = 'identity_verification_documents'
+const INTENTS = 'kyc_document_upload_intents'
 const BUCKET = 'kyc-documents'
 
 const validBody = { document_type: 'identity_document' as const, storage_path: PATH, mime_type: 'image/jpeg' as const, file_size: 12345 }
 const registeredRow = { id: 'row-1', document_type: 'identity_document', storage_path: PATH, mime_type: 'image/jpeg', file_size: 12345, uploaded_at: '2026-09-09T00:00:00Z' }
 const objectPresentMatching = { data: { contentType: 'image/jpeg', size: 12345 }, error: null }
+
+/** Legacy-branch admin fake: no owning intent, empty existing rows, a
+ * successful insert, and a matching Storage object -- the "valid new
+ * no-intent path" baseline. Individual tests override one slice. */
+function legacyAdmin(over: { intents?: ChainTableConfig; docs?: ChainTableConfig; storage?: Record<string, { data: unknown; error?: unknown }> } = {}) {
+  return fakeChainClient(
+    {
+      [INTENTS]: over.intents ?? { existing: { data: [] } },
+      [TABLE]: over.docs ?? { existing: { data: [] }, afterInsert: { data: registeredRow } },
+    },
+    over.storage ?? { [BUCKET]: objectPresentMatching }
+  )
+}
 
 function req(body: unknown) {
   return new NextRequest('http://localhost/api/verification/documents', {
@@ -88,12 +109,12 @@ beforeEach(() => {
   getRequestProfile.mockReset().mockResolvedValue({ userId: USER_ID, profile: {} })
   cleanupUnregisteredUpload.mockReset().mockResolvedValue(undefined)
   insertCallCount = 0
-  nextAdmin = fakeServiceRoleClient({}, {}, { [BUCKET]: objectPresentMatching })
-  nextSession = fakeSessionClient({ [TABLE]: { existing: { data: [] } } })
+  nextAdmin = legacyAdmin()
+  nextSession = fakeChainClient({})
   nextRpcResponse = { data: null, error: null }
 })
 
-describe('POST /api/verification/documents (category: KYC Orphan Cleanup Phase B1)', () => {
+describe('POST /api/verification/documents -- legacy branch (category: KYC Orphan Cleanup Phase B1 / B2L)', () => {
   // ── Pre-T2 -- no cleanup possible or attempted for any of these. ──
   it('A. unauthenticated -> 401, no insert, no cleanup', async () => {
     getRequestProfile.mockResolvedValue(null)
@@ -110,11 +131,15 @@ describe('POST /api/verification/documents (category: KYC Orphan Cleanup Phase B
     expect(cleanupUnregisteredUpload).not.toHaveBeenCalled()
   })
 
-  it('C. cross-user path -> deny, no insert, no cleanup', async () => {
+  it('C. cross-user path -> deny BEFORE the intent-existence lookup (no oracle), no insert, no cleanup', async () => {
     const res = await POST(req({ ...validBody, storage_path: `${OTHER_USER_ID}/identity_document/${LEAF_UUID}.jpg` }))
     expect(res.status).toBe(403)
     expect(insertCallCount).toBe(0)
     expect(cleanupUnregisteredUpload).not.toHaveBeenCalled()
+    // The service-role client is fetched lazily inside the try block,
+    // only reached after path ownership passes -- a 403 here means the
+    // intent-existence lookup was never performed.
+    expect(nextAdmin.from).not.toHaveBeenCalledWith(INTENTS)
   })
 
   it('D. `..` traversal path -> deny, no insert, no cleanup', async () => {
@@ -146,23 +171,44 @@ describe('POST /api/verification/documents (category: KYC Orphan Cleanup Phase B
   })
 
   it('MIME/extension inconsistency -> deny, no insert, no cleanup', async () => {
-    // Path says .jpg but the claimed mime_type is PNG.
     const res = await POST(req({ ...validBody, mime_type: 'image/png' }))
     expect(res.status).toBe(403)
     expect(insertCallCount).toBe(0)
     expect(cleanupUnregisteredUpload).not.toHaveBeenCalled()
   })
 
-  // ── T2 established from here on. ──
-  it('H. valid new path + Storage object present and matching -> 201, no cleanup', async () => {
+  // ── B2L intent gate ──
+  it('B2L-1. exact path owned by an intent -> 409, no insert, no cleanup, no RPC (regardless of intent status: gate selects id only)', async () => {
+    nextAdmin = legacyAdmin({ intents: { existing: { data: [{ id: 'intent-x' }] } } })
+    const res = await POST(req(validBody))
+    expect(res.status).toBe(409)
+    expect(insertCallCount).toBe(0)
+    expect(cleanupUnregisteredUpload).not.toHaveBeenCalled()
+    expect(nextSession?.rpc).not.toHaveBeenCalled()
+  })
+
+  it('B2L-2. intent-gate lookup itself errors -> fail closed (500), no insert, never treated as "no intent"', async () => {
+    nextAdmin = legacyAdmin({ intents: { existing: { data: null, error: { message: 'connection reset' } } } })
+    const res = await POST(req(validBody))
+    expect(res.status).toBe(500)
+    expect(insertCallCount).toBe(0)
+    expect(cleanupUnregisteredUpload).not.toHaveBeenCalled()
+    const body = await res.json()
+    expect(body.error).not.toMatch(/connection reset|postgres/i)
+  })
+
+  // ── T2 established, no owning intent -- B1 behaviour, now service-role authority. ──
+  it('H. valid new no-intent path + Storage object present and matching -> 201 via service-role insert', async () => {
     const res = await POST(req(validBody))
     expect(res.status).toBe(201)
     expect(insertCallCount).toBe(1)
     expect(cleanupUnregisteredUpload).not.toHaveBeenCalled()
+    // The legacy branch no longer uses the session client at all.
+    expect(nextSession?.rpc).not.toHaveBeenCalled()
   })
 
-  it('I. same path + same effective metadata replay -> existing row returned, insert NOT called, cleanup NOT called', async () => {
-    nextSession = fakeSessionClient({ [TABLE]: { existing: { data: [registeredRow] } } })
+  it('I. same path + same effective metadata replay -> existing row returned, insert NOT called, cleanup NOT called (intent gate proven first)', async () => {
+    nextAdmin = legacyAdmin({ docs: { existing: { data: [registeredRow] } } })
     const res = await POST(req(validBody))
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -172,17 +218,15 @@ describe('POST /api/verification/documents (category: KYC Orphan Cleanup Phase B
   })
 
   it('J. same path + conflicting metadata -> 409, insert NOT called, cleanup NOT called', async () => {
-    nextSession = fakeSessionClient({ [TABLE]: { existing: { data: [{ ...registeredRow, file_size: 999 }] } } })
+    nextAdmin = legacyAdmin({ docs: { existing: { data: [{ ...registeredRow, file_size: 999 }] } } })
     const res = await POST(req(validBody))
     expect(res.status).toBe(409)
     expect(insertCallCount).toBe(0)
     expect(cleanupUnregisteredUpload).not.toHaveBeenCalled()
   })
 
-  it('K. valid unregistered path, insert fails -> guarded cleanup invoked with correct params', async () => {
-    nextSession = fakeSessionClient({
-      [TABLE]: { existing: { data: [] }, afterInsert: { data: null, error: { message: 'insert failed' } } },
-    })
+  it('K. valid unregistered no-intent path, insert fails -> guarded cleanup invoked with correct params', async () => {
+    nextAdmin = legacyAdmin({ docs: { existing: { data: [] }, afterInsert: { data: null, error: { message: 'insert failed' } } } })
     const res = await POST(req(validBody))
     expect(res.status).toBe(500)
     expect(cleanupUnregisteredUpload).toHaveBeenCalledTimes(1)
@@ -191,24 +235,9 @@ describe('POST /api/verification/documents (category: KYC Orphan Cleanup Phase B
     )
   })
 
-  it('L. insert error but the shared cleanup helper is trusted to guard registered-path races (not re-tested here, see storage-cleanup.test.ts)', async () => {
-    // This route always delegates the fresh registered-path recheck to
-    // cleanupUnregisteredUpload itself (Phase A's own proven guard) --
-    // it never re-implements that check locally. Proven here only as
-    // "cleanup was invoked, with the exact params that let the helper's
-    // own guard do its job" -- same assertion as K.
-    nextSession = fakeSessionClient({
-      [TABLE]: { existing: { data: [] }, afterInsert: { data: null, error: { message: 'insert failed' } } },
-    })
-    await POST(req(validBody))
-    expect(cleanupUnregisteredUpload).toHaveBeenCalledTimes(1)
-  })
-
   it('M. cleanup itself throws -> original safe registration-failure response is preserved', async () => {
     cleanupUnregisteredUpload.mockRejectedValue(new Error('cleanup blew up'))
-    nextSession = fakeSessionClient({
-      [TABLE]: { existing: { data: [] }, afterInsert: { data: null, error: { message: 'insert failed' } } },
-    })
+    nextAdmin = legacyAdmin({ docs: { existing: { data: [] }, afterInsert: { data: null, error: { message: 'insert failed' } } } })
     const res = await POST(req(validBody))
     expect(res.status).toBe(500)
     const body = await res.json()
@@ -216,31 +245,26 @@ describe('POST /api/verification/documents (category: KYC Orphan Cleanup Phase B
   })
 
   it('N. document A already registered, document B registration fails -> A untouched (only B is cleanup-eligible)', async () => {
-    // Registering B (a different path/document_type) never touches A's
-    // row -- cleanup is always scoped to exactly this request's own
-    // validatedPath, never a broader per-user sweep.
     const pathB = `${USER_ID}/proof_of_address/44444444-4444-4444-4444-444444444444.pdf`
-    nextSession = fakeSessionClient({
-      [TABLE]: { existing: { data: [] }, afterInsert: { data: null, error: { message: 'insert failed' } } },
+    nextAdmin = legacyAdmin({
+      docs: { existing: { data: [] }, afterInsert: { data: null, error: { message: 'insert failed' } } },
+      storage: { [BUCKET]: { data: { contentType: 'application/pdf', size: 500 }, error: null } },
     })
-    nextAdmin = fakeServiceRoleClient({}, {}, { [BUCKET]: { data: { contentType: 'application/pdf', size: 500 }, error: null } })
     await POST(req({ document_type: 'proof_of_address', storage_path: pathB, mime_type: 'application/pdf', file_size: 500 }))
     expect(cleanupUnregisteredUpload).toHaveBeenCalledWith(expect.objectContaining({ storagePath: pathB }))
     expect(cleanupUnregisteredUpload).not.toHaveBeenCalledWith(expect.objectContaining({ storagePath: PATH }))
   })
 
   it('O. failure responses never contain raw DB/Storage error text', async () => {
-    nextSession = fakeSessionClient({
-      [TABLE]: { existing: { data: [] }, afterInsert: { data: null, error: { message: 'duplicate key value violates unique constraint "some_pg_constraint"' } } },
-    })
+    nextAdmin = legacyAdmin({ docs: { existing: { data: [] }, afterInsert: { data: null, error: { message: 'duplicate key value violates unique constraint "some_pg_constraint"' } } } })
     const res = await POST(req(validBody))
     const body = await res.json()
     expect(body.error).not.toMatch(/constraint|duplicate key|postgres/i)
   })
 
-  // ── Storage-object integrity (new to Phase B1's amended design). ──
-  it('P. syntactically valid path but Storage object does not exist -> 404, no insert, no cleanup', async () => {
-    nextAdmin = fakeServiceRoleClient({}, {}, { [BUCKET]: { data: null, error: { status: 404, message: 'not found' } } })
+  // ── Storage-object integrity (unchanged from B1). ──
+  it('P. syntactically valid no-intent path but Storage object does not exist -> 404, no insert, no cleanup', async () => {
+    nextAdmin = legacyAdmin({ storage: { [BUCKET]: { data: null, error: { status: 404, message: 'not found' } } } })
     const res = await POST(req(validBody))
     expect(res.status).toBe(404)
     expect(insertCallCount).toBe(0)
@@ -248,7 +272,7 @@ describe('POST /api/verification/documents (category: KYC Orphan Cleanup Phase B
   })
 
   it('Q. Storage existence lookup fails ambiguously -> fail closed, no insert, no cleanup', async () => {
-    nextAdmin = fakeServiceRoleClient({}, {}, { [BUCKET]: { data: null, error: { status: 500, message: 'upstream unavailable' } } })
+    nextAdmin = legacyAdmin({ storage: { [BUCKET]: { data: null, error: { status: 500, message: 'upstream unavailable' } } } })
     const res = await POST(req(validBody))
     expect(res.status).toBe(500)
     expect(insertCallCount).toBe(0)
@@ -261,7 +285,7 @@ describe('POST /api/verification/documents (category: KYC Orphan Cleanup Phase B
   })
 
   it('S. actual Storage content-type mismatches the claim -> reject before insert, no cleanup', async () => {
-    nextAdmin = fakeServiceRoleClient({}, {}, { [BUCKET]: { data: { contentType: 'application/pdf', size: 12345 }, error: null } })
+    nextAdmin = legacyAdmin({ storage: { [BUCKET]: { data: { contentType: 'application/pdf', size: 12345 }, error: null } } })
     const res = await POST(req(validBody))
     expect(res.status).toBe(403)
     expect(insertCallCount).toBe(0)
@@ -269,7 +293,7 @@ describe('POST /api/verification/documents (category: KYC Orphan Cleanup Phase B
   })
 
   it('T. actual Storage size mismatches the claim -> reject before insert, no cleanup', async () => {
-    nextAdmin = fakeServiceRoleClient({}, {}, { [BUCKET]: { data: { contentType: 'image/jpeg', size: 999 }, error: null } })
+    nextAdmin = legacyAdmin({ storage: { [BUCKET]: { data: { contentType: 'image/jpeg', size: 999 }, error: null } } })
     const res = await POST(req(validBody))
     expect(res.status).toBe(403)
     expect(insertCallCount).toBe(0)
@@ -278,7 +302,7 @@ describe('POST /api/verification/documents (category: KYC Orphan Cleanup Phase B
 
   // ── Multiple-row replay handling (no uniqueness constraint exists). ──
   it('U. multiple existing rows, all identical effective metadata -> 200 idempotent success, no insert, no cleanup', async () => {
-    nextSession = fakeSessionClient({ [TABLE]: { existing: { data: [registeredRow, { ...registeredRow, id: 'row-2' }] } } })
+    nextAdmin = legacyAdmin({ docs: { existing: { data: [registeredRow, { ...registeredRow, id: 'row-2' }] } } })
     const res = await POST(req(validBody))
     expect(res.status).toBe(200)
     expect(insertCallCount).toBe(0)
@@ -286,9 +310,7 @@ describe('POST /api/verification/documents (category: KYC Orphan Cleanup Phase B
   })
 
   it('V. multiple existing rows, any one conflicting -> 409, no insert, no cleanup', async () => {
-    nextSession = fakeSessionClient({
-      [TABLE]: { existing: { data: [registeredRow, { ...registeredRow, id: 'row-2', file_size: 1 }] } },
-    })
+    nextAdmin = legacyAdmin({ docs: { existing: { data: [registeredRow, { ...registeredRow, id: 'row-2', file_size: 1 }] } } })
     const res = await POST(req(validBody))
     expect(res.status).toBe(409)
     expect(insertCallCount).toBe(0)
@@ -315,10 +337,8 @@ describe('POST /api/verification/documents -- dual-shape dispatch (category: KYC
   it('NEW-C. never uses the service-role client to invoke the RPC', async () => {
     nextRpcResponse = { data: registeredRow, error: null }
     await POST(req({ intent_id: INTENT_ID }))
-    // The admin (service-role) fake has no .rpc at all in this file's
-    // config -- if the route ever called admin.rpc(...), this would
-    // throw a TypeError before reaching the assertion below.
     expect(nextSession?.rpc).toHaveBeenCalled()
+    expect(nextAdmin.rpc).not.toHaveBeenCalled()
   })
 
   it('NEW-D. safe success mapping -> 201 with the function\'s returned document', async () => {
@@ -361,19 +381,24 @@ describe('POST /api/verification/documents -- dual-shape dispatch (category: KYC
     expect(res.status).toBe(403)
   })
 
-  it('LEGACY-A. original B1 body is still accepted unchanged during B3A', async () => {
-    // Uses the exact same fixtures as the B1 describe block above --
-    // proves the compatibility invariant explicitly, not merely
-    // incidentally via those other tests still passing.
+  it('LEGACY-A. original B1 body is still accepted for a genuine no-intent path during B3A', async () => {
     const res = await POST(req(validBody))
     expect(res.status).toBe(201)
     expect(nextSession?.rpc).not.toHaveBeenCalled()
   })
 
-  it('LEGACY-B. legacy Storage .info() check still governs the legacy branch (unchanged from B1 -- see the R/S/T cases above, which vary storageResponses and observe the outcome change accordingly)', async () => {
-    nextAdmin = fakeServiceRoleClient({}, {}, { [BUCKET]: { data: null, error: { status: 404 } } })
+  it('LEGACY-B. legacy Storage .info() check still governs the legacy branch', async () => {
+    nextAdmin = legacyAdmin({ storage: { [BUCKET]: { data: null, error: { status: 404 } } } })
     const res = await POST(req(validBody))
     expect(res.status).toBe(404)
+  })
+
+  it('LEGACY-C. a known intent-backed path submitted through the legacy body is rejected (B2L)', async () => {
+    nextAdmin = legacyAdmin({ intents: { existing: { data: [{ id: 'intent-x' }] } } })
+    const res = await POST(req(validBody))
+    expect(res.status).toBe(409)
+    expect(insertCallCount).toBe(0)
+    expect(nextSession?.rpc).not.toHaveBeenCalled()
   })
 
   it('mixed intent + legacy body -> rejected, dispatched to neither branch', async () => {
