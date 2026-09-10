@@ -72,7 +72,12 @@ console.log('=== Table: kyc_document_upload_intents ===')
   const [statusCheck] = dbQuery(
     "select pg_get_constraintdef(oid) as def from pg_constraint where conname = 'kyc_document_upload_intents_status_check';"
   )
-  check("status CHECK restricted to pending/finalized/expired/cleaned (no claimed/failed)", /'pending'.*'finalized'.*'expired'.*'cleaned'/.test(statusCheck?.def ?? ''), statusCheck)
+  const def = statusCheck?.def ?? ''
+  check(
+    "status CHECK is exactly pending/finalized/expired/cleaned/preserved (no claimed/failed)",
+    /'pending'.*'finalized'.*'expired'.*'cleaned'.*'preserved'/.test(def) && !/'claimed'|'failed'/.test(def),
+    statusCheck
+  )
 
   const indexes = dbQuery("select indexname from pg_indexes where tablename='kyc_document_upload_intents' order by indexname;").map((r) => r.indexname)
   check('exactly the expected indexes, no redundant ones', indexes.length === 3 && indexes.includes('kyc_document_upload_intents_storage_path_key') && indexes.includes('kyc_document_upload_intents_cleanup_idx'), indexes)
@@ -95,6 +100,25 @@ console.log('=== Function: finalize_kyc_document_upload ===')
   check('anon EXECUTE denied', !grants.includes('anon'), grants)
   check('service_role EXECUTE denied (nothing calls this as service_role)', !grants.includes('service_role'), grants)
   check('authenticated EXECUTE granted', grants.includes('authenticated'), grants)
+}
+
+console.log('=== Function: claim_expired_kyc_upload_intents (KYC B3C) ===')
+{
+  const [fn] = dbQuery(
+    "select p.prosecdef, p.proconfig, p.pronargs, r.rolname as owner from pg_proc p join pg_roles r on p.proowner = r.oid where p.proname = 'claim_expired_kyc_upload_intents';"
+  )
+  check('exists exactly once', !!fn, fn)
+  check('SECURITY DEFINER', fn?.prosecdef === true, fn)
+  check('minimal search_path (pg_catalog only)', JSON.stringify(fn?.proconfig) === JSON.stringify(['search_path=pg_catalog']), fn)
+  check('exactly one parameter (p_limit)', fn?.pronargs === 1, fn)
+  check('owned by a trusted privileged role, never anon/authenticated', fn?.owner && fn.owner !== 'anon' && fn.owner !== 'authenticated', fn)
+
+  const grants = dbQuery(
+    "select grantee from information_schema.routine_privileges where routine_name='claim_expired_kyc_upload_intents' and privilege_type='EXECUTE' order by grantee;"
+  ).map((r) => r.grantee)
+  check('PUBLIC/anon EXECUTE denied', !grants.includes('anon') && !grants.includes('PUBLIC'), grants)
+  check('authenticated EXECUTE denied', !grants.includes('authenticated'), grants)
+  check('service_role EXECUTE granted (the only intended caller)', grants.includes('service_role'), grants)
 }
 
 console.log('=== identity_verification_documents write surface (KYC B2L) ===')
