@@ -1,0 +1,188 @@
+# KYC Upload Intent Cleanup — scheduled invoker for the B3C cleanup route.
+#
+# This workflow is the ONLY automatic caller of
+#   POST /api/internal/kyc/cleanup-upload-intents
+# (see docs/KYC_UPLOAD_INTENT_CLEANUP.md). It issues one bounded,
+# authenticated HTTPS POST per run — no repository checkout, no write
+# permissions, no Supabase access, no caller-controlled cleanup
+# parameters. The route itself claims and resolves at most 100 expired
+# upload intents per invocation; any remainder is handled by the next
+# run.
+#
+# Scheduled workflows run ONLY from this file on the repository's
+# default branch.
+
+name: KYC Upload Intent Cleanup
+
+on:
+  schedule:
+    # Hourly at minute 17 UTC. Deliberately NOT minute 0 — GitHub
+    # documents the top of the hour as a high-load window where
+    # scheduled runs are more likely to be delayed or dropped.
+    - cron: '17 * * * *'
+  workflow_dispatch: {}
+
+# Least privilege: this workflow only makes an outbound HTTPS request.
+permissions: {}
+
+# Serialize scheduled and manual invocations. B3C is safe under overlap
+# regardless (the claim function uses FOR UPDATE SKIP LOCKED), but
+# scheduler-level serialization is preferred. Never cancel a janitor
+# run that is already in flight.
+concurrency:
+  group: kyc-upload-intent-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Invoke KYC upload-intent cleanup
+    runs-on: ubuntu-latest
+    # 300s — safely covers the worst designed request path:
+    # 120s first curl + 10s retry delay + 120s second curl = 250s.
+    timeout-minutes: 5
+    steps:
+      - name: Invoke cleanup endpoint
+        env:
+          INTERNAL_CRON_SECRET: ${{ secrets.INTERNAL_CRON_SECRET }}
+          KYC_CLEANUP_ENDPOINT: ${{ vars.KYC_CLEANUP_ENDPOINT }}
+        run: |
+          set -euo pipefail
+
+          # --- Required configuration -------------------------------------------------
+          if [ -z "${INTERNAL_CRON_SECRET:-}" ]; then
+            echo "Required GitHub Actions secret INTERNAL_CRON_SECRET is not configured."
+            exit 1
+          fi
+          if [ -z "${KYC_CLEANUP_ENDPOINT:-}" ]; then
+            echo "Required GitHub Actions variable KYC_CLEANUP_ENDPOINT is not configured."
+            exit 1
+          fi
+          case "${KYC_CLEANUP_ENDPOINT}" in
+            https://*) ;;
+            *)
+              echo "KYC_CLEANUP_ENDPOINT must be an https:// URL. Refusing to proceed."
+              exit 1
+              ;;
+          esac
+
+          BODY_FILE="$(mktemp)"
+          HTTP_CODE=""
+          CURL_EXIT=0
+          RETRIED=0
+
+          # One curl attempt. Never verbose — the Authorization header must
+          # never reach the log. Body -> file, HTTP status -> stdout.
+          run_curl() {
+            HTTP_CODE=$(curl -sS -X POST \
+              --max-time 120 \
+              -H "Authorization: Bearer ${INTERNAL_CRON_SECRET}" \
+              -H 'Accept: application/json' \
+              -o "${BODY_FILE}" \
+              -w '%{http_code}' \
+              "${KYC_CLEANUP_ENDPOINT}") && CURL_EXIT=0 || CURL_EXIT=$?
+          }
+
+          # At most ONE retry across the whole invocation, ~10s apart.
+          retry_once() {
+            if [ "${RETRIED}" -eq 1 ]; then
+              echo "The single permitted retry has already been used. Failing."
+              exit 1
+            fi
+            RETRIED=1
+            echo "Retrying once in 10s..."
+            sleep 10
+            run_curl
+          }
+
+          run_curl
+
+          # Transport / connection failure (DNS, refused, timeout, TLS...).
+          if [ "${CURL_EXIT}" -ne 0 ]; then
+            echo "Transport failure contacting the cleanup endpoint (curl exit ${CURL_EXIT})."
+            retry_once
+            if [ "${CURL_EXIT}" -ne 0 ]; then
+              echo "Transport failure persists (curl exit ${CURL_EXIT}). Failing workflow."
+              exit 1
+            fi
+          fi
+
+          # Genuinely transient server errors ONLY. 503 is intentionally
+          # excluded — for this route 503 means "endpoint not configured",
+          # a permanent config fault that a retry cannot fix.
+          case "${HTTP_CODE}" in
+            500|502|504)
+              echo "Transient server error HTTP ${HTTP_CODE}."
+              retry_once
+              if [ "${CURL_EXIT}" -ne 0 ]; then
+                echo "Transport failure on retry (curl exit ${CURL_EXIT}). Failing workflow."
+                exit 1
+              fi
+              ;;
+          esac
+
+          # Final HTTP verdict. No further retries beyond the one above.
+          case "${HTTP_CODE}" in
+            200)
+              ;;
+            401)
+              echo "HTTP 401 Unauthorized — the GitHub secret INTERNAL_CRON_SECRET does not match the deployed app. Not retrying."
+              exit 1
+              ;;
+            503)
+              echo "HTTP 503 — the cleanup endpoint reports it is not configured (INTERNAL_CRON_SECRET or Supabase env unset in the app). Not retrying."
+              exit 1
+              ;;
+            *)
+              echo "Unexpected HTTP ${HTTP_CODE} from the cleanup endpoint. Not retrying."
+              exit 1
+              ;;
+          esac
+
+          # --- Response body validation ---------------------------------------------
+          if ! jq -e . "${BODY_FILE}" >/dev/null 2>&1; then
+            echo "HTTP 200 but the response body is not valid JSON. Failing."
+            exit 1
+          fi
+
+          REQUIRED_FIELDS="scanned claimed_first_time claimed_retry cleaned preserved storage_errors metadata_errors invalid_paths duration_ms"
+          for field in ${REQUIRED_FIELDS}; do
+            if ! jq -e --arg f "${field}" 'has($f) and (.[$f] | type == "number") and (.[$f] >= 0)' "${BODY_FILE}" >/dev/null; then
+              echo "Response is missing a non-negative numeric field: ${field}. Failing."
+              exit 1
+            fi
+          done
+
+          echo "Cleanup aggregate response:"
+          jq . "${BODY_FILE}"
+
+          SCANNED=$(jq -r '.scanned' "${BODY_FILE}")
+          INVALID_PATHS=$(jq -r '.invalid_paths' "${BODY_FILE}")
+          STORAGE_ERRORS=$(jq -r '.storage_errors' "${BODY_FILE}")
+          METADATA_ERRORS=$(jq -r '.metadata_errors' "${BODY_FILE}")
+
+          FAILED=0
+          if [ "${INVALID_PATHS}" -gt 0 ]; then
+            echo "::error::invalid_paths=${INVALID_PATHS} — a malformed stored KYC path should be structurally impossible. Investigate."
+            FAILED=1
+          fi
+          if [ "${STORAGE_ERRORS}" -gt 0 ]; then
+            echo "::error::storage_errors=${STORAGE_ERRORS} — Storage API problem. Affected rows stay retryable, but this needs investigation."
+            FAILED=1
+          fi
+          if [ "${METADATA_ERRORS}" -gt 0 ]; then
+            echo "::error::metadata_errors=${METADATA_ERRORS} — metadata/DB problem. Affected rows stay retryable, but this needs investigation."
+            FAILED=1
+          fi
+
+          # One scheduled tick == one bounded invocation. No second call,
+          # no drain loop — the backlog drains on subsequent hourly runs.
+          if [ "${SCANNED}" -ge 100 ]; then
+            echo "::warning::Cleanup batch reached configured capacity (scanned=${SCANNED}); remaining candidates will be handled by subsequent runs."
+          fi
+
+          if [ "${FAILED}" -eq 1 ]; then
+            echo "Cleanup reported candidate-level errors; failing the run so the problem is visible."
+            exit 1
+          fi
+
+          echo "KYC upload-intent cleanup completed cleanly."
