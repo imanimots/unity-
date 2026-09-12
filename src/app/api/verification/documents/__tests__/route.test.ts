@@ -31,12 +31,23 @@ interface ChainTableConfig {
 }
 let insertCallCount = 0
 let nextRpcResponse: { data: unknown; error: { message: string } | null } = { data: null, error: null }
+// B3M -- the legacy branch's own durable-metric RPC response, kept
+// independent from `nextRpcResponse` (the NEW/intent branch's RPC)
+// since both branches' fakes share this module's `rpc()` shape but
+// must be controllable separately in tests.
+let nextMetricRpcResponse: { data: unknown; error: { message: string } | null } = { data: null, error: null }
+const METRIC_RPC = 'record_kyc_legacy_finalize_attempt'
+// B3M -- records the exact sequence of fake-client operations across
+// both `nextAdmin` and `nextSession` for one request, so the B2L-gate
+// -> metric-RPC -> downstream-legacy-work ordering can be asserted
+// directly rather than inferred from source position alone.
+let callOrder: string[] = []
 
 function fakeChainClient(
   tables: Record<string, ChainTableConfig>,
   storageResponses: Record<string, { data: unknown; error?: unknown }> = {}
 ) {
-  function makeChain(config: ChainTableConfig) {
+  function makeChain(config: ChainTableConfig, table: string) {
     let insertCalled = false
     const existing = { data: config.existing?.data ?? [], error: config.existing?.error ?? null }
     const afterInsert = { data: config.afterInsert?.data ?? null, error: config.afterInsert?.error ?? null }
@@ -47,6 +58,7 @@ function fakeChainClient(
       insert: () => {
         insertCalled = true
         insertCallCount += 1
+        callOrder.push(`insert:${table}`)
         return chain
       },
       single: () => Promise.resolve(insertCalled ? afterInsert : existing),
@@ -55,9 +67,18 @@ function fakeChainClient(
     }
     return chain
   }
-  const from = vi.fn((table: string) => makeChain(tables[table] ?? {}))
-  const rpc = vi.fn(() => Promise.resolve(nextRpcResponse))
-  const storageInfo = vi.fn((bucket: string) => Promise.resolve(storageResponses[bucket] ?? { data: null, error: { status: 404, message: 'not found' } }))
+  const from = vi.fn((table: string) => {
+    callOrder.push(`from:${table}`)
+    return makeChain(tables[table] ?? {}, table)
+  })
+  const rpc = vi.fn((name: string) => {
+    callOrder.push(`rpc:${name}`)
+    return Promise.resolve(name === METRIC_RPC ? nextMetricRpcResponse : nextRpcResponse)
+  })
+  const storageInfo = vi.fn((bucket: string) => {
+    callOrder.push(`storage.info:${bucket}`)
+    return Promise.resolve(storageResponses[bucket] ?? { data: null, error: { status: 404, message: 'not found' } })
+  })
   const storage = { from: (bucket: string) => ({ info: () => storageInfo(bucket), remove: vi.fn(() => Promise.resolve({ data: null, error: null })) }) }
   return { from, rpc, storage }
 }
@@ -109,9 +130,11 @@ beforeEach(() => {
   getRequestProfile.mockReset().mockResolvedValue({ userId: USER_ID, profile: {} })
   cleanupUnregisteredUpload.mockReset().mockResolvedValue(undefined)
   insertCallCount = 0
+  callOrder = []
   nextAdmin = legacyAdmin()
   nextSession = fakeChainClient({})
   nextRpcResponse = { data: null, error: null }
+  nextMetricRpcResponse = { data: null, error: null }
 })
 
 describe('POST /api/verification/documents -- legacy branch (category: KYC Orphan Cleanup Phase B1 / B2L)', () => {
@@ -185,6 +208,9 @@ describe('POST /api/verification/documents -- legacy branch (category: KYC Orpha
     expect(insertCallCount).toBe(0)
     expect(cleanupUnregisteredUpload).not.toHaveBeenCalled()
     expect(nextSession?.rpc).not.toHaveBeenCalled()
+    // B3M: an intent-owned path never reaches the durable-metric
+    // boundary -- it is rejected by the B2L gate itself.
+    expect(nextAdmin.rpc).not.toHaveBeenCalledWith(METRIC_RPC)
   })
 
   it('B2L-2. intent-gate lookup itself errors -> fail closed (500), no insert, never treated as "no intent"', async () => {
@@ -399,6 +425,7 @@ describe('POST /api/verification/documents -- dual-shape dispatch (category: KYC
     expect(res.status).toBe(409)
     expect(insertCallCount).toBe(0)
     expect(nextSession?.rpc).not.toHaveBeenCalled()
+    expect(nextAdmin.rpc).not.toHaveBeenCalledWith(METRIC_RPC)
   })
 
   it('mixed intent + legacy body -> rejected, dispatched to neither branch', async () => {
@@ -412,5 +439,179 @@ describe('POST /api/verification/documents -- dual-shape dispatch (category: KYC
     const res = await POST(req({}))
     expect(res.status).toBe(400)
     expect(nextSession?.rpc).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /api/verification/documents -- B3M durable legacy-finalization metric (category: KYC Orphan Cleanup Phase B3M)', () => {
+  const consoleLogSpy = () => vi.spyOn(console, 'log').mockImplementation(() => undefined)
+
+  it('A. anonymous request -> recorder not called', async () => {
+    getRequestProfile.mockResolvedValue(null)
+    await POST(req(validBody))
+    expect(nextAdmin.rpc).not.toHaveBeenCalledWith(METRIC_RPC)
+  })
+
+  it('B. malformed body -> recorder not called', async () => {
+    await POST(req('not json'))
+    expect(nextAdmin.rpc).not.toHaveBeenCalledWith(METRIC_RPC)
+  })
+
+  it('C. cross-user path -> recorder not called', async () => {
+    await POST(req({ ...validBody, storage_path: `${OTHER_USER_ID}/identity_document/${LEAF_UUID}.jpg` }))
+    expect(nextAdmin.rpc).not.toHaveBeenCalledWith(METRIC_RPC)
+  })
+
+  it('D. intent-owned path -> 409, recorder not called', async () => {
+    nextAdmin = legacyAdmin({ intents: { existing: { data: [{ id: 'intent-x' }] } } })
+    const res = await POST(req(validBody))
+    expect(res.status).toBe(409)
+    expect(nextAdmin.rpc).not.toHaveBeenCalledWith(METRIC_RPC)
+  })
+
+  it('E. valid genuine no-intent fresh legacy request -> recorder called once', async () => {
+    const res = await POST(req(validBody))
+    expect(res.status).toBe(201)
+    expect(nextAdmin.rpc).toHaveBeenCalledWith(METRIC_RPC)
+    expect(nextAdmin.rpc).toHaveBeenCalledTimes(1)
+  })
+
+  it('F. same genuine legacy request replayed -> recorder called once for that request', async () => {
+    nextAdmin = legacyAdmin({ docs: { existing: { data: [registeredRow] } } })
+    const res = await POST(req(validBody))
+    expect(res.status).toBe(200)
+    expect(nextAdmin.rpc).toHaveBeenCalledWith(METRIC_RPC)
+    expect(nextAdmin.rpc).toHaveBeenCalledTimes(1)
+  })
+
+  it('G. second replay request increments/calls the recorder again -- request-volume semantics, no dedup', async () => {
+    nextAdmin = legacyAdmin({ docs: { existing: { data: [registeredRow] } } })
+    await POST(req(validBody))
+    await POST(req(validBody))
+    const metricCalls = nextAdmin.rpc.mock.calls.filter((c) => c[0] === METRIC_RPC)
+    expect(metricCalls).toHaveLength(2)
+  })
+
+  it('H. metadata conflict downstream -> recorder already called before the conflict is detected', async () => {
+    nextAdmin = legacyAdmin({ docs: { existing: { data: [{ ...registeredRow, file_size: 999 }] } } })
+    const res = await POST(req(validBody))
+    expect(res.status).toBe(409)
+    expect(nextAdmin.rpc).toHaveBeenCalledWith(METRIC_RPC)
+  })
+
+  it('I. Storage missing downstream -> recorder already called', async () => {
+    nextAdmin = legacyAdmin({ storage: { [BUCKET]: { data: null, error: { status: 404 } } } })
+    const res = await POST(req(validBody))
+    expect(res.status).toBe(404)
+    expect(nextAdmin.rpc).toHaveBeenCalledWith(METRIC_RPC)
+  })
+
+  it('J. Storage mismatch downstream -> recorder already called', async () => {
+    nextAdmin = legacyAdmin({ storage: { [BUCKET]: { data: { contentType: 'application/pdf', size: 12345 }, error: null } } })
+    const res = await POST(req(validBody))
+    expect(res.status).toBe(403)
+    expect(nextAdmin.rpc).toHaveBeenCalledWith(METRIC_RPC)
+  })
+
+  it('K. Storage ambiguous failure downstream -> recorder already called', async () => {
+    nextAdmin = legacyAdmin({ storage: { [BUCKET]: { data: null, error: { status: 500 } } } })
+    const res = await POST(req(validBody))
+    expect(res.status).toBe(500)
+    expect(nextAdmin.rpc).toHaveBeenCalledWith(METRIC_RPC)
+  })
+
+  it('L. metadata insert failure downstream -> recorder already called', async () => {
+    nextAdmin = legacyAdmin({ docs: { existing: { data: [] }, afterInsert: { data: null, error: { message: 'insert failed' } } } })
+    const res = await POST(req(validBody))
+    expect(res.status).toBe(500)
+    expect(nextAdmin.rpc).toHaveBeenCalledWith(METRIC_RPC)
+  })
+
+  it('M. metric recorder failure -> 503, fail closed: no replay lookup, no Storage info, no metadata insert after the boundary', async () => {
+    nextMetricRpcResponse = { data: null, error: { message: 'boom' } }
+    const res = await POST(req(validBody))
+    expect(res.status).toBe(503)
+    expect(insertCallCount).toBe(0)
+    expect(cleanupUnregisteredUpload).not.toHaveBeenCalled()
+    // The replay/conflict lookup (`from(TABLE)` with no insert) and the
+    // Storage check must never occur once the metric RPC has failed.
+    expect(nextAdmin.from).not.toHaveBeenCalledWith(TABLE)
+    const storageCalls = callOrder.filter((c) => c.startsWith('storage.info:'))
+    expect(storageCalls).toHaveLength(0)
+    const body = await res.json()
+    expect(body.error).not.toMatch(/boom|record_kyc_legacy_finalize_attempt|postgres|sql/i)
+  })
+
+  it('metric recorder failure -> safe error message never exposed to a different status either', async () => {
+    nextMetricRpcResponse = { data: null, error: { message: 'duplicate key value violates unique constraint "some_pg_constraint"' } }
+    const res = await POST(req(validBody))
+    expect(res.status).toBe(503)
+    const body = await res.json()
+    expect(body.error).not.toMatch(/constraint|duplicate key|postgres/i)
+  })
+
+  it('N. metric recorder success -> downstream legacy behavior remains unchanged (still 201 on fresh insert)', async () => {
+    const res = await POST(req(validBody))
+    expect(res.status).toBe(201)
+    expect(insertCallCount).toBe(1)
+  })
+
+  it('O. B3A intent finalization never calls the legacy metric recorder', async () => {
+    const INTENT_ID = '44444444-4444-8444-8444-444444444444'
+    nextRpcResponse = { data: registeredRow, error: null }
+    const res = await POST(req({ intent_id: INTENT_ID }))
+    expect(res.status).toBe(201)
+    expect(nextAdmin.rpc).not.toHaveBeenCalled()
+    expect(nextSession?.rpc).toHaveBeenCalledWith('finalize_kyc_document_upload', { p_intent_id: INTENT_ID })
+  })
+
+  it('P. diagnostic attempt-recorded log occurs only after a successful metric increment', async () => {
+    const spy = consoleLogSpy()
+    await POST(req(validBody))
+    const messages = spy.mock.calls.map((c) => c[0])
+    expect(messages).toContain('[verification.documents] kyc_legacy_finalize_attempt_recorded')
+    spy.mockRestore()
+  })
+
+  it('P2. diagnostic attempt-recorded log does NOT occur when the metric recorder fails', async () => {
+    nextMetricRpcResponse = { data: null, error: { message: 'boom' } }
+    const spy = consoleLogSpy()
+    await POST(req(validBody))
+    const messages = spy.mock.calls.map((c) => c[0])
+    expect(messages).not.toContain('[verification.documents] kyc_legacy_finalize_attempt_recorded')
+    spy.mockRestore()
+  })
+
+  it('Q. existing legacy success log semantics remain intact alongside the new diagnostic log', async () => {
+    const spy = consoleLogSpy()
+    await POST(req(validBody))
+    const messages = spy.mock.calls.map((c) => c[0])
+    expect(messages).toContain('[verification.documents] kyc_document_finalize_legacy')
+    expect(messages).toContain('[verification.documents] kyc_legacy_finalize_attempt_recorded')
+    spy.mockRestore()
+  })
+
+  it('R. ordering: B2L intent lookup -> metric RPC -> replay lookup -> Storage info -> metadata insert', async () => {
+    await POST(req(validBody))
+    const relevant = callOrder.filter(
+      (c) => c === `from:${INTENTS}` || c === `rpc:${METRIC_RPC}` || c === `from:${TABLE}` || c.startsWith('storage.info:') || c === `insert:${TABLE}`
+    )
+    // `from:${TABLE}` appears twice on the fresh-insert path -- once for
+    // the replay/conflict lookup (immediately after the metric RPC),
+    // once immediately preceding the insert call itself.
+    expect(relevant).toEqual([
+      `from:${INTENTS}`,
+      `rpc:${METRIC_RPC}`,
+      `from:${TABLE}`,
+      `storage.info:${BUCKET}`,
+      `from:${TABLE}`,
+      `insert:${TABLE}`,
+    ])
+  })
+
+  it('R2. ordering holds even on a replay (no insert step, but metric still precedes the replay lookup)', async () => {
+    nextAdmin = legacyAdmin({ docs: { existing: { data: [registeredRow] } } })
+    await POST(req(validBody))
+    const relevant = callOrder.filter((c) => c === `from:${INTENTS}` || c === `rpc:${METRIC_RPC}` || c === `from:${TABLE}`)
+    expect(relevant).toEqual([`from:${INTENTS}`, `rpc:${METRIC_RPC}`, `from:${TABLE}`])
   })
 })

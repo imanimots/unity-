@@ -157,6 +157,12 @@ function mapFinalizeErrorMessage(message: string): string {
  *      through the service-role client, since B2L drops the
  *      "identity_verification_documents: owner insert" RLS policy. Every
  *      preceding B1 check is unchanged and still runs first.
+ *
+ * B3M: immediately after the intent gate above confirms zero owning
+ * intents, this function records one durable, non-identifying
+ * "legacy attempt" increment (record_kyc_legacy_finalize_attempt(),
+ * fail-closed) before doing anything else -- see that call site below
+ * for the full rationale. Nothing about the B2L gate itself changes.
  */
 async function finalizeViaLegacyBody(body: unknown, userId: string) {
   const parsed = documentUploadRecordSchema.safeParse(body)
@@ -213,6 +219,34 @@ async function finalizeViaLegacyBody(body: unknown, userId: string) {
         { status: 409 }
       )
     }
+
+    // ── B3M durable observability boundary. This request has now
+    // provably: authenticated, matched the legacy body shape, passed
+    // structural/path-grammar/MIME validation, and passed the B2L
+    // fail-closed intent-ownership gate above with zero owning intents
+    // -- it is a genuine authenticated legacy no-intent attempt,
+    // counted as request volume regardless of what happens next
+    // (replay, conflict, Storage failure, insert failure, or insert
+    // success all still count -- a future B3B cutover decision needs
+    // to know whether clients are still calling this deprecated
+    // contract at all, not just whether they succeed at it).
+    //
+    // FAIL CLOSED: if the durable increment itself cannot be recorded,
+    // no downstream legacy work may proceed. A silently-failing metric
+    // write must never let this request appear to "just succeed" while
+    // going uncounted -- that would make a future zero reading
+    // unreliable, which defeats the entire purpose of this metric. ──
+    const { error: metricError } = await admin.rpc('record_kyc_legacy_finalize_attempt')
+    if (metricError) {
+      console.error('[verification.documents] legacy finalize metric recording failed', { userId })
+      return NextResponse.json({ error: 'Could not register this document — please try again' }, { status: 503 })
+    }
+    // Diagnostic only -- distinguishes "attempt reached the accepted
+    // legacy boundary" from the existing success-only
+    // kyc_document_finalize_legacy log below. The durable daily
+    // aggregate above is the authority for B3B; this log (like that
+    // one) carries no identifying content.
+    console.log('[verification.documents] kyc_legacy_finalize_attempt_recorded')
 
     // ── Existing-row lookup, BOTH user_id and storage_path (never rely
     // on the path alone to imply ownership) -- service-role (B2L), so
