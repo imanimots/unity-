@@ -22,9 +22,17 @@ describe('mapDisputeRpcError', () => {
     ['invalid outcome', 400],
     ['a dispute can only be resolved while under review', 409],
     ['a dispute can only be closed after it has been resolved', 409],
+    ['this listing is no longer available for the requested dates', 409],
     ['not authorized', 500],
   ])('maps %j to status %i', (message, status) => {
     expect(mapDisputeRpcError(message).status).toBe(status)
+  })
+
+  it('maps the booking-availability-conflict trigger message to the same conflict wording used on the booking side', () => {
+    expect(mapDisputeRpcError('this listing is no longer available for the requested dates')).toEqual({
+      status: 409,
+      error: 'The requested dates are no longer available for this listing.',
+    })
   })
 
   it('falls back to a generic 500 for an unrecognized message', () => {

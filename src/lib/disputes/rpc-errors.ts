@@ -59,6 +59,16 @@ export function mapDisputeRpcError(message: string | undefined): { status: numbe
   if (m.includes('a dispute can only be closed after it has been resolved')) {
     return { status: 409, error: 'A dispute can only be closed after it has been resolved.' }
   }
+  // Raised by bookings_check_availability_conflict()
+  // (20260914101000_enforce_booking_listing_availability_integrity.sql)
+  // when restoring a booking's pre-dispute status would put it back into
+  // a date range the merchant has since marked unavailable elsewhere.
+  // Same canonical message/status as the booking-side conflict
+  // (src/lib/bookings/rpc-errors.ts already recognizes it) -- kept
+  // consistent here rather than falling through to a generic 500.
+  if (m.includes('this listing is no longer available for the requested dates')) {
+    return { status: 409, error: 'The requested dates are no longer available for this listing.' }
+  }
   if (m.includes('not authorized')) {
     return { status: 500, error: 'Could not process your request — please try again' }
   }

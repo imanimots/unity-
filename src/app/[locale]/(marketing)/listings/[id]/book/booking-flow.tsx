@@ -8,6 +8,7 @@ import 'react-day-picker/style.css'
 import { ArrowLeft, ArrowRight, ShieldCheck, CheckCircle, Calendar, Star, Info } from 'lucide-react'
 import type { Listing } from '@/types'
 import { calculateBookingPrice } from '@/lib/bookings/price'
+import { calendarDateToSastIso } from '@/lib/bookings/date'
 import { formatDate as formatLocaleDate } from '@/lib/i18n/format'
 import type { Locale } from '@/i18n/locales'
 import Image from 'next/image'
@@ -133,8 +134,8 @@ export function BookingFlow({ listing }: { listing: Listing & { daily_rate: numb
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           listing_id: listing.id,
-          start_at: range.from.toISOString(),
-          end_at: range.to.toISOString(),
+          start_at: calendarDateToSastIso(range.from),
+          end_at: calendarDateToSastIso(range.to),
           renter_message: renterMessage.trim() || undefined,
           idempotency_key: idempotencyKeyRef.current,
         }),
