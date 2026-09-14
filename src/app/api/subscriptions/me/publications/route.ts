@@ -13,7 +13,13 @@ export interface MerchantPublicationSummary {
  * GET /api/subscriptions/me/publications -- the caller's own currently
  * active/open published entities across all three canonical tables,
  * for the downgrade keep-set picker (Section 55). Real content only
- * (is_test excluded), same predicate as _lock_and_count_active_supply.
+ * (is_test excluded).
+ *
+ * Mirrors the canonical active-publication-supply contract enforced by
+ * _lock_and_count_active_supply(): active non-test listings, Available-
+ * direction active non-test Skill/Task posts, and active/offers_received
+ * non-test marketplace_requests. A Looking-For Skill/Task post never
+ * consumes a publication slot, so it must never appear here either.
  */
 export async function GET() {
   const requester = await getRequestProfile()
@@ -30,7 +36,13 @@ export async function GET() {
     const [listings, requests, posts] = await Promise.all([
       admin.from('listings').select('id, title, created_at').eq('merchant_id', requester.userId).eq('status', 'active').eq('is_test', false),
       admin.from('marketplace_requests').select('id, title, created_at').eq('requester_id', requester.userId).in('status', ['active', 'offers_received']).eq('is_test', false),
-      admin.from('barter_skill_task_posts').select('id, title, created_at').eq('owner_id', requester.userId).in('status', ['active', 'offers_received']).eq('is_test', false),
+      admin
+        .from('barter_skill_task_posts')
+        .select('id, title, created_at')
+        .eq('owner_id', requester.userId)
+        .eq('direction', 'available')
+        .eq('status', 'active')
+        .eq('is_test', false),
     ])
 
     const items: MerchantPublicationSummary[] = [

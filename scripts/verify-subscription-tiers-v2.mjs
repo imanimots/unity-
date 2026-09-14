@@ -20,7 +20,7 @@
  * Requires the dev server running on NEXT_PUBLIC_APP_URL for LIVE checks.
  */
 
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
@@ -40,6 +40,115 @@ function skip(label, reason) {
 }
 function readFile(path) {
   return readFileSync(join(REPO_ROOT, path), 'utf8')
+}
+
+// ── --source-only: Active-Supply Fix (Phase A4). A clearly-isolated,
+// early-exit path that runs BEFORE the live `createClient`/`admin.from()`
+// check below ever executes -- no network, no DB client, no credential
+// requirement, no live project read, no Supabase CLI, no mutation.
+// Statically verifies the two active-supply fix-forward migrations'
+// text only, then exits. The rest of this file (including the
+// unconditional live-provisioning check a few lines down) is untouched
+// and never reached on this path. ──
+if (process.argv.includes('--source-only')) {
+  let sFailures = 0
+  const sCheck = (label, cond, detail) => {
+    if (cond) console.log(`  ok ${label}`)
+    else {
+      sFailures += 1
+      console.error(`  FAIL ${label}`, JSON.stringify(detail ?? {}).slice(0, 500))
+    }
+  }
+
+  console.log('=== Active-Supply Fix -- source-only static verification ===\n')
+
+  const migrationsDir = join(REPO_ROOT, 'supabase', 'migrations')
+  const allMigrationFiles = readdirSync(migrationsDir)
+
+  console.log('--- Migration 1: restore_marketplace_requests_active_supply_count ---')
+  const helperMatches = allMigrationFiles.filter((f) => f.endsWith('_restore_marketplace_requests_active_supply_count.sql'))
+  sCheck('A. exactly one matching migration file exists', helperMatches.length === 1, helperMatches)
+
+  if (helperMatches.length === 1) {
+    const helperSql = readFile(join('supabase', 'migrations', helperMatches[0]))
+    sCheck(
+      'B. helper signature unchanged (p_user_id uuid, returns int)',
+      /create or replace function public\._lock_and_count_active_supply\(p_user_id uuid\)\s*returns int/.test(helperSql)
+    )
+    sCheck(
+      'C. profiles FOR UPDATE lock still present',
+      /from public\.profiles\s*where id = p_user_id\s*for update/.test(helperSql)
+    )
+    sCheck(
+      "D. listings predicate unchanged (status='active', is_test=false)",
+      /from public\.listings\s*where merchant_id = p_user_id\s*and status = 'active'\s*and is_test = false/.test(helperSql)
+    )
+    sCheck(
+      "E. Skill/Task predicate is Available-only (direction='available', status='active', is_test=false)",
+      /from public\.barter_skill_task_posts\s*where owner_id = p_user_id\s*and direction = 'available'\s*and status = 'active'\s*and is_test = false/.test(
+        helperSql
+      )
+    )
+    sCheck(
+      "F. marketplace_requests predicate restored exactly (requester_id=p_user_id, status IN (active, offers_received), is_test=false)",
+      /from public\.marketplace_requests\s*where requester_id = p_user_id\s*and status in \('active', 'offers_received'\)\s*and is_test = false/.test(
+        helperSql
+      )
+    )
+    sCheck(
+      'G. PUBLIC/anon/authenticated EXECUTE revoked in one statement',
+      /revoke all on function public\._lock_and_count_active_supply\(uuid\) from public, anon, authenticated/.test(helperSql)
+    )
+    sCheck(
+      'H. service_role EXECUTE granted',
+      /grant execute on function public\._lock_and_count_active_supply\(uuid\) to service_role/.test(helperSql)
+    )
+    const helperFnDefCount = (helperSql.match(/create or replace function/g) ?? []).length
+    sCheck('I. migration defines exactly one function (no unrelated function)', helperFnDefCount === 1, { helperFnDefCount })
+  }
+
+  console.log('\n--- Migration 2: align_downgrade_available_skill_task_supply ---')
+  const downgradeMatches = allMigrationFiles.filter((f) => f.endsWith('_align_downgrade_available_skill_task_supply.sql'))
+  sCheck('A. exactly one matching migration file exists', downgradeMatches.length === 1, downgradeMatches)
+
+  if (downgradeMatches.length === 1) {
+    const downgradeSql = readFile(join('supabase', 'migrations', downgradeMatches[0]))
+    const fnDefs = downgradeSql.match(/create or replace function public\.(\w+)\(/g) ?? []
+    const fnNames = fnDefs.map((m) => m.replace(/create or replace function public\.(\w+)\(/, '$1'))
+    sCheck('B. exactly two CREATE OR REPLACE FUNCTION definitions exist', fnDefs.length === 2, fnDefs)
+    sCheck(
+      'C. function names are exactly set_merchant_downgrade_keep_set and resolve_frozen_merchant_downgrade (no others)',
+      fnNames.length === 2 && fnNames.includes('set_merchant_downgrade_keep_set') && fnNames.includes('resolve_frozen_merchant_downgrade'),
+      fnNames
+        )
+    const canonicalSkillTaskPredicate =
+      /from public\.barter_skill_task_posts where id = v_entity_id and owner_id = p_merchant_id and direction = 'available' and status = 'active' and is_test = false/
+    const canonicalOccurrences = (
+      downgradeSql.match(
+        /owner_id = p_merchant_id and direction = 'available' and status = 'active' and is_test = false/g
+      ) ?? []
+    ).length
+    sCheck(
+      'D. set_merchant_downgrade_keep_set contains the canonical Skill/Task predicate (keep-set validation role)',
+      canonicalSkillTaskPredicate.test(downgradeSql)
+    )
+    sCheck(
+      'E. resolve_frozen_merchant_downgrade contains the canonical predicate in BOTH required roles (keep-set validation + excess selection)',
+      canonicalOccurrences >= 2,
+      { canonicalOccurrences }
+    )
+    sCheck(
+      "F. no stale Skill/Task entitlement predicate remains (the pre-direction-filter form no longer appears anywhere)",
+      !downgradeSql.includes("owner_id = p_merchant_id and status in ('active', 'offers_received') and is_test = false")
+    )
+    sCheck(
+      'G. no other function body is redefined in this migration',
+      fnNames.length === 2 && !fnDefs.some((_, i) => !['set_merchant_downgrade_keep_set', 'resolve_frozen_merchant_downgrade'].includes(fnNames[i]))
+    )
+  }
+
+  console.log(sFailures === 0 ? '\nAll source-only checks passed.' : `\n${sFailures} source-only check(s) FAILED.`)
+  process.exit(sFailures === 0 ? 0 : 1)
 }
 
 console.log('=== Unity Merchant Subscription Tiers V2 ===\n')
