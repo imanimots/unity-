@@ -25,7 +25,7 @@ Vercel deployment (see `docs/PUBLIC_TEST_RUNBOOK.md` §5) before inviting tester
 | 18 | Booking works | ✅ Done | 9 of 10 documented states confirmed live (see runbook §9 for the one gap and its 2-minute manual fix) |
 | 19 | Checkout works | ✅ Done | mock success/retryable/declined scenarios all exercised live |
 | 20 | Payment deadline works | ✅ Done | `payment_due_at` derivation and the awaiting-payment state confirmed |
-| 21 | Expiry works | ✅ Done | unpaid-expiry booking backdated and confirmed present (sweep pending `INTERNAL_CRON_SECRET`-authenticated trigger — see runbook §12) |
+| 21 | Expiry works | ✅ Done | unpaid-expiry booking backdated and confirmed present (sweep now scheduled via `vercel.json` — P4, Production Operations: Scheduled Job Activation) |
 | 22 | Emails recorded | ✅ Done | delivery records confirmed for requested/accepted/financially-ready/declined events across the seed run |
 | 23 | Admin dashboard works | ✅ Done | overview, users, listings, bookings, financial operations, email deliveries, exceptions, audit all real-data-backed (Step 9) |
 | 24 | No broken links | ✅ Done | footer legal links + dead `href="#"` social icons removed and verified by Playwright |

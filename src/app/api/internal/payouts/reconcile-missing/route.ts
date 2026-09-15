@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createMerchantPayout } from '@/lib/payments/orchestrator'
 import { notifyMerchantPayoutEvent } from '@/lib/payouts/notify'
+import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
 
 const RECONCILE_MISSING_BATCH_LIMIT = 50
 
@@ -30,14 +31,18 @@ const RECONCILE_MISSING_BATCH_LIMIT = 50
  * state is needed: a booking that gets a payout (from this batch or from
  * best-effort creation elsewhere) simply falls out of the candidate set
  * on the next call.
+ *
+ * Scheduled via vercel.json (P4) to run before /api/internal/payouts/
+ * reconcile within the same hour, so the detection sweep never reports a
+ * gap this route would have already repaired. GET (Vercel Cron) and
+ * POST (manual/curl) share one handler and the shared
+ * isAuthorizedCronRequest() authority (src/lib/internal-cron/auth.ts).
  */
-export async function POST(request: NextRequest) {
-  const secret = process.env.INTERNAL_CRON_SECRET
-  if (!secret) {
+async function handleCronRequest(request: NextRequest) {
+  if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal payout reconciliation endpoint is not configured' }, { status: 503 })
   }
-  const provided = request.headers.get('authorization')
-  if (provided !== `Bearer ${secret}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -93,4 +98,12 @@ export async function POST(request: NextRequest) {
     console.error('[internal.payouts.reconcile-missing] unexpected error', err)
     return NextResponse.json({ error: 'Sweep failed' }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleCronRequest(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleCronRequest(request)
 }

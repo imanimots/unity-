@@ -4,30 +4,33 @@ import { isMockScenarioSelectionAllowed } from '@/lib/checkout/test-scenario'
 import { getPaymentProvider } from '@/lib/payments/registry'
 import { notifyAffiliateOfCommission } from '@/lib/affiliate/notify'
 import type { MockScenario } from '@/lib/payments/provider'
+import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
 
 /**
- * POST /api/internal/affiliate/process-payouts -- payout_queued ->
+ * GET|POST /api/internal/affiliate/process-payouts -- third step of the
+ * affiliate automation chain (review-and-approve -> queue-payouts ->
+ * process-payouts), scheduled via vercel.json (P4). payout_queued ->
  * processing -> paid/failed, calling the configured payout provider
- * once per commission. If no provider is configured (mock is always
- * configured in dev; this branch matters for a future real-provider
- * deployment with missing credentials), the sweep stops each row at
- * `processing` rather than falsely marking anything paid -- an
- * exception surfaces it (Part F's own "payout queued but not
- * processed").
+ * once per commission. `PAYMENT_PROVIDER` is unchanged by this phase --
+ * still defaults to `'mock'` unless a real provider is explicitly
+ * configured (P5's exclusive authority), so scheduling this route now
+ * cannot activate real-money behavior. If no provider is configured,
+ * the sweep stops each row at `processing` rather than falsely marking
+ * anything paid -- an exception surfaces it.
  *
  * `mock_scenario` is only ever honoured when isMockScenarioSelectionAllowed()
  * -- the same dev/test-only gate checkout itself uses -- letting the
  * regression script deterministically force a payout failure to prove
  * "failed" and "retry" behave correctly. Never trusted in a real
- * deployment.
+ * deployment. GET (Vercel Cron) and POST (manual/curl) share one
+ * handler and the shared isAuthorizedCronRequest() authority
+ * (src/lib/internal-cron/auth.ts).
  */
-export async function POST(request: NextRequest) {
-  const secret = process.env.INTERNAL_CRON_SECRET
-  if (!secret) {
+async function handleCronRequest(request: NextRequest) {
+  if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal affiliate payout-processing endpoint is not configured' }, { status: 503 })
   }
-  const provided = request.headers.get('authorization')
-  if (provided !== `Bearer ${secret}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -127,4 +130,12 @@ export async function POST(request: NextRequest) {
     console.error('[internal.affiliate.process-payouts] unexpected error', err)
     return NextResponse.json({ error: 'Sweep failed' }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleCronRequest(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleCronRequest(request)
 }

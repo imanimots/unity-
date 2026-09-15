@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
 
 /**
- * POST /api/internal/expire-marketplace-requests -- Step Z. Secret-
- * authenticated sweep (mirrors /api/internal/expire-unpaid-bookings
- * exactly): active/offers_received requests past their expires_at move
- * to date_passed. Never deletes. Bounded batch, safely re-runnable.
+ * GET|POST /api/internal/expire-marketplace-requests -- Step Z.
+ * Sweep (mirrors /api/internal/expire-unpaid-bookings exactly):
+ * active/offers_received requests past their expires_at move to
+ * date_passed. Never deletes. Bounded batch, safely re-runnable.
+ * Scheduled via vercel.json (P4). GET (Vercel Cron) and POST
+ * (manual/curl) share one handler and the shared
+ * isAuthorizedCronRequest() authority (src/lib/internal-cron/auth.ts).
  */
-export async function POST(request: NextRequest) {
-  const secret = process.env.INTERNAL_CRON_SECRET
-  if (!secret) return NextResponse.json({ error: 'Internal expiry endpoint is not configured' }, { status: 503 })
+async function handleCronRequest(request: NextRequest) {
+  if (!hasCronAuthConfigured()) return NextResponse.json({ error: 'Internal expiry endpoint is not configured' }, { status: 503 })
 
-  const provided = request.headers.get('authorization')
-  if (provided !== `Bearer ${secret}`) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isAuthorizedCronRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -30,4 +32,12 @@ export async function POST(request: NextRequest) {
     console.error('[internal.expire-marketplace-requests] unexpected error', { err })
     return NextResponse.json({ error: 'Sweep failed' }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleCronRequest(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleCronRequest(request)
 }

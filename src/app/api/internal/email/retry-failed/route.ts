@@ -1,21 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { retryAllFailedDeliveries } from '@/lib/email'
+import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
 
 /**
- * POST /api/internal/email/retry-failed -- re-attempts every currently
- * failed_retryable delivery. Same secret-authenticated internal-route
- * pattern as the other two internal routes. Recommended cadence: every
- * 15-30 minutes, or triggered manually from the admin email-previews page
- * during development.
+ * GET|POST /api/internal/email/retry-failed -- re-attempts every
+ * currently failed_retryable delivery. Scheduled via vercel.json (P4);
+ * GET (Vercel Cron) and POST (manual/curl, or the admin email-previews
+ * page during development) share one handler and the shared
+ * isAuthorizedCronRequest() authority (src/lib/internal-cron/auth.ts).
  */
-export async function POST(request: NextRequest) {
-  const secret = process.env.INTERNAL_CRON_SECRET
-  if (!secret) {
+async function handleCronRequest(request: NextRequest) {
+  if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal retry endpoint is not configured' }, { status: 503 })
   }
-
-  const provided = request.headers.get('authorization')
-  if (provided !== `Bearer ${secret}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -34,4 +32,12 @@ export async function POST(request: NextRequest) {
     console.error('[internal.email.retry-failed] unexpected error', { err })
     return NextResponse.json({ error: 'Retry sweep failed' }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleCronRequest(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleCronRequest(request)
 }

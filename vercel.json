@@ -1,0 +1,22 @@
+{
+  "crons": [
+    { "path": "/api/internal/reviews/process-deadlines", "schedule": "0 * * * *" },
+    { "path": "/api/internal/expire-unpaid-bookings", "schedule": "*/10 * * * *" },
+    { "path": "/api/internal/expire-marketplace-requests", "schedule": "*/10 * * * *" },
+    { "path": "/api/internal/email/send-payment-reminders", "schedule": "*/20 * * * *" },
+    { "path": "/api/internal/email/retry-failed", "schedule": "10 * * * *" },
+    { "path": "/api/internal/affiliate/review-and-approve", "schedule": "0 * * * *" },
+    { "path": "/api/internal/affiliate/queue-payouts", "schedule": "15 * * * *" },
+    { "path": "/api/internal/affiliate/process-payouts", "schedule": "30 * * * *" },
+    { "path": "/api/internal/affiliate/reconcile-refunds", "schedule": "0 */4 * * *" },
+    { "path": "/api/internal/commissions/finalize-earned", "schedule": "20 * * * *" },
+    { "path": "/api/internal/commissions/reconcile-refunds", "schedule": "0 */4 * * *" },
+    { "path": "/api/internal/payouts/reconcile-missing", "schedule": "5 * * * *" },
+    { "path": "/api/internal/payouts/reconcile", "schedule": "10 */6 * * *" },
+    { "path": "/api/internal/rent-to-buy/finalize-due-ownership", "schedule": "40 * * * *" },
+    { "path": "/api/internal/subscriptions/apply-due", "schedule": "50 * * * *" },
+    { "path": "/api/internal/subscriptions/execute-scheduled-publications", "schedule": "45 * * * *" },
+    { "path": "/api/internal/advertising/finalize-expired", "schedule": "0 */2 * * *" },
+    { "path": "/api/internal/advertising/purge-events", "schedule": "0 3 * * *" }
+  ]
+}

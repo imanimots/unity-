@@ -1,24 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { notifyMerchantSubscriptionEvent } from '@/lib/subscriptions/notify'
+import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
 
 /**
- * POST /api/internal/subscriptions/apply-due -- secret-authenticated
- * explicit trigger for the same sweep that runs opportunistically from
- * GET /api/subscriptions/me and the admin list/detail routes
+ * GET|POST /api/internal/subscriptions/apply-due -- explicit trigger
+ * for the same sweep that runs opportunistically from GET
+ * /api/subscriptions/me and the admin list/detail routes
  * (apply_due_merchant_subscription_changes(), naturally idempotent).
- * This route exists so a real scheduler can guarantee the sweep runs
+ * Scheduled via vercel.json (P4) so it now guarantees the sweep runs
  * even for merchants who never happen to hit a read path around their
- * due date -- documented for manual curl invocation in
- * docs/PUBLIC_TEST_RUNBOOK.md pending real Vercel cron wiring, matching
- * every other internal route in this codebase.
+ * due date. GET (Vercel Cron) and POST (manual/curl) share one handler
+ * and the shared isAuthorizedCronRequest() authority
+ * (src/lib/internal-cron/auth.ts).
  */
-export async function POST(request: NextRequest) {
-  const secret = process.env.INTERNAL_CRON_SECRET
-  if (!secret) {
+async function handleCronRequest(request: NextRequest) {
+  if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal subscription sweep endpoint is not configured' }, { status: 503 })
   }
-  const provided = request.headers.get('authorization')
-  if (provided !== `Bearer ${secret}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -59,4 +58,12 @@ export async function POST(request: NextRequest) {
     console.error('[internal.subscriptions.apply-due] unexpected error', err)
     return NextResponse.json({ error: 'Sweep failed' }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleCronRequest(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleCronRequest(request)
 }

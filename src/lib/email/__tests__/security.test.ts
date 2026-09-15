@@ -58,19 +58,25 @@ describe('security: internal email routes require the configured secret (categor
     'src/app/api/internal/email/retry-failed/route.ts',
   ]
 
-  it('4. every internal email route refuses to run when INTERNAL_CRON_SECRET is unset (closed by default)', () => {
+  it('4. every internal email route refuses to run when no cron secret is configured (closed by default) -- P4 moved this check into the shared src/lib/internal-cron/auth.ts authority, which every route now imports rather than each re-implementing it', () => {
     for (const rel of internalRoutes) {
       const content = readFileSync(join(REPO_ROOT, rel), 'utf-8')
-      expect(content, rel).toMatch(/INTERNAL_CRON_SECRET/)
-      expect(content, rel).toMatch(/if \(!secret\)/)
+      expect(content, rel).toMatch(/from '@\/lib\/internal-cron\/auth'/)
+      expect(content, rel).toMatch(/if \(!hasCronAuthConfigured\(\)\)/)
     }
+    const authContent = readFileSync(join(REPO_ROOT, 'src/lib/internal-cron/auth.ts'), 'utf-8')
+    expect(authContent).toMatch(/INTERNAL_CRON_SECRET/)
+    expect(authContent).toMatch(/CRON_SECRET/)
   })
 
-  it('5. every internal email route compares the Authorization header against the configured secret', () => {
+  it('5. every internal email route compares the Authorization header against a configured secret via the shared isAuthorizedCronRequest() authority', () => {
     for (const rel of internalRoutes) {
       const content = readFileSync(join(REPO_ROOT, rel), 'utf-8')
-      expect(content, rel).toMatch(/Bearer \$\{secret\}/)
+      expect(content, rel).toMatch(/if \(!isAuthorizedCronRequest\(request\)\)/)
     }
+    const authContent = readFileSync(join(REPO_ROOT, 'src/lib/internal-cron/auth.ts'), 'utf-8')
+    expect(authContent).toMatch(/authHeader === `Bearer \$\{internalSecret\}`/)
+    expect(authContent).toMatch(/authHeader === `Bearer \$\{vercelCronSecret\}`/)
   })
 
   it('6. the admin email-previews page is gated by the parent admin layout\'s requireAdmin(), not a public route', () => {

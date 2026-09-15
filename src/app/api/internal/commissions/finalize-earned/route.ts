@@ -1,20 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { finalizeEarnedCommissions } from '@/lib/commissions/finalize'
+import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
 
 /**
- * POST /api/internal/commissions/finalize-earned -- promotes pending
- * commissions past the review window (with no refund/dispute found) to
- * 'earned'. Purely a reporting-clarity sweep; commissions in 'pending'
- * already count identically to 'earned' in payout arithmetic (see
- * createMerchantPayout()).
+ * GET|POST /api/internal/commissions/finalize-earned -- promotes
+ * pending Unity commissions past the review window (with no
+ * refund/dispute found) to 'earned', scheduled via vercel.json (P4).
+ * Purely a reporting-clarity sweep; commissions in 'pending' already
+ * count identically to 'earned' in payout arithmetic (see
+ * createMerchantPayout()). GET (Vercel Cron) and POST (manual/curl)
+ * share one handler and the shared isAuthorizedCronRequest() authority
+ * (src/lib/internal-cron/auth.ts).
  */
-export async function POST(request: NextRequest) {
-  const secret = process.env.INTERNAL_CRON_SECRET
-  if (!secret) {
+async function handleCronRequest(request: NextRequest) {
+  if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal commission finalization endpoint is not configured' }, { status: 503 })
   }
-  const provided = request.headers.get('authorization')
-  if (provided !== `Bearer ${secret}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -34,4 +36,12 @@ export async function POST(request: NextRequest) {
     console.error('[internal.commissions.finalize-earned] unexpected error', err)
     return NextResponse.json({ error: 'Sweep failed' }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleCronRequest(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleCronRequest(request)
 }

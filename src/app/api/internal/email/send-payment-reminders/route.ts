@@ -1,26 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendDuePaymentReminders } from '@/lib/email'
+import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
 
 /**
- * POST /api/internal/email/send-payment-reminders -- the payment-deadline
- * reminder sweep, on the same secret-authenticated internal-route pattern
- * as Step 6's POST /api/internal/expire-unpaid-bookings. Recommended
- * cadence: every 15-30 minutes -- reminders are a single, infrequent nudge
+ * GET|POST /api/internal/email/send-payment-reminders -- the
+ * payment-deadline reminder sweep. Scheduled via vercel.json (P4);
+ * GET (Vercel Cron) and POST (manual/curl) share one handler and the
+ * shared isAuthorizedCronRequest() authority (src/lib/internal-cron/
+ * auth.ts). Reminders are a single, infrequent nudge
  * (PAYMENT_REMINDER_HOURS_BEFORE_DUE), not something that needs
  * minute-level precision.
- *
- * No scheduler is actually configured this phase -- this route exists so
- * wiring one later needs no new code, only a cron configuration pointing
- * at this URL with the secret header.
  */
-export async function POST(request: NextRequest) {
-  const secret = process.env.INTERNAL_CRON_SECRET
-  if (!secret) {
+async function handleCronRequest(request: NextRequest) {
+  if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal reminder endpoint is not configured' }, { status: 503 })
   }
-
-  const provided = request.headers.get('authorization')
-  if (provided !== `Bearer ${secret}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -39,4 +34,12 @@ export async function POST(request: NextRequest) {
     console.error('[internal.email.send-payment-reminders] unexpected error', { err })
     return NextResponse.json({ error: 'Reminder sweep failed' }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleCronRequest(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleCronRequest(request)
 }

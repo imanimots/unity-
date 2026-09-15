@@ -1,41 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { triggerLazyExpirySweep } from '@/lib/bookings/lazy-expiry'
+import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
 
 /**
- * POST /api/internal/expire-unpaid-bookings -- the one safe entry point
- * for a future scheduler (Vercel Cron or equivalent) to invoke the
- * expire_unpaid_accepted_bookings() sweep on a fixed cadence, rather than
- * relying solely on the lazy-expiry trigger fired from user-facing reads
- * (src/lib/bookings/lazy-expiry.ts). Recommended cadence: every 5-15
- * minutes -- frequent enough that an unpaid booking's dates free up
- * promptly, infrequent enough to be cheap at MVP scale.
+ * GET|POST /api/internal/expire-unpaid-bookings -- invokes the
+ * expire_unpaid_accepted_bookings() sweep on a fixed cadence (via
+ * triggerLazyExpirySweep(), src/lib/bookings/lazy-expiry.ts), rather than
+ * relying solely on the lazy-expiry trigger fired from user-facing reads.
+ * Scheduled hourly via vercel.json (P4) -- recommended cadence stays
+ * every 5-15 minutes for a tighter future schedule if warranted; frequent
+ * enough that an unpaid booking's dates free up promptly, infrequent
+ * enough to be cheap at MVP scale.
  *
  * Secret-authenticated, not session-authenticated -- this is a
- * machine-to-machine route with no concept of a signed-in user. Requires
- * INTERNAL_CRON_SECRET to be set; if it is not configured, the route
- * refuses to run rather than defaulting open. Never call this from any
- * client-side code -- the secret must never reach the browser (it is not
- * a NEXT_PUBLIC_ variable).
+ * machine-to-machine route with no concept of a signed-in user. GET
+ * (Vercel Cron's own invocation method) and POST (this codebase's
+ * pre-existing manual/curl convention) both delegate to the same
+ * handler and the same isAuthorizedCronRequest() authority
+ * (src/lib/internal-cron/auth.ts) -- no business-logic drift between
+ * the two entry points. Refuses to run rather than defaulting open if
+ * neither secret is configured. Never call this from any client-side
+ * code -- no secret ever reaches the browser (neither is a
+ * NEXT_PUBLIC_ variable).
  *
- * No scheduler is actually configured this phase (see Step 6's "Scheduler
- * preparation" -- production cron wiring is explicitly out of scope);
- * this route exists so wiring one later requires no new code, only a
- * cron configuration pointing at this URL with the secret header.
- *
- * Step 8: now delegates to triggerLazyExpirySweep() (src/lib/bookings/
+ * Step 8: delegates to triggerLazyExpirySweep() (src/lib/bookings/
  * lazy-expiry.ts) instead of calling the RPC directly, so a
  * scheduler-driven sweep dispatches booking.payment_expired emails
  * exactly the same way a lazy, read-triggered sweep does -- one sweep
  * implementation, not two.
  */
-export async function POST(request: NextRequest) {
-  const secret = process.env.INTERNAL_CRON_SECRET
-  if (!secret) {
+async function handleCronRequest(request: NextRequest) {
+  if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal expiry endpoint is not configured' }, { status: 503 })
   }
-
-  const provided = request.headers.get('authorization')
-  if (provided !== `Bearer ${secret}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -57,4 +55,12 @@ export async function POST(request: NextRequest) {
     console.error('[internal.expire-unpaid-bookings] unexpected error', { err })
     return NextResponse.json({ error: 'Sweep failed' }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleCronRequest(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleCronRequest(request)
 }

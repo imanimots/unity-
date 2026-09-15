@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { AFFILIATE_SWEEP_BATCH_LIMIT } from '@/lib/affiliate/constants'
 import { notifyAffiliateOfCommission } from '@/lib/affiliate/notify'
+import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
 
-/** POST /api/internal/affiliate/queue-payouts -- approved -> payout_queued, bounded batch. */
-export async function POST(request: NextRequest) {
-  const secret = process.env.INTERNAL_CRON_SECRET
-  if (!secret) {
+/**
+ * GET|POST /api/internal/affiliate/queue-payouts -- second step of the
+ * affiliate automation chain (review-and-approve -> queue-payouts ->
+ * process-payouts), scheduled via vercel.json (P4). approved ->
+ * payout_queued, bounded batch. GET (Vercel Cron) and POST (manual/curl)
+ * share one handler and the shared isAuthorizedCronRequest() authority
+ * (src/lib/internal-cron/auth.ts).
+ */
+async function handleCronRequest(request: NextRequest) {
+  if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal affiliate payout-queue endpoint is not configured' }, { status: 503 })
   }
-  const provided = request.headers.get('authorization')
-  if (provided !== `Bearer ${secret}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -56,4 +62,12 @@ export async function POST(request: NextRequest) {
     console.error('[internal.affiliate.queue-payouts] unexpected error', err)
     return NextResponse.json({ error: 'Sweep failed' }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleCronRequest(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleCronRequest(request)
 }

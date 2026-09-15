@@ -1,22 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { listOperationalExceptions } from '@/lib/admin/exceptions-service'
+import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
 
 /**
- * POST /api/internal/payouts/reconcile -- secret-authenticated, READ-ONLY
- * detection sweep. Reuses listOperationalExceptions() (the same live
- * computation the admin exceptions page already runs) rather than
- * duplicating the same detection queries in a second place -- filtered
- * to payout-related categories. Never mutates a payout: no automatic
- * mark-paid, no automatic reversal. Surfaces stalled/mismatched/
- * paid-then-refunded payouts for admin review only.
+ * GET|POST /api/internal/payouts/reconcile -- READ-ONLY detection sweep.
+ * Reuses listOperationalExceptions() (the same live computation the
+ * admin exceptions page already runs) rather than duplicating the same
+ * detection queries in a second place -- filtered to payout-related
+ * categories. Never mutates a payout: no automatic mark-paid, no
+ * automatic reversal. Surfaces stalled/mismatched/paid-then-refunded
+ * payouts for admin review only.
+ *
+ * Scheduled via vercel.json (P4) at :10 every 6th hour, deliberately
+ * after that same hour's /api/internal/payouts/reconcile-missing run
+ * (:05, hourly) -- guarantees this detection sweep never runs before
+ * the repair pass has had a chance to close a genuinely-missing payout
+ * from earlier that hour. GET (Vercel Cron) and POST (manual/curl)
+ * share one handler and the shared isAuthorizedCronRequest() authority
+ * (src/lib/internal-cron/auth.ts).
  */
-export async function POST(request: NextRequest) {
-  const secret = process.env.INTERNAL_CRON_SECRET
-  if (!secret) {
+async function handleCronRequest(request: NextRequest) {
+  if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal payout reconciliation endpoint is not configured' }, { status: 503 })
   }
-  const provided = request.headers.get('authorization')
-  if (provided !== `Bearer ${secret}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -43,4 +50,12 @@ export async function POST(request: NextRequest) {
     console.error('[internal.payouts.reconcile] unexpected error', err)
     return NextResponse.json({ error: 'Reconciliation sweep failed' }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleCronRequest(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleCronRequest(request)
 }

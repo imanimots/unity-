@@ -1,25 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { notifyRentToBuyParty } from '@/lib/rent-to-buy/notify'
+import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
 
 /**
- * POST /api/internal/rent-to-buy/finalize-due-ownership -- secret-
- * authenticated explicit trigger, mirroring
- * /api/internal/subscriptions/apply-due exactly. This is NOT a default-
- * like automatic termination sweep (Rule 17 explicitly prohibits that
- * shape) -- it only ever finalizes an outcome that has ALREADY been
- * fully earned (100% paid, genuinely received via confirmed possession,
+ * GET|POST /api/internal/rent-to-buy/finalize-due-ownership -- explicit
+ * trigger, mirroring /api/internal/subscriptions/apply-due exactly,
+ * scheduled via vercel.json (P4). This is NOT a default-like automatic
+ * termination sweep (Rule 17 explicitly prohibits that shape) -- it
+ * only ever finalizes an outcome that has ALREADY been fully earned
+ * (100% paid, genuinely received via confirmed possession,
  * completion/inspection window elapsed, no unresolved dispute); every
  * one of those conditions is re-verified authoritatively inside
  * finalize_rent_to_buy_ownership() itself, this route only selects
- * plausible candidates to reduce wasted calls.
+ * plausible candidates to reduce wasted calls. GET (Vercel Cron) and
+ * POST (manual/curl) share one handler and the shared
+ * isAuthorizedCronRequest() authority (src/lib/internal-cron/auth.ts).
  */
-export async function POST(request: NextRequest) {
-  const secret = process.env.INTERNAL_CRON_SECRET
-  if (!secret) {
+async function handleCronRequest(request: NextRequest) {
+  if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal rent-to-buy sweep endpoint is not configured' }, { status: 503 })
   }
-  const provided = request.headers.get('authorization')
-  if (provided !== `Bearer ${secret}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -75,4 +76,12 @@ export async function POST(request: NextRequest) {
     console.error('[internal.rent-to-buy.finalize-due-ownership] unexpected error', err)
     return NextResponse.json({ error: 'Sweep failed' }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleCronRequest(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleCronRequest(request)
 }

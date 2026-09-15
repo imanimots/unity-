@@ -1,23 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { AFFILIATE_SWEEP_BATCH_LIMIT } from '@/lib/affiliate/constants'
 import { notifyAffiliateOfCommission } from '@/lib/affiliate/notify'
+import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
 
 /**
- * POST /api/internal/affiliate/reconcile-refunds -- an unpaid commission
- * (pending/held/approved/payout_queued) whose underlying payment later
- * shows refunded/partially_refunded/chargeback is voided automatically.
- * A commission that was already PAID before the refund is never
- * touched here -- it becomes the "paid commission followed by refund"
- * exception instead (computed live by exceptions-service.ts), requiring
- * admin review before any recovery, exactly as specified.
+ * GET|POST /api/internal/affiliate/reconcile-refunds -- runs
+ * independently of the review-and-approve -> queue-payouts ->
+ * process-payouts chain, scheduled via vercel.json (P4). An unpaid
+ * commission (pending/held/approved/payout_queued) whose underlying
+ * payment later shows refunded/partially_refunded/chargeback is voided
+ * automatically. A commission that was already PAID before the refund
+ * is never touched here -- it becomes the "paid commission followed by
+ * refund" exception instead (computed live by exceptions-service.ts),
+ * requiring admin review before any recovery, exactly as specified. GET
+ * (Vercel Cron) and POST (manual/curl) share one handler and the shared
+ * isAuthorizedCronRequest() authority (src/lib/internal-cron/auth.ts).
  */
-export async function POST(request: NextRequest) {
-  const secret = process.env.INTERNAL_CRON_SECRET
-  if (!secret) {
+async function handleCronRequest(request: NextRequest) {
+  if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal affiliate reconciliation endpoint is not configured' }, { status: 503 })
   }
-  const provided = request.headers.get('authorization')
-  if (provided !== `Bearer ${secret}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -72,4 +75,12 @@ export async function POST(request: NextRequest) {
     console.error('[internal.affiliate.reconcile-refunds] unexpected error', err)
     return NextResponse.json({ error: 'Sweep failed' }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleCronRequest(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleCronRequest(request)
 }

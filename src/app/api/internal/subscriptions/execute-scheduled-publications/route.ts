@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
 
 /**
- * POST /api/internal/subscriptions/execute-scheduled-publications --
- * secret-authenticated sweep, exact same shape as
- * /api/internal/subscriptions/apply-due and
- * /api/internal/expire-marketplace-requests. Calls
- * execute_due_scheduled_publications(), which is idempotent and never
- * auto-deactivates anything to make room for a scheduled publish.
+ * GET|POST /api/internal/subscriptions/execute-scheduled-publications --
+ * sweep, exact same shape as /api/internal/subscriptions/apply-due and
+ * /api/internal/expire-marketplace-requests, scheduled via vercel.json
+ * (P4). Calls execute_due_scheduled_publications(), which is idempotent
+ * and never auto-deactivates anything to make room for a scheduled
+ * publish. GET (Vercel Cron) and POST (manual/curl) share one handler
+ * and the shared isAuthorizedCronRequest() authority
+ * (src/lib/internal-cron/auth.ts).
  */
-export async function POST(request: NextRequest) {
-  const secret = process.env.INTERNAL_CRON_SECRET
-  if (!secret) {
+async function handleCronRequest(request: NextRequest) {
+  if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal scheduled-publication sweep endpoint is not configured' }, { status: 503 })
   }
-  const provided = request.headers.get('authorization')
-  if (provided !== `Bearer ${secret}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -37,4 +38,12 @@ export async function POST(request: NextRequest) {
     console.error('[internal.execute-scheduled-publications] unexpected error', { err })
     return NextResponse.json({ error: 'Sweep failed' }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleCronRequest(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleCronRequest(request)
 }

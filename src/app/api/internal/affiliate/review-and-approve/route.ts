@@ -1,23 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { AFFILIATE_COMMISSION_REVIEW_HOURS, AFFILIATE_SWEEP_BATCH_LIMIT } from '@/lib/affiliate/constants'
 import { notifyAffiliateOfCommission } from '@/lib/affiliate/notify'
+import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
 
 /**
- * POST /api/internal/affiliate/review-and-approve -- secret-authenticated,
- * mirrors POST /api/internal/expire-unpaid-bookings' exact shape. Selects
- * a bounded batch of `pending` commissions older than the review window
- * and calls progress_affiliate_commission() once per row -- the RPC
- * itself decides approved vs. held (blocking refund/dispute found).
- * Idempotent: a commission already progressed past `pending` is simply
- * not in the next sweep's batch.
+ * GET|POST /api/internal/affiliate/review-and-approve -- first step of
+ * the affiliate automation chain (review-and-approve -> queue-payouts ->
+ * process-payouts), scheduled via vercel.json (P4). Selects a bounded
+ * batch of `pending` commissions older than the review window and calls
+ * progress_affiliate_commission() once per row -- the RPC itself decides
+ * approved vs. held (blocking refund/dispute found). Idempotent: a
+ * commission already progressed past `pending` is simply not in the
+ * next sweep's batch. GET (Vercel Cron) and POST (manual/curl) share one
+ * handler and the shared isAuthorizedCronRequest() authority
+ * (src/lib/internal-cron/auth.ts).
  */
-export async function POST(request: NextRequest) {
-  const secret = process.env.INTERNAL_CRON_SECRET
-  if (!secret) {
+async function handleCronRequest(request: NextRequest) {
+  if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal affiliate review endpoint is not configured' }, { status: 503 })
   }
-  const provided = request.headers.get('authorization')
-  if (provided !== `Bearer ${secret}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -74,4 +76,12 @@ export async function POST(request: NextRequest) {
     console.error('[internal.affiliate.review-and-approve] unexpected error', err)
     return NextResponse.json({ error: 'Sweep failed' }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleCronRequest(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleCronRequest(request)
 }
