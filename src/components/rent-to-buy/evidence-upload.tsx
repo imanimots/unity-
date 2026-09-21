@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
-import { validateRentToBuyEvidenceFile, ALLOWED_RTB_EVIDENCE_MIME_TYPES, MAX_RTB_EVIDENCE_SIZE_BYTES } from '@/lib/rent-to-buy/evidence-upload'
+import { validateRentToBuyEvidenceFile, sanitizeRtbEvidenceExtension, ALLOWED_RTB_EVIDENCE_MIME_TYPES, MAX_RTB_EVIDENCE_SIZE_BYTES } from '@/lib/rent-to-buy/evidence-upload'
 
 interface Props {
   agreementId: string
@@ -43,7 +43,7 @@ export function RentToBuyEvidenceUpload({ agreementId, userId, evidenceType, lab
     try {
       const supabase = createClient()
       const fileType = file.type.startsWith('video/') ? 'video' : file.type === 'application/pdf' ? 'pdf' : 'image'
-      const ext = file.name.split('.').pop() ?? 'bin'
+      const ext = sanitizeRtbEvidenceExtension(file.name)
       const path = `${agreementId}/${userId}/${evidenceType}-${Date.now()}.${ext}`
 
       // Storage failure never surfaces its raw provider message to the

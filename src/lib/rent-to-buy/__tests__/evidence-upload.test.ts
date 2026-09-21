@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateRentToBuyEvidenceFile, MAX_RTB_EVIDENCE_SIZE_BYTES, ALLOWED_RTB_EVIDENCE_MIME_TYPES } from '../evidence-upload'
+import { validateRentToBuyEvidenceFile, sanitizeRtbEvidenceExtension, MAX_RTB_EVIDENCE_SIZE_BYTES, ALLOWED_RTB_EVIDENCE_MIME_TYPES } from '../evidence-upload'
 import enZA from '@/i18n/messages/en-ZA/rtb.json'
 import afZA from '@/i18n/messages/af-ZA/rtb.json'
 import zuZA from '@/i18n/messages/zu-ZA/rtb.json'
@@ -63,6 +63,37 @@ describe('validateRentToBuyEvidenceFile', () => {
 
   it('exposes the exact byte boundary (20MB, 1024-based)', () => {
     expect(MAX_RTB_EVIDENCE_SIZE_BYTES).toBe(20 * 1024 * 1024)
+  })
+})
+
+describe('sanitizeRtbEvidenceExtension (Security Hardening Phase F, Commit C -- D-02)', () => {
+  it('lowercases a normal extension', () => {
+    expect(sanitizeRtbEvidenceExtension('photo.PNG')).toBe('png')
+    expect(sanitizeRtbEvidenceExtension('photo.jpg')).toBe('jpg')
+  })
+
+  it('strips any non-alphanumeric character from the trailing extension-like segment -- a crafted filename can never smuggle a path separator or dot-dot into the storage key this way', () => {
+    expect(sanitizeRtbEvidenceExtension('evil.png/../../x')).toBe('x')
+    expect(sanitizeRtbEvidenceExtension('evil.png\\..\\..\\x')).toBe('x')
+  })
+
+  it('sanitizes (rather than rejecting) a filename with no dot at all', () => {
+    expect(sanitizeRtbEvidenceExtension('no-extension')).toBe('noextension')
+  })
+
+  it('falls back to "bin" for a filename that is only a dot', () => {
+    expect(sanitizeRtbEvidenceExtension('.')).toBe('bin')
+  })
+
+  it('falls back to "bin" when the trailing segment sanitizes to nothing (e.g. only punctuation)', () => {
+    expect(sanitizeRtbEvidenceExtension('file.---')).toBe('bin')
+  })
+
+  it('result is always exactly [a-z0-9]+, regardless of adversarial input shape', () => {
+    const inputs = ['a.b.c.PDF', 'x..y', 'weird name.M4V', 'trailing.dot.', 'evil/../etc/passwd.png', '\t.png', '\n\r.jpg']
+    for (const input of inputs) {
+      expect(sanitizeRtbEvidenceExtension(input)).toMatch(/^[a-z0-9]+$/)
+    }
   })
 })
 

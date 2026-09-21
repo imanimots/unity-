@@ -38,3 +38,24 @@ export function validateRentToBuyEvidenceFile(file: File): RtbEvidenceValidation
   }
   return null
 }
+
+/**
+ * Mirrors the `sanitizedExtension()` helper already duplicated across
+ * every sibling evidence/attachment upload path (src/lib/disputes/evidence.ts,
+ * src/lib/barter/offer-media.ts, src/lib/barter/skill-task-evidence.ts,
+ * src/lib/listings/storage.ts, src/lib/messaging/attachments.ts) --
+ * evidence-upload.tsx was the one outlier still deriving the storage-key
+ * extension directly from `file.name.split('.').pop()` with no further
+ * sanitization (Security Hardening Phase D finding D-02). Lives in this
+ * pure-logic module (not the 'use client' component) for the same
+ * reason validateRentToBuyEvidenceFile() does -- directly unit-testable
+ * without pulling in the component's next-intl/navigation import graph.
+ * Intentionally kept local to this domain rather than joining the
+ * six-way duplication with a new shared module -- that consolidation is
+ * a separate, non-blocking backlog item, not part of this fix.
+ */
+export function sanitizeRtbEvidenceExtension(fileName: string): string {
+  const raw = fileName.split('.').pop() ?? 'bin'
+  const clean = raw.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+  return clean || 'bin'
+}
