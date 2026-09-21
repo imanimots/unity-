@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/client'
 import { Eye, EyeOff } from 'lucide-react'
 import { hasUnmergedAnonymousHistory, buildAnonymousViewRecords, markAnonymousHistoryMerged } from '@/lib/personalization/anonymous'
+import { getSafeRedirectPath } from '@/lib/safe-redirect'
 
 function LoginForm() {
   const t = useTranslations('auth.login')
@@ -22,7 +23,7 @@ function LoginForm() {
   // ("/af/af/dashboard"). This must navigate verbatim.
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirectTo') ?? '/'
+  const redirectTo = getSafeRedirectPath(searchParams.get('redirectTo'), '/')
   const passwordReset = searchParams.get('passwordReset') === '1'
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)

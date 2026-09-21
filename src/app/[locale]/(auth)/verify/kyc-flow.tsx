@@ -10,6 +10,7 @@ import {
 import { useRouter, Link } from '@/i18n/navigation'
 import { useAuth } from '@/hooks/use-auth'
 import { createClient } from '@/lib/supabase/client'
+import { getSafeRedirectPath } from '@/lib/safe-redirect'
 
 /**
  * Real, provider-neutral KYC submission flow -- replaces the prior
@@ -138,7 +139,7 @@ function StatusBanner({
 function KycFlowInner() {
   const router = useRouter()
   const params = useSearchParams()
-  const redirectTo = params.get('redirectTo') ?? '/dashboard/renter'
+  const redirectTo = getSafeRedirectPath(params.get('redirectTo'), '/dashboard/renter')
   const { user } = useAuth()
   const t = useTranslations('auth.verify')
   const tDetails = useTranslations('auth.verify.details')
