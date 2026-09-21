@@ -29,7 +29,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const { id } = await params
   if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ error: 'Invalid agreement id' }, { status: 400 })
 
-  const rate = checkRateLimit(`rent-to-buy:pay-installment:${getClientKey(request)}`, 15, 60_000)
+  const rate = await checkRateLimit(`rent-to-buy:pay-installment:${getClientKey(request)}`, 15, 60_000)
   if (!rate.allowed) return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
 
   const requester = await getRequestProfile()

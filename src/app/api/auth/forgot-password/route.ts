@@ -18,7 +18,7 @@ const schema = z.object({
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
 export async function POST(request: NextRequest) {
-  const rate = checkRateLimit(`auth:forgot-password:${getClientKey(request)}`, 5, 60_000)
+  const rate = await checkRateLimit(`auth:forgot-password:${getClientKey(request)}`, 5, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests — please try again shortly' }, { status: 429 })
   }

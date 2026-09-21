@@ -60,7 +60,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const { id: offerId } = await params
   if (!/^[0-9a-f-]{36}$/i.test(offerId)) return NextResponse.json({ error: 'Invalid offer id' }, { status: 400 })
 
-  const rate = checkRateLimit(`marketplace:offers:message:${getClientKey(request)}`, 30, 60_000)
+  const rate = await checkRateLimit(`marketplace:offers:message:${getClientKey(request)}`, 30, 60_000)
   if (!rate.allowed) return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
 
   const requester = await getRequestProfile()

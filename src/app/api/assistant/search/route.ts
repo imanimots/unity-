@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ results: [] })
   }
 
-  const rate = checkRateLimit(`search:${getClientKey(request)}`, 30, 60_000)
+  const rate = await checkRateLimit(`search:${getClientKey(request)}`, 30, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }

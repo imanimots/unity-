@@ -15,7 +15,7 @@ import { isLocale } from '@/i18n/locales'
  * authoritative layer of that same validation.
  */
 export async function PATCH(request: NextRequest) {
-  const rate = checkRateLimit(`profile:locale:${getClientKey(request)}`, 20, 60_000)
+  const rate = await checkRateLimit(`profile:locale:${getClientKey(request)}`, 20, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
   }

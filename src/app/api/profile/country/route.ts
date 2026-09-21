@@ -13,7 +13,7 @@ import { countryUpdateSchema } from '@/lib/profile/validation'
  * "profiles: own update" RLS, never a client-supplied user id).
  */
 export async function PATCH(request: NextRequest) {
-  const rate = checkRateLimit(`profile:country:${getClientKey(request)}`, 20, 60_000)
+  const rate = await checkRateLimit(`profile:country:${getClientKey(request)}`, 20, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
   }

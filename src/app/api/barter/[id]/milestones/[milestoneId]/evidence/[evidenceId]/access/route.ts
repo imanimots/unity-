@@ -32,7 +32,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Invalid agreement, milestone, or evidence id' }, { status: 400 })
   }
 
-  const rate = checkRateLimit(`barter:milestone:evidence:access:${getClientKey(request)}`, 30, 60_000)
+  const rate = await checkRateLimit(`barter:milestone:evidence:access:${getClientKey(request)}`, 30, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
   }

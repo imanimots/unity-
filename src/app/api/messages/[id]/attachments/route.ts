@@ -35,7 +35,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Chat storage is not configured' }, { status: 503 })
   }
 
-  const rate = checkRateLimit(`messages:attachments:${getClientKey(request)}`, 30, 60_000)
+  const rate = await checkRateLimit(`messages:attachments:${getClientKey(request)}`, 30, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
   }

@@ -20,7 +20,7 @@ export function handleSimpleCampaignAction(rpcName: string, rateLimitKey: string
     if (!isValidUuid(campaignId)) {
       return NextResponse.json({ error: 'Invalid campaign id' }, { status: 400 })
     }
-    const rate = checkRateLimit(`${rateLimitKey}:${getClientKey(request)}`, 20, 60_000)
+    const rate = await checkRateLimit(`${rateLimitKey}:${getClientKey(request)}`, 20, 60_000)
     if (!rate.allowed) {
       return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
     }

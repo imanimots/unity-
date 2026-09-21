@@ -27,7 +27,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Review storage is not configured' }, { status: 503 })
   }
 
-  const rate = checkRateLimit(`reviews:reply:${getClientKey(request)}`, 10, 60_000)
+  const rate = await checkRateLimit(`reviews:reply:${getClientKey(request)}`, 10, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
   }

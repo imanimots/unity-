@@ -27,7 +27,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Invalid listing id' }, { status: 400 })
   }
 
-  const rate = checkRateLimit(`listings:resume:${getClientKey(request)}`, 20, 60_000)
+  const rate = await checkRateLimit(`listings:resume:${getClientKey(request)}`, 20, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
   }

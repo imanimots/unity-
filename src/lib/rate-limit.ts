@@ -1,34 +1,27 @@
 /**
- * Minimal in-memory sliding-window rate limiter.
+ * Rate limiter public entry point -- Security Hardening Phase F, Commit B.
  *
- * KNOWN LIMITATION: state lives in process memory. On a serverless platform
- * (Vercel) each invocation may hit a different instance, so this does not
- * provide a real global limit in production — it only helps within a single
- * long-lived process (local dev, a persistent Node server). It's included
- * as defense-in-depth for Phase 1; production hardening should replace this
- * with a shared store (e.g. Upstash Redis) — see docs/PHASE_1_REPORT.md.
+ * The exported API is unchanged in shape from before this phase:
+ * `checkRateLimit(key, limit, windowMs) -> { allowed, remaining }`, and
+ * `getClientKey(request)` is untouched. The one necessary breaking
+ * change is that `checkRateLimit` is now `async` (it may make a network
+ * call to the distributed backend) -- every one of this repository's 80+
+ * call sites was mechanically updated to `await` it as part of this
+ * same commit.
+ *
+ * checkRateLimitDistributed() (rate-limit-distributed-adapter.ts)
+ * already contains its own "not configured" / "backend failed" fallback
+ * to checkRateLimitMemory() (rate-limit-memory-adapter.ts) -- this file
+ * stays a thin, stable re-export so callers never need to know which
+ * backend actually served a given request.
  */
 
-const hits = new Map<string, number[]>()
+import { checkRateLimitDistributed } from './rate-limit-distributed-adapter'
 
-export interface RateLimitResult {
-  allowed: boolean
-  remaining: number
-}
+export type { RateLimitResult } from './rate-limit-memory-adapter'
 
-export function checkRateLimit(key: string, limit: number, windowMs: number): RateLimitResult {
-  const now = Date.now()
-  const windowStart = now - windowMs
-  const timestamps = (hits.get(key) ?? []).filter((t) => t > windowStart)
-
-  if (timestamps.length >= limit) {
-    hits.set(key, timestamps)
-    return { allowed: false, remaining: 0 }
-  }
-
-  timestamps.push(now)
-  hits.set(key, timestamps)
-  return { allowed: true, remaining: limit - timestamps.length }
+export async function checkRateLimit(key: string, limit: number, windowMs: number) {
+  return checkRateLimitDistributed(key, limit, windowMs)
 }
 
 export function getClientKey(request: Request): string {

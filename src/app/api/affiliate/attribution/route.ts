@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Affiliate storage is not configured' }, { status: 503 })
   }
 
-  const rate = checkRateLimit(`affiliate:attribution:${getClientKey(request)}`, 20, 60_000)
+  const rate = await checkRateLimit(`affiliate:attribution:${getClientKey(request)}`, 20, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
   }

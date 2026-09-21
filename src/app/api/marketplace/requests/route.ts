@@ -15,7 +15,7 @@ import { computeCreateRequestHash, checkIdempotentReplay } from '@/lib/marketpla
  * browse freely (Step I).
  */
 export async function POST(request: NextRequest) {
-  const rate = checkRateLimit(`marketplace:requests:create:${getClientKey(request)}`, 20, 60_000)
+  const rate = await checkRateLimit(`marketplace:requests:create:${getClientKey(request)}`, 20, 60_000)
   if (!rate.allowed) return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
 
   const requester = await getRequestProfile()

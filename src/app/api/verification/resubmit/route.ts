@@ -18,7 +18,7 @@ import { sendTemplate, loadUserDisplayName } from '@/lib/email'
  * "nothing to resubmit" message).
  */
 export async function POST(request: NextRequest) {
-  const rate = checkRateLimit(`verification:resubmit:${getClientKey(request)}`, 10, 60_000)
+  const rate = await checkRateLimit(`verification:resubmit:${getClientKey(request)}`, 10, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
   }

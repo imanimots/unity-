@@ -29,7 +29,7 @@ const INTENT_TTL_MS = 6 * 60 * 60 * 1000
  * uploaded to the returned storage_path.
  */
 export async function POST(request: NextRequest) {
-  const rate = checkRateLimit(`verification:documents:create-intent:${getClientKey(request)}`, 10, 60_000)
+  const rate = await checkRateLimit(`verification:documents:create-intent:${getClientKey(request)}`, 10, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
   }

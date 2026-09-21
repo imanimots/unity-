@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 })
   }
 
-  const rate = checkRateLimit(`activate:${getClientKey(request)}`, 5, 60_000)
+  const rate = await checkRateLimit(`activate:${getClientKey(request)}`, 5, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }

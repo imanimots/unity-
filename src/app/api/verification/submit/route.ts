@@ -19,7 +19,7 @@ import { blockIfCannotTransact } from '@/lib/admin/account-status'
  * route in this codebase.
  */
 export async function POST(request: NextRequest) {
-  const rate = checkRateLimit(`verification:submit:${getClientKey(request)}`, 10, 60_000)
+  const rate = await checkRateLimit(`verification:submit:${getClientKey(request)}`, 10, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
   }

@@ -17,7 +17,7 @@ export async function requireAdminForRoute(
   request: NextRequest,
   rateLimitKeyPrefix: string
 ): Promise<{ ok: true; requester: AuthedProfile } | { ok: false; response: NextResponse }> {
-  const rate = checkRateLimit(`${rateLimitKeyPrefix}:${getClientKey(request)}`, 30, 60_000)
+  const rate = await checkRateLimit(`${rateLimitKeyPrefix}:${getClientKey(request)}`, 30, 60_000)
   if (!rate.allowed) {
     return { ok: false, response: NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 }) }
   }

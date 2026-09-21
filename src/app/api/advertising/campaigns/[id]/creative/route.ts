@@ -27,7 +27,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (!isValidUuid(campaignId)) {
     return NextResponse.json({ error: 'Invalid campaign id' }, { status: 400 })
   }
-  const rate = checkRateLimit(`advertising:campaigns:creative:${getClientKey(request)}`, 20, 60_000)
+  const rate = await checkRateLimit(`advertising:campaigns:creative:${getClientKey(request)}`, 20, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
   }

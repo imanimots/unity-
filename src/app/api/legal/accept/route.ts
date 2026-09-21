@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Not configured' }, { status: 503 })
   }
 
-  const rate = checkRateLimit(`legal:accept:${getClientKey(request)}`, 30, 60_000)
+  const rate = await checkRateLimit(`legal:accept:${getClientKey(request)}`, 30, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
   }

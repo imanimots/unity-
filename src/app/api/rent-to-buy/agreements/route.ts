@@ -17,7 +17,7 @@ import { blockIfCannotCreate } from '@/lib/admin/account-status'
  * merchant or customer), scoped by RLS.
  */
 export async function POST(request: NextRequest) {
-  const rate = checkRateLimit(`rent-to-buy:agreements:create:${getClientKey(request)}`, 15, 60_000)
+  const rate = await checkRateLimit(`rent-to-buy:agreements:create:${getClientKey(request)}`, 15, 60_000)
   if (!rate.allowed) return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
 
   if (!isRentToBuyEnabled()) return NextResponse.json({ error: 'Rent-to-buy is not currently available' }, { status: 503 })

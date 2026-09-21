@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const rate = checkRateLimit(`messages:send:${getClientKey(request)}`, 30, 60_000)
+  const rate = await checkRateLimit(`messages:send:${getClientKey(request)}`, 30, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
   }

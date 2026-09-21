@@ -17,7 +17,7 @@ const bodySchema = z.object({
  * arbitrary destination). Clicks are analytics-only, never billable.
  */
 export async function POST(request: NextRequest) {
-  const rate = checkRateLimit(`advertising:click:${getClientKey(request)}`, 60, 60_000)
+  const rate = await checkRateLimit(`advertising:click:${getClientKey(request)}`, 60, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
   }

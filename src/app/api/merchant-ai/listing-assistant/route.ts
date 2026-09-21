@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'The merchant assistant is not currently available' }, { status: 503 })
   }
 
-  const rate = checkRateLimit(`merchant-ai:listing:${getClientKey(request)}`, 20, 60_000)
+  const rate = await checkRateLimit(`merchant-ai:listing:${getClientKey(request)}`, 20, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests — please slow down' }, { status: 429 })
   }

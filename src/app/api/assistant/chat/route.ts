@@ -113,7 +113,7 @@ function getMockResponse(userMessage: string): string {
 export async function POST(request: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY
 
-  const rate = checkRateLimit(`chat:${getClientKey(request)}`, 20, 60_000)
+  const rate = await checkRateLimit(`chat:${getClientKey(request)}`, 20, 60_000)
   if (!rate.allowed) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
