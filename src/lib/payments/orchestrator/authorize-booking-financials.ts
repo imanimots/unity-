@@ -128,7 +128,7 @@ async function ensureRentalCharged(
   await admin.rpc('update_financial_workflow_progress', { p_workflow_id: workflowId, p_status: 'processing', p_current_step: 'rental_authorization' })
 
   try {
-    const charge = await provider.chargeRental({ paymentId, providerReference: '', amount: 0, currency: 'ZAR', mockScenario: testScenario })
+    const charge = await provider.chargeRental({ paymentId, providerReference: '', amount: Number(payment?.amount ?? 0), currency: payment?.currency ?? 'ZAR', mockScenario: testScenario })
     await admin.rpc('record_payment_attempt', {
       p_payment_id: paymentId,
       p_attempt_number: 1,
@@ -188,13 +188,13 @@ async function ensureDepositAuthorised(
   paymentId: string,
   testScenario?: MockScenario
 ): Promise<string> {
-  const { data: payment } = await admin.from('payments').select('status').eq('id', paymentId).maybeSingle()
+  const { data: payment } = await admin.from('payments').select('status, amount, currency').eq('id', paymentId).maybeSingle()
   if (payment?.status === 'authorised') return payment.status
 
   await admin.rpc('update_financial_workflow_progress', { p_workflow_id: workflowId, p_status: 'processing', p_current_step: 'deposit_authorization' })
 
   try {
-    const auth = await provider.authorizeDeposit({ paymentId, providerReference: '', amount: 0, currency: 'ZAR', mockScenario: testScenario })
+    const auth = await provider.authorizeDeposit({ paymentId, providerReference: '', amount: Number(payment?.amount ?? 0), currency: payment?.currency ?? 'ZAR', mockScenario: testScenario })
     await admin.rpc('record_payment_attempt', {
       p_payment_id: paymentId,
       p_attempt_number: 1,
