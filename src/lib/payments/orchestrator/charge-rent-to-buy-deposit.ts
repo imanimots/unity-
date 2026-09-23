@@ -2,10 +2,12 @@ import type { OrchestratorContext } from './types'
 import { OrchestrationError, type OrchestrationErrorCode } from './errors'
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../provider-errors'
 import { getPaymentProvider } from '../registry'
+import { assertNoPendingProviderAttempt } from './pending-provider-attempt-guard'
 
 export interface ChargeRentToBuyDepositResult {
   paymentId: string
-  status: 'captured'
+  status: 'captured' | 'requires_action'
+  redirectUrl?: string
 }
 
 /**
@@ -59,14 +61,29 @@ export async function chargeRentToBuyDeposit(
     paymentId = intent.payment_id as string
   }
 
+  await assertNoPendingProviderAttempt(admin, paymentId)
+
   try {
     const charge = await provider.authorizeDeposit({
       paymentId,
       providerReference: '',
-      amount: 0,
-      currency: 'ZAR',
+      amount: Number(agreement.security_deposit_amount),
+      currency: agreement.currency,
       mockScenario: ctx.testDepositScenario,
     })
+
+    if (charge.status === 'requires_action') {
+      await admin.rpc('record_payment_attempt', {
+        p_payment_id: paymentId,
+        p_attempt_number: 1,
+        p_provider: provider.name,
+        p_status: 'pending',
+        p_provider_reference: charge.providerReference,
+        p_failure_code: null,
+        p_failure_message: null,
+      })
+      return { paymentId, status: 'requires_action', redirectUrl: charge.redirectUrl }
+    }
 
     await admin.rpc('record_payment_attempt', {
       p_payment_id: paymentId,
@@ -75,7 +92,7 @@ export async function chargeRentToBuyDeposit(
       p_status: charge.status === 'authorised' ? 'succeeded' : 'failed',
       p_provider_reference: charge.providerReference,
       p_failure_code: charge.status === 'failed' ? 'provider_declined' : null,
-      p_failure_message: charge.failureReason ?? null,
+      p_failure_message: charge.status === 'failed' ? (charge.failureReason ?? null) : null,
     })
 
     if (charge.status === 'failed') {

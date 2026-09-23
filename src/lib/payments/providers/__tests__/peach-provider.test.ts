@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createHmac, createCipheriv, randomBytes } from 'crypto'
 import { PeachPaymentsProvider } from '../peach-provider'
 import { NotImplementedError } from '../../provider'
+import { OrchestrationConfigurationError } from '../orchestration/config'
 
 const ORIGINAL_ENV = { ...process.env }
 
@@ -193,17 +194,67 @@ describe('PeachPaymentsProvider -- P5C: Orchestration wiring', () => {
     resetEnv()
   })
 
-  describe('chargeRental / authorizeDeposit -- deliberately not wired this phase', () => {
-    it('chargeRental throws NotImplementedError with a specific, accurate reason (Hosted Checkout session creation is asynchronous)', async () => {
+  describe('chargeRental -- wired to POST /payments (P5C.1: Hosted Checkout, always requires_action on success)', () => {
+    it('creates a session and returns requires_action with the redirect URL, never a false captured', async () => {
+      setOrchestrationEnv()
+      fetchSpy.mockResolvedValue(jsonResponse(200, { payment_id: 'pay_1', status: 'requires_confirmation', redirect_url: 'https://secure.example/checkout/1' }))
       const provider = new PeachPaymentsProvider()
-      await expect(provider.chargeRental({ paymentId: 'p1', providerReference: '', amount: 92, currency: 'ZAR' })).rejects.toThrow(NotImplementedError)
-      await expect(provider.chargeRental({ paymentId: 'p1', providerReference: '', amount: 92, currency: 'ZAR' })).rejects.toThrow(/asynchronous/)
-      expect(fetchSpy).not.toHaveBeenCalled()
+
+      const result = await provider.chargeRental({ paymentId: 'p1', providerReference: '', amount: 92, currency: 'ZAR' })
+
+      expect(result.status).toBe('requires_action')
+      if (result.status !== 'requires_action') throw new Error('expected requires_action')
+      expect(result.providerReference).toBe('pay_1')
+      expect(result.redirectUrl).toBe('https://secure.example/checkout/1')
+
+      const [url, init] = fetchSpy.mock.calls[0]
+      expect(url).toBe('https://sandbox.example/orchestration/payments')
+      const body = JSON.parse(init.body)
+      expect(body.confirm).toBe(false)
+      expect(body.payment_link).toBe(true)
+      expect(body.capture_method).toBe('automatic')
+      expect(body.amount).toBe(9200)
     })
 
-    it('authorizeDeposit throws NotImplementedError with a specific, accurate reason', async () => {
+    it('fails closed (throws, no false result) when the response has no recognizable redirect-URL field', async () => {
+      setOrchestrationEnv()
+      fetchSpy.mockResolvedValue(jsonResponse(200, { payment_id: 'pay_1', status: 'requires_confirmation' }))
       const provider = new PeachPaymentsProvider()
-      await expect(provider.authorizeDeposit({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })).rejects.toThrow(NotImplementedError)
+      await expect(provider.chargeRental({ paymentId: 'p1', providerReference: '', amount: 92, currency: 'ZAR' })).rejects.toThrow()
+    })
+
+    it('throws OrchestrationConfigurationError without a network call when Orchestration is not configured', async () => {
+      const provider = new PeachPaymentsProvider()
+      await expect(provider.chargeRental({ paymentId: 'p1', providerReference: '', amount: 92, currency: 'ZAR' })).rejects.toThrow(OrchestrationConfigurationError)
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('authorizeDeposit -- wired to POST /payments with capture_method=manual (P5C.1)', () => {
+    it('creates a manual-capture session and returns requires_action, never a false authorised', async () => {
+      setOrchestrationEnv()
+      fetchSpy.mockResolvedValue(jsonResponse(200, { payment_id: 'pay_2', status: 'requires_confirmation', redirect_url: 'https://secure.example/checkout/2' }))
+      const provider = new PeachPaymentsProvider()
+
+      const result = await provider.authorizeDeposit({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })
+
+      expect(result.status).toBe('requires_action')
+      if (result.status !== 'requires_action') throw new Error('expected requires_action')
+      expect(result.providerReference).toBe('pay_2')
+      expect(result.redirectUrl).toBe('https://secure.example/checkout/2')
+
+      const [, init] = fetchSpy.mock.calls[0]
+      const body = JSON.parse(init.body)
+      expect(body.capture_method).toBe('manual')
+      // Deliberately NOT restricted to CARD -- which methods actually
+      // support preauthorisation was never confirmed by any fetch
+      // performed across this project's research, so none is guessed.
+      expect(body.allowed_payment_method_types).toBeUndefined()
+    })
+
+    it('throws OrchestrationConfigurationError without a network call when Orchestration is not configured', async () => {
+      const provider = new PeachPaymentsProvider()
+      await expect(provider.authorizeDeposit({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })).rejects.toThrow(OrchestrationConfigurationError)
       expect(fetchSpy).not.toHaveBeenCalled()
     })
   })

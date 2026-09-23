@@ -6,11 +6,13 @@ import { getPaymentProvider } from '../registry'
 import { qualifySaleAffiliateCommission } from '@/lib/affiliate/qualify'
 import { qualifySaleUnityCommission } from '@/lib/commissions/qualify'
 import { createEscrowForPayment, fundEscrowForPayment } from '@/lib/escrow/orchestrator'
+import { assertNoPendingProviderAttempt } from './pending-provider-attempt-guard'
 
 export interface ChargeOrderPaymentResult {
   paymentId: string
-  status: 'captured'
-  orderStatus: 'paid'
+  status: 'captured' | 'requires_action'
+  orderStatus: 'paid' | 'pending'
+  redirectUrl?: string
 }
 
 /**
@@ -61,6 +63,10 @@ export async function chargeOrderPayment(
     return { paymentId, status: 'captured', orderStatus: 'paid' }
   }
 
+  // P5C.1: reject a retry rather than creating a second live Hosted
+  // Checkout session while an earlier attempt's session is still open.
+  await assertNoPendingProviderAttempt(admin, paymentId)
+
   try {
     // testRentalScenario is reused here (not a new order-specific field
     // on OrchestratorContext) -- it already means exactly "the mock
@@ -69,10 +75,23 @@ export async function chargeOrderPayment(
     const charge = await provider.chargeRental({
       paymentId,
       providerReference: payment?.provider_reference ?? '',
-      amount: 0,
-      currency: 'ZAR',
+      amount: Number(payment?.amount ?? 0),
+      currency: payment?.currency ?? 'ZAR',
       mockScenario: ctx.testRentalScenario,
     })
+
+    if (charge.status === 'requires_action') {
+      await admin.rpc('record_payment_attempt', {
+        p_payment_id: paymentId,
+        p_attempt_number: 1,
+        p_provider: provider.name,
+        p_status: 'pending',
+        p_provider_reference: charge.providerReference,
+        p_failure_code: null,
+        p_failure_message: null,
+      })
+      return { paymentId, status: 'requires_action', orderStatus: 'pending', redirectUrl: charge.redirectUrl }
+    }
 
     await admin.rpc('record_payment_attempt', {
       p_payment_id: paymentId,
@@ -84,7 +103,7 @@ export async function chargeOrderPayment(
       // provider text) so admin/CSV/email surfaces can display a safe
       // category -- see docs/ORDER_ADMINISTRATION.md, "failure category".
       p_failure_code: charge.status === 'failed' ? 'provider_declined' : null,
-      p_failure_message: charge.failureReason ?? null,
+      p_failure_message: charge.status === 'failed' ? (charge.failureReason ?? null) : null,
     })
 
     if (charge.status === 'failed') {

@@ -22,45 +22,40 @@ import { verifyCheckoutSignature, decryptOppwaWebhook } from './peach/signature'
 import { normalizeCheckoutWebhookPayload, normalizeOppwaWebhookPayload, normalizePayoutWebhookPayload } from './peach/event-normalizer'
 import { loadOrchestrationConfig, OrchestrationConfigurationError, type OrchestrationConfig } from './orchestration/config'
 import { OrchestrationClient } from './orchestration/client'
-import { parseCapturePaymentResponse, parseCancelPaymentResponse } from './orchestration/response-parsers'
+import { buildOrdinaryPaymentRequest, buildDepositAuthorisationRequest } from './orchestration/request-builders'
+import { parseCreateHostedCheckoutPaymentResponse, parseCapturePaymentResponse, parseCancelPaymentResponse, extractRedirectUrl } from './orchestration/response-parsers'
+import { orchestrationReturnUrl } from '@/app/api/payments/checkout-return/route'
 
 /**
- * Money-moving methods are partially wired to Peach Orchestration as of
- * P5C (see the P5B.2-R phase report for the product-selection evidence:
- * a genuinely distinct generation from the classic Checkout V2/Payments
+ * Money-moving methods are wired to Peach Orchestration as of P5C.1 (see
+ * the P5B.2-R phase report for the product-selection evidence: a
+ * genuinely distinct generation from the classic Checkout V2/Payments
  * API/Card-backoffice-API scaffolding under ./peach/, which remains
  * present but unreferenced by any of these methods -- left in place for
  * a later cleanup phase to remove, not deleted here).
  *
- * `captureDeposit()`/`releaseDeposit()` are wired for real: both act on
- * an *already-created* payment (one that already reached
- * `requires_capture` via a completed Hosted Checkout session), so
- * Orchestration's synchronous capture/cancel response is genuinely
- * authoritative -- no pending state is possible at this point.
+ * `chargeRental()`/`authorizeDeposit()` create a Hosted Checkout session
+ * and return `requires_action` (never a false `'captured'`/`'authorised'`)
+ * -- P5C found that session creation is inherently asynchronous (the
+ * shopper hasn't paid yet), and P5C.1 closes that gap by widening
+ * `ChargeResult`/`DepositResult` into genuine discriminated unions
+ * (../provider.ts) rather than forcing either method to lie. Every
+ * orchestrator caller was updated to treat `requires_action` as "leave
+ * `payments.status` at `pending`, persist the provider reference, return
+ * the redirect URL" -- never a financial state transition. Resolving
+ * `requires_action` to a final `captured`/`authorised`/`failed` state
+ * remains P5D's job (webhook reconciliation), not this method's.
  *
- * `chargeRental()`/`authorizeDeposit()` remain stubs -- NOT an
- * oversight, a genuine architecture gap discovered while implementing
- * this phase: creating a Hosted Checkout session is itself asynchronous
- * (the shopper hasn't paid yet at creation time), but `ChargeResult`/
- * `DepositResult` only support synchronous `'captured'|'failed'`/
- * `'authorised'|...|'failed'` outcomes with no pending value. Returning
- * from either method today would force a false signal in one direction
- * or the other. See each method's own comment for the full reasoning,
- * and the P5C phase report for the resolution options this raises.
- * The request-builder primitives for both
- * (`buildOrdinaryPaymentRequest`/`buildDepositAuthorisationRequest` in
- * ./orchestration/request-builders.ts) are fully built and tested,
- * ready for whichever resolution is chosen.
+ * `captureDeposit()`/`releaseDeposit()` act on an *already-created*
+ * payment (one that already reached `requires_capture` via a completed
+ * Hosted Checkout session), so Orchestration's synchronous capture/
+ * cancel response is genuinely authoritative -- no pending state is
+ * possible at this point, unchanged from P5C.
  *
  * `createPaymentIntent()` remains a stub: zero real call sites in the
- * orchestrator, and its input shape has no return-URL concept.
- * `refund()`/`createMerchantPayout()`/`createAffiliatePayout()` remain
- * stubs -- explicitly P5E/deferred. `verifyWebhook()` is untouched --
- * explicitly P5D scope; it continues to use the classic signature
- * scheme and classic config, since Orchestration's own webhook
- * authentication model (custom HTTP headers, no confirmed HMAC
- * canonicalization) was not established precisely enough this phase to
- * safely wire a real verifier.
+ * orchestrator. `refund()`/`createMerchantPayout()`/
+ * `createAffiliatePayout()` remain stubs -- explicitly P5E/deferred.
+ * `verifyWebhook()` is untouched -- explicitly P5D scope.
  */
 export class PeachPaymentsProvider implements PaymentProvider {
   readonly name = 'peach'
@@ -83,27 +78,27 @@ export class PeachPaymentsProvider implements PaymentProvider {
   }
 
   /**
-   * NOT WIRED THIS PHASE -- a genuine, discovered architecture gap, not
-   * an oversight. Creating a Hosted Checkout session (`payment_link:
-   * true`, `confirm: false`) is inherently asynchronous: the response to
-   * `POST /payments` reflects that a session was created (e.g.
-   * `requires_confirmation`), not whether the shopper has authorised
-   * anything -- that only becomes known later, via webhook (P5D) or an
-   * explicit `GET /payments/{id}` sync. The existing `DepositResult`
-   * type (`status: 'authorised' | 'captured' | 'released' | 'failed'`)
-   * has no pending/in-progress value, so returning from this method
-   * would force a choice between two false signals: claiming
-   * 'authorised' before the shopper has done anything, or claiming
-   * 'failed' for a checkout session that's actually still open and
-   * valid. Neither is acceptable, and this phase's own scope forbids
-   * both widening this interface and implementing the P5D webhook layer
-   * that would resolve it properly. buildDepositAuthorisationRequest()
-   * (request-builders.ts) is fully built and tested and ready for
-   * whichever resolution is chosen.
+   * Creates a manual-capture (`capture_method: 'manual'`) Hosted
+   * Checkout session. Always returns `requires_action` on success --
+   * never `'authorised'`, which would falsely claim the shopper has
+   * already acted. `payment_link_config`'s allowed-method restriction is
+   * deliberately left unset (see request-builders.ts's own comment:
+   * which Peach payment methods actually support preauthorisation was
+   * never confirmed by any fetch performed across this project's
+   * research, so none is guessed into the request).
    */
-  async authorizeDeposit(_input: DepositInput): Promise<DepositResult> {
-    void _input
-    throw new NotImplementedError(this.name, 'authorizeDeposit (Hosted Checkout session creation is asynchronous; see class-level comment)')
+  async authorizeDeposit(input: DepositInput): Promise<DepositResult> {
+    const client = this.orchestrationClient()
+    const request = buildDepositAuthorisationRequest({
+      amount: input.amount.toFixed(2),
+      currency: input.currency,
+      returnUrl: orchestrationReturnUrl(),
+      metadata: { unity_payment_id: input.paymentId },
+    })
+    const raw = await client.post('/payments', request, 'authorizeDeposit')
+    const parsed = parseCreateHostedCheckoutPaymentResponse(raw)
+    const redirectUrl = extractRedirectUrl(raw as Record<string, unknown>)
+    return { status: 'requires_action', providerReference: parsed.payment_id, redirectUrl }
   }
 
   async captureDeposit(input: DepositInput): Promise<DepositResult> {
@@ -129,14 +124,23 @@ export class PeachPaymentsProvider implements PaymentProvider {
   }
 
   /**
-   * NOT WIRED THIS PHASE -- same reason as authorizeDeposit() above:
-   * session creation is asynchronous, and `ChargeResult`'s
-   * `'captured' | 'failed'` shape has no pending state to return
-   * honestly. buildOrdinaryPaymentRequest() is fully built and tested.
+   * Creates an automatic-capture Hosted Checkout session for the
+   * ordinary rental/order/barter-cash-adjustment/RTB-instalment charge.
+   * Always returns `requires_action` on success, never `'captured'` --
+   * see the class-level comment.
    */
-  async chargeRental(_input: ChargeInput): Promise<ChargeResult> {
-    void _input
-    throw new NotImplementedError(this.name, 'chargeRental (Hosted Checkout session creation is asynchronous; see class-level comment)')
+  async chargeRental(input: ChargeInput): Promise<ChargeResult> {
+    const client = this.orchestrationClient()
+    const request = buildOrdinaryPaymentRequest({
+      amount: input.amount.toFixed(2),
+      currency: input.currency,
+      returnUrl: orchestrationReturnUrl(),
+      metadata: { unity_payment_id: input.paymentId },
+    })
+    const raw = await client.post('/payments', request, 'chargeRental')
+    const parsed = parseCreateHostedCheckoutPaymentResponse(raw)
+    const redirectUrl = extractRedirectUrl(raw as Record<string, unknown>)
+    return { status: 'requires_action', providerReference: parsed.payment_id, redirectUrl }
   }
 
   async refund(_input: RefundInput): Promise<RefundResult> {

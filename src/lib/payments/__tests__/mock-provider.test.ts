@@ -3,6 +3,7 @@ import { MockProvider } from '../providers/mock-provider'
 import { PeachPaymentsProvider } from '../providers/peach-provider'
 import { NotImplementedError } from '../provider'
 import { getPaymentProvider, listRegisteredProviders } from '../registry'
+import { OrchestrationConfigurationError } from '../providers/orchestration/config'
 
 describe('MockProvider', () => {
   const provider = new MockProvider()
@@ -92,14 +93,20 @@ describe('PeachPaymentsProvider (stub)', () => {
     expect(provider.name).toBe('peach')
   })
 
-  it('every money-moving method throws NotImplementedError -- no real API calls in this phase', async () => {
+  it('methods with zero real orchestrator call sites, or an explicit unimplemented gate, throw NotImplementedError', async () => {
     await expect(provider.createPaymentIntent({ bookingId: 'b1', amount: 500, currency: 'ZAR' })).rejects.toThrow(NotImplementedError)
-    await expect(provider.authorizeDeposit({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })).rejects.toThrow(NotImplementedError)
+    // captureDeposit/releaseDeposit are wired to Orchestration (P5C), but
+    // still throw NotImplementedError specifically for a missing
+    // providerReference -- there is nothing to capture/release without one.
     await expect(provider.captureDeposit({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })).rejects.toThrow(NotImplementedError)
     await expect(provider.releaseDeposit({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })).rejects.toThrow(NotImplementedError)
-    await expect(provider.chargeRental({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })).rejects.toThrow(NotImplementedError)
     await expect(provider.refund({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })).rejects.toThrow(NotImplementedError)
     await expect(provider.createMerchantPayout({ merchantId: 'm1', amount: 500, currency: 'ZAR' })).rejects.toThrow(NotImplementedError)
+  })
+
+  it('authorizeDeposit/chargeRental are wired to Orchestration (P5C.1) -- with no config, they fail closed with OrchestrationConfigurationError, not NotImplementedError, and make no network call', async () => {
+    await expect(provider.authorizeDeposit({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })).rejects.toThrow(OrchestrationConfigurationError)
+    await expect(provider.chargeRental({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })).rejects.toThrow(OrchestrationConfigurationError)
   })
 
   // verifyWebhook() and healthCheck() are real, not stubbed -- neither moves

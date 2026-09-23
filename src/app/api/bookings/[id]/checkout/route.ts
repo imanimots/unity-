@@ -113,6 +113,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       parsed.data.idempotency_key
     )
 
+    // P5C.1: a Hosted Checkout session was created but the shopper hasn't
+    // paid yet -- return the redirect URL(s) and stop here. Must happen
+    // BEFORE the "financially ready" email/readiness-derivation logic
+    // below, which assumes a completed workflow; sending that email now
+    // would falsely tell the renter/merchant the booking is paid.
+    if (result.status === 'requires_action') {
+      return NextResponse.json({
+        status: 'requires_action',
+        rentalStatus: result.rentalStatus,
+        depositStatus: result.depositStatus,
+        rentalRedirectUrl: result.rentalRedirectUrl,
+        depositRedirectUrl: result.depositRedirectUrl,
+      })
+    }
+
     // Race guard: the payment deadline may have passed while this
     // authorization was in flight (a concurrent expiry sweep). The
     // booking must never be silently reactivated -- see

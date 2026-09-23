@@ -3,12 +3,14 @@ import { OrchestrationError, type OrchestrationErrorCode } from './errors'
 import { checkIdempotentReplay, computeAuthorizeBarterDepositHash } from './idempotency'
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../provider-errors'
 import { getPaymentProvider } from '../registry'
+import { assertNoPendingProviderAttempt } from './pending-provider-attempt-guard'
 
 const ELIGIBLE_AGREEMENT_STATUSES = ['accepted']
 
 export interface AuthorizeBarterDepositResult {
   paymentId: string
   status: string
+  redirectUrl?: string
 }
 
 /**
@@ -69,14 +71,31 @@ export async function authorizeBarterDeposit(
     throw new OrchestrationError('invalid_payment_transition', `Deposit payment is "${deposit.status}", not eligible for authorization`)
   }
 
+  // P5C.1: reject a retry rather than creating a second live Hosted
+  // Checkout session while an earlier attempt's session is still open.
+  await assertNoPendingProviderAttempt(admin, deposit.id)
+
   try {
+    const { data: paymentAmount } = await admin.from('payments').select('amount, currency').eq('id', deposit.id).maybeSingle()
     const auth = await provider.authorizeDeposit({
       paymentId: deposit.id,
       providerReference: deposit.provider_reference ?? '',
-      amount: 0,
-      currency: 'ZAR',
+      amount: Number(paymentAmount?.amount ?? 0),
+      currency: paymentAmount?.currency ?? 'ZAR',
       mockScenario: ctx.testDepositScenario,
     })
+
+    if (auth.status === 'requires_action') {
+      await admin.rpc('record_payment_attempt', {
+        p_payment_id: deposit.id,
+        p_attempt_number: 1,
+        p_provider: provider.name,
+        p_status: 'pending',
+        p_provider_reference: auth.providerReference,
+        p_failure_message: null,
+      })
+      return { paymentId: deposit.id, status: 'requires_action', redirectUrl: auth.redirectUrl }
+    }
 
     await admin.rpc('record_payment_attempt', {
       p_payment_id: deposit.id,
@@ -84,7 +103,7 @@ export async function authorizeBarterDeposit(
       p_provider: provider.name,
       p_status: auth.status === 'authorised' ? 'succeeded' : 'failed',
       p_provider_reference: auth.providerReference,
-      p_failure_message: auth.failureReason ?? null,
+      p_failure_message: auth.status === 'failed' ? (auth.failureReason ?? null) : null,
     })
 
     if (auth.status === 'failed') {

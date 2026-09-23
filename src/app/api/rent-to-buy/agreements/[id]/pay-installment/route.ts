@@ -75,7 +75,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       parsed.data.idempotency_key
     )
 
-    if (parsed.data.sequence === 1) {
+    // P5C.1: a requires_action result means a Hosted Checkout session was
+    // created but the shopper hasn't paid yet -- these notifications must
+    // not fire until the payment genuinely settles (P5D resolves this).
+    if (parsed.data.sequence === 1 && result.status !== 'requires_action') {
       await notifyRentToBuyParty(admin, id, agreement.customer_id, 'rent_to_buy.agreement_accepted', 'rent-to-buy-agreement-accepted', `rtb-accepted-${id}`)
       await notifyRentToBuyParty(admin, id, agreement.customer_id, 'rent_to_buy.first_payment_settled', 'rent-to-buy-possession-eligible', `rtb-possession-eligible-${id}`)
     }

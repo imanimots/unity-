@@ -7,6 +7,12 @@ import type { MockScenario } from '../provider'
 import { qualifyRentalPaymentAffiliateCommission } from '@/lib/affiliate/qualify'
 import { qualifyRentalPaymentUnityCommission } from '@/lib/commissions/qualify'
 import { createEscrowForPayment, fundEscrowForPayment } from '@/lib/escrow/orchestrator'
+import { assertNoPendingProviderAttempt } from './pending-provider-attempt-guard'
+
+interface StepOutcome {
+  status: string
+  redirectUrl?: string
+}
 
 /**
  * The one genuinely multi-step workflow in this pass: it makes up to two
@@ -73,18 +79,44 @@ export async function authorizeBookingFinancials(
   const { rentalPaymentId, depositPaymentId } = await prepareBookingFinancials(ctx, bookingId, idempotencyKey)
 
   try {
-    const rentalStatus = await ensureRentalCharged(admin, provider, workflowId, bookingId, rentalPaymentId, ctx.testRentalScenario)
-    const depositStatus = depositPaymentId
+    const rental = await ensureRentalCharged(admin, provider, workflowId, bookingId, rentalPaymentId, ctx.testRentalScenario)
+    const deposit = depositPaymentId
       ? await ensureDepositAuthorised(admin, provider, workflowId, depositPaymentId, ctx.testDepositScenario)
       : null
+
+    // P5C.1: if either leg created a Hosted Checkout session the shopper
+    // still needs to complete, the overall workflow is NOT 'completed' --
+    // it stays 'requires_action', payments.status stays 'pending' for
+    // that leg (already true -- neither ensureRentalCharged() nor
+    // ensureDepositAuthorised() touches payments.status for this
+    // outcome), and this result is NOT cached as the workflow's
+    // 'completed' result (a future replay must be allowed to re-check
+    // progress, not short-circuit on a stale in-progress snapshot).
+    // update_financial_workflow_progress was already called with
+    // p_status:'processing' inside whichever step(s) ran -- no further
+    // workflow-status write happens here for this branch; the
+    // per-payment pending-attempt guard (assertNoPendingProviderAttempt)
+    // is what actually prevents a duplicate session on retry.
+    if (rental.status === 'requires_action' || deposit?.status === 'requires_action') {
+      return {
+        workflowId,
+        status: 'requires_action',
+        rentalPaymentId,
+        rentalStatus: rental.status,
+        depositPaymentId,
+        depositStatus: deposit?.status ?? null,
+        rentalRedirectUrl: rental.redirectUrl,
+        depositRedirectUrl: deposit?.redirectUrl,
+      }
+    }
 
     const result: AuthorizeBookingFinancialsResult = {
       workflowId,
       status: 'completed',
       rentalPaymentId,
-      rentalStatus,
+      rentalStatus: rental.status,
       depositPaymentId,
-      depositStatus,
+      depositStatus: deposit?.status ?? null,
     }
 
     await admin.rpc('update_financial_workflow_progress', {
@@ -108,7 +140,7 @@ async function ensureRentalCharged(
   bookingId: string,
   paymentId: string,
   testScenario?: MockScenario
-): Promise<string> {
+): Promise<StepOutcome> {
   const { data: payment } = await admin.from('payments').select('status, amount, currency').eq('id', paymentId).maybeSingle()
   if (payment?.status === 'captured') {
     // Step 11 Phase 7: re-attempted on every replay -- see the matching
@@ -122,20 +154,47 @@ async function ensureRentalCharged(
     } catch (escrowErr) {
       console.error('[bookings.authorize-financials] escrow best-effort step failed', { bookingId, paymentId, escrowErr })
     }
-    return payment.status
+    return { status: payment.status }
   }
+
+  // P5C.1: reject a retry outright rather than creating a second live
+  // Hosted Checkout session while an earlier attempt's session is still
+  // open (payment.status stays 'pending' for a requires_action outcome,
+  // so the check above alone can't distinguish "never attempted" from
+  // "attempted, awaiting the shopper").
+  await assertNoPendingProviderAttempt(admin, paymentId)
 
   await admin.rpc('update_financial_workflow_progress', { p_workflow_id: workflowId, p_status: 'processing', p_current_step: 'rental_authorization' })
 
   try {
     const charge = await provider.chargeRental({ paymentId, providerReference: '', amount: Number(payment?.amount ?? 0), currency: payment?.currency ?? 'ZAR', mockScenario: testScenario })
+
+    if (charge.status === 'requires_action') {
+      // Persist the provider reference (so P5D can later resolve this
+      // exact session) via the same existing, safe mechanism every other
+      // attempt already uses -- record_payment_attempt's own
+      // provider_reference column. payments.status is deliberately left
+      // untouched (still 'pending') -- no transition_payment_status call
+      // here, and this is not a workflow failure, so failWorkflow() is
+      // not called either.
+      await admin.rpc('record_payment_attempt', {
+        p_payment_id: paymentId,
+        p_attempt_number: 1,
+        p_provider: provider.name,
+        p_status: 'pending',
+        p_provider_reference: charge.providerReference,
+        p_failure_message: null,
+      })
+      return { status: 'requires_action', redirectUrl: charge.redirectUrl }
+    }
+
     await admin.rpc('record_payment_attempt', {
       p_payment_id: paymentId,
       p_attempt_number: 1,
       p_provider: provider.name,
       p_status: charge.status === 'captured' ? 'succeeded' : 'failed',
       p_provider_reference: charge.providerReference,
-      p_failure_message: charge.failureReason ?? null,
+      p_failure_message: charge.status === 'failed' ? (charge.failureReason ?? null) : null,
     })
 
     if (charge.status === 'failed') {
@@ -175,7 +234,7 @@ async function ensureRentalCharged(
       console.error('[bookings.authorize-financials] escrow best-effort step failed', { bookingId, paymentId, escrowErr })
     }
 
-    return 'captured'
+    return { status: 'captured' }
   } catch (err) {
     throw await handleProviderError(admin, workflowId, err)
   }
@@ -187,21 +246,36 @@ async function ensureDepositAuthorised(
   workflowId: string,
   paymentId: string,
   testScenario?: MockScenario
-): Promise<string> {
+): Promise<StepOutcome> {
   const { data: payment } = await admin.from('payments').select('status, amount, currency').eq('id', paymentId).maybeSingle()
-  if (payment?.status === 'authorised') return payment.status
+  if (payment?.status === 'authorised') return { status: payment.status }
+
+  await assertNoPendingProviderAttempt(admin, paymentId)
 
   await admin.rpc('update_financial_workflow_progress', { p_workflow_id: workflowId, p_status: 'processing', p_current_step: 'deposit_authorization' })
 
   try {
     const auth = await provider.authorizeDeposit({ paymentId, providerReference: '', amount: Number(payment?.amount ?? 0), currency: payment?.currency ?? 'ZAR', mockScenario: testScenario })
+
+    if (auth.status === 'requires_action') {
+      await admin.rpc('record_payment_attempt', {
+        p_payment_id: paymentId,
+        p_attempt_number: 1,
+        p_provider: provider.name,
+        p_status: 'pending',
+        p_provider_reference: auth.providerReference,
+        p_failure_message: null,
+      })
+      return { status: 'requires_action', redirectUrl: auth.redirectUrl }
+    }
+
     await admin.rpc('record_payment_attempt', {
       p_payment_id: paymentId,
       p_attempt_number: 1,
       p_provider: provider.name,
       p_status: auth.status === 'authorised' ? 'succeeded' : 'failed',
       p_provider_reference: auth.providerReference,
-      p_failure_message: auth.failureReason ?? null,
+      p_failure_message: auth.status === 'failed' ? (auth.failureReason ?? null) : null,
     })
 
     if (auth.status === 'failed') {
@@ -221,7 +295,7 @@ async function ensureDepositAuthorised(
       p_provider_reference: auth.providerReference,
       p_actor_type: 'system',
     })
-    return 'authorised'
+    return { status: 'authorised' }
   } catch (err) {
     throw await handleProviderError(admin, workflowId, err)
   }

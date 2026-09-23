@@ -41,11 +41,29 @@ export interface DepositInput {
   mockScenario?: MockScenario
 }
 
-export interface DepositResult {
-  providerReference: string
-  status: 'authorised' | 'captured' | 'released' | 'failed'
-  failureReason?: string
-}
+/**
+ * P5C.1: a discriminated union, not a single interface with an optional
+ * field -- `redirectUrl` only exists to *ask the shopper to act* (a
+ * Hosted Checkout session was created but hasn't resolved yet), and
+ * TypeScript enforces that no caller can read it without first
+ * narrowing on `status === 'requires_action'`. This is the fix for the
+ * gap P5C discovered: creating a Hosted Checkout session is inherently
+ * asynchronous (Peach's response reflects "a session now exists", not
+ * "the shopper paid"), so a provider that only had `'authorised' |
+ * 'captured' | 'released' | 'failed'` to choose from had no honest value
+ * to return. `requires_action` is a genuinely new intermediate state,
+ * never a hidden synonym for success or failure -- see
+ * docs/PAYMENT_ARCHITECTURE.md and every orchestrator caller's own
+ * handling of it (never transitions `payments.status` away from
+ * `pending` for this branch; P5D's webhook/reconciliation layer alone
+ * resolves it to a terminal state).
+ */
+export type DepositResult =
+  | { status: 'authorised'; providerReference: string }
+  | { status: 'captured'; providerReference: string }
+  | { status: 'released'; providerReference: string }
+  | { status: 'requires_action'; providerReference: string; redirectUrl: string }
+  | { status: 'failed'; providerReference: string; failureReason?: string }
 
 export interface ChargeInput {
   paymentId: string
@@ -55,11 +73,11 @@ export interface ChargeInput {
   mockScenario?: MockScenario
 }
 
-export interface ChargeResult {
-  providerReference: string
-  status: 'captured' | 'failed'
-  failureReason?: string
-}
+/** Mirrors DepositResult's discriminated-union shape and rationale above. */
+export type ChargeResult =
+  | { status: 'captured'; providerReference: string }
+  | { status: 'requires_action'; providerReference: string; redirectUrl: string }
+  | { status: 'failed'; providerReference: string; failureReason?: string }
 
 export interface RefundInput {
   paymentId: string

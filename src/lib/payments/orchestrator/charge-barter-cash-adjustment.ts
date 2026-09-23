@@ -4,10 +4,12 @@ import { checkIdempotentReplay, computeChargeBarterCashAdjustmentHash } from './
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../provider-errors'
 import { getPaymentProvider } from '../registry'
 import { createEscrowForPayment, fundEscrowForPayment } from '@/lib/escrow/orchestrator'
+import { assertNoPendingProviderAttempt } from './pending-provider-attempt-guard'
 
 export interface ChargeBarterCashAdjustmentResult {
   paymentId: string
-  status: 'captured'
+  status: 'captured' | 'requires_action'
+  redirectUrl?: string
 }
 
 const ELIGIBLE_AGREEMENT_STATUSES = ['accepted']
@@ -78,14 +80,33 @@ export async function chargeBarterCashAdjustment(
     throw new OrchestrationError('invalid_payment_transition', `Cash adjustment payment is "${payment.status}", not eligible for charge`)
   }
 
+  // P5C.1: reject a retry rather than creating a second live Hosted
+  // Checkout session while an earlier attempt's session is still open.
+  await assertNoPendingProviderAttempt(admin, payment.id)
+
   try {
     const charge = await provider.chargeRental({
       paymentId: payment.id,
       providerReference: payment.provider_reference ?? '',
-      amount: 0,
-      currency: 'ZAR',
+      amount: Number(payment.amount),
+      currency: payment.currency,
       mockScenario: ctx.testRentalScenario,
     })
+
+    if (charge.status === 'requires_action') {
+      // Hosted Checkout session created -- payment stays 'pending',
+      // never marked captured/failed. Provider reference persisted via
+      // the existing safe mechanism; P5D resolves this later.
+      await admin.rpc('record_payment_attempt', {
+        p_payment_id: payment.id,
+        p_attempt_number: 1,
+        p_provider: provider.name,
+        p_status: 'pending',
+        p_provider_reference: charge.providerReference,
+        p_failure_message: null,
+      })
+      return { paymentId: payment.id, status: 'requires_action', redirectUrl: charge.redirectUrl }
+    }
 
     await admin.rpc('record_payment_attempt', {
       p_payment_id: payment.id,
@@ -93,7 +114,7 @@ export async function chargeBarterCashAdjustment(
       p_provider: provider.name,
       p_status: charge.status === 'captured' ? 'succeeded' : 'failed',
       p_provider_reference: charge.providerReference,
-      p_failure_message: charge.failureReason ?? null,
+      p_failure_message: charge.status === 'failed' ? (charge.failureReason ?? null) : null,
     })
 
     if (charge.status === 'failed') {

@@ -13,6 +13,7 @@ describe('MockProvider deterministic scenarios (never randomness)', () => {
   it('"declined" returns a failed result, not a thrown error -- a decline is a valid provider response', async () => {
     const result = await provider.chargeRental({ paymentId: 'p1', providerReference: '', amount: 1000, currency: 'ZAR', mockScenario: 'declined' })
     expect(result.status).toBe('failed')
+    if (result.status !== 'failed') throw new Error('expected a failed result')
     expect(result.failureReason).toBeTruthy()
   })
 
@@ -46,6 +47,7 @@ describe('MockProvider deterministic scenarios (never randomness)', () => {
     )
     for (const r of results) {
       expect(r.status).toBe('failed')
+      if (r.status !== 'failed' || results[0].status !== 'failed') throw new Error('expected failed results')
       expect(r.failureReason).toBe(results[0].failureReason)
     }
   })

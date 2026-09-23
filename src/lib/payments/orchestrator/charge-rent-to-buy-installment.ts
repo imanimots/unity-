@@ -3,11 +3,13 @@ import { OrchestrationError, type OrchestrationErrorCode } from './errors'
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../provider-errors'
 import { getPaymentProvider } from '../registry'
 import { createEscrowForPayment, fundEscrowForPayment } from '@/lib/escrow/orchestrator'
+import { assertNoPendingProviderAttempt } from './pending-provider-attempt-guard'
 
 export interface ChargeRentToBuyInstallmentResult {
   paymentId: string
-  status: 'captured'
+  status: 'captured' | 'requires_action'
   installmentId: string
+  redirectUrl?: string
 }
 
 /**
@@ -68,14 +70,29 @@ export async function chargeRentToBuyInstallment(
   if (intentError) throw new OrchestrationError('internal_consistency_error', `Could not create instalment payment: ${intentError.message}`)
   const paymentId = intent.payment_id as string
 
+  await assertNoPendingProviderAttempt(admin, paymentId)
+
   try {
     const charge = await provider.chargeRental({
       paymentId,
       providerReference: '',
-      amount: 0,
-      currency: 'ZAR',
+      amount: Number(installment.principal_amount),
+      currency: agreement.currency,
       mockScenario: ctx.testRentalScenario,
     })
+
+    if (charge.status === 'requires_action') {
+      await admin.rpc('record_payment_attempt', {
+        p_payment_id: paymentId,
+        p_attempt_number: 1,
+        p_provider: provider.name,
+        p_status: 'pending',
+        p_provider_reference: charge.providerReference,
+        p_failure_code: null,
+        p_failure_message: null,
+      })
+      return { paymentId, status: 'requires_action', installmentId: installment.id, redirectUrl: charge.redirectUrl }
+    }
 
     await admin.rpc('record_payment_attempt', {
       p_payment_id: paymentId,
@@ -84,7 +101,7 @@ export async function chargeRentToBuyInstallment(
       p_status: charge.status === 'captured' ? 'succeeded' : 'failed',
       p_provider_reference: charge.providerReference,
       p_failure_code: charge.status === 'failed' ? 'provider_declined' : null,
-      p_failure_message: charge.failureReason ?? null,
+      p_failure_message: charge.status === 'failed' ? (charge.failureReason ?? null) : null,
     })
 
     if (charge.status === 'failed') {

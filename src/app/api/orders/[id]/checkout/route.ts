@@ -89,6 +89,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       parsed.data.idempotency_key
     )
 
+    // P5C.1: a Hosted Checkout session was created but the shopper hasn't
+    // paid yet -- return the redirect URL and stop, before sending a
+    // "payment received" email that would otherwise be sent too early.
+    if (result.status === 'requires_action') {
+      return NextResponse.json({ status: 'requires_action', paymentId: result.paymentId, orderStatus: result.orderStatus, redirectUrl: result.redirectUrl })
+    }
+
     try {
       await notifyOrderParties(admin, orderId, 'order.payment_received', [
         { role: 'buyer', templateId: 'order-payment-received-buyer' },

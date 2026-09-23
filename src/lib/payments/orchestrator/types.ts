@@ -31,11 +31,22 @@ export interface PrepareBookingFinancialsResult {
 
 export interface AuthorizeBookingFinancialsResult {
   workflowId: string
-  status: 'completed' | 'failed_retryable' | 'failed_terminal'
+  /**
+   * `'requires_action'` (P5C.1): the rental charge and/or deposit
+   * authorization created a Hosted Checkout session the shopper must
+   * still complete -- `payments.status` stays `pending` for whichever
+   * leg(s) this applies to, and neither is a workflow failure. The
+   * route layer surfaces `rentalRedirectUrl`/`depositRedirectUrl` to the
+   * caller; P5D's webhook reconciliation is what eventually resolves
+   * this to `'completed'` or a failure.
+   */
+  status: 'completed' | 'failed_retryable' | 'failed_terminal' | 'requires_action'
   rentalPaymentId: string
   rentalStatus: string
   depositPaymentId: string | null
   depositStatus: string | null
+  rentalRedirectUrl?: string
+  depositRedirectUrl?: string
 }
 
 export interface ReleaseDepositResult {

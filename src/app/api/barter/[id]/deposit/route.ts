@@ -67,7 +67,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       parsed.data.idempotency_key
     )
 
-    return NextResponse.json({ status: 'success', paymentId: result.paymentId, depositStatus: result.status })
+    // P5C.1: result.status may now be 'requires_action' (a Hosted
+    // Checkout session was created, not yet paid) -- echo it directly
+    // rather than a hardcoded 'success', which would misrepresent a
+    // still-pending payment as complete.
+    return NextResponse.json({ status: result.status, paymentId: result.paymentId, depositStatus: result.status, redirectUrl: result.redirectUrl })
   } catch (err) {
     if (err instanceof OrchestrationError) {
       console.error('[barter.deposit] orchestration error', { userId: requester.userId, agreementId, code: err.code, message: err.message })

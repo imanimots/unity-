@@ -65,7 +65,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       parsed.data.idempotency_key
     )
 
-    return NextResponse.json({ status: 'success', paymentId: result.paymentId, cashAdjustmentStatus: result.status })
+    // P5C.1: result.status may now be 'requires_action' -- echo it
+    // directly rather than a hardcoded 'success' (see the equivalent
+    // fix in barter/[id]/deposit/route.ts for the full reasoning).
+    return NextResponse.json({ status: result.status, paymentId: result.paymentId, cashAdjustmentStatus: result.status, redirectUrl: result.redirectUrl })
   } catch (err) {
     if (err instanceof OrchestrationError) {
       console.error('[barter.cash-adjustment] orchestration error', { userId: requester.userId, agreementId, code: err.code, message: err.message })
