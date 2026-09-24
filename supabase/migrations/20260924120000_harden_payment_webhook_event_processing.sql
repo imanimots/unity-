@@ -137,24 +137,45 @@ end;
 $$;
 
 -- ------------------------------------------------------------
--- MARK_WEBHOOK_EVENT_PROCESSED -- the completion path. Unconditional on
--- source processing_status (deliberately -- see P5D-M1 phase report
--- item 12: a dedicated mark-ignored RPC was considered and not added
--- this phase; P5D-B may call this same function for any
--- terminally-handled outcome, including one it decides to treat as a
--- business no-op, since this column's job is only "was this delivery
--- durably handled", not which business reconciliation outcome resulted
--- -- that distinction belongs in payment_events/payload, a separate
--- concern). Matched strictly by (provider, provider_event_id) -- the
--- same exact composite key the table's own dedup constraint already
--- guarantees is unique, so no unrelated row can ever be touched.
--- Idempotent on repeat: calling this twice for the same event just
--- re-confirms 'processed' with a later processed_at, never errors,
--- never regresses to an earlier state.
+-- MARK_WEBHOOK_EVENT_PROCESSED -- the completion path.
+--
+-- P5D-M1-R found the first version of this function unconditional on
+-- source processing_status, matched only by (provider,
+-- provider_event_id) -- claim_webhook_event_processing's own returned
+-- processing_attempts value was telemetry-only, never enforced. That let
+-- a stale worker (one whose lease had already been reclaimed by a
+-- second, newer claim) still finalize the row out from under the
+-- worker that actually owns the current attempt. P5D-M1.1 fixes this by
+-- making processing_attempts a genuine fencing token: the mutating
+-- UPDATE below only ever matches a row that is BOTH currently
+-- 'processing' AND still on exactly the attempt number the caller
+-- claimed -- a stale caller's token can never match once a newer claim
+-- has incremented it, because the row's processing_attempts has already
+-- moved on.
+--
+-- Distinguishes three outcomes without mutation when the fenced UPDATE
+-- affects zero rows (the reporting SELECT below runs strictly AFTER
+-- that UPDATE has already made -- and lost -- its atomic attempt, never
+-- before it, so it never controls whether a mutation happens):
+--   already_processed -- same token, already 'processed' (this exact
+--     worker's own earlier call already landed; a retry after a lost
+--     response). No mutation, processed_at is NOT refreshed, so a retry
+--     can never be told apart from the original success by timestamp.
+--   lost_claim -- processing_attempts on the row no longer matches the
+--     caller's token: someone else has reclaimed this event since.
+--   invalid_state -- same token, but the row is in a status this
+--     function was never meant to complete from (e.g. 'ignored', or a
+--     status that only a genuine claim produces) -- reported rather
+--     than silently mutated or silently ignored.
+-- A row that genuinely does not exist raises an exception (the only
+-- case an exception is used for -- every ownership-related outcome
+-- above is a structured, non-exceptional 'outcome' value, so the caller
+-- never has to infer ownership from exception text).
 -- ------------------------------------------------------------
 create or replace function public.mark_webhook_event_processed(
   p_provider text,
-  p_provider_event_id text
+  p_provider_event_id text,
+  p_expected_processing_attempt integer
 )
 returns jsonb
 language plpgsql
@@ -167,6 +188,15 @@ begin
   if auth.role() <> 'service_role' then
     raise exception 'not authorized';
   end if;
+  if p_provider is null or p_provider = '' then
+    raise exception 'provider is required';
+  end if;
+  if p_provider_event_id is null or p_provider_event_id = '' then
+    raise exception 'provider_event_id is required';
+  end if;
+  if p_expected_processing_attempt is null or p_expected_processing_attempt <= 0 then
+    raise exception 'expected processing attempt must be a positive number';
+  end if;
 
   update public.payment_webhook_events
   set processing_status = 'processed',
@@ -175,34 +205,62 @@ begin
       last_error = null
   where provider = p_provider
     and provider_event_id = p_provider_event_id
+    and processing_status = 'processing'
+    and processing_attempts = p_expected_processing_attempt
   returning * into v_row;
+
+  if v_row.id is not null then
+    return jsonb_build_object('outcome', 'completed', 'processing_status', v_row.processing_status, 'processing_attempts', v_row.processing_attempts);
+  end if;
+
+  select * into v_row from public.payment_webhook_events
+  where provider = p_provider and provider_event_id = p_provider_event_id;
 
   if v_row.id is null then
     raise exception 'webhook event not found for provider % / event %', p_provider, p_provider_event_id;
   end if;
 
-  return jsonb_build_object('provider_event_id', v_row.provider_event_id, 'processing_status', v_row.processing_status);
+  if v_row.processing_status = 'processed' and v_row.processing_attempts = p_expected_processing_attempt then
+    return jsonb_build_object('outcome', 'already_processed', 'processing_status', v_row.processing_status, 'processing_attempts', v_row.processing_attempts);
+  end if;
+
+  if v_row.processing_attempts <> p_expected_processing_attempt then
+    return jsonb_build_object('outcome', 'lost_claim', 'processing_status', v_row.processing_status, 'processing_attempts', v_row.processing_attempts);
+  end if;
+
+  return jsonb_build_object('outcome', 'invalid_state', 'processing_status', v_row.processing_status, 'processing_attempts', v_row.processing_attempts);
 end;
 $$;
 
 -- ------------------------------------------------------------
--- MARK_WEBHOOK_EVENT_ERROR -- the retryable-failure path. Clears the
--- lease (processing_started_at = null) so the event is immediately
--- eligible for claim_webhook_event_processing's 'error' branch, rather
--- than waiting out a stale-lease window for a failure the current
--- attempt already knows is over. p_last_error is truncated to 500
--- characters (same bounded-diagnostic-text convention as
--- subscription_v2_scheduled_publishing.sql's `left(sqlerrm, 200)`, and
--- the payment_events/booking_history *_message columns' 2000-char
--- check-constraint shape) before storage -- the CALLER (P5D-B) remains
--- responsible for never passing an API key, custom webhook secret,
--- payment_response_hash_key, raw provider payload, or unbounded stack
--- trace as p_last_error; this function only bounds length, it cannot
--- itself distinguish a secret from an ordinary error string.
+-- MARK_WEBHOOK_EVENT_ERROR -- the retryable-failure path. Same
+-- token-fenced ownership model as mark_webhook_event_processed above
+-- (P5D-M1.1 -- see that function's comment for the stale-worker defect
+-- this closes for both completion paths). Clears the lease
+-- (processing_started_at = null) on a genuine first error so the event
+-- is immediately eligible for claim_webhook_event_processing's 'error'
+-- branch, rather than waiting out a stale-lease window for a failure
+-- the current attempt already knows is over.
+--
+-- Same-token retry (already_error) deliberately does NOT overwrite
+-- last_error -- the first durable error record for a given attempt is
+-- preserved rather than replaced by whatever message a retried call
+-- happens to carry, since both calls describe the same underlying
+-- failure and the first is no less authoritative than the second.
+-- p_last_error itself is truncated to 500 characters (same
+-- bounded-diagnostic-text convention as
+-- subscription_v2_scheduled_publishing.sql's `left(sqlerrm, 200)`)
+-- before storage on the one path that does write it -- the CALLER
+-- (P5D-B) remains responsible for never passing an API key, custom
+-- webhook secret, payment_response_hash_key, raw provider payload, or
+-- unbounded stack trace as p_last_error; this function only bounds
+-- length, it cannot itself distinguish a secret from an ordinary error
+-- string.
 -- ------------------------------------------------------------
 create or replace function public.mark_webhook_event_error(
   p_provider text,
   p_provider_event_id text,
+  p_expected_processing_attempt integer,
   p_last_error text default null
 )
 returns jsonb
@@ -216,6 +274,15 @@ begin
   if auth.role() <> 'service_role' then
     raise exception 'not authorized';
   end if;
+  if p_provider is null or p_provider = '' then
+    raise exception 'provider is required';
+  end if;
+  if p_provider_event_id is null or p_provider_event_id = '' then
+    raise exception 'provider_event_id is required';
+  end if;
+  if p_expected_processing_attempt is null or p_expected_processing_attempt <= 0 then
+    raise exception 'expected processing attempt must be a positive number';
+  end if;
 
   update public.payment_webhook_events
   set processing_status = 'error',
@@ -223,13 +290,30 @@ begin
       last_error = left(p_last_error, 500)
   where provider = p_provider
     and provider_event_id = p_provider_event_id
+    and processing_status = 'processing'
+    and processing_attempts = p_expected_processing_attempt
   returning * into v_row;
+
+  if v_row.id is not null then
+    return jsonb_build_object('outcome', 'error_recorded', 'processing_status', v_row.processing_status, 'processing_attempts', v_row.processing_attempts);
+  end if;
+
+  select * into v_row from public.payment_webhook_events
+  where provider = p_provider and provider_event_id = p_provider_event_id;
 
   if v_row.id is null then
     raise exception 'webhook event not found for provider % / event %', p_provider, p_provider_event_id;
   end if;
 
-  return jsonb_build_object('provider_event_id', v_row.provider_event_id, 'processing_status', v_row.processing_status, 'processing_attempts', v_row.processing_attempts);
+  if v_row.processing_status = 'error' and v_row.processing_attempts = p_expected_processing_attempt then
+    return jsonb_build_object('outcome', 'already_error', 'processing_status', v_row.processing_status, 'processing_attempts', v_row.processing_attempts);
+  end if;
+
+  if v_row.processing_attempts <> p_expected_processing_attempt then
+    return jsonb_build_object('outcome', 'lost_claim', 'processing_status', v_row.processing_status, 'processing_attempts', v_row.processing_attempts);
+  end if;
+
+  return jsonb_build_object('outcome', 'invalid_state', 'processing_status', v_row.processing_status, 'processing_attempts', v_row.processing_attempts);
 end;
 $$;
 
@@ -243,9 +327,9 @@ $$;
 -- claim/complete/error functions are additive, called only after it.
 -- ------------------------------------------------------------
 revoke all on function public.claim_webhook_event_processing(text, text, integer) from public, anon, authenticated;
-revoke all on function public.mark_webhook_event_processed(text, text) from public, anon, authenticated;
-revoke all on function public.mark_webhook_event_error(text, text, text) from public, anon, authenticated;
+revoke all on function public.mark_webhook_event_processed(text, text, integer) from public, anon, authenticated;
+revoke all on function public.mark_webhook_event_error(text, text, integer, text) from public, anon, authenticated;
 
 grant execute on function public.claim_webhook_event_processing(text, text, integer) to service_role;
-grant execute on function public.mark_webhook_event_processed(text, text) to service_role;
-grant execute on function public.mark_webhook_event_error(text, text, text) to service_role;
+grant execute on function public.mark_webhook_event_processed(text, text, integer) to service_role;
+grant execute on function public.mark_webhook_event_error(text, text, integer, text) to service_role;

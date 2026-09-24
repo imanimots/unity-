@@ -18,6 +18,17 @@ function functionBody(name: string): string {
   return sql.slice(idx).split('$$;')[0]
 }
 
+// Isolates the WHERE clause of the FIRST update-...-returning statement
+// in a function body -- the one atomic, ownership-mutating statement --
+// distinct from any later reporting SELECT or idempotent-branch logic
+// in the same function. Same technique test #8 already used for the
+// claim RPC, reused here for mark_webhook_event_processed/_error so
+// fencing assertions are checked against the actual mutating predicate,
+// not just "this string appears somewhere in the function".
+function firstUpdateWhereClause(fnBody: string): string {
+  return fnBody.split('where provider = p_provider')[1].split('returning * into v_row;')[0]
+}
+
 describe('P5D-M1 webhook inbox migration invariants (regression guards over the SQL text)', () => {
   it('1. adds processing_started_at as a nullable timestamptz column', () => {
     expect(sql).toMatch(/add column if not exists processing_started_at timestamptz/)
@@ -73,13 +84,17 @@ describe('P5D-M1 webhook inbox migration invariants (regression guards over the 
     expect(fnBody).not.toMatch(/processing_status = 'processing'\)\s*$/m)
   })
 
-  it('10. processing_attempts is incremented only inside the claim RPC\'s own UPDATE, not in mark_webhook_event_processed or mark_webhook_event_error', () => {
+  it('10. processing_attempts is incremented only inside the claim RPC\'s own UPDATE -- mark_webhook_event_processed/_error read and compare it (fencing) but never increment it', () => {
     const claimBody = functionBody('claim_webhook_event_processing')
     const processedBody = functionBody('mark_webhook_event_processed')
     const errorBody = functionBody('mark_webhook_event_error')
     expect(claimBody).toMatch(/processing_attempts = processing_attempts \+ 1/)
-    expect(processedBody).not.toMatch(/processing_attempts/)
+    expect(processedBody).not.toMatch(/processing_attempts = processing_attempts \+ 1/)
     expect(errorBody).not.toMatch(/processing_attempts \+ 1/)
+    // Both DO reference processing_attempts -- as the fencing token
+    // they compare against, not a counter they advance.
+    expect(processedBody).toMatch(/processing_attempts = p_expected_processing_attempt/)
+    expect(errorBody).toMatch(/processing_attempts = p_expected_processing_attempt/)
   })
 
   it('11. the claim RPC never writes received_at -- only the original insert (record_webhook_event, untouched by this migration) sets it', () => {
@@ -93,34 +108,162 @@ describe('P5D-M1 webhook inbox migration invariants (regression guards over the 
     expect(signature).not.toMatch(/p_stale_after_seconds integer default/)
   })
 
-  it('13. mark_webhook_event_processed clears the processing lease and records processed_at, matched strictly by (provider, provider_event_id)', () => {
+  it('13. mark_webhook_event_processed\'s mutating UPDATE clears the processing lease and records processed_at, matched by (provider, provider_event_id) AND the fencing predicate', () => {
     const fnBody = functionBody('mark_webhook_event_processed')
     expect(fnBody).toMatch(/processing_status = 'processed'/)
     expect(fnBody).toMatch(/processed_at = now\(\)/)
     expect(fnBody).toMatch(/processing_started_at = null/)
-    expect(fnBody).toMatch(/where provider = p_provider\s+and provider_event_id = p_provider_event_id/)
+    const whereClause = firstUpdateWhereClause(fnBody)
+    expect(whereClause).toMatch(/and provider_event_id = p_provider_event_id/)
   })
 
-  it('14. mark_webhook_event_error clears the lease (immediately reclaimable) and bounds last_error to 500 characters via left()', () => {
+  it('14. mark_webhook_event_error\'s mutating UPDATE clears the lease (immediately reclaimable) and bounds last_error to 500 characters via left()', () => {
     const fnBody = functionBody('mark_webhook_event_error')
     expect(fnBody).toMatch(/processing_status = 'error'/)
     expect(fnBody).toMatch(/processing_started_at = null/)
     expect(fnBody).toMatch(/last_error = left\(p_last_error, 500\)/)
   })
 
-  it('15. record_webhook_event is not redefined by this migration -- the file only adds new, additive functions', () => {
+  it('19. mark_webhook_event_processed accepts p_expected_processing_attempt as a required (no-default) integer parameter', () => {
+    const signature = sql.slice(
+      sql.indexOf('create or replace function public.mark_webhook_event_processed'),
+      sql.indexOf('returns jsonb', sql.indexOf('create or replace function public.mark_webhook_event_processed'))
+    )
+    expect(signature).toMatch(/p_expected_processing_attempt integer/)
+    expect(signature).not.toMatch(/p_expected_processing_attempt integer default/)
+  })
+
+  it('20. mark_webhook_event_error accepts p_expected_processing_attempt as a required (no-default) integer parameter, ordered before the defaulted p_last_error', () => {
+    const signature = sql.slice(
+      sql.indexOf('create or replace function public.mark_webhook_event_error'),
+      sql.indexOf('returns jsonb', sql.indexOf('create or replace function public.mark_webhook_event_error'))
+    )
+    expect(signature).toMatch(/p_expected_processing_attempt integer,\s*\n\s*p_last_error text default null/)
+  })
+
+  it('21. mark_webhook_event_processed\'s mutating UPDATE requires processing_status = \'processing\' in its own WHERE clause -- not merely elsewhere in the function', () => {
+    const fnBody = functionBody('mark_webhook_event_processed')
+    const whereClause = firstUpdateWhereClause(fnBody)
+    expect(whereClause).toMatch(/and processing_status = 'processing'/)
+  })
+
+  it('22. mark_webhook_event_processed\'s mutating UPDATE requires processing_attempts = p_expected_processing_attempt in its own WHERE clause', () => {
+    const fnBody = functionBody('mark_webhook_event_processed')
+    const whereClause = firstUpdateWhereClause(fnBody)
+    expect(whereClause).toMatch(/and processing_attempts = p_expected_processing_attempt/)
+  })
+
+  it('23. mark_webhook_event_error\'s mutating UPDATE requires processing_status = \'processing\' in its own WHERE clause', () => {
+    const fnBody = functionBody('mark_webhook_event_error')
+    const whereClause = firstUpdateWhereClause(fnBody)
+    expect(whereClause).toMatch(/and processing_status = 'processing'/)
+  })
+
+  it('24. mark_webhook_event_error\'s mutating UPDATE requires processing_attempts = p_expected_processing_attempt in its own WHERE clause', () => {
+    const fnBody = functionBody('mark_webhook_event_error')
+    const whereClause = firstUpdateWhereClause(fnBody)
+    expect(whereClause).toMatch(/and processing_attempts = p_expected_processing_attempt/)
+  })
+
+  it('25. a "processed" row can never be mutated to "error" -- mark_webhook_event_error\'s fenced UPDATE only ever matches processing_status = \'processing\', which \'processed\' is not', () => {
+    const fnBody = functionBody('mark_webhook_event_error')
+    const whereClause = firstUpdateWhereClause(fnBody)
+    // The only status literal the mutating WHERE clause matches is
+    // 'processing' -- 'processed' never appears as an eligible source
+    // state for this UPDATE.
+    expect(whereClause).toMatch(/processing_status = 'processing'/)
+    expect(whereClause).not.toMatch(/'processed'/)
+  })
+
+  it('26. an "ignored" row can never be mutated to "error" -- same fenced UPDATE, same reasoning as processed -> error', () => {
+    const fnBody = functionBody('mark_webhook_event_error')
+    const whereClause = firstUpdateWhereClause(fnBody)
+    expect(whereClause).not.toMatch(/'ignored'/)
+  })
+
+  it('27. a "received" row can never be directly marked processed -- mark_webhook_event_processed\'s fenced UPDATE only matches processing_status = \'processing\', never \'received\'', () => {
+    const fnBody = functionBody('mark_webhook_event_processed')
+    const whereClause = firstUpdateWhereClause(fnBody)
+    expect(whereClause).toMatch(/processing_status = 'processing'/)
+    expect(whereClause).not.toMatch(/'received'/)
+  })
+
+  it('28. a stale attempt N is fenced out once attempt N+1 exists -- both completion RPCs report "lost_claim" when the row\'s processing_attempts no longer equals the caller\'s token, without mutating', () => {
+    for (const name of ['mark_webhook_event_processed', 'mark_webhook_event_error']) {
+      const fnBody = functionBody(name)
+      const postUpdate = fnBody.split('returning * into v_row;')[1]
+      expect(postUpdate, `${name} should have a lost_claim branch`).toMatch(/if v_row\.processing_attempts <> p_expected_processing_attempt then/)
+      expect(postUpdate).toMatch(/'outcome', 'lost_claim'/)
+    }
+  })
+
+  it('29. same-token processed retry has an explicit already_processed idempotent branch, checked after the mutating UPDATE (never inside it)', () => {
+    const fnBody = functionBody('mark_webhook_event_processed')
+    const postUpdate = fnBody.split('returning * into v_row;')[1]
+    expect(postUpdate).toMatch(/if v_row\.processing_status = 'processed' and v_row\.processing_attempts = p_expected_processing_attempt then/)
+    expect(postUpdate).toMatch(/'outcome', 'already_processed'/)
+  })
+
+  it('30. same-token error retry has an explicit already_error idempotent branch, checked after the mutating UPDATE', () => {
+    const fnBody = functionBody('mark_webhook_event_error')
+    const postUpdate = fnBody.split('returning * into v_row;')[1]
+    expect(postUpdate).toMatch(/if v_row\.processing_status = 'error' and v_row\.processing_attempts = p_expected_processing_attempt then/)
+    expect(postUpdate).toMatch(/'outcome', 'already_error'/)
+  })
+
+  it('31. the idempotent already_processed branch never writes processed_at = now() -- only the fenced first-completion UPDATE does, so a retry can never be told apart from the original by timestamp', () => {
+    const fnBody = functionBody('mark_webhook_event_processed')
+    const alreadyProcessedBranch = fnBody.split("if v_row.processing_status = 'processed'")[1].split('end if;')[0]
+    expect(alreadyProcessedBranch).not.toMatch(/processed_at = now\(\)/)
+    // processed_at = now() must appear exactly once in the whole
+    // function -- inside the fenced mutating UPDATE, nowhere else.
+    expect(fnBody.match(/processed_at = now\(\)/g)?.length).toBe(1)
+  })
+
+  it('32. the idempotent already_error branch never rewrites last_error -- the first durable error record for a given attempt is preserved, not replaced by a retry', () => {
+    const fnBody = functionBody('mark_webhook_event_error')
+    const alreadyErrorBranch = fnBody.split("if v_row.processing_status = 'error'")[1].split('end if;')[0]
+    expect(alreadyErrorBranch).not.toMatch(/last_error = /)
+    // last_error is written exactly once in the whole function -- inside
+    // the fenced mutating UPDATE, nowhere else.
+    expect(fnBody.match(/last_error = /g)?.length).toBe(1)
+  })
+
+  it('33. every ownership-related outcome is a structured, non-exceptional return value -- the caller never has to infer ownership from an exception message', () => {
+    for (const name of ['mark_webhook_event_processed', 'mark_webhook_event_error']) {
+      const fnBody = functionBody(name)
+      // Exactly one raise exception for "row not found at all" -- every
+      // other branch returns a jsonb 'outcome' value instead of raising.
+      const exceptionCount = (fnBody.match(/raise exception 'webhook event not found/g) || []).length
+      expect(exceptionCount, `${name} should raise exactly once, only for a genuinely missing row`).toBe(1)
+      expect(fnBody).toMatch(/'outcome', 'lost_claim'/)
+      expect(fnBody).toMatch(/'outcome', 'invalid_state'/)
+    }
+  })
+
+  it('34. p_expected_processing_attempt is validated as a required positive number before any mutation, in both completion RPCs', () => {
+    for (const name of ['mark_webhook_event_processed', 'mark_webhook_event_error']) {
+      const fnBody = functionBody(name)
+      const validationSection = fnBody.split('update public.payment_webhook_events')[0]
+      expect(validationSection, `${name} should validate the token before its UPDATE`).toMatch(
+        /if p_expected_processing_attempt is null or p_expected_processing_attempt <= 0 then/
+      )
+    }
+  })
+
+  it('35. record_webhook_event is not redefined by this migration -- the file only adds new, additive functions', () => {
     expect(sql).not.toMatch(/create or replace function public\.record_webhook_event/)
   })
 
-  it('16. every new function is service_role only, matching every existing payment RPC -- no anon/authenticated/public grant', () => {
-    for (const fn of ['claim_webhook_event_processing(text, text, integer)', 'mark_webhook_event_processed(text, text)', 'mark_webhook_event_error(text, text, text)']) {
+  it('36. every new function is service_role only, matching every existing payment RPC -- no anon/authenticated/public grant, using each function\'s current (post-fencing) signature', () => {
+    for (const fn of ['claim_webhook_event_processing(text, text, integer)', 'mark_webhook_event_processed(text, text, integer)', 'mark_webhook_event_error(text, text, integer, text)']) {
       const escaped = fn.replace(/[()]/g, '\\$&')
       expect(sql).toMatch(new RegExp(`revoke all on function public\\.${escaped} from public, anon, authenticated`))
       expect(sql).toMatch(new RegExp(`grant execute on function public\\.${escaped} to service_role`))
     }
   })
 
-  it('17. every new function is SECURITY DEFINER with an explicit search_path and a service_role auth guard, matching existing payment RPC convention', () => {
+  it('37. every new function is SECURITY DEFINER with an explicit search_path and a service_role auth guard, matching existing payment RPC convention', () => {
     for (const name of ['claim_webhook_event_processing', 'mark_webhook_event_processed', 'mark_webhook_event_error']) {
       const fnBody = functionBody(name)
       expect(fnBody, `${name} should be security definer`).toMatch(/security definer/)
@@ -129,7 +272,7 @@ describe('P5D-M1 webhook inbox migration invariants (regression guards over the 
     }
   })
 
-  it('18. no provider_reference unique index and no refund RPC are created by this migration -- explicitly out of P5D-M1 scope', () => {
+  it('38. no provider_reference unique index and no refund RPC are created by this migration -- explicitly out of P5D-M1/P5D-M1.1 scope', () => {
     expect(sql).not.toMatch(/payments_provider_reference_unique/)
     expect(sql).not.toMatch(/create.*function.*refund/i)
   })
