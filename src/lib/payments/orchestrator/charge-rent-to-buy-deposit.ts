@@ -13,17 +13,30 @@ export interface ChargeRentToBuyDepositResult {
 /**
  * The security deposit is charged as its own, independent, single-shot
  * payment -- never counted toward purchase progress, never commissioned
- * (Rule 10-12). record_rent_to_buy_deposit_payment() sets
- * deposit_funded_at (the Rule 12 handover gate) and re-checks possession
- * eligibility; it never touches rent_to_buy_installments or
- * ownership_status. Deliberately NOT wired through escrow_transactions --
- * the deposit is a genuinely separate pool from purchase escrow (Rule
- * 28), tracked instead via the agreement's own deposit_funded_at/
- * deposit_forfeited_at/deposit_refunded_at columns and settled by the
- * V2 settlement helpers directly; giving it its own escrow row would
- * make it indistinguishable from purchase-proceeds rows to the generic
- * settlement sweep, risking exactly the "auto-convert deposit into
- * purchase payment" outcome Rule 12 prohibits.
+ * (Rule 10-12). record_rent_to_buy_deposit_payment() never touches
+ * rent_to_buy_installments or ownership_status. Deliberately NOT wired
+ * through escrow_transactions -- the deposit is a genuinely separate
+ * pool from purchase escrow (Rule 28), tracked instead via the
+ * agreement's own deposit_funded_at/deposit_forfeited_at/
+ * deposit_refunded_at columns and settled by the V2 settlement helpers
+ * directly; giving it its own escrow row would make it indistinguishable
+ * from purchase-proceeds rows to the generic settlement sweep, risking
+ * exactly the "auto-convert deposit into purchase payment" outcome
+ * Rule 12 prohibits.
+ *
+ * P5D-B.2: the deposit's economic intent is IMMEDIATE COLLECTION (it is
+ * later refunded or forfeited per RTB business rules, never held as an
+ * open provider authorization) -- confirmed against docs/RENT_TO_BUY.md's
+ * own "refunded"/"forfeited" language and fresh Peach documentation
+ * (P5D-B.2-D). The prior authorizeDeposit()-based flow was a genuine bug:
+ * it transitioned pending -> captured directly after a successful
+ * authorization, without ever calling captureDeposit() -- financially
+ * untruthful, since 'authorised' only means funds are held, not
+ * collected. This now uses chargeRental() (automatic capture), exactly
+ * the same provider operation every other immediate-settlement payment
+ * type already uses -- never authorizeDeposit()/captureDeposit(), which
+ * remain correct for the genuinely-manual-capture 'deposit'/
+ * 'barter_deposit' families.
  */
 export async function chargeRentToBuyDeposit(
   ctx: OrchestratorContext,
@@ -64,7 +77,7 @@ export async function chargeRentToBuyDeposit(
   await assertNoPendingProviderAttempt(admin, paymentId)
 
   try {
-    const charge = await provider.authorizeDeposit({
+    const charge = await provider.chargeRental({
       paymentId,
       providerReference: '',
       amount: Number(agreement.security_deposit_amount),
@@ -89,7 +102,7 @@ export async function chargeRentToBuyDeposit(
       p_payment_id: paymentId,
       p_attempt_number: 1,
       p_provider: provider.name,
-      p_status: charge.status === 'authorised' ? 'succeeded' : 'failed',
+      p_status: charge.status === 'captured' ? 'succeeded' : 'failed',
       p_provider_reference: charge.providerReference,
       p_failure_code: charge.status === 'failed' ? 'provider_declined' : null,
       p_failure_message: charge.status === 'failed' ? (charge.failureReason ?? null) : null,

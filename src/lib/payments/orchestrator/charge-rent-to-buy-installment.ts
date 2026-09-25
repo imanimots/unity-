@@ -66,6 +66,7 @@ export async function chargeRentToBuyInstallment(
     p_currency: agreement.currency,
     p_provider: providerName,
     p_idempotency_key: idempotencyKey ? `${idempotencyKey}-intent-${sequence}` : null,
+    p_installment_sequence: sequence,
   })
   if (intentError) throw new OrchestrationError('internal_consistency_error', `Could not create instalment payment: ${intentError.message}`)
   const paymentId = intent.payment_id as string

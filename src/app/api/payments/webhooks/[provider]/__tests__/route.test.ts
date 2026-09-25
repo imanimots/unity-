@@ -63,6 +63,12 @@ function fakeAdmin(overrides: {
   transitionResult?: { data?: unknown; error?: unknown }
   markOrderPaidResult?: { data?: unknown; error?: unknown }
   bookingRow?: { status: string; payment_expired_at: string | null } | null
+  rentalAffiliateCommissionResult?: { data?: unknown; error?: unknown }
+  rentalUnityCommissionResult?: { data?: unknown; error?: unknown }
+  saleAffiliateCommissionResult?: { data?: unknown; error?: unknown }
+  saleUnityCommissionResult?: { data?: unknown; error?: unknown }
+  recordInstallmentResult?: { data?: unknown; error?: unknown }
+  payoffResult?: { data?: unknown; error?: unknown }
 }) {
   const rpcCalls: Array<{ name: string; params: unknown }> = []
   const rpc = vi.fn(async (name: string, params: unknown) => {
@@ -82,6 +88,18 @@ function fakeAdmin(overrides: {
         return overrides.markOrderPaidResult ?? { data: { order_id: 'order-1', status: 'paid' }, error: null }
       case 'record_late_payment_reconciliation':
         return { data: { booking_id: 'booking-1', recorded: true }, error: null }
+      case 'qualify_rental_payment_affiliate_commission':
+        return overrides.rentalAffiliateCommissionResult ?? { data: { qualified: true, commission_id: 'affiliate-rental-1' }, error: null }
+      case 'qualify_rental_payment_unity_commission':
+        return overrides.rentalUnityCommissionResult ?? { data: { qualified: true, commission_id: 'unity-rental-1' }, error: null }
+      case 'qualify_sale_affiliate_commission':
+        return overrides.saleAffiliateCommissionResult ?? { data: { qualified: true, commission_id: 'affiliate-sale-1' }, error: null }
+      case 'qualify_sale_unity_commission':
+        return overrides.saleUnityCommissionResult ?? { data: { qualified: true, commission_id: 'unity-sale-1' }, error: null }
+      case 'record_rent_to_buy_installment_payment':
+        return overrides.recordInstallmentResult ?? { data: { installment_id: 'inst-1', status: 'paid', already_paid: false }, error: null }
+      case 'payoff_rent_to_buy_agreement':
+        return overrides.payoffResult ?? { data: { status: 'completed', amount_paid: 100 }, error: null }
       default:
         throw new Error(`unexpected rpc call: ${name}`)
     }

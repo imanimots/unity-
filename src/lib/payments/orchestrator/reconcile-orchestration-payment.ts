@@ -26,20 +26,49 @@ export interface OrchestrationEvidence {
 }
 
 /**
- * `paymentType`/`bookingId`/`orderId` are only carried on the two
- * outcomes that can represent a genuine financial completion
- * (`transitioned` and `already_current`) -- exactly what
- * completeAsyncPaymentBusinessProgression() needs to dispatch domain
- * progression without a second lookup, and nothing else. `bookingId`/
- * `orderId` are `null` when the payment belongs to a different domain
- * (payments.booking_id/order_id are mutually-exclusive-with-the-other-
- * domain-FKs nullable columns -- confirmed via
+ * `paymentType`/`bookingId`/`orderId`/`rentToBuyAgreementId`/`renterId`/
+ * `metadata` are only carried on the two outcomes that can represent a
+ * genuine financial completion (`transitioned` and `already_current`) --
+ * exactly what completeAsyncPaymentBusinessProgression() needs to
+ * dispatch domain progression without a second lookup, and nothing
+ * else. `bookingId`/`orderId`/`rentToBuyAgreementId` are `null` when the
+ * payment belongs to a different domain (payments.booking_id/order_id/
+ * rent_to_buy_agreement_id are mutually-exclusive-with-the-other-domain-
+ * FKs nullable columns -- confirmed via
  * 20260812000002_order_payments_widening.sql's own
- * payments_one_transaction_chk).
+ * payments_one_transaction_chk). `renterId` carries payments.renter_id --
+ * for an RTB installment/payoff/deposit payment this is always the
+ * agreement's own customer_id (create_rent_to_buy_payment_intent inserts
+ * it directly from p_payer_id, and every RTB caller passes
+ * agreement.customer_id as p_payer_id -- confirmed by direct source
+ * reading, not assumed), which is exactly the persisted, authoritative
+ * actor identity payoff_rent_to_buy_agreement's own p_actor_user_id
+ * check requires (P5D-B.2 S14).
  */
 export type ReconciliationOutcome =
-  | { outcome: 'transitioned'; paymentId: string; from: PaymentStatus; to: PaymentStatus; paymentType: string; bookingId: string | null; orderId: string | null }
-  | { outcome: 'already_current'; paymentId: string; status: PaymentStatus; paymentType: string; bookingId: string | null; orderId: string | null }
+  | {
+      outcome: 'transitioned'
+      paymentId: string
+      from: PaymentStatus
+      to: PaymentStatus
+      paymentType: string
+      bookingId: string | null
+      orderId: string | null
+      rentToBuyAgreementId: string | null
+      renterId: string | null
+      metadata: Record<string, unknown>
+    }
+  | {
+      outcome: 'already_current'
+      paymentId: string
+      status: PaymentStatus
+      paymentType: string
+      bookingId: string | null
+      orderId: string | null
+      rentToBuyAgreementId: string | null
+      renterId: string | null
+      metadata: Record<string, unknown>
+    }
   | { outcome: 'pending_noop'; paymentId: string }
   | { outcome: 'stale'; paymentId: string; rawStatus: string }
   | { outcome: 'manual_review'; paymentId: string; reason: string }
@@ -56,6 +85,9 @@ interface PaymentRow {
   currency: string
   booking_id: string | null
   order_id: string | null
+  rent_to_buy_agreement_id: string | null
+  renter_id: string | null
+  metadata: Record<string, unknown> | null
 }
 
 /**
@@ -69,17 +101,22 @@ interface PaymentRow {
  * 'order_payment' (20260812000001), 'barter_deposit' /
  * 'barter_cash_adjustment' (20260816000001), and
  * 'rent_to_buy_installment' / 'rent_to_buy_deposit' (20260827000001).
- * Of those seven, exactly three use `authorizeDeposit()`:
+ *
+ * P5D-B.2: 'rent_to_buy_deposit' moved OUT of this set -- its economic
+ * intent is immediate collection (confirmed against docs/RENT_TO_BUY.md
+ * and Peach documentation, P5D-B.2-D), and charge-rent-to-buy-deposit.ts
+ * now uses chargeRental() (automatic capture), the same operation every
+ * other member of the immediate-settlement family already uses. Of the
+ * seven payment_type values, exactly two remain genuinely manual-capture:
  *   - 'deposit'            -- authorize-booking-financials.ts
  *   - 'barter_deposit'     -- authorize-barter-deposit.ts
- *   - 'rent_to_buy_deposit'-- charge-rent-to-buy-deposit.ts
- * The other four ('rental_charge', 'order_payment',
- * 'barter_cash_adjustment', 'rent_to_buy_installment') all use
- * `chargeRental()` (automatic capture) -- confirmed by direct source
- * reading of every orchestrator call site, not inferred from a type
- * name containing "deposit".
+ * The other five ('rental_charge', 'order_payment',
+ * 'barter_cash_adjustment', 'rent_to_buy_installment',
+ * 'rent_to_buy_deposit') all use `chargeRental()` (automatic capture) --
+ * confirmed by direct source reading of every orchestrator call site,
+ * not inferred from a type name containing "deposit".
  */
-const MANUAL_CAPTURE_PAYMENT_TYPES = new Set(['deposit', 'barter_deposit', 'rent_to_buy_deposit'])
+const MANUAL_CAPTURE_PAYMENT_TYPES = new Set(['deposit', 'barter_deposit'])
 
 /**
  * The single reconciliation entry point every source (webhook, and once
@@ -112,7 +149,7 @@ export async function reconcileOrchestrationPayment(admin: SupabaseClient, evide
   // constraint yet -- P5D-A.1's own confirmed, separately-gated gap).
   const { data: rows, error: lookupError } = await admin
     .from('payments')
-    .select('id, status, payment_type, amount, currency, booking_id, order_id')
+    .select('id, status, payment_type, amount, currency, booking_id, order_id, rent_to_buy_agreement_id, renter_id, metadata')
     .eq('provider', 'peach')
     .eq('provider_reference', evidence.paymentId)
     .limit(2)
@@ -266,7 +303,17 @@ export async function reconcileOrchestrationPayment(admin: SupabaseClient, evide
       : category.target
 
   if (target === payment.status) {
-    return { outcome: 'already_current', paymentId: payment.id, status: payment.status, paymentType: payment.payment_type, bookingId: payment.booking_id, orderId: payment.order_id }
+    return {
+      outcome: 'already_current',
+      paymentId: payment.id,
+      status: payment.status,
+      paymentType: payment.payment_type,
+      bookingId: payment.booking_id,
+      orderId: payment.order_id,
+      rentToBuyAgreementId: payment.rent_to_buy_agreement_id,
+      renterId: payment.renter_id,
+      metadata: payment.metadata ?? {},
+    }
   }
 
   if (!isValidPaymentTransition(payment.status, target)) {
@@ -318,7 +365,18 @@ export async function reconcileOrchestrationPayment(admin: SupabaseClient, evide
     throw transitionError
   }
 
-  return { outcome: 'transitioned', paymentId: payment.id, from: payment.status, to: target, paymentType: payment.payment_type, bookingId: payment.booking_id, orderId: payment.order_id }
+  return {
+    outcome: 'transitioned',
+    paymentId: payment.id,
+    from: payment.status,
+    to: target,
+    paymentType: payment.payment_type,
+    bookingId: payment.booking_id,
+    orderId: payment.order_id,
+    rentToBuyAgreementId: payment.rent_to_buy_agreement_id,
+    renterId: payment.renter_id,
+    metadata: payment.metadata ?? {},
+  }
 }
 
 /**
@@ -330,7 +388,7 @@ function safeLog(reason: string, fields: Record<string, unknown>): void {
   console.error(`[orchestration.reconcile] ${reason}`, fields)
 }
 
-export type BusinessProgressionOutcome = { outcome: 'not_applicable' } | { outcome: 'completed' }
+export type BusinessProgressionOutcome = { outcome: 'not_applicable' } | { outcome: 'completed' } | { outcome: 'manual_review'; reason: string }
 
 /**
  * P5D-B.1: `payments.status` changing is not the same as the business
@@ -365,29 +423,92 @@ export type BusinessProgressionOutcome = { outcome: 'not_applicable' } | { outco
  * business object stuck while the event is marked handled.
  *
  * SCOPE, EXPLICITLY NOT WIRED THIS PHASE (reported, not silently
- * omitted -- see the P5D-B.1 phase report):
- *   - RTB installment progression (record_rent_to_buy_installment_payment)
- *     requires the specific installment `sequence`, which is not
- *     reliably recoverable from the `payments`/`rent_to_buy_installments`
- *     schema alone for an in-flight (not-yet-recorded) payment --
- *     `rent_to_buy_installments.payment_id` is only ever set BY that
- *     same RPC, so there is no safe reverse lookup before it has run.
+ * omitted -- see the P5D-B.2 phase report):
  *   - RTB deposit progression (record_rent_to_buy_deposit_payment) --
- *     charge-rent-to-buy-deposit.ts's own synchronous flow treats a
- *     successful authorizeDeposit() as immediately 'captured' (not
- *     'authorised', unlike booking/barter deposits), a
- *     domain-specific business rule not independently re-verified
- *     safe to replicate generically here this phase.
+ *     re-read fresh at P5D-B.2 and found to have NO idempotency guard at
+ *     all (no idempotency-key check, no "already recorded" short-circuit
+ *     -- every call unconditionally inserts a new rent_to_buy_history
+ *     row). Safe for the synchronous path (called at most once per
+ *     successful charge, guarded by charge-rent-to-buy-deposit.ts's own
+ *     "already captured -> return early" check before ever re-entering
+ *     the charge step), but NOT safe to wire into this function, which
+ *     is deliberately re-run on every `already_current` recovery --
+ *     exactly the repeated-invocation pattern this RPC has no protection
+ *     against. Wiring it here would produce a duplicate history row on
+ *     every retried webhook/force-sync poll for an already-captured
+ *     deposit. Genuinely blocked without a narrow RPC-hardening
+ *     migration (out of this phase's scope) -- not routed around.
  *   - Barter requires no domain-specific progression at all beyond the
  *     payment transition itself -- confirmed: authorize-barter-deposit.ts
  *     and charge-barter-cash-adjustment.ts call only
  *     record_payment_attempt/transition_payment_status, no
  *     domain-specific RPC exists for either barter payment_type.
- *   - Commission qualification (qualifyRentalPaymentAffiliateCommission
- *     etc.) and escrow funding are deliberately out of scope -- both are
+ *   - Escrow funding remains out of scope here, unchanged from P5D-B.1 --
  *     already documented as "best-effort, never blocks" in every
- *     synchronous caller, a materially different risk category from the
- *     "business object permanently stuck" gaps this function closes.
+ *     synchronous caller, and P5D-B.2 was explicitly directed not to
+ *     enlarge escrow's footprint.
+ *
+ * RTB INSTALLMENT/PAYOFF (P5D-B.2, wired this phase): dispatches on
+ * payments.metadata, written once and immutably by
+ * create_rent_to_buy_payment_intent (P5D-M2/P5D-M3) -- never guessed,
+ * never inferred from "whatever is currently unpaid":
+ *   - metadata.rent_to_buy_installment_sequence present -> ordinary
+ *     single-installment completion via
+ *     record_rent_to_buy_installment_payment (idempotent: an already-
+ *     'paid' installment returns already_paid=true, confirmed by direct
+ *     source reading, 20260827000005_rtb_rpcs.sql).
+ *   - metadata.rent_to_buy_payoff_sequences present -> payoff completion
+ *     via payoff_rent_to_buy_agreement (P5D-M3), using payments.renter_id
+ *     as the persisted, proven-authoritative actor identity (see this
+ *     file's own ReconciliationOutcome doc comment) -- never an
+ *     interactive request user, since none exists on this path. A
+ *     completed/already_completed result is success; a payment_conflict/
+ *     invalid_snapshot result is a PERMANENT business-state conflict
+ *     (the P5D-M3 RPC itself guarantees no write occurred) -- logged via
+ *     safeLog() and returned as `manual_review`, never thrown. Retrying
+ *     forever cannot resolve a permanent conflict, so this deliberately
+ *     does NOT block mark_webhook_event_processed, exactly mirroring how
+ *     reconcileOrchestrationPayment's own pre-existing manual_review
+ *     outcomes are already handled (see this file's own doc comment on
+ *     the "manual-review audit interface gap").
+ *   - Neither key present -> a legacy payment predating this
+ *     correlation mechanism (or one created by application code from
+ *     before this phase). NO GUESSING: never chooses the lowest-unpaid
+ *     or next-scheduled installment, never parses a sequence from the
+ *     idempotency key, never infers from provider metadata. Logged via
+ *     safeLog() and returned as `manual_review` -- the same durable,
+ *     already-established fallback (safeLog + the payment_webhook_events
+ *     audit row already written before reconciliation ever runs), since
+ *     no other "flag for review" primitive exists in this codebase
+ *     without a new migration (out of scope this phase).
+ *
+ * COMMISSION QUALIFICATION (P5D-B.2, wired this phase): unlike the
+ * existing qualifySaleAffiliateCommission()/qualifySaleUnityCommission()/
+ * qualifyRentalPaymentAffiliateCommission()/
+ * qualifyRentalPaymentUnityCommission() wrappers (src/lib/affiliate/
+ * qualify.ts, src/lib/commissions/qualify.ts) -- which are deliberately
+ * best-effort/never-throw for their EXISTING synchronous call sites,
+ * where a commission bug must never roll back the customer's actual
+ * payment -- this function calls the underlying
+ * qualify_sale_affiliate_commission / qualify_sale_unity_commission /
+ * qualify_rental_payment_affiliate_commission /
+ * qualify_rental_payment_unity_commission RPCs directly and lets a
+ * genuine RPC error PROPAGATE (`if (error) throw error`, exactly like
+ * mark_order_paid below). This is a deliberate, narrow difference in
+ * error-propagation for this ONE additional call site, not a change to
+ * the wrapper functions or their existing callers: commission
+ * entitlement is mandatory business progression on the async path (no
+ * missing-commission sweep exists anywhere in this codebase to recover a
+ * silently-swallowed failure), so a transient failure here must prevent
+ * mark_webhook_event_processed exactly like a booking/order/RTB
+ * progression failure already does. Idempotency key construction
+ * (computeQualifyCommissionHash) and the RPCs themselves are reused
+ * unmodified -- both re-confirmed idempotent-by-payment_id fresh this
+ * phase (unique(payment_id) + an explicit already-qualified pre-check,
+ * 20260823000007_unity_commission_qualify_idempotency_fk_fix.sql /
+ * 20260904000025_affiliate_current_plan_gate_for_new_activity.sql) -- no
+ * calculation logic is duplicated, only the call site's throw behavior
+ * differs from the existing wrappers'.
  */
 export async function completeAsyncPaymentBusinessProgression(admin: SupabaseClient, reconciliation: ReconciliationOutcome): Promise<BusinessProgressionOutcome> {
   if (reconciliation.outcome !== 'transitioned' && reconciliation.outcome !== 'already_current') {
@@ -423,6 +544,84 @@ export async function completeAsyncPaymentBusinessProgression(admin: SupabaseCli
       p_idempotency_key: `async-reconcile:${reconciliation.paymentId}`,
     })
     if (error) throw error
+  }
+
+  if (reconciliation.paymentType === 'rent_to_buy_installment' && achievedStatus === 'captured' && reconciliation.rentToBuyAgreementId) {
+    const metadata = reconciliation.metadata
+    const sequence = metadata.rent_to_buy_installment_sequence
+    const payoffSequences = metadata.rent_to_buy_payoff_sequences
+
+    if (typeof sequence === 'number' && Number.isInteger(sequence) && sequence > 0) {
+      const { error } = await admin.rpc('record_rent_to_buy_installment_payment', {
+        p_agreement_id: reconciliation.rentToBuyAgreementId,
+        p_sequence: sequence,
+        p_payment_id: reconciliation.paymentId,
+        p_idempotency_key: `async-reconcile:${reconciliation.paymentId}`,
+      })
+      if (error) throw error
+    } else if (Array.isArray(payoffSequences) && payoffSequences.length > 0) {
+      if (!reconciliation.renterId) {
+        safeLog('rtb_payoff_missing_actor', { paymentId: reconciliation.paymentId, rentToBuyAgreementId: reconciliation.rentToBuyAgreementId })
+        return { outcome: 'manual_review', reason: 'rent-to-buy payoff payment has no persisted renter_id to use as the async actor identity' }
+      }
+      const { data, error } = await admin.rpc('payoff_rent_to_buy_agreement', {
+        p_actor_user_id: reconciliation.renterId,
+        p_agreement_id: reconciliation.rentToBuyAgreementId,
+        p_payment_id: reconciliation.paymentId,
+      })
+      if (error) throw error
+      const status = (data as { status?: string } | null)?.status
+      if (status !== 'completed' && status !== 'already_completed') {
+        // Permanent business-state conflict (payment_conflict/
+        // invalid_snapshot) -- the RPC itself guarantees no installment/
+        // ownership write occurred. Never retried forever: a conflict
+        // between two captured payments for overlapping installments
+        // cannot be resolved by trying again.
+        safeLog('rtb_payoff_manual_review', { paymentId: reconciliation.paymentId, rentToBuyAgreementId: reconciliation.rentToBuyAgreementId, result: data })
+        return { outcome: 'manual_review', reason: `payoff_rent_to_buy_agreement returned "${status}" -- not a safe automatic completion` }
+      }
+    } else {
+      // Legacy payment predating durable installment/payoff correlation
+      // -- no domain guessing.
+      safeLog('rtb_installment_uncorrelated_legacy_payment', { paymentId: reconciliation.paymentId, rentToBuyAgreementId: reconciliation.rentToBuyAgreementId })
+      return { outcome: 'manual_review', reason: 'rent-to-buy installment payment has no durable installment_sequence or payoff_sequences correlation' }
+    }
+  }
+
+  if (reconciliation.paymentType === 'rental_charge' && achievedStatus === 'captured' && reconciliation.bookingId) {
+    const { computeQualifyCommissionHash: computeAffiliateHash } = await import('@/lib/affiliate/idempotency')
+    const { error: affiliateError } = await admin.rpc('qualify_rental_payment_affiliate_commission', {
+      p_booking_id: reconciliation.bookingId,
+      p_payment_id: reconciliation.paymentId,
+      p_idempotency_key: computeAffiliateHash(reconciliation.bookingId, reconciliation.paymentId),
+    })
+    if (affiliateError) throw affiliateError
+
+    const { computeQualifyCommissionHash: computeUnityHash } = await import('@/lib/commissions/idempotency')
+    const { error: unityError } = await admin.rpc('qualify_rental_payment_unity_commission', {
+      p_booking_id: reconciliation.bookingId,
+      p_payment_id: reconciliation.paymentId,
+      p_idempotency_key: computeUnityHash(reconciliation.bookingId, reconciliation.paymentId),
+    })
+    if (unityError) throw unityError
+  }
+
+  if (reconciliation.paymentType === 'order_payment' && achievedStatus === 'captured' && reconciliation.orderId) {
+    const { computeQualifyCommissionHash: computeAffiliateHash } = await import('@/lib/affiliate/idempotency')
+    const { error: affiliateError } = await admin.rpc('qualify_sale_affiliate_commission', {
+      p_order_id: reconciliation.orderId,
+      p_payment_id: reconciliation.paymentId,
+      p_idempotency_key: computeAffiliateHash(reconciliation.orderId, reconciliation.paymentId),
+    })
+    if (affiliateError) throw affiliateError
+
+    const { computeQualifyCommissionHash: computeUnityHash } = await import('@/lib/commissions/idempotency')
+    const { error: unityError } = await admin.rpc('qualify_sale_unity_commission', {
+      p_order_id: reconciliation.orderId,
+      p_payment_id: reconciliation.paymentId,
+      p_idempotency_key: computeUnityHash(reconciliation.orderId, reconciliation.paymentId),
+    })
+    if (unityError) throw unityError
   }
 
   return { outcome: 'completed' }

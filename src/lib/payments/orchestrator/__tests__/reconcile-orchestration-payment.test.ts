@@ -30,6 +30,79 @@ function evidence(overrides: Partial<OrchestrationEvidence> = {}): Orchestration
   return { paymentId: 'peach_pay_1', status: 'succeeded', amountMinorUnits: 9200, currency: 'ZAR', source: 'webhook', providerEventId: 'evt_1', ...overrides }
 }
 
+/**
+ * Fake admin covering every domain-progression call shape
+ * completeAsyncPaymentBusinessProgression can issue:
+ * `.from('bookings').select().eq().maybeSingle()` (what the real,
+ * unmodified checkAndRecordLateSuccessIfExpired() issues) and every RPC
+ * name the function calls directly (order/booking/RTB/commission).
+ */
+function fakeProgressionAdmin(options: {
+  bookingRow?: { status: string; payment_expired_at: string | null } | null
+  markOrderPaidResult?: { data?: unknown; error?: unknown }
+  recordLateSuccessResult?: { data?: unknown; error?: unknown }
+  rentalAffiliateCommissionResult?: { data?: unknown; error?: unknown }
+  rentalUnityCommissionResult?: { data?: unknown; error?: unknown }
+  saleAffiliateCommissionResult?: { data?: unknown; error?: unknown }
+  saleUnityCommissionResult?: { data?: unknown; error?: unknown }
+  recordInstallmentResult?: { data?: unknown; error?: unknown }
+  payoffResult?: { data?: unknown; error?: unknown }
+}) {
+  const rpcCalls: Array<{ name: string; params: unknown }> = []
+  const bookingsChain = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockResolvedValue({ data: options.bookingRow ?? null, error: null }),
+  }
+  const rpc = vi.fn(async (name: string, params: unknown) => {
+    rpcCalls.push({ name, params })
+    if (name === 'record_late_payment_reconciliation') return options.recordLateSuccessResult ?? { data: { booking_id: 'booking-1', recorded: true }, error: null }
+    if (name === 'mark_order_paid') return options.markOrderPaidResult ?? { data: { order_id: 'order-1', status: 'paid' }, error: null }
+    if (name === 'qualify_rental_payment_affiliate_commission') return options.rentalAffiliateCommissionResult ?? { data: { qualified: true, commission_id: 'affiliate-rental-1' }, error: null }
+    if (name === 'qualify_rental_payment_unity_commission') return options.rentalUnityCommissionResult ?? { data: { qualified: true, commission_id: 'unity-rental-1' }, error: null }
+    if (name === 'qualify_sale_affiliate_commission') return options.saleAffiliateCommissionResult ?? { data: { qualified: true, commission_id: 'affiliate-sale-1' }, error: null }
+    if (name === 'qualify_sale_unity_commission') return options.saleUnityCommissionResult ?? { data: { qualified: true, commission_id: 'unity-sale-1' }, error: null }
+    if (name === 'record_rent_to_buy_installment_payment') return options.recordInstallmentResult ?? { data: { installment_id: 'inst-1', status: 'paid', already_paid: false }, error: null }
+    if (name === 'payoff_rent_to_buy_agreement') return options.payoffResult ?? { data: { status: 'completed', amount_paid: 100 }, error: null }
+    throw new Error(`unexpected rpc call in progression test: ${name}`)
+  })
+  const from = vi.fn((table: string) => {
+    if (table === 'bookings') return bookingsChain
+    throw new Error(`unexpected table in progression test: ${table}`)
+  })
+  return { from, rpc, rpcCalls } as unknown as Parameters<typeof completeAsyncPaymentBusinessProgression>[0] & { rpcCalls: typeof rpcCalls }
+}
+
+function transitionedOutcome(overrides: Partial<Extract<ReconciliationOutcome, { outcome: 'transitioned' }>> = {}): ReconciliationOutcome {
+  return {
+    outcome: 'transitioned',
+    paymentId: 'pay-1',
+    from: 'pending',
+    to: 'captured',
+    paymentType: 'rental_charge',
+    bookingId: null,
+    orderId: null,
+    rentToBuyAgreementId: null,
+    renterId: null,
+    metadata: {},
+    ...overrides,
+  }
+}
+function alreadyCurrentOutcome(overrides: Partial<Extract<ReconciliationOutcome, { outcome: 'already_current' }>> = {}): ReconciliationOutcome {
+  return {
+    outcome: 'already_current',
+    paymentId: 'pay-1',
+    status: 'captured',
+    paymentType: 'rental_charge',
+    bookingId: null,
+    orderId: null,
+    rentToBuyAgreementId: null,
+    renterId: null,
+    metadata: {},
+    ...overrides,
+  }
+}
+
 describe('reconcileOrchestrationPayment -- payment lookup', () => {
   it('0 matches -> unknown_payment, no transition attempted', async () => {
     const admin = fakeAdmin([])
@@ -270,8 +343,12 @@ describe('reconcileOrchestrationPayment -- infrastructure failures are never swa
 })
 
 describe('reconcileOrchestrationPayment -- P5D-B.1 payment_type context guards', () => {
-  const MANUAL_CAPTURE_TYPES = ['deposit', 'barter_deposit', 'rent_to_buy_deposit']
-  const AUTOMATIC_CAPTURE_TYPES = ['rental_charge', 'order_payment', 'barter_cash_adjustment', 'rent_to_buy_installment']
+  // P5D-B.2: rent_to_buy_deposit moved from manual-capture to automatic-
+  // capture (charge-rent-to-buy-deposit.ts now uses chargeRental(), never
+  // authorizeDeposit()) -- see reconcile-orchestration-payment.ts's own
+  // updated MANUAL_CAPTURE_PAYMENT_TYPES comment.
+  const MANUAL_CAPTURE_TYPES = ['deposit', 'barter_deposit']
+  const AUTOMATIC_CAPTURE_TYPES = ['rental_charge', 'order_payment', 'barter_cash_adjustment', 'rent_to_buy_installment', 'rent_to_buy_deposit']
 
   it.each(MANUAL_CAPTURE_TYPES)('requires_capture on a pending %s payment -> transitions to authorised', async (paymentType) => {
     const admin = fakeAdmin([payment({ status: 'pending', payment_type: paymentType })])
@@ -331,47 +408,6 @@ describe('reconcileOrchestrationPayment -- P5D-B.1 payment_type context guards',
 })
 
 describe('completeAsyncPaymentBusinessProgression -- booking + order async business-state progression', () => {
-  /**
-   * Fake admin covering both domain-progression call shapes:
-   * `.from('bookings').select().eq().maybeSingle()` (what the real,
-   * unmodified checkAndRecordLateSuccessIfExpired() issues) and
-   * `.rpc('record_late_payment_reconciliation' | 'mark_order_paid', ...)`.
-   * The real checkAndRecordLateSuccessIfExpired/late-payment-reconciliation
-   * module is imported and run for real (not mocked) against this fake
-   * admin -- an integration-style proof that the actual existing,
-   * already-idempotent helper is reused, not reimplemented.
-   */
-  function fakeProgressionAdmin(options: {
-    bookingRow?: { status: string; payment_expired_at: string | null } | null
-    markOrderPaidResult?: { data?: unknown; error?: unknown }
-    recordLateSuccessResult?: { data?: unknown; error?: unknown }
-  }) {
-    const rpcCalls: Array<{ name: string; params: unknown }> = []
-    const bookingsChain = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: options.bookingRow ?? null, error: null }),
-    }
-    const rpc = vi.fn(async (name: string, params: unknown) => {
-      rpcCalls.push({ name, params })
-      if (name === 'record_late_payment_reconciliation') return options.recordLateSuccessResult ?? { data: { booking_id: 'booking-1', recorded: true }, error: null }
-      if (name === 'mark_order_paid') return options.markOrderPaidResult ?? { data: { order_id: 'order-1', status: 'paid' }, error: null }
-      throw new Error(`unexpected rpc call in progression test: ${name}`)
-    })
-    const from = vi.fn((table: string) => {
-      if (table === 'bookings') return bookingsChain
-      throw new Error(`unexpected table in progression test: ${table}`)
-    })
-    return { from, rpc, rpcCalls } as unknown as Parameters<typeof completeAsyncPaymentBusinessProgression>[0] & { rpcCalls: typeof rpcCalls }
-  }
-
-  function transitionedOutcome(overrides: Partial<Extract<ReconciliationOutcome, { outcome: 'transitioned' }>> = {}): ReconciliationOutcome {
-    return { outcome: 'transitioned', paymentId: 'pay-1', from: 'pending', to: 'captured', paymentType: 'rental_charge', bookingId: null, orderId: null, ...overrides }
-  }
-  function alreadyCurrentOutcome(overrides: Partial<Extract<ReconciliationOutcome, { outcome: 'already_current' }>> = {}): ReconciliationOutcome {
-    return { outcome: 'already_current', paymentId: 'pay-1', status: 'captured', paymentType: 'rental_charge', bookingId: null, orderId: null, ...overrides }
-  }
-
   it('not_applicable for outcomes that never represent a financial completion', async () => {
     const admin = fakeProgressionAdmin({})
     for (const outcome of [
@@ -454,5 +490,174 @@ describe('completeAsyncPaymentBusinessProgression -- booking + order async busin
     const result = await completeAsyncPaymentBusinessProgression(admin, transitionedOutcome({ paymentType: 'barter_cash_adjustment', bookingId: null, orderId: null }))
     expect(result).toEqual({ outcome: 'completed' })
     expect(admin.rpc).not.toHaveBeenCalled()
+  })
+})
+
+describe('completeAsyncPaymentBusinessProgression -- P5D-B.2 RTB installment/payoff progression', () => {
+  it('1. a captured installment payment with a persisted single-sequence correlation progresses that exact sequence', async () => {
+    const admin = fakeProgressionAdmin({})
+    const result = await completeAsyncPaymentBusinessProgression(
+      admin,
+      transitionedOutcome({ paymentType: 'rent_to_buy_installment', rentToBuyAgreementId: 'agr-1', renterId: 'customer-1', metadata: { rent_to_buy_installment_sequence: 3 } })
+    )
+    expect(result).toEqual({ outcome: 'completed' })
+    const call = admin.rpcCalls.find((c) => c.name === 'record_rent_to_buy_installment_payment')
+    expect(call!.params).toMatchObject({ p_agreement_id: 'agr-1', p_sequence: 3, p_payment_id: 'pay-1' })
+  })
+
+  it('4/5. runs the same installment progression for both a fresh transition and a legitimate already_current recovery', async () => {
+    const admin = fakeProgressionAdmin({})
+    const outcome = alreadyCurrentOutcome({ paymentType: 'rent_to_buy_installment', rentToBuyAgreementId: 'agr-1', renterId: 'customer-1', metadata: { rent_to_buy_installment_sequence: 3 } })
+    const result = await completeAsyncPaymentBusinessProgression(admin, outcome)
+    expect(result).toEqual({ outcome: 'completed' })
+    expect(admin.rpcCalls.map((c) => c.name)).toContain('record_rent_to_buy_installment_payment')
+  })
+
+  it('2. a captured payoff payment with a persisted payoff-sequence snapshot invokes payoff_rent_to_buy_agreement using the persisted renter_id as actor', async () => {
+    const admin = fakeProgressionAdmin({})
+    const result = await completeAsyncPaymentBusinessProgression(
+      admin,
+      transitionedOutcome({ paymentType: 'rent_to_buy_installment', rentToBuyAgreementId: 'agr-1', renterId: 'customer-1', metadata: { rent_to_buy_payoff_sequences: [2, 3] } })
+    )
+    expect(result).toEqual({ outcome: 'completed' })
+    const call = admin.rpcCalls.find((c) => c.name === 'payoff_rent_to_buy_agreement')
+    expect(call!.params).toMatchObject({ p_actor_user_id: 'customer-1', p_agreement_id: 'agr-1', p_payment_id: 'pay-1' })
+  })
+
+  it('6. a completed payoff outcome is treated as success', async () => {
+    const admin = fakeProgressionAdmin({ payoffResult: { data: { status: 'completed', amount_paid: 250 }, error: null } })
+    const result = await completeAsyncPaymentBusinessProgression(
+      admin,
+      transitionedOutcome({ paymentType: 'rent_to_buy_installment', rentToBuyAgreementId: 'agr-1', renterId: 'customer-1', metadata: { rent_to_buy_payoff_sequences: [2, 3] } })
+    )
+    expect(result).toEqual({ outcome: 'completed' })
+  })
+
+  it('7. an already_completed payoff outcome is treated as success', async () => {
+    const admin = fakeProgressionAdmin({ payoffResult: { data: { status: 'already_completed', amount_paid: 250 }, error: null } })
+    const result = await completeAsyncPaymentBusinessProgression(
+      admin,
+      alreadyCurrentOutcome({ paymentType: 'rent_to_buy_installment', rentToBuyAgreementId: 'agr-1', renterId: 'customer-1', metadata: { rent_to_buy_payoff_sequences: [2, 3] } })
+    )
+    expect(result).toEqual({ outcome: 'completed' })
+  })
+
+  it('8. a payment_conflict payoff outcome enters safe permanent-review handling -- never thrown, never treated as completed', async () => {
+    const admin = fakeProgressionAdmin({ payoffResult: { data: { status: 'payment_conflict', conflicting_sequences: [2] }, error: null } })
+    const result = await completeAsyncPaymentBusinessProgression(
+      admin,
+      transitionedOutcome({ paymentType: 'rent_to_buy_installment', rentToBuyAgreementId: 'agr-1', renterId: 'customer-1', metadata: { rent_to_buy_payoff_sequences: [2, 3] } })
+    )
+    expect(result.outcome).toBe('manual_review')
+  })
+
+  it('9. an invalid_snapshot payoff outcome enters safe permanent-review handling -- never thrown, never treated as completed', async () => {
+    const admin = fakeProgressionAdmin({ payoffResult: { data: { status: 'invalid_snapshot', reason: 'amount mismatch' }, error: null } })
+    const result = await completeAsyncPaymentBusinessProgression(
+      admin,
+      transitionedOutcome({ paymentType: 'rent_to_buy_installment', rentToBuyAgreementId: 'agr-1', renterId: 'customer-1', metadata: { rent_to_buy_payoff_sequences: [2, 3] } })
+    )
+    expect(result.outcome).toBe('manual_review')
+  })
+
+  it('a genuine infrastructure error calling payoff_rent_to_buy_agreement propagates (throws), unlike a structured conflict', async () => {
+    const admin = fakeProgressionAdmin({ payoffResult: { data: null, error: new Error('rpc infra failure') } })
+    await expect(
+      completeAsyncPaymentBusinessProgression(
+        admin,
+        transitionedOutcome({ paymentType: 'rent_to_buy_installment', rentToBuyAgreementId: 'agr-1', renterId: 'customer-1', metadata: { rent_to_buy_payoff_sequences: [2, 3] } })
+      )
+    ).rejects.toThrow('rpc infra failure')
+  })
+
+  it('10. neither correlation key present (legacy payment) never infers a sequence -- no guessing, safe permanent-review handling', async () => {
+    const admin = fakeProgressionAdmin({})
+    const result = await completeAsyncPaymentBusinessProgression(
+      admin,
+      transitionedOutcome({ paymentType: 'rent_to_buy_installment', rentToBuyAgreementId: 'agr-1', renterId: 'customer-1', metadata: {} })
+    )
+    expect(result.outcome).toBe('manual_review')
+    expect(admin.rpcCalls.map((c) => c.name)).not.toContain('record_rent_to_buy_installment_payment')
+    expect(admin.rpcCalls.map((c) => c.name)).not.toContain('payoff_rent_to_buy_agreement')
+  })
+
+  it('a payoff payment with no persisted renter_id is a safe permanent-review condition, never called with a null/undefined actor', async () => {
+    const admin = fakeProgressionAdmin({})
+    const result = await completeAsyncPaymentBusinessProgression(
+      admin,
+      transitionedOutcome({ paymentType: 'rent_to_buy_installment', rentToBuyAgreementId: 'agr-1', renterId: null, metadata: { rent_to_buy_payoff_sequences: [2, 3] } })
+    )
+    expect(result.outcome).toBe('manual_review')
+    expect(admin.rpcCalls.map((c) => c.name)).not.toContain('payoff_rent_to_buy_agreement')
+  })
+
+  it('a genuine infrastructure error calling record_rent_to_buy_installment_payment propagates (throws) for crash recovery', async () => {
+    const admin = fakeProgressionAdmin({ recordInstallmentResult: { data: null, error: new Error('installment rpc failed') } })
+    await expect(
+      completeAsyncPaymentBusinessProgression(
+        admin,
+        transitionedOutcome({ paymentType: 'rent_to_buy_installment', rentToBuyAgreementId: 'agr-1', renterId: 'customer-1', metadata: { rent_to_buy_installment_sequence: 1 } })
+      )
+    ).rejects.toThrow('installment rpc failed')
+  })
+})
+
+describe('completeAsyncPaymentBusinessProgression -- P5D-B.2 async commission entitlement', () => {
+  it('rental_charge: a captured booking payment qualifies both rental affiliate and Unity commission', async () => {
+    const admin = fakeProgressionAdmin({})
+    const result = await completeAsyncPaymentBusinessProgression(admin, transitionedOutcome({ paymentType: 'rental_charge', bookingId: 'booking-1' }))
+    expect(result).toEqual({ outcome: 'completed' })
+    const names = admin.rpcCalls.map((c) => c.name)
+    expect(names).toContain('qualify_rental_payment_affiliate_commission')
+    expect(names).toContain('qualify_rental_payment_unity_commission')
+    const affiliateCall = admin.rpcCalls.find((c) => c.name === 'qualify_rental_payment_affiliate_commission')
+    expect(affiliateCall!.params).toMatchObject({ p_booking_id: 'booking-1', p_payment_id: 'pay-1' })
+  })
+
+  it('order_payment: a captured order payment qualifies both sale affiliate and Unity commission', async () => {
+    const admin = fakeProgressionAdmin({})
+    const result = await completeAsyncPaymentBusinessProgression(admin, transitionedOutcome({ paymentType: 'order_payment', orderId: 'order-1' }))
+    expect(result).toEqual({ outcome: 'completed' })
+    const names = admin.rpcCalls.map((c) => c.name)
+    expect(names).toContain('qualify_sale_affiliate_commission')
+    expect(names).toContain('qualify_sale_unity_commission')
+  })
+
+  it('already_current captured recovery re-runs commission qualification safely (idempotent by payment_id)', async () => {
+    const admin = fakeProgressionAdmin({})
+    const result = await completeAsyncPaymentBusinessProgression(admin, alreadyCurrentOutcome({ paymentType: 'order_payment', orderId: 'order-1' }))
+    expect(result).toEqual({ outcome: 'completed' })
+    expect(admin.rpcCalls.map((c) => c.name)).toContain('qualify_sale_affiliate_commission')
+  })
+
+  it('a transient failure in rental affiliate commission qualification propagates (throws) -- the webhook must not be marked processed', async () => {
+    const admin = fakeProgressionAdmin({ rentalAffiliateCommissionResult: { data: null, error: new Error('affiliate rpc failed') } })
+    await expect(completeAsyncPaymentBusinessProgression(admin, transitionedOutcome({ paymentType: 'rental_charge', bookingId: 'booking-1' }))).rejects.toThrow('affiliate rpc failed')
+  })
+
+  it('a transient failure in rental Unity commission qualification propagates (throws)', async () => {
+    const admin = fakeProgressionAdmin({ rentalUnityCommissionResult: { data: null, error: new Error('unity rpc failed') } })
+    await expect(completeAsyncPaymentBusinessProgression(admin, transitionedOutcome({ paymentType: 'rental_charge', bookingId: 'booking-1' }))).rejects.toThrow('unity rpc failed')
+  })
+
+  it('a transient failure in sale affiliate commission qualification propagates (throws)', async () => {
+    const admin = fakeProgressionAdmin({ saleAffiliateCommissionResult: { data: null, error: new Error('sale affiliate rpc failed') } })
+    await expect(completeAsyncPaymentBusinessProgression(admin, transitionedOutcome({ paymentType: 'order_payment', orderId: 'order-1' }))).rejects.toThrow('sale affiliate rpc failed')
+  })
+
+  it('a transient failure in sale Unity commission qualification propagates (throws)', async () => {
+    const admin = fakeProgressionAdmin({ saleUnityCommissionResult: { data: null, error: new Error('sale unity rpc failed') } })
+    await expect(completeAsyncPaymentBusinessProgression(admin, transitionedOutcome({ paymentType: 'order_payment', orderId: 'order-1' }))).rejects.toThrow('sale unity rpc failed')
+  })
+
+  it('commission qualification never runs for an RTB installment payment (commission is qualified once at settlement, never per-payment)', async () => {
+    const admin = fakeProgressionAdmin({})
+    await completeAsyncPaymentBusinessProgression(
+      admin,
+      transitionedOutcome({ paymentType: 'rent_to_buy_installment', rentToBuyAgreementId: 'agr-1', renterId: 'customer-1', metadata: { rent_to_buy_installment_sequence: 1 } })
+    )
+    const names = admin.rpcCalls.map((c) => c.name)
+    expect(names).not.toContain('qualify_rental_payment_affiliate_commission')
+    expect(names).not.toContain('qualify_sale_affiliate_commission')
   })
 })
