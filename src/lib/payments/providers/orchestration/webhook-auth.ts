@@ -63,13 +63,18 @@ const HEX_SIGNATURE_PATTERN = /^[0-9a-f]+$/i
  * evidence: header `x-webhook-signature-512`, key
  * `payment_response_hash_key`, canonical input the exact raw request
  * body bytes -- "Get the raw request body (as bytes, before parsing)",
- * never a re-serialized/re-parsed JSON object). `rawBody` MUST be
- * exactly what was received, byte-for-byte, before any JSON.parse --
- * the caller (the webhook route) is responsible for that ordering; this
- * function only ever hashes what it's given.
+ * never a re-serialized/re-parsed JSON object).
+ *
+ * `rawBodyBytes` MUST be the literal `Buffer` the HTTP stream produced
+ * -- never a decoded-then-re-encoded string (P5D-B.1 correction: that
+ * round-trip is only lossless for input that is already valid UTF-8;
+ * see webhook-body-reader.ts's own comment for the proof). Passing a
+ * `Buffer` here, rather than a `string`, is a deliberate type-level
+ * guard against ever re-introducing that defect -- there is no decode
+ * step between "bytes received" and "bytes hashed".
  */
 export function verifyOrchestrationWebhookSignature(
-  rawBody: string,
+  rawBodyBytes: Buffer,
   headers: Record<string, string | null>,
   config: OrchestrationWebhookConfig
 ): OrchestrationAuthResult {
@@ -81,7 +86,7 @@ export function verifyOrchestrationWebhookSignature(
     return { valid: false, reason: 'malformed HMAC signature encoding' }
   }
 
-  const expected = createHmac('sha512', config.paymentResponseHashKey).update(Buffer.from(rawBody, 'utf-8')).digest('hex')
+  const expected = createHmac('sha512', config.paymentResponseHashKey).update(rawBodyBytes).digest('hex')
 
   if (!constantTimeEquals(received.toLowerCase(), expected)) {
     return { valid: false, reason: 'HMAC signature did not match' }
@@ -94,13 +99,14 @@ export function verifyOrchestrationWebhookSignature(
  * explicit acceptance criterion). Short-circuits on Layer 1 failure --
  * still safe (never processes the body either way on failure), and
  * avoids spending an HMAC computation on a request that's already
- * rejected.
+ * rejected. Takes the raw bytes, never a decoded string -- see
+ * verifyOrchestrationWebhookSignature's own comment.
  */
-export function verifyOrchestrationWebhook(rawBody: string, headers: Record<string, string | null>, config: OrchestrationWebhookConfig): OrchestrationAuthResult {
+export function verifyOrchestrationWebhook(rawBodyBytes: Buffer, headers: Record<string, string | null>, config: OrchestrationWebhookConfig): OrchestrationAuthResult {
   const secretResult = verifyOrchestrationWebhookSecret(headers, config)
   if (!secretResult.valid) return secretResult
 
-  const signatureResult = verifyOrchestrationWebhookSignature(rawBody, headers, config)
+  const signatureResult = verifyOrchestrationWebhookSignature(rawBodyBytes, headers, config)
   if (!signatureResult.valid) return signatureResult
 
   return { valid: true, reason: 'both authentication layers passed' }

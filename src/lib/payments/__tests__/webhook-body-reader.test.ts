@@ -6,10 +6,21 @@ function requestWithBody(body: string, extraHeaders: Record<string, string> = {}
 }
 
 describe('readBoundedRequestBody', () => {
-  it('reads a body under the limit and preserves it exactly', async () => {
+  it('reads a body under the limit and preserves it exactly as bytes', async () => {
     const body = JSON.stringify({ hello: 'world' })
     const result = await readBoundedRequestBody(requestWithBody(body), ORCHESTRATION_WEBHOOK_BODY_LIMIT_BYTES)
-    expect(result).toEqual({ ok: true, body })
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error('unreachable')
+    expect(Buffer.compare(result.bytes, Buffer.from(body, 'utf-8'))).toBe(0)
+  })
+
+  it('P5D-B.1: returns the literal Buffer, never a decoded string -- preserves bytes that are not valid UTF-8 unchanged', async () => {
+    const invalidUtf8 = Buffer.from([0x7b, 0x22, 0x61, 0x22, 0x3a, 0x22, 0x80, 0x22, 0x7d])
+    const request = new Request('https://example.test/webhook', { method: 'POST', body: new Uint8Array(invalidUtf8), headers: { 'content-type': 'application/json' } })
+    const result = await readBoundedRequestBody(request, ORCHESTRATION_WEBHOOK_BODY_LIMIT_BYTES)
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error('unreachable')
+    expect(Buffer.compare(result.bytes, invalidUtf8)).toBe(0)
   })
 
   it('accepts a body exactly at the limit', async () => {
@@ -74,6 +85,8 @@ describe('readBoundedRequestBody', () => {
 
   it('handles an empty body safely', async () => {
     const result = await readBoundedRequestBody(requestWithBody(''), ORCHESTRATION_WEBHOOK_BODY_LIMIT_BYTES)
-    expect(result).toEqual({ ok: true, body: '' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error('unreachable')
+    expect(result.bytes.byteLength).toBe(0)
   })
 })

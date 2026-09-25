@@ -19,7 +19,13 @@ export { authorizeBarterDeposit, type AuthorizeBarterDepositResult } from './aut
 export { releaseBarterDeposit, type ReleaseBarterDepositResult } from './release-barter-deposit'
 export { chargeBarterCashAdjustment, type ChargeBarterCashAdjustmentResult } from './charge-barter-cash-adjustment'
 export { reconcileProviderEvent, type NormalizedPaymentEvent, type ReconcileResult } from './reconcile-provider-event'
-export { reconcileOrchestrationPayment, type OrchestrationEvidence, type ReconciliationOutcome } from './reconcile-orchestration-payment'
+export {
+  reconcileOrchestrationPayment,
+  completeAsyncPaymentBusinessProgression,
+  type OrchestrationEvidence,
+  type ReconciliationOutcome,
+  type BusinessProgressionOutcome,
+} from './reconcile-orchestration-payment'
 export { OrchestrationError, isRetryableOrchestrationError, type OrchestrationErrorCode } from './errors'
 export type {
   OrchestratorContext,

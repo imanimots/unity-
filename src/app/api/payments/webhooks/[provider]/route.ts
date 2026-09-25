@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getPaymentProvider, listRegisteredProviders } from '@/lib/payments/registry'
-import { reconcileProviderEvent, reconcileOrchestrationPayment, type NormalizedPaymentEvent } from '@/lib/payments/orchestrator'
+import { reconcileProviderEvent, reconcileOrchestrationPayment, completeAsyncPaymentBusinessProgression, type NormalizedPaymentEvent } from '@/lib/payments/orchestrator'
 import { readBoundedRequestBody, ORCHESTRATION_WEBHOOK_BODY_LIMIT_BYTES } from '@/lib/payments/webhook-body-reader'
 import {
   requireOrchestrationWebhookConfig,
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.error('[payments.webhook] request body rejected', { providerName, reason: bodyResult.reason })
     return NextResponse.json({ error: 'Request body too large' }, { status: 413 })
   }
-  const rawBody = bodyResult.body
+  const rawBodyBytes = bodyResult.bytes
 
   const headers: Record<string, string | null> = {}
   request.headers.forEach((value, key) => {
@@ -83,10 +83,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     providerName === 'peach' && (headers[ORCHESTRATION_WEBHOOK_SECRET_HEADER] != null || headers[ORCHESTRATION_WEBHOOK_SIGNATURE_HEADER] != null)
 
   if (looksLikeOrchestrationDelivery) {
-    return handleOrchestrationWebhook(admin, providerName, rawBody, headers)
+    // P5D-B.1: authentication (Layer 1 + Layer 2 HMAC) happens on the
+    // literal received bytes -- decoding to a string is deferred until
+    // AFTER authentication succeeds (see handleOrchestrationWebhook's
+    // own comment).
+    return handleOrchestrationWebhook(admin, providerName, rawBodyBytes, headers)
   }
 
-  return handleGenericWebhook(admin, providerName, rawBody, headers)
+  // The generic pipeline (classic Peach / MockProvider) has always
+  // operated on a decoded string -- its own verifyWebhook()
+  // implementations parse/verify against `rawBody: string` per the
+  // shared PaymentProvider interface, unchanged by P5D-B/P5D-B.1. An
+  // ordinary (non-fatal) decode is correct here: this path's signature
+  // schemes were never re-audited for the byte-fidelity nuance P5D-B.1
+  // fixes for Orchestration specifically, and changing that shared
+  // interface is out of this phase's scope.
+  return handleGenericWebhook(admin, providerName, rawBodyBytes.toString('utf-8'), headers)
 }
 
 /**
@@ -173,22 +185,33 @@ function normalizeEvent(eventId: string, payload: unknown): NormalizedPaymentEve
 }
 
 /**
- * Dedicated Peach Orchestration pipeline (P5D-B). Critical financial
- * work only, kept narrowly bounded, all before the response is sent (no
- * durable post-response worker is proven to exist on this platform --
- * see the phase report's own "five-second response budget" section):
- * authenticate -> parse -> record -> claim -> reconcile -> mark handled
- * -> respond. No email/notification/analytics work happens on this
- * path in this phase -- see the phase report's "downstream hooks"
- * section for the exact reason (unproven idempotency under
- * webhook-retry/force-sync-race conditions).
+ * Dedicated Peach Orchestration pipeline (P5D-B, corrected P5D-B.1).
+ * Critical financial work only, kept narrowly bounded, all before the
+ * response is sent (no durable post-response worker is proven to exist
+ * on this platform -- see the phase report's own "five-second response
+ * budget" section): authenticate on raw bytes -> decode -> parse ->
+ * record -> claim -> reconcile -> mark handled -> respond. No
+ * email/notification/analytics work happens on this path in this
+ * phase -- see the phase report's "downstream hooks" section for the
+ * exact reason (unproven idempotency under webhook-retry/force-sync-race
+ * conditions).
+ *
+ * P5D-B.1 CORRECTION: `rawBodyBytes` is authenticated (Layer 1 + Layer 2
+ * HMAC) as a literal `Buffer` -- decoding to a string happens ONLY after
+ * authentication succeeds, using a STRICT UTF-8 decoder (`fatal: true`).
+ * A body containing invalid UTF-8 is therefore classified precisely:
+ * if the HMAC (computed over the true original bytes) is valid but the
+ * bytes are not valid UTF-8, this is "authenticated but malformed" (400),
+ * never confused with "invalid HMAC" (401) -- the two failure modes have
+ * different causes and must not be conflated. No byte is ever silently
+ * replaced/corrected before either check.
  */
-async function handleOrchestrationWebhook(admin: SupabaseClient, providerName: string, rawBody: string, headers: Record<string, string | null>) {
+async function handleOrchestrationWebhook(admin: SupabaseClient, providerName: string, rawBodyBytes: Buffer, headers: Record<string, string | null>) {
   let authValid: boolean
   let authReason: string
   try {
     const config = requireOrchestrationWebhookConfig()
-    const result = verifyOrchestrationWebhook(rawBody, headers, config)
+    const result = verifyOrchestrationWebhook(rawBodyBytes, headers, config)
     authValid = result.valid
     authReason = result.reason
   } catch (err) {
@@ -207,19 +230,33 @@ async function handleOrchestrationWebhook(admin: SupabaseClient, providerName: s
     // full attacker-controlled payload, and this identity must never be
     // reused as a normal authenticated event_id (see the distinct
     // "invalid_" prefix, matching the pre-existing classic-path
-    // convention in handleGenericWebhook above).
-    const bodyHash = createHash('sha256').update(rawBody, 'utf-8').digest('hex')
+    // convention in handleGenericWebhook above). Hashed from the exact
+    // original bytes, never a decoded/re-encoded string.
+    const bodyHash = createHash('sha256').update(rawBodyBytes).digest('hex')
     try {
       await admin.rpc('record_webhook_event', {
         p_provider: providerName,
         p_provider_event_id: `invalid_${bodyHash.slice(0, 32)}_${Date.now()}`,
         p_signature_valid: false,
-        p_payload: { body_sha256: bodyHash, body_length: Buffer.byteLength(rawBody, 'utf-8'), auth_failure_reason: authReason },
+        p_payload: { body_sha256: bodyHash, body_length: rawBodyBytes.byteLength, auth_failure_reason: authReason },
       })
     } catch (recordErr) {
       console.error('[payments.webhook.orchestration] failed to record invalid-auth audit', { recordErr })
     }
     return NextResponse.json({ error: 'Invalid webhook authentication' }, { status: 401 })
+  }
+
+  // Authentication succeeded -- ONLY NOW decode the bytes to a string,
+  // using a strict decoder so invalid UTF-8 fails closed as a distinct
+  // "authenticated but malformed" outcome rather than being silently
+  // corrected. This is exactly the ordering P5D-B.1 requires: decode
+  // after auth, never before.
+  let rawBody: string
+  try {
+    rawBody = new TextDecoder('utf-8', { fatal: true }).decode(rawBodyBytes)
+  } catch {
+    console.error('[payments.webhook.orchestration] authenticated body was not valid UTF-8', { providerName })
+    return NextResponse.json({ error: 'Malformed webhook envelope' }, { status: 400 })
   }
 
   let envelope: OrchestrationWebhookEnvelope
@@ -300,6 +337,20 @@ async function handleOrchestrationWebhook(admin: SupabaseClient, providerName: s
       nextAction: envelope.content.nextAction,
       source: 'webhook',
     })
+    // P5D-B.1: essential domain business-state progression (booking
+    // late-success safety, order paid-marking, ...) is NOT a
+    // notification -- it must complete before this event is ever marked
+    // processed. Deliberately inside the SAME try block as the
+    // reconciliation call above: if this throws, it falls through to
+    // the identical mark_webhook_event_error/503 path below, so a retry
+    // re-attempts it. On retry, reconcileOrchestrationPayment will
+    // likely return already_current (the payment itself already
+    // reached its target) -- completeAsyncPaymentBusinessProgression
+    // treats that the same as a fresh transition and safely re-runs
+    // its (independently confirmed idempotent) domain calls, closing
+    // the exact payment-transitioned/domain-progression-not-yet-done
+    // crash window this phase is required to close.
+    await completeAsyncPaymentBusinessProgression(admin, reconciliation)
   } catch (err) {
     // Transient infrastructure failure -- mark-error (never overwrites
     // a newer claim; lost_claim is logged, not treated as a further
@@ -313,7 +364,7 @@ async function handleOrchestrationWebhook(admin: SupabaseClient, providerName: s
       p_last_error: sanitizedError,
     })
     logIfLostClaim('mark_webhook_event_error', errorMarkResult)
-    console.error('[payments.webhook.orchestration] reconciliation failed transiently', { providerName, eventId: envelope.eventId, reason: sanitizedError })
+    console.error('[payments.webhook.orchestration] reconciliation or business progression failed transiently', { providerName, eventId: envelope.eventId, reason: sanitizedError })
     return NextResponse.json({ error: 'Could not reconcile payment' }, { status: 503 })
   }
 

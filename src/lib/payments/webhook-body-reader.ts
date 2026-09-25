@@ -1,14 +1,35 @@
 /**
- * Bounded raw-body reader for payment webhook routes (P5D-B).
+ * Bounded raw-body reader for payment webhook routes (P5D-B, corrected
+ * P5D-B.1).
  *
- * Preserves exact delivered bytes (required for HMAC verification --
- * see orchestration/webhook-auth.ts) while capping how much of a
- * request body this server will ever buffer, before any JSON parsing or
- * authentication is attempted. Genuinely provider-neutral -- nothing
- * here is Peach-specific -- but scoped inside src/lib/payments/ rather
- * than a new generic top-level module, since this repo has no existing
- * generic HTTP-utilities namespace and this is only used by the one
- * payment webhook route today.
+ * P5D-B.1 CORRECTION: the original version of this function returned
+ * only a decoded `string` (`Buffer.concat(...).toString('utf-8')`),
+ * which the HMAC verifier then re-encoded (`Buffer.from(str, 'utf-8')`)
+ * before hashing. That decode/re-encode round-trip is only guaranteed
+ * lossless for input that is ALREADY valid UTF-8 -- for a byte sequence
+ * that is not (encoding corruption, a proxy re-encoding bug, a
+ * genuinely malformed delivery), the lossy decode silently substitutes
+ * U+FFFD replacement characters, and the re-encoded bytes then differ
+ * from what the provider actually signed -- HMAC verification would
+ * then fail for a delivery that was, in fact, correctly signed over the
+ * true original bytes. A P5D-B-R read-only review caught this and
+ * proved it empirically (a decode/re-encode round-trip is NOT
+ * byte-identical for invalid UTF-8, confirmed via direct testing).
+ *
+ * This function now returns the literal received `Buffer` -- callers
+ * that need HMAC verification hash these bytes directly, never a
+ * decoded/re-encoded string. Decoding to a string (for JSON parsing)
+ * must only happen AFTER authentication succeeds, and should use a
+ * STRICT decoder (`fatal: true`) so a body containing invalid UTF-8 is
+ * classified as "authenticated but malformed", never silently
+ * corrected -- see orchestration/webhook-auth.ts and the webhook
+ * route's own ordering.
+ *
+ * Genuinely provider-neutral -- nothing here is Peach-specific -- but
+ * scoped inside src/lib/payments/ rather than a new generic top-level
+ * module, since this repo has no existing generic HTTP-utilities
+ * namespace and this is only used by the one payment webhook route
+ * today.
  *
  * Does not trust `Content-Length` alone: a request that declares a
  * small Content-Length but streams more bytes than that is still caught
@@ -17,7 +38,7 @@
  * without reading anything) never the sole enforcement.
  */
 
-export type BoundedBodyResult = { ok: true; body: string } | { ok: false; reason: 'content_length_exceeded' | 'body_exceeded_limit' }
+export type BoundedBodyResult = { ok: true; bytes: Buffer } | { ok: false; reason: 'content_length_exceeded' | 'body_exceeded_limit' }
 
 export async function readBoundedRequestBody(request: Request, maxBytes: number): Promise<BoundedBodyResult> {
   const declaredLength = request.headers.get('content-length')
@@ -31,13 +52,16 @@ export async function readBoundedRequestBody(request: Request, maxBytes: number)
   const reader = request.body?.getReader()
   if (!reader) {
     // No readable stream exposed (some test doubles / edge runtimes) --
-    // fall back to a single bounded read, still enforcing the limit
-    // after the fact rather than trusting the caller.
-    const text = await request.text()
-    if (Buffer.byteLength(text, 'utf-8') > maxBytes) {
+    // fall back to a single bounded read via arrayBuffer(), which still
+    // yields the literal received bytes (never a decoded string), and
+    // still enforces the limit after the fact rather than trusting the
+    // caller.
+    const arrayBuffer = await request.arrayBuffer()
+    const bytes = Buffer.from(arrayBuffer)
+    if (bytes.byteLength > maxBytes) {
       return { ok: false, reason: 'body_exceeded_limit' }
     }
-    return { ok: true, body: text }
+    return { ok: true, bytes }
   }
 
   const chunks: Uint8Array[] = []
@@ -54,8 +78,8 @@ export async function readBoundedRequestBody(request: Request, maxBytes: number)
     chunks.push(value)
   }
 
-  const body = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString('utf-8')
-  return { ok: true, body }
+  const bytes = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)))
+  return { ok: true, bytes }
 }
 
 /**

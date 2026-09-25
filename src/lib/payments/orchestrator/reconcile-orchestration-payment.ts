@@ -25,9 +25,21 @@ export interface OrchestrationEvidence {
   source: 'webhook' | 'force_sync'
 }
 
+/**
+ * `paymentType`/`bookingId`/`orderId` are only carried on the two
+ * outcomes that can represent a genuine financial completion
+ * (`transitioned` and `already_current`) -- exactly what
+ * completeAsyncPaymentBusinessProgression() needs to dispatch domain
+ * progression without a second lookup, and nothing else. `bookingId`/
+ * `orderId` are `null` when the payment belongs to a different domain
+ * (payments.booking_id/order_id are mutually-exclusive-with-the-other-
+ * domain-FKs nullable columns -- confirmed via
+ * 20260812000002_order_payments_widening.sql's own
+ * payments_one_transaction_chk).
+ */
 export type ReconciliationOutcome =
-  | { outcome: 'transitioned'; paymentId: string; from: PaymentStatus; to: PaymentStatus }
-  | { outcome: 'already_current'; paymentId: string; status: PaymentStatus }
+  | { outcome: 'transitioned'; paymentId: string; from: PaymentStatus; to: PaymentStatus; paymentType: string; bookingId: string | null; orderId: string | null }
+  | { outcome: 'already_current'; paymentId: string; status: PaymentStatus; paymentType: string; bookingId: string | null; orderId: string | null }
   | { outcome: 'pending_noop'; paymentId: string }
   | { outcome: 'stale'; paymentId: string; rawStatus: string }
   | { outcome: 'manual_review'; paymentId: string; reason: string }
@@ -42,7 +54,32 @@ interface PaymentRow {
   payment_type: string
   amount: string
   currency: string
+  booking_id: string | null
+  order_id: string | null
 }
+
+/**
+ * The exact, complete `payment_type` Postgres enum values that use
+ * manual-capture/pre-authorisation semantics (`provider.authorizeDeposit()`,
+ * `capture_method: 'manual'`) -- confirmed P5D-B.1 by reading every enum
+ * widening migration and every orchestrator call site that constructs a
+ * payment intent, not assumed from naming: the base enum
+ * (20260801000001_payment_enums.sql) only ever had 'deposit' /
+ * 'rental_charge', but later migrations widened it with
+ * 'order_payment' (20260812000001), 'barter_deposit' /
+ * 'barter_cash_adjustment' (20260816000001), and
+ * 'rent_to_buy_installment' / 'rent_to_buy_deposit' (20260827000001).
+ * Of those seven, exactly three use `authorizeDeposit()`:
+ *   - 'deposit'            -- authorize-booking-financials.ts
+ *   - 'barter_deposit'     -- authorize-barter-deposit.ts
+ *   - 'rent_to_buy_deposit'-- charge-rent-to-buy-deposit.ts
+ * The other four ('rental_charge', 'order_payment',
+ * 'barter_cash_adjustment', 'rent_to_buy_installment') all use
+ * `chargeRental()` (automatic capture) -- confirmed by direct source
+ * reading of every orchestrator call site, not inferred from a type
+ * name containing "deposit".
+ */
+const MANUAL_CAPTURE_PAYMENT_TYPES = new Set(['deposit', 'barter_deposit', 'rent_to_buy_deposit'])
 
 /**
  * The single reconciliation entry point every source (webhook, and once
@@ -75,7 +112,7 @@ export async function reconcileOrchestrationPayment(admin: SupabaseClient, evide
   // constraint yet -- P5D-A.1's own confirmed, separately-gated gap).
   const { data: rows, error: lookupError } = await admin
     .from('payments')
-    .select('id, status, payment_type, amount, currency')
+    .select('id, status, payment_type, amount, currency, booking_id, order_id')
     .eq('provider', 'peach')
     .eq('provider_reference', evidence.paymentId)
     .limit(2)
@@ -131,6 +168,96 @@ export async function reconcileOrchestrationPayment(admin: SupabaseClient, evide
     return { outcome: 'stale', paymentId: payment.id, rawStatus: evidence.status }
   }
 
+  // P5D-B.1: every remaining branch (category.kind is 'target' or
+  // 'cancelled') must resolve its target with awareness of
+  // payment.payment_type -- a P5D-B-R review found the original version
+  // mapped requires_capture -> authorised and cancelled -> released
+  // purely from current status, with no check that the payment is
+  // actually one of the three manual-capture types. An automatic-capture
+  // payment (rental_charge/order_payment/barter_cash_adjustment/
+  // rent_to_buy_installment) receiving provider evidence that only makes
+  // sense for a manual-capture flow is never guessed into a transition.
+  const isManualCaptureType = MANUAL_CAPTURE_PAYMENT_TYPES.has(payment.payment_type)
+
+  if (category.kind === 'target' && category.target === 'authorised') {
+    // requires_capture
+    if (!isManualCaptureType) {
+      safeLog('webhook_invalid_provider_state', {
+        paymentId: payment.id,
+        reason: 'requires_capture on a non-manual-capture payment_type',
+        paymentType: payment.payment_type,
+        source: evidence.source,
+      })
+      return {
+        outcome: 'manual_review',
+        paymentId: payment.id,
+        reason: `provider status "requires_capture" is not valid for payment_type "${payment.payment_type}" -- only deposit/barter_deposit/rent_to_buy_deposit payments support manual capture`,
+      }
+    }
+  }
+
+  if (category.kind === 'target' && category.target === 'captured' && isManualCaptureType && payment.status === 'authorised') {
+    // succeeded, on an authorised manual-capture payment: P5D-B.1 audit
+    // (capture-deposit.ts) confirmed deposit capture is a deliberate,
+    // reasoned, admin/dispute-gated action via the dedicated
+    // capture_deposit_amount RPC (required p_reason, required p_amount,
+    // booking-status eligibility check) -- not something a generic
+    // webhook 'succeeded' signal can safely trigger. The same
+    // conservative default applies to barter_deposit/rent_to_buy_deposit:
+    // auto-capturing via the generic transition_payment_status path
+    // would bypass whatever domain-specific recording each of those
+    // flows' own dedicated capture path is responsible for.
+    safeLog('webhook_invalid_provider_state', {
+      paymentId: payment.id,
+      reason: 'succeeded on an authorised manual-capture payment requires the dedicated capture workflow, not a generic webhook transition',
+      paymentType: payment.payment_type,
+      source: evidence.source,
+    })
+    return {
+      outcome: 'manual_review',
+      paymentId: payment.id,
+      reason: 'an authorised manual-capture payment reaching "succeeded" must be captured via its own dedicated, reasoned capture workflow, never a generic webhook transition',
+    }
+  }
+
+  if (category.kind === 'cancelled' && payment.status === 'authorised' && !isManualCaptureType) {
+    // A non-manual-capture payment should never legitimately be
+    // 'authorised' in the first place (only the requires_capture guard
+    // above, now closed, could have put it there) -- if one is found in
+    // that state anyway, never guess whether 'cancelled' means
+    // 'released' (a deposit-specific term) is safe to apply here.
+    safeLog('webhook_invalid_provider_state', {
+      paymentId: payment.id,
+      reason: 'authorised non-manual-capture payment received cancelled -- payment_type inconsistent with its own status',
+      paymentType: payment.payment_type,
+      source: evidence.source,
+    })
+    return {
+      outcome: 'manual_review',
+      paymentId: payment.id,
+      reason: `payment is "authorised" but payment_type "${payment.payment_type}" does not support manual capture -- cannot safely label a cancelled event as released`,
+    }
+  }
+
+  if (category.kind === 'target' && category.target === 'partially_captured' && !isManualCaptureType) {
+    // partially_captured only makes semantic sense for a manual-capture
+    // flow (an ordinary automatic-capture charge is always full-amount);
+    // isValidPaymentTransition already makes this unreachable from
+    // 'pending' for any type, but this guard makes the business-context
+    // requirement explicit rather than relying solely on that side effect.
+    safeLog('webhook_invalid_provider_state', {
+      paymentId: payment.id,
+      reason: 'partially_captured on a non-manual-capture payment_type',
+      paymentType: payment.payment_type,
+      source: evidence.source,
+    })
+    return {
+      outcome: 'manual_review',
+      paymentId: payment.id,
+      reason: `provider status "partially_captured" is not valid for payment_type "${payment.payment_type}"`,
+    }
+  }
+
   const target: PaymentStatus =
     category.kind === 'cancelled'
       ? payment.status === 'authorised'
@@ -139,7 +266,7 @@ export async function reconcileOrchestrationPayment(admin: SupabaseClient, evide
       : category.target
 
   if (target === payment.status) {
-    return { outcome: 'already_current', paymentId: payment.id, status: payment.status }
+    return { outcome: 'already_current', paymentId: payment.id, status: payment.status, paymentType: payment.payment_type, bookingId: payment.booking_id, orderId: payment.order_id }
   }
 
   if (!isValidPaymentTransition(payment.status, target)) {
@@ -191,7 +318,7 @@ export async function reconcileOrchestrationPayment(admin: SupabaseClient, evide
     throw transitionError
   }
 
-  return { outcome: 'transitioned', paymentId: payment.id, from: payment.status, to: target }
+  return { outcome: 'transitioned', paymentId: payment.id, from: payment.status, to: target, paymentType: payment.payment_type, bookingId: payment.booking_id, orderId: payment.order_id }
 }
 
 /**
@@ -201,4 +328,102 @@ export async function reconcileOrchestrationPayment(admin: SupabaseClient, evide
  */
 function safeLog(reason: string, fields: Record<string, unknown>): void {
   console.error(`[orchestration.reconcile] ${reason}`, fields)
+}
+
+export type BusinessProgressionOutcome = { outcome: 'not_applicable' } | { outcome: 'completed' }
+
+/**
+ * P5D-B.1: `payments.status` changing is not the same as the business
+ * object reaching the state the SYNCHRONOUS checkout path would have
+ * produced -- a P5D-B-R review found the async webhook path never
+ * triggered any of the domain-specific follow-up each synchronous
+ * charge orchestrator already performs after a successful provider
+ * call (bookings: checkAndRecordLateSuccessIfExpired; orders:
+ * mark_order_paid; RTB: record_rent_to_buy_installment_payment /
+ * record_rent_to_buy_deposit_payment). This function is the narrow,
+ * domain-aware dispatcher the webhook route calls right after
+ * reconcileOrchestrationPayment() -- kept separate from it so financial
+ * reconciliation and business-state dispatch stay two distinct
+ * concerns, per this phase's own "keep the route thin, don't reimplement
+ * domain SQL here" instruction.
+ *
+ * CRASH-RECOVERY DESIGN (P5D-B.1 §13/§14): runs for BOTH `transitioned`
+ * (a fresh transition just happened) and `already_current` (the payment
+ * already reached the same target on a PRIOR attempt that may have
+ * crashed before this exact progression step ran) -- an `already_current`
+ * outcome is only ever produced when target === the payment's actual
+ * current status (see reconcileOrchestrationPayment's own construction
+ * of it), so it is always the "legitimate equivalent-target" case, never
+ * stale/inconsistent evidence being used as blanket permission to
+ * advance business state. Every domain primitive called here is
+ * independently confirmed idempotent (see each branch's own comment),
+ * so re-running this function on a retry after a genuine failure is
+ * always safe. The caller (the webhook route) is responsible for NOT
+ * marking the webhook event processed if this function throws -- a
+ * thrown error here must surface as a transient failure so a retry can
+ * complete the still-missing progression, never silently leaving the
+ * business object stuck while the event is marked handled.
+ *
+ * SCOPE, EXPLICITLY NOT WIRED THIS PHASE (reported, not silently
+ * omitted -- see the P5D-B.1 phase report):
+ *   - RTB installment progression (record_rent_to_buy_installment_payment)
+ *     requires the specific installment `sequence`, which is not
+ *     reliably recoverable from the `payments`/`rent_to_buy_installments`
+ *     schema alone for an in-flight (not-yet-recorded) payment --
+ *     `rent_to_buy_installments.payment_id` is only ever set BY that
+ *     same RPC, so there is no safe reverse lookup before it has run.
+ *   - RTB deposit progression (record_rent_to_buy_deposit_payment) --
+ *     charge-rent-to-buy-deposit.ts's own synchronous flow treats a
+ *     successful authorizeDeposit() as immediately 'captured' (not
+ *     'authorised', unlike booking/barter deposits), a
+ *     domain-specific business rule not independently re-verified
+ *     safe to replicate generically here this phase.
+ *   - Barter requires no domain-specific progression at all beyond the
+ *     payment transition itself -- confirmed: authorize-barter-deposit.ts
+ *     and charge-barter-cash-adjustment.ts call only
+ *     record_payment_attempt/transition_payment_status, no
+ *     domain-specific RPC exists for either barter payment_type.
+ *   - Commission qualification (qualifyRentalPaymentAffiliateCommission
+ *     etc.) and escrow funding are deliberately out of scope -- both are
+ *     already documented as "best-effort, never blocks" in every
+ *     synchronous caller, a materially different risk category from the
+ *     "business object permanently stuck" gaps this function closes.
+ */
+export async function completeAsyncPaymentBusinessProgression(admin: SupabaseClient, reconciliation: ReconciliationOutcome): Promise<BusinessProgressionOutcome> {
+  if (reconciliation.outcome !== 'transitioned' && reconciliation.outcome !== 'already_current') {
+    return { outcome: 'not_applicable' }
+  }
+
+  const achievedStatus = reconciliation.outcome === 'transitioned' ? reconciliation.to : reconciliation.status
+  // Only a genuine "money captured" or "hold placed" completion ever
+  // triggers domain progression -- never failed/cancelled/released/
+  // refunded/etc.
+  if (achievedStatus !== 'captured' && achievedStatus !== 'authorised') {
+    return { outcome: 'not_applicable' }
+  }
+
+  if (reconciliation.bookingId) {
+    // Idempotent (confirmed, unchanged from the synchronous path's own
+    // use): "at most one such marker per booking" -- reused verbatim,
+    // not reimplemented. Runs for either the rental leg (captured) or
+    // the deposit leg (authorised) reaching its target, matching the
+    // synchronous path's own booking-level (not leg-specific) check.
+    const { checkAndRecordLateSuccessIfExpired } = await import('@/lib/bookings/late-payment-reconciliation')
+    await checkAndRecordLateSuccessIfExpired(admin, reconciliation.bookingId)
+  }
+
+  if (reconciliation.orderId && reconciliation.paymentType === 'order_payment' && achievedStatus === 'captured') {
+    // Confirmed idempotent by direct source reading
+    // (20260812000005_order_idempotency_fk_fix.sql): "if v_order.status
+    // = 'paid' then ... naturally idempotent, not an error ... return"
+    // -- safe to call again on a retry regardless of idempotency key.
+    const { error } = await admin.rpc('mark_order_paid', {
+      p_order_id: reconciliation.orderId,
+      p_payment_id: reconciliation.paymentId,
+      p_idempotency_key: `async-reconcile:${reconciliation.paymentId}`,
+    })
+    if (error) throw error
+  }
+
+  return { outcome: 'completed' }
 }

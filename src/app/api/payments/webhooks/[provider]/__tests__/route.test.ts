@@ -61,6 +61,8 @@ function fakeAdmin(overrides: {
   markError?: { data?: unknown; error?: unknown }
   paymentsLookupRows?: unknown[]
   transitionResult?: { data?: unknown; error?: unknown }
+  markOrderPaidResult?: { data?: unknown; error?: unknown }
+  bookingRow?: { status: string; payment_expired_at: string | null } | null
 }) {
   const rpcCalls: Array<{ name: string; params: unknown }> = []
   const rpc = vi.fn(async (name: string, params: unknown) => {
@@ -76,6 +78,10 @@ function fakeAdmin(overrides: {
         return overrides.markError ?? { data: { outcome: 'error_recorded', processing_status: 'error' }, error: null }
       case 'transition_payment_status':
         return overrides.transitionResult ?? { data: {}, error: null }
+      case 'mark_order_paid':
+        return overrides.markOrderPaidResult ?? { data: { order_id: 'order-1', status: 'paid' }, error: null }
+      case 'record_late_payment_reconciliation':
+        return { data: { booking_id: 'booking-1', recorded: true }, error: null }
       default:
         throw new Error(`unexpected rpc call: ${name}`)
     }
@@ -86,9 +92,15 @@ function fakeAdmin(overrides: {
     eq: vi.fn().mockReturnThis(),
     limit: vi.fn().mockResolvedValue({ data: overrides.paymentsLookupRows ?? [], error: null }),
   }
+  const bookingsSelectChain = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockResolvedValue({ data: overrides.bookingRow ?? null, error: null }),
+  }
 
   const from = vi.fn((table: string) => {
     if (table === 'payments') return paymentsSelectChain
+    if (table === 'bookings') return bookingsSelectChain
     throw new Error(`unexpected table: ${table}`)
   })
 
@@ -331,6 +343,69 @@ describe('POST /api/payments/webhooks/[provider] -- Orchestration inbox integrat
     const json = await response.json()
     expect(json.status).toBe('deferred')
     expect(admin.rpcCalls.map((c) => c.name)).toEqual(['record_webhook_event', 'claim_webhook_event_processing', 'mark_webhook_event_processed'])
+  })
+})
+
+describe('POST /api/payments/webhooks/[provider] -- P5D-B.1 async business-state progression', () => {
+  beforeEach(() => {
+    resetEnv()
+    setStorageEnv()
+    setOrchestrationWebhookEnv()
+  })
+  afterEach(resetEnv)
+
+  const orderBody = { event_id: 'evt_order_1', event_type: 'payment_succeeded', content: { payment_id: 'peach_order_1', status: 'succeeded', amount: 9200, currency: 'ZAR' } }
+
+  it('a captured order_payment triggers mark_order_paid before the event is marked processed', async () => {
+    const admin = fakeAdmin({
+      claim: { data: { claimed: true, processing_status: 'processing', processing_attempts: 1 }, error: null },
+      paymentsLookupRows: [{ id: 'pay-order-1', status: 'pending', payment_type: 'order_payment', amount: '92.00', currency: 'ZAR', order_id: 'order-1' }],
+    })
+    const response = await withAdmin(admin, () => POST(orchestrationRequest(orderBody), routeParams))
+    expect(response.status).toBe(200)
+    const names = admin.rpcCalls.map((c) => c.name)
+    expect(names.indexOf('mark_order_paid')).toBeGreaterThan(names.indexOf('transition_payment_status'))
+    expect(names.indexOf('mark_order_paid')).toBeLessThan(names.indexOf('mark_webhook_event_processed'))
+  })
+
+  it('a transient mark_order_paid failure is treated exactly like a reconciliation failure -- mark_webhook_event_error, 503, event never marked processed', async () => {
+    const admin = fakeAdmin({
+      claim: { data: { claimed: true, processing_status: 'processing', processing_attempts: 1 }, error: null },
+      paymentsLookupRows: [{ id: 'pay-order-1', status: 'pending', payment_type: 'order_payment', amount: '92.00', currency: 'ZAR', order_id: 'order-1' }],
+      markOrderPaidResult: { data: null, error: new Error('order rpc failed') },
+    })
+    const response = await withAdmin(admin, () => POST(orchestrationRequest(orderBody), routeParams))
+    expect(response.status).toBe(503)
+    expect(admin.rpcCalls.map((c) => c.name)).toContain('mark_webhook_event_error')
+    expect(admin.rpcCalls.map((c) => c.name)).not.toContain('mark_webhook_event_processed')
+  })
+
+  it('retry after a transient business-progression failure: payment now already_current, mark_order_paid safely retries and succeeds, event marked processed', async () => {
+    const admin = fakeAdmin({
+      claim: { data: { claimed: true, processing_status: 'processing', processing_attempts: 2 }, error: null },
+      // Simulates the payment having already reached 'captured' on a
+      // prior attempt (already_current), business progression not yet
+      // having completed then.
+      paymentsLookupRows: [{ id: 'pay-order-1', status: 'captured', payment_type: 'order_payment', amount: '92.00', currency: 'ZAR', order_id: 'order-1' }],
+    })
+    const response = await withAdmin(admin, () => POST(orchestrationRequest(orderBody), routeParams))
+    expect(response.status).toBe(200)
+    const names = admin.rpcCalls.map((c) => c.name)
+    expect(names).toContain('mark_order_paid')
+    expect(names).toContain('mark_webhook_event_processed')
+    expect(names).not.toContain('transition_payment_status')
+  })
+
+  it('a captured booking rental payment triggers the existing late-success check before the event is marked processed', async () => {
+    const bookingBody = { event_id: 'evt_booking_1', event_type: 'payment_succeeded', content: { payment_id: 'peach_booking_1', status: 'succeeded', amount: 9200, currency: 'ZAR' } }
+    const admin = fakeAdmin({
+      claim: { data: { claimed: true, processing_status: 'processing', processing_attempts: 1 }, error: null },
+      paymentsLookupRows: [{ id: 'pay-booking-1', status: 'pending', payment_type: 'rental_charge', amount: '92.00', currency: 'ZAR', booking_id: 'booking-1' }],
+      bookingRow: { status: 'expired', payment_expired_at: '2026-01-01T00:00:00Z' },
+    })
+    const response = await withAdmin(admin, () => POST(orchestrationRequest(bookingBody), routeParams))
+    expect(response.status).toBe(200)
+    expect(admin.rpcCalls.map((c) => c.name)).toContain('record_late_payment_reconciliation')
   })
 })
 

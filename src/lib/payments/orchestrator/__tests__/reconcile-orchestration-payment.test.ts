@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { reconcileOrchestrationPayment, type OrchestrationEvidence } from '../reconcile-orchestration-payment'
+import { reconcileOrchestrationPayment, completeAsyncPaymentBusinessProgression, type OrchestrationEvidence, type ReconciliationOutcome } from '../reconcile-orchestration-payment'
 
 /**
  * Lightweight fake of the two Supabase calls this function makes --
@@ -144,37 +144,37 @@ describe('reconcileOrchestrationPayment -- status normalization', () => {
   it('requires_capture on a pending deposit -> transitions to authorised', async () => {
     const admin = fakeAdmin([payment({ status: 'pending', payment_type: 'deposit' })])
     const result = await reconcileOrchestrationPayment(admin, evidence({ status: 'requires_capture' }))
-    expect(result).toEqual({ outcome: 'transitioned', paymentId: 'pay-row-1', from: 'pending', to: 'authorised' })
+    expect(result).toMatchObject({ outcome: 'transitioned', paymentId: 'pay-row-1', from: 'pending', to: 'authorised' })
   })
 
   it('succeeded on a pending rental charge -> transitions to captured', async () => {
     const admin = fakeAdmin([payment({ status: 'pending' })])
     const result = await reconcileOrchestrationPayment(admin, evidence({ status: 'succeeded' }))
-    expect(result).toEqual({ outcome: 'transitioned', paymentId: 'pay-row-1', from: 'pending', to: 'captured' })
+    expect(result).toMatchObject({ outcome: 'transitioned', paymentId: 'pay-row-1', from: 'pending', to: 'captured' })
   })
 
   it('failed on a pending payment -> transitions to failed', async () => {
     const admin = fakeAdmin([payment({ status: 'pending' })])
     const result = await reconcileOrchestrationPayment(admin, evidence({ status: 'failed' }))
-    expect(result).toEqual({ outcome: 'transitioned', paymentId: 'pay-row-1', from: 'pending', to: 'failed' })
+    expect(result).toMatchObject({ outcome: 'transitioned', paymentId: 'pay-row-1', from: 'pending', to: 'failed' })
   })
 
   it('partially_captured on an authorised deposit -> transitions to partially_captured', async () => {
     const admin = fakeAdmin([payment({ status: 'authorised', payment_type: 'deposit' })])
     const result = await reconcileOrchestrationPayment(admin, evidence({ status: 'partially_captured' }))
-    expect(result).toEqual({ outcome: 'transitioned', paymentId: 'pay-row-1', from: 'authorised', to: 'partially_captured' })
+    expect(result).toMatchObject({ outcome: 'transitioned', paymentId: 'pay-row-1', from: 'authorised', to: 'partially_captured' })
   })
 
   it('cancelled on an authorised deposit -> released (context-sensitive)', async () => {
     const admin = fakeAdmin([payment({ status: 'authorised', payment_type: 'deposit' })])
     const result = await reconcileOrchestrationPayment(admin, evidence({ status: 'cancelled' }))
-    expect(result).toEqual({ outcome: 'transitioned', paymentId: 'pay-row-1', from: 'authorised', to: 'released' })
+    expect(result).toMatchObject({ outcome: 'transitioned', paymentId: 'pay-row-1', from: 'authorised', to: 'released' })
   })
 
   it('cancelled on an ordinary pending payment -> cancelled (context-sensitive)', async () => {
     const admin = fakeAdmin([payment({ status: 'pending', payment_type: 'rental_charge' })])
     const result = await reconcileOrchestrationPayment(admin, evidence({ status: 'cancelled' }))
-    expect(result).toEqual({ outcome: 'transitioned', paymentId: 'pay-row-1', from: 'pending', to: 'cancelled' })
+    expect(result).toMatchObject({ outcome: 'transitioned', paymentId: 'pay-row-1', from: 'pending', to: 'cancelled' })
   })
 
   it('unknown future status -> unknown_status, no transition RPC call', async () => {
@@ -202,14 +202,14 @@ describe('reconcileOrchestrationPayment -- stale/terminal protection (never regr
   it('succeeded after already-captured -> already_current, no duplicate transition', async () => {
     const admin = fakeAdmin([payment({ status: 'captured' })])
     const result = await reconcileOrchestrationPayment(admin, evidence({ status: 'succeeded' }))
-    expect(result).toEqual({ outcome: 'already_current', paymentId: 'pay-row-1', status: 'captured' })
+    expect(result).toMatchObject({ outcome: 'already_current', paymentId: 'pay-row-1', status: 'captured' })
     expect(admin.rpc).not.toHaveBeenCalled()
   })
 
   it('requires_capture after already-authorised -> already_current', async () => {
     const admin = fakeAdmin([payment({ status: 'authorised', payment_type: 'deposit' })])
     const result = await reconcileOrchestrationPayment(admin, evidence({ status: 'requires_capture' }))
-    expect(result).toEqual({ outcome: 'already_current', paymentId: 'pay-row-1', status: 'authorised' })
+    expect(result).toMatchObject({ outcome: 'already_current', paymentId: 'pay-row-1', status: 'authorised' })
   })
 
   it('failed after captured -> manual_review, no transition attempted (invalid transition, never a silent no-op)', async () => {
@@ -266,5 +266,193 @@ describe('reconcileOrchestrationPayment -- infrastructure failures are never swa
   it('a transition RPC error throws rather than returning a handled outcome', async () => {
     const admin = fakeAdmin([payment({ status: 'pending' })], { data: null, error: new Error('rpc failed') })
     await expect(reconcileOrchestrationPayment(admin, evidence({ status: 'succeeded' }))).rejects.toThrow('rpc failed')
+  })
+})
+
+describe('reconcileOrchestrationPayment -- P5D-B.1 payment_type context guards', () => {
+  const MANUAL_CAPTURE_TYPES = ['deposit', 'barter_deposit', 'rent_to_buy_deposit']
+  const AUTOMATIC_CAPTURE_TYPES = ['rental_charge', 'order_payment', 'barter_cash_adjustment', 'rent_to_buy_installment']
+
+  it.each(MANUAL_CAPTURE_TYPES)('requires_capture on a pending %s payment -> transitions to authorised', async (paymentType) => {
+    const admin = fakeAdmin([payment({ status: 'pending', payment_type: paymentType })])
+    const result = await reconcileOrchestrationPayment(admin, evidence({ status: 'requires_capture' }))
+    expect(result).toMatchObject({ outcome: 'transitioned', paymentId: 'pay-row-1', from: 'pending', to: 'authorised' })
+  })
+
+  it.each(AUTOMATIC_CAPTURE_TYPES)('requires_capture on a pending %s (automatic-capture) payment -> manual_review, no transition', async (paymentType) => {
+    const admin = fakeAdmin([payment({ status: 'pending', payment_type: paymentType })])
+    const result = await reconcileOrchestrationPayment(admin, evidence({ status: 'requires_capture' }))
+    expect(result.outcome).toBe('manual_review')
+    expect(admin.rpc).not.toHaveBeenCalled()
+  })
+
+  it.each(MANUAL_CAPTURE_TYPES)('cancelled on an authorised %s payment -> released', async (paymentType) => {
+    const admin = fakeAdmin([payment({ status: 'authorised', payment_type: paymentType })])
+    const result = await reconcileOrchestrationPayment(admin, evidence({ status: 'cancelled' }))
+    expect(result).toMatchObject({ outcome: 'transitioned', paymentId: 'pay-row-1', from: 'authorised', to: 'released' })
+  })
+
+  it('cancelled on an ordinary pending (automatic-capture) payment -> cancelled', async () => {
+    const admin = fakeAdmin([payment({ status: 'pending', payment_type: 'rental_charge' })])
+    const result = await reconcileOrchestrationPayment(admin, evidence({ status: 'cancelled' }))
+    expect(result).toMatchObject({ outcome: 'transitioned', paymentId: 'pay-row-1', from: 'pending', to: 'cancelled' })
+  })
+
+  it('cancelled on a non-manual-capture payment that is somehow already "authorised" -> manual_review, never labelled released', async () => {
+    const admin = fakeAdmin([payment({ status: 'authorised', payment_type: 'rental_charge' })])
+    const result = await reconcileOrchestrationPayment(admin, evidence({ status: 'cancelled' }))
+    expect(result.outcome).toBe('manual_review')
+    expect(admin.rpc).not.toHaveBeenCalled()
+  })
+
+  it.each(MANUAL_CAPTURE_TYPES)('succeeded on an authorised %s payment -> manual_review (deposit capture requires the dedicated reasoned workflow, never a generic webhook transition)', async (paymentType) => {
+    const admin = fakeAdmin([payment({ status: 'authorised', payment_type: paymentType })])
+    const result = await reconcileOrchestrationPayment(admin, evidence({ status: 'succeeded' }))
+    expect(result.outcome).toBe('manual_review')
+    expect(admin.rpc).not.toHaveBeenCalled()
+  })
+
+  it('succeeded on a pending automatic-capture payment still transitions normally to captured -- the manual-capture guard does not affect ordinary charges', async () => {
+    const admin = fakeAdmin([payment({ status: 'pending', payment_type: 'rental_charge' })])
+    const result = await reconcileOrchestrationPayment(admin, evidence({ status: 'succeeded' }))
+    expect(result).toMatchObject({ outcome: 'transitioned', paymentId: 'pay-row-1', from: 'pending', to: 'captured' })
+  })
+
+  it.each(AUTOMATIC_CAPTURE_TYPES)('partially_captured on a %s (automatic-capture) payment -> manual_review, never guessed', async (paymentType) => {
+    // Even if isValidPaymentTransition would otherwise permit it from an
+    // authorised-like state, the payment_type guard is explicit and
+    // independent -- this asserts the guard itself, not just the state
+    // machine's own side-effect.
+    const admin = fakeAdmin([payment({ status: 'authorised', payment_type: paymentType })])
+    const result = await reconcileOrchestrationPayment(admin, evidence({ status: 'partially_captured' }))
+    expect(result.outcome).toBe('manual_review')
+    expect(admin.rpc).not.toHaveBeenCalled()
+  })
+})
+
+describe('completeAsyncPaymentBusinessProgression -- booking + order async business-state progression', () => {
+  /**
+   * Fake admin covering both domain-progression call shapes:
+   * `.from('bookings').select().eq().maybeSingle()` (what the real,
+   * unmodified checkAndRecordLateSuccessIfExpired() issues) and
+   * `.rpc('record_late_payment_reconciliation' | 'mark_order_paid', ...)`.
+   * The real checkAndRecordLateSuccessIfExpired/late-payment-reconciliation
+   * module is imported and run for real (not mocked) against this fake
+   * admin -- an integration-style proof that the actual existing,
+   * already-idempotent helper is reused, not reimplemented.
+   */
+  function fakeProgressionAdmin(options: {
+    bookingRow?: { status: string; payment_expired_at: string | null } | null
+    markOrderPaidResult?: { data?: unknown; error?: unknown }
+    recordLateSuccessResult?: { data?: unknown; error?: unknown }
+  }) {
+    const rpcCalls: Array<{ name: string; params: unknown }> = []
+    const bookingsChain = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: options.bookingRow ?? null, error: null }),
+    }
+    const rpc = vi.fn(async (name: string, params: unknown) => {
+      rpcCalls.push({ name, params })
+      if (name === 'record_late_payment_reconciliation') return options.recordLateSuccessResult ?? { data: { booking_id: 'booking-1', recorded: true }, error: null }
+      if (name === 'mark_order_paid') return options.markOrderPaidResult ?? { data: { order_id: 'order-1', status: 'paid' }, error: null }
+      throw new Error(`unexpected rpc call in progression test: ${name}`)
+    })
+    const from = vi.fn((table: string) => {
+      if (table === 'bookings') return bookingsChain
+      throw new Error(`unexpected table in progression test: ${table}`)
+    })
+    return { from, rpc, rpcCalls } as unknown as Parameters<typeof completeAsyncPaymentBusinessProgression>[0] & { rpcCalls: typeof rpcCalls }
+  }
+
+  function transitionedOutcome(overrides: Partial<Extract<ReconciliationOutcome, { outcome: 'transitioned' }>> = {}): ReconciliationOutcome {
+    return { outcome: 'transitioned', paymentId: 'pay-1', from: 'pending', to: 'captured', paymentType: 'rental_charge', bookingId: null, orderId: null, ...overrides }
+  }
+  function alreadyCurrentOutcome(overrides: Partial<Extract<ReconciliationOutcome, { outcome: 'already_current' }>> = {}): ReconciliationOutcome {
+    return { outcome: 'already_current', paymentId: 'pay-1', status: 'captured', paymentType: 'rental_charge', bookingId: null, orderId: null, ...overrides }
+  }
+
+  it('not_applicable for outcomes that never represent a financial completion', async () => {
+    const admin = fakeProgressionAdmin({})
+    for (const outcome of [
+      { outcome: 'pending_noop', paymentId: 'p1' },
+      { outcome: 'stale', paymentId: 'p1', rawStatus: 'processing' },
+      { outcome: 'manual_review', paymentId: 'p1', reason: 'x' },
+      { outcome: 'unknown_payment' },
+      { outcome: 'ambiguous_provider_reference' },
+      { outcome: 'rejected_mismatch', paymentId: 'p1', reason: 'amount' },
+      { outcome: 'unknown_status', paymentId: 'p1', rawStatus: 'x' },
+    ] as ReconciliationOutcome[]) {
+      const result = await completeAsyncPaymentBusinessProgression(admin, outcome)
+      expect(result).toEqual({ outcome: 'not_applicable' })
+    }
+    expect(admin.rpc).not.toHaveBeenCalled()
+  })
+
+  it('A. first async success: a transitioned outcome for a booking payment triggers checkAndRecordLateSuccessIfExpired', async () => {
+    const admin = fakeProgressionAdmin({ bookingRow: { status: 'expired', payment_expired_at: '2026-01-01T00:00:00Z' } })
+    const result = await completeAsyncPaymentBusinessProgression(admin, transitionedOutcome({ bookingId: 'booking-1' }))
+    expect(result).toEqual({ outcome: 'completed' })
+    expect(admin.rpcCalls.map((c) => c.name)).toContain('record_late_payment_reconciliation')
+  })
+
+  it('a booking not actually expired does not record a late-success marker (checkAndRecordLateSuccessIfExpired\'s own existing no-op condition)', async () => {
+    const admin = fakeProgressionAdmin({ bookingRow: { status: 'active', payment_expired_at: null } })
+    await completeAsyncPaymentBusinessProgression(admin, transitionedOutcome({ bookingId: 'booking-1' }))
+    expect(admin.rpcCalls.map((c) => c.name)).not.toContain('record_late_payment_reconciliation')
+  })
+
+  it('A. first async success: a transitioned outcome for an order_payment triggers mark_order_paid with a deterministic idempotency key', async () => {
+    const admin = fakeProgressionAdmin({})
+    await completeAsyncPaymentBusinessProgression(admin, transitionedOutcome({ paymentId: 'pay-order-1', paymentType: 'order_payment', orderId: 'order-1' }))
+    const call = admin.rpcCalls.find((c) => c.name === 'mark_order_paid')
+    expect(call).toBeDefined()
+    expect(call!.params).toMatchObject({ p_order_id: 'order-1', p_payment_id: 'pay-order-1' })
+  })
+
+  it('mark_order_paid is not called for a deposit/authorised outcome (order progression only fires on captured)', async () => {
+    const admin = fakeProgressionAdmin({})
+    await completeAsyncPaymentBusinessProgression(admin, alreadyCurrentOutcome({ status: 'authorised', paymentType: 'order_payment', orderId: 'order-1' }))
+    expect(admin.rpcCalls.map((c) => c.name)).not.toContain('mark_order_paid')
+  })
+
+  it('C. legitimate already_current can recover missing progression: an already_current outcome at the qualifying target also triggers progression', async () => {
+    const admin = fakeProgressionAdmin({})
+    const result = await completeAsyncPaymentBusinessProgression(admin, alreadyCurrentOutcome({ paymentId: 'pay-order-1', paymentType: 'order_payment', orderId: 'order-1' }))
+    expect(result).toEqual({ outcome: 'completed' })
+    expect(admin.rpcCalls.map((c) => c.name)).toContain('mark_order_paid')
+  })
+
+  it('B/D. a transient failure in mark_order_paid propagates (throws) rather than being swallowed -- the caller must not mark the webhook event processed', async () => {
+    const admin = fakeProgressionAdmin({ markOrderPaidResult: { data: null, error: new Error('order rpc failed') } })
+    await expect(
+      completeAsyncPaymentBusinessProgression(admin, transitionedOutcome({ paymentId: 'pay-order-1', paymentType: 'order_payment', orderId: 'order-1' }))
+    ).rejects.toThrow('order rpc failed')
+  })
+
+  it('B/C. retry after a transient progression failure: already_current now recovers the same (idempotent) mark_order_paid call and succeeds', async () => {
+    // Simulates: attempt 1 -- payment transitioned but mark_order_paid
+    // failed transiently (tested above). Attempt 2 (retry) -- payment
+    // reconciliation now returns already_current (already captured),
+    // and mark_order_paid succeeds this time -- confirmed idempotent
+    // (safe to call again) via mark_order_paid's own "already paid ->
+    // naturally idempotent" branch, reused here unmodified.
+    const admin = fakeProgressionAdmin({})
+    const result = await completeAsyncPaymentBusinessProgression(admin, alreadyCurrentOutcome({ paymentId: 'pay-order-1', paymentType: 'order_payment', orderId: 'order-1' }))
+    expect(result).toEqual({ outcome: 'completed' })
+  })
+
+  it('E. non-success provider state (manual_review) never triggers order/booking progression', async () => {
+    const admin = fakeProgressionAdmin({})
+    const result = await completeAsyncPaymentBusinessProgression(admin, { outcome: 'manual_review', paymentId: 'pay-1', reason: 'amount mismatch' })
+    expect(result).toEqual({ outcome: 'not_applicable' })
+    expect(admin.rpc).not.toHaveBeenCalled()
+  })
+
+  it('a barter payment_type never triggers order/RTB-specific progression -- only the payment transition itself matters for barter', async () => {
+    const admin = fakeProgressionAdmin({})
+    const result = await completeAsyncPaymentBusinessProgression(admin, transitionedOutcome({ paymentType: 'barter_cash_adjustment', bookingId: null, orderId: null }))
+    expect(result).toEqual({ outcome: 'completed' })
+    expect(admin.rpc).not.toHaveBeenCalled()
   })
 })
