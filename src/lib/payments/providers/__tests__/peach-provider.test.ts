@@ -318,4 +318,94 @@ describe('PeachPaymentsProvider -- P5C: Orchestration wiring', () => {
       expect(result.status).toBe('failed')
     })
   })
+
+  describe('P5D-B redirect-parser regression: requires_customer_action + nested next_action.redirect_to_url', () => {
+    it('chargeRental: a requires_customer_action response with next_action.type=redirect_to_url produces a requires_action provider result with redirectUrl + providerReference, never captured/authorised/failed', async () => {
+      setOrchestrationEnv()
+      fetchSpy.mockResolvedValue(
+        jsonResponse(200, {
+          payment_id: 'pay_3ds',
+          status: 'requires_customer_action',
+          next_action: { type: 'redirect_to_url', redirect_to_url: 'https://app.sandbox-next.peachpayments.com/api/payments/redirect/pay_3ds' },
+        })
+      )
+      const result = await new PeachPaymentsProvider().chargeRental({ paymentId: 'p1', providerReference: '', amount: 92, currency: 'ZAR' })
+
+      expect(result.status).toBe('requires_action')
+      if (result.status !== 'requires_action') throw new Error('expected requires_action')
+      expect(result.providerReference).toBe('pay_3ds')
+      expect(result.redirectUrl).toBe('https://app.sandbox-next.peachpayments.com/api/payments/redirect/pay_3ds')
+      // Explicitly not any of the other ChargeResult variants.
+      expect(result.status).not.toBe('captured')
+      expect(result.status).not.toBe('failed')
+    })
+
+    it('authorizeDeposit: same requires_customer_action + next_action shape produces requires_action, never authorised', async () => {
+      setOrchestrationEnv()
+      fetchSpy.mockResolvedValue(
+        jsonResponse(200, {
+          payment_id: 'pay_3ds_2',
+          status: 'requires_customer_action',
+          next_action: { type: 'redirect_to_url', redirect_to_url: 'https://app.sandbox-next.peachpayments.com/api/payments/redirect/pay_3ds_2' },
+        })
+      )
+      const result = await new PeachPaymentsProvider().authorizeDeposit({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })
+
+      expect(result.status).toBe('requires_action')
+      if (result.status !== 'requires_action') throw new Error('expected requires_action')
+      expect(result.providerReference).toBe('pay_3ds_2')
+      expect(result.redirectUrl).toBe('https://app.sandbox-next.peachpayments.com/api/payments/redirect/pay_3ds_2')
+      expect(result.status).not.toBe('authorised')
+    })
+
+    it('retains coverage for the existing requires_action spelling with a top-level redirect field (pre-P5D-B response shape)', async () => {
+      setOrchestrationEnv()
+      fetchSpy.mockResolvedValue(jsonResponse(200, { payment_id: 'pay_legacy', status: 'requires_action', redirect_url: 'https://secure.example/legacy' }))
+      const result = await new PeachPaymentsProvider().chargeRental({ paymentId: 'p1', providerReference: '', amount: 92, currency: 'ZAR' })
+
+      expect(result.status).toBe('requires_action')
+      if (result.status !== 'requires_action') throw new Error('expected requires_action')
+      expect(result.redirectUrl).toBe('https://secure.example/legacy')
+    })
+  })
+
+  describe('getPayment -- force-sync retrieval, GET /payments/{id}?force_sync=true (P5D-B)', () => {
+    it('requests force_sync=true by default and returns the parsed payment', async () => {
+      setOrchestrationEnv()
+      fetchSpy.mockResolvedValue(jsonResponse(200, { payment_id: 'pay_1', status: 'succeeded', amount: 9200, currency: 'ZAR' }))
+      const result = await new PeachPaymentsProvider().getPayment('pay_1')
+
+      expect(result).toEqual({ payment_id: 'pay_1', status: 'succeeded', amount: 9200, currency: 'ZAR' })
+      const [url, init] = fetchSpy.mock.calls[0]
+      expect(url).toBe('https://sandbox.example/orchestration/payments/pay_1?force_sync=true')
+      expect(init.method).toBe('GET')
+    })
+
+    it('URL-encodes the payment id', async () => {
+      setOrchestrationEnv()
+      fetchSpy.mockResolvedValue(jsonResponse(200, { payment_id: 'pay/1 x', status: 'succeeded', amount: 100, currency: 'ZAR' }))
+      await new PeachPaymentsProvider().getPayment('pay/1 x')
+      const [url] = fetchSpy.mock.calls[0]
+      expect(url).toBe('https://sandbox.example/orchestration/payments/pay%2F1%20x?force_sync=true')
+    })
+
+    it('omits force_sync when explicitly disabled', async () => {
+      setOrchestrationEnv()
+      fetchSpy.mockResolvedValue(jsonResponse(200, { payment_id: 'pay_1', status: 'succeeded', amount: 9200, currency: 'ZAR' }))
+      await new PeachPaymentsProvider().getPayment('pay_1', { forceSync: false })
+      const [url] = fetchSpy.mock.calls[0]
+      expect(url).toBe('https://sandbox.example/orchestration/payments/pay_1')
+    })
+
+    it('throws OrchestrationConfigurationError without a network call when Orchestration is not configured', async () => {
+      await expect(new PeachPaymentsProvider().getPayment('pay_1')).rejects.toThrow(OrchestrationConfigurationError)
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    it('fails closed on a malformed response (missing amount)', async () => {
+      setOrchestrationEnv()
+      fetchSpy.mockResolvedValue(jsonResponse(200, { payment_id: 'pay_1', status: 'succeeded', currency: 'ZAR' }))
+      await expect(new PeachPaymentsProvider().getPayment('pay_1')).rejects.toThrow()
+    })
+  })
 })

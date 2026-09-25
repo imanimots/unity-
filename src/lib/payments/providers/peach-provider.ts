@@ -23,7 +23,8 @@ import { normalizeCheckoutWebhookPayload, normalizeOppwaWebhookPayload, normaliz
 import { loadOrchestrationConfig, OrchestrationConfigurationError, type OrchestrationConfig } from './orchestration/config'
 import { OrchestrationClient } from './orchestration/client'
 import { buildOrdinaryPaymentRequest, buildDepositAuthorisationRequest } from './orchestration/request-builders'
-import { parseCreateHostedCheckoutPaymentResponse, parseCapturePaymentResponse, parseCancelPaymentResponse, extractRedirectUrl } from './orchestration/response-parsers'
+import { parseCreateHostedCheckoutPaymentResponse, parseCapturePaymentResponse, parseCancelPaymentResponse, parseGetPaymentResponse, extractRedirectUrl } from './orchestration/response-parsers'
+import type { GetPaymentResponse } from './orchestration/types'
 import { orchestrationReturnUrl } from '@/app/api/payments/checkout-return/route'
 
 /**
@@ -141,6 +142,25 @@ export class PeachPaymentsProvider implements PaymentProvider {
     const parsed = parseCreateHostedCheckoutPaymentResponse(raw)
     const redirectUrl = extractRedirectUrl(raw as Record<string, unknown>)
     return { status: 'requires_action', providerReference: parsed.payment_id, redirectUrl }
+  }
+
+  /**
+   * P5D-B: server-side authoritative retrieval, `GET
+   * /payments/{payment_id}?force_sync=true`. Not part of the generic
+   * PaymentProvider interface (no other provider has an equivalent
+   * concept, and forcing one onto MockProvider/the shared contract
+   * would be exactly the kind of Orchestration-specific leakage P5D-B
+   * is required to avoid) -- called directly by
+   * reconcile-orchestration-payment.ts's force-sync caller once wired.
+   * Uses the existing OrchestrationClient.get() path and the
+   * already-tested parseGetPaymentResponse() parser -- neither needed
+   * to change.
+   */
+  async getPayment(paymentId: string, options: { forceSync: boolean } = { forceSync: true }): Promise<GetPaymentResponse> {
+    const client = this.orchestrationClient()
+    const query = options.forceSync ? '?force_sync=true' : ''
+    const raw = await client.get(`/payments/${encodeURIComponent(paymentId)}${query}`, 'getPayment')
+    return parseGetPaymentResponse(raw)
   }
 
   async refund(_input: RefundInput): Promise<RefundResult> {

@@ -30,20 +30,48 @@ export type OrchestrationEnvironment = 'sandbox' | 'production'
 export type OrchestrationCaptureMethod = 'automatic' | 'manual'
 
 /**
- * Confirmed verbatim from playground.peachpayments.com/payment-states.
- * Not every value is reachable from every capture_method/flow, but all
- * nine are real, documented Orchestration states -- not invented here.
+ * Confirmed verbatim from playground.peachpayments.com/payment-states
+ * (the general state-machine reference): nine values, including
+ * `requires_action` -- "Additional customer action needed (for example,
+ * 3DS authentication)".
+ *
+ * `requires_customer_action` (P5D-B) is confirmed verbatim, separately,
+ * from playground.peachpayments.com/concepts/three-ds-next-action: "is
+ * the only value that means 'I cannot proceed without the shopper's
+ * browser', and it is the only one where `next_action` is populated."
+ * That page and the payment-states page disagree on which spelling is
+ * canonical for the same underlying condition -- P5D-A.1 found this
+ * inconsistency directly in Peach's own current documentation, not
+ * invented here. Both are real, both are supported: Unity's provider
+ * boundary normalizes either to `pending`, never guesses which one
+ * "must" be wrong. See webhook-envelope.ts's own status normalizer.
  */
 export type OrchestrationPaymentStatus =
   | 'requires_payment_method'
   | 'requires_confirmation'
   | 'requires_action'
+  | 'requires_customer_action'
   | 'requires_capture'
   | 'processing'
   | 'succeeded'
   | 'failed'
   | 'cancelled'
   | 'partially_captured'
+
+/**
+ * Confirmed verbatim from concepts/three-ds-next-action: `type` selects
+ * the variant, and only that variant's own fields are populated.
+ * `redirect_to_url` is Unity's only currently-supported variant (Hosted
+ * Checkout); `three_ds_invoke`/`invoke_hidden_iframe`/
+ * `redirect_inside_popup` are real, documented Orchestration variants
+ * this codebase does not yet handle -- represented, not silently
+ * coerced, so an unsupported variant fails closed rather than guessing.
+ */
+export interface OrchestrationNextAction {
+  type: string
+  redirect_to_url?: string
+  [key: string]: unknown
+}
 
 export interface CreateHostedCheckoutPaymentRequest {
   amount: number // integer minor units -- see amount.ts

@@ -25,6 +25,46 @@ describe('extractRedirectUrl (unconfirmed response field -- defensive, never a s
   })
 })
 
+describe('extractRedirectUrl (P5D-B: documented nested next_action shape)', () => {
+  it('prefers next_action.redirect_to_url when next_action.type is "redirect_to_url"', () => {
+    const result = extractRedirectUrl({
+      payment_id: 'p_1',
+      status: 'requires_customer_action',
+      next_action: { type: 'redirect_to_url', redirect_to_url: 'https://app.sandbox-next.peachpayments.com/api/payments/redirect/pay_1' },
+    })
+    expect(result).toBe('https://app.sandbox-next.peachpayments.com/api/payments/redirect/pay_1')
+  })
+
+  it('never lets a top-level fallback field override a present next_action', () => {
+    const result = extractRedirectUrl({
+      next_action: { type: 'redirect_to_url', redirect_to_url: 'https://correct.example/nested' },
+      url: 'https://wrong.example/top-level-should-be-ignored',
+    })
+    expect(result).toBe('https://correct.example/nested')
+  })
+
+  it('rejects an unsupported next_action.type explicitly, never silently falling through to a guessed field', () => {
+    expect(() =>
+      extractRedirectUrl({ next_action: { type: 'three_ds_invoke', three_ds_data: {} }, url: 'https://should-not-be-used.example' })
+    ).toThrow(UnrecognizedOrchestrationResponseError)
+    expect(() => extractRedirectUrl({ next_action: { type: 'invoke_hidden_iframe', iframe_data: {} } })).toThrow(UnrecognizedOrchestrationResponseError)
+    expect(() => extractRedirectUrl({ next_action: { type: 'redirect_inside_popup', popup_url: 'https://x' } })).toThrow(UnrecognizedOrchestrationResponseError)
+  })
+
+  it('rejects a redirect_to_url next_action with a missing/empty redirect_to_url field, rather than returning an empty string', () => {
+    expect(() => extractRedirectUrl({ next_action: { type: 'redirect_to_url' } })).toThrow(UnrecognizedOrchestrationResponseError)
+    expect(() => extractRedirectUrl({ next_action: { type: 'redirect_to_url', redirect_to_url: '' } })).toThrow(UnrecognizedOrchestrationResponseError)
+  })
+
+  it('falls back to the top-level candidate fields only when next_action is entirely absent', () => {
+    expect(extractRedirectUrl({ redirect_url: 'https://legacy.example/1' })).toBe('https://legacy.example/1')
+  })
+
+  it('does not treat a malformed next_action (no string type) as a next_action -- falls through to the top-level candidates instead', () => {
+    expect(extractRedirectUrl({ next_action: { redirect_to_url: 'https://ignored.example' }, url: 'https://fallback.example' })).toBe('https://fallback.example')
+  })
+})
+
 describe('parseCreateHostedCheckoutPaymentResponse', () => {
   it('parses a well-formed response', () => {
     const result = parseCreateHostedCheckoutPaymentResponse({ payment_id: 'p_1', status: 'requires_confirmation', redirect_url: 'https://secure.example/x' })
