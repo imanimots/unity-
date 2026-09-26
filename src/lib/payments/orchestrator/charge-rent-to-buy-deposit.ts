@@ -37,6 +37,14 @@ export interface ChargeRentToBuyDepositResult {
  * type already uses -- never authorizeDeposit()/captureDeposit(), which
  * remain correct for the genuinely-manual-capture 'deposit'/
  * 'barter_deposit' families.
+ *
+ * P5D-B.3: the "already captured" early return now completes deposit
+ * domain progression before returning, instead of skipping it -- safe
+ * only now that P5D-M4 made record_rent_to_buy_deposit_payment
+ * idempotent. Closes the crash window where a process died between the
+ * provider capture and this RPC call: a route retry used to see the
+ * payment already captured and return success without ever restoring
+ * deposit_funded_at.
  */
 export async function chargeRentToBuyDeposit(
   ctx: OrchestratorContext,
@@ -56,7 +64,21 @@ export async function chargeRentToBuyDeposit(
   if (!agreement.security_deposit_amount) throw new OrchestrationError('invalid_booking_state', 'This agreement has no security deposit configured')
 
   const { data: existing } = await admin.from('payments').select('id, status').eq('rent_to_buy_agreement_id', agreementId).eq('payment_type', 'rent_to_buy_deposit').maybeSingle()
-  if (existing?.status === 'captured') return { paymentId: existing.id, status: 'captured' }
+  if (existing?.status === 'captured') {
+    // P5D-M4 made record_rent_to_buy_deposit_payment idempotent -- a
+    // route retry after a crash between capture and domain progression
+    // must still complete that progression before reporting success,
+    // never call the provider again for an already-captured payment.
+    const { error: recordError } = await admin.rpc('record_rent_to_buy_deposit_payment', {
+      p_agreement_id: agreementId,
+      p_payment_id: existing.id,
+      p_idempotency_key: idempotencyKey ? `${idempotencyKey}-record` : null,
+    })
+    if (recordError) {
+      throw new OrchestrationError('internal_consistency_error', `Deposit is captured but could not be recorded: ${recordError.message}`)
+    }
+    return { paymentId: existing.id, status: 'captured' }
+  }
 
   let paymentId = existing?.id
   if (!paymentId) {

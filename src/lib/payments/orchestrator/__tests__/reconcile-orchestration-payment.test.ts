@@ -47,6 +47,7 @@ function fakeProgressionAdmin(options: {
   saleUnityCommissionResult?: { data?: unknown; error?: unknown }
   recordInstallmentResult?: { data?: unknown; error?: unknown }
   payoffResult?: { data?: unknown; error?: unknown }
+  recordDepositResult?: { data?: unknown; error?: unknown }
 }) {
   const rpcCalls: Array<{ name: string; params: unknown }> = []
   const bookingsChain = {
@@ -64,6 +65,7 @@ function fakeProgressionAdmin(options: {
     if (name === 'qualify_sale_unity_commission') return options.saleUnityCommissionResult ?? { data: { qualified: true, commission_id: 'unity-sale-1' }, error: null }
     if (name === 'record_rent_to_buy_installment_payment') return options.recordInstallmentResult ?? { data: { installment_id: 'inst-1', status: 'paid', already_paid: false }, error: null }
     if (name === 'payoff_rent_to_buy_agreement') return options.payoffResult ?? { data: { status: 'completed', amount_paid: 100 }, error: null }
+    if (name === 'record_rent_to_buy_deposit_payment') return options.recordDepositResult ?? { data: { agreement_id: 'agr-1', deposit_paid: true, already_paid: false }, error: null }
     throw new Error(`unexpected rpc call in progression test: ${name}`)
   })
   const from = vi.fn((table: string) => {
@@ -659,5 +661,56 @@ describe('completeAsyncPaymentBusinessProgression -- P5D-B.2 async commission en
     const names = admin.rpcCalls.map((c) => c.name)
     expect(names).not.toContain('qualify_rental_payment_affiliate_commission')
     expect(names).not.toContain('qualify_sale_affiliate_commission')
+  })
+})
+
+describe('completeAsyncPaymentBusinessProgression -- P5D-B.3 RTB deposit async progression', () => {
+  it('1/2/3. a captured rent_to_buy_deposit payment invokes record_rent_to_buy_deposit_payment using the authoritative persisted payment id and agreement id', async () => {
+    const admin = fakeProgressionAdmin({})
+    const result = await completeAsyncPaymentBusinessProgression(
+      admin,
+      transitionedOutcome({ paymentId: 'pay-deposit-1', paymentType: 'rent_to_buy_deposit', rentToBuyAgreementId: 'agr-1' })
+    )
+    expect(result).toEqual({ outcome: 'completed' })
+    const call = admin.rpcCalls.find((c) => c.name === 'record_rent_to_buy_deposit_payment')
+    expect(call!.params).toMatchObject({ p_agreement_id: 'agr-1', p_payment_id: 'pay-deposit-1' })
+  })
+
+  it('4. the transitioned path progresses deposit funding', async () => {
+    const admin = fakeProgressionAdmin({})
+    await completeAsyncPaymentBusinessProgression(admin, transitionedOutcome({ paymentType: 'rent_to_buy_deposit', rentToBuyAgreementId: 'agr-1' }))
+    expect(admin.rpcCalls.map((c) => c.name)).toContain('record_rent_to_buy_deposit_payment')
+  })
+
+  it('5. the already_current path also progresses deposit funding -- crash recovery', async () => {
+    const admin = fakeProgressionAdmin({})
+    const result = await completeAsyncPaymentBusinessProgression(admin, alreadyCurrentOutcome({ paymentType: 'rent_to_buy_deposit', rentToBuyAgreementId: 'agr-1' }))
+    expect(result).toEqual({ outcome: 'completed' })
+    expect(admin.rpcCalls.map((c) => c.name)).toContain('record_rent_to_buy_deposit_payment')
+  })
+
+  it('6. an already_paid: true RPC result is accepted as success, not treated as a failure', async () => {
+    const admin = fakeProgressionAdmin({ recordDepositResult: { data: { agreement_id: 'agr-1', deposit_paid: true, already_paid: true }, error: null } })
+    const result = await completeAsyncPaymentBusinessProgression(admin, alreadyCurrentOutcome({ paymentType: 'rent_to_buy_deposit', rentToBuyAgreementId: 'agr-1' }))
+    expect(result).toEqual({ outcome: 'completed' })
+  })
+
+  it('7. an already_paid: false (fresh) RPC result is accepted as success', async () => {
+    const admin = fakeProgressionAdmin({ recordDepositResult: { data: { agreement_id: 'agr-1', deposit_paid: true, already_paid: false }, error: null } })
+    const result = await completeAsyncPaymentBusinessProgression(admin, transitionedOutcome({ paymentType: 'rent_to_buy_deposit', rentToBuyAgreementId: 'agr-1' }))
+    expect(result).toEqual({ outcome: 'completed' })
+  })
+
+  it('8/9. a genuine RPC technical error propagates (throws), preventing a successful business-progression result', async () => {
+    const admin = fakeProgressionAdmin({ recordDepositResult: { data: null, error: new Error('deposit rpc infra failure') } })
+    await expect(
+      completeAsyncPaymentBusinessProgression(admin, transitionedOutcome({ paymentType: 'rent_to_buy_deposit', rentToBuyAgreementId: 'agr-1' }))
+    ).rejects.toThrow('deposit rpc infra failure')
+  })
+
+  it('deposit progression never runs for an ordinary deposit/barter_deposit payment_type (still manual-capture families)', async () => {
+    const admin = fakeProgressionAdmin({})
+    await completeAsyncPaymentBusinessProgression(admin, alreadyCurrentOutcome({ paymentType: 'deposit', status: 'authorised', rentToBuyAgreementId: null }))
+    expect(admin.rpcCalls.map((c) => c.name)).not.toContain('record_rent_to_buy_deposit_payment')
   })
 })

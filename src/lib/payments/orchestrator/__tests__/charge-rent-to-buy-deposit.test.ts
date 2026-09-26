@@ -107,7 +107,7 @@ describe('chargeRentToBuyDeposit -- P5D-B.2 automatic-capture correction', () =>
     expect(admin.rpcCalls.map((c) => c.name)).not.toContain('record_rent_to_buy_deposit_payment')
   })
 
-  it('9. an already-captured deposit short-circuits before any provider call (single-shot per agreement)', async () => {
+  it('9/10/11/12. an already-captured deposit completes domain progression (crash recovery) before returning, and never calls the provider again', async () => {
     const provider = { name: 'mock', chargeRental: vi.fn() }
     vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
     const admin = fakeAdmin({ existingPaymentRow: { id: 'pay-existing', status: 'captured' } })
@@ -116,5 +116,53 @@ describe('chargeRentToBuyDeposit -- P5D-B.2 automatic-capture correction', () =>
 
     expect(result).toEqual({ paymentId: 'pay-existing', status: 'captured' })
     expect(provider.chargeRental).not.toHaveBeenCalled()
+    const recordCall = admin.rpcCalls.find((c) => c.name === 'record_rent_to_buy_deposit_payment')
+    expect(recordCall).toBeDefined()
+    expect(recordCall!.params).toMatchObject({ p_agreement_id: 'agr-1', p_payment_id: 'pay-existing' })
+  })
+
+  it('13. an already-captured deposit whose recovery RPC fails technically propagates the error, never silently reports ordinary success', async () => {
+    const provider = { name: 'mock', chargeRental: vi.fn() }
+    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    const admin = fakeAdmin({ existingPaymentRow: { id: 'pay-existing', status: 'captured' }, recordResult: { data: null, error: new Error('deposit rpc infra failure') } })
+
+    await expect(chargeRentToBuyDeposit({ admin } as never, 'agr-1', 'idem-1')).rejects.toThrow(OrchestrationError)
+    expect(provider.chargeRental).not.toHaveBeenCalled()
+  })
+
+  it('an already-captured deposit\'s recovery accepts an already_paid: true RPC result as success, not a failure', async () => {
+    const provider = { name: 'mock', chargeRental: vi.fn() }
+    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    const admin = fakeAdmin({
+      existingPaymentRow: { id: 'pay-existing', status: 'captured' },
+      recordResult: { data: { agreement_id: 'agr-1', deposit_paid: true, already_paid: true }, error: null },
+    })
+
+    const result = await chargeRentToBuyDeposit({ admin } as never, 'agr-1', 'idem-1')
+
+    expect(result).toEqual({ paymentId: 'pay-existing', status: 'captured' })
+  })
+
+  it('14/15. requires_action still stays pending and returns redirect info -- unregressed by the recovery fix', async () => {
+    const provider = { name: 'mock', chargeRental: vi.fn().mockResolvedValue({ status: 'requires_action', providerReference: 'ref-1', redirectUrl: 'https://pay.example/session' }) }
+    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    const admin = fakeAdmin({})
+
+    const result = await chargeRentToBuyDeposit({ admin } as never, 'agr-1', 'idem-1')
+
+    expect(result).toEqual({ paymentId: 'pay-1', status: 'requires_action', redirectUrl: 'https://pay.example/session' })
+    expect(admin.rpcCalls.map((c) => c.name)).not.toContain('record_rent_to_buy_deposit_payment')
+  })
+
+  it('16. a fresh synchronous captured path still completes deposit domain progression exactly once -- unregressed by the recovery fix', async () => {
+    const provider = { name: 'mock', chargeRental: vi.fn().mockResolvedValue({ status: 'captured', providerReference: 'ref-1' }) }
+    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    const admin = fakeAdmin({})
+
+    const result = await chargeRentToBuyDeposit({ admin } as never, 'agr-1', 'idem-1')
+
+    expect(result).toEqual({ paymentId: 'pay-1', status: 'captured' })
+    const recordCalls = admin.rpcCalls.filter((c) => c.name === 'record_rent_to_buy_deposit_payment')
+    expect(recordCalls).toHaveLength(1)
   })
 })

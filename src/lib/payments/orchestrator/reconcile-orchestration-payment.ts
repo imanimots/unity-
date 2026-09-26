@@ -139,7 +139,15 @@ const MANUAL_CAPTURE_PAYMENT_TYPES = new Set(['deposit', 'barter_deposit'])
  * the P5D-A.1/P5D-B briefs both explicitly sanction ("log safely...
  * do not invent a schema"). A future `record_payment_review_event`-style
  * RPC (mirroring `record_late_payment_reconciliation`'s existing
- * pattern for bookings) would close this gap; not built here.
+ * pattern for bookings) would close this gap; not built here. The RTB-
+ * specific manual_review conditions this function's own RTB branches
+ * and completeAsyncPaymentBusinessProgression() can produce are a
+ * narrower exception to this gap -- P5D-B.3 added live-computed admin
+ * exceptions for them (src/lib/admin/exceptions-service.ts) that read
+ * persisted payment/installment/agreement state directly, independent
+ * of this log-only fallback. The other, non-RTB manual_review/
+ * rejected_mismatch/unknown_* outcomes below remain covered only by
+ * this fallback.
  */
 export async function reconcileOrchestrationPayment(admin: SupabaseClient, evidence: OrchestrationEvidence): Promise<ReconciliationOutcome> {
   // Lookup: content.payment_id -> payments.provider_reference, scoped to
@@ -424,20 +432,6 @@ export type BusinessProgressionOutcome = { outcome: 'not_applicable' } | { outco
  *
  * SCOPE, EXPLICITLY NOT WIRED THIS PHASE (reported, not silently
  * omitted -- see the P5D-B.2 phase report):
- *   - RTB deposit progression (record_rent_to_buy_deposit_payment) --
- *     re-read fresh at P5D-B.2 and found to have NO idempotency guard at
- *     all (no idempotency-key check, no "already recorded" short-circuit
- *     -- every call unconditionally inserts a new rent_to_buy_history
- *     row). Safe for the synchronous path (called at most once per
- *     successful charge, guarded by charge-rent-to-buy-deposit.ts's own
- *     "already captured -> return early" check before ever re-entering
- *     the charge step), but NOT safe to wire into this function, which
- *     is deliberately re-run on every `already_current` recovery --
- *     exactly the repeated-invocation pattern this RPC has no protection
- *     against. Wiring it here would produce a duplicate history row on
- *     every retried webhook/force-sync poll for an already-captured
- *     deposit. Genuinely blocked without a narrow RPC-hardening
- *     migration (out of this phase's scope) -- not routed around.
  *   - Barter requires no domain-specific progression at all beyond the
  *     payment transition itself -- confirmed: authorize-barter-deposit.ts
  *     and charge-barter-cash-adjustment.ts call only
@@ -467,20 +461,39 @@ export type BusinessProgressionOutcome = { outcome: 'not_applicable' } | { outco
  *     (the P5D-M3 RPC itself guarantees no write occurred) -- logged via
  *     safeLog() and returned as `manual_review`, never thrown. Retrying
  *     forever cannot resolve a permanent conflict, so this deliberately
- *     does NOT block mark_webhook_event_processed, exactly mirroring how
- *     reconcileOrchestrationPayment's own pre-existing manual_review
- *     outcomes are already handled (see this file's own doc comment on
- *     the "manual-review audit interface gap").
+ *     does NOT block mark_webhook_event_processed. Durably operator-
+ *     discoverable regardless via the P5D-B.3 live-computed admin
+ *     exceptions (rtb_payoff_payment_conflict/rtb_payoff_invalid_snapshot,
+ *     src/lib/admin/exceptions-service.ts), which read persisted
+ *     payment/installment state directly, never webhook inbox status --
+ *     so the condition remains visible long after this event was marked
+ *     processed.
  *   - Neither key present -> a legacy payment predating this
  *     correlation mechanism (or one created by application code from
  *     before this phase). NO GUESSING: never chooses the lowest-unpaid
  *     or next-scheduled installment, never parses a sequence from the
  *     idempotency key, never infers from provider metadata. Logged via
- *     safeLog() and returned as `manual_review` -- the same durable,
- *     already-established fallback (safeLog + the payment_webhook_events
- *     audit row already written before reconciliation ever runs), since
- *     no other "flag for review" primitive exists in this codebase
- *     without a new migration (out of scope this phase).
+ *     safeLog() and returned as `manual_review`; durably operator-
+ *     discoverable via the same P5D-B.3 admin exception mechanism
+ *     (rtb_installment_legacy_uncorrelated).
+ *
+ * RTB DEPOSIT (P5D-B.3, wired this phase -- deliberately NOT wired at
+ * P5D-B.2): record_rent_to_buy_deposit_payment was re-read fresh at
+ * P5D-B.2 and found to have no idempotency guard at all -- unsafe to
+ * call on every `already_current` recovery, since that would insert a
+ * duplicate rent_to_buy_history row on every retried webhook/force-sync
+ * poll for an already-captured deposit. P5D-M4 (a dedicated,
+ * independently-reviewed migration) corrected that RPC to be safely
+ * idempotent by canonical payment identity (deposit_funded_at is not
+ * null -> already_paid: true, no duplicate write) -- this function now
+ * calls it directly, using the payment row's own persisted
+ * rent_to_buy_agreement_id (never inferred from provider metadata or
+ * parsed from the idempotency key), for both `transitioned` and
+ * `already_current`. A genuine RPC error propagates (`if (error) throw
+ * error`) exactly like every other mandatory progression call here --
+ * deposit funding is a technical, always-eventually-succeeds operation
+ * once the payment is genuinely captured, never a permanent business
+ * conflict, so there is no manual_review branch for it.
  *
  * COMMISSION QUALIFICATION (P5D-B.2, wired this phase): unlike the
  * existing qualifySaleAffiliateCommission()/qualifySaleUnityCommission()/
@@ -586,6 +599,15 @@ export async function completeAsyncPaymentBusinessProgression(admin: SupabaseCli
       safeLog('rtb_installment_uncorrelated_legacy_payment', { paymentId: reconciliation.paymentId, rentToBuyAgreementId: reconciliation.rentToBuyAgreementId })
       return { outcome: 'manual_review', reason: 'rent-to-buy installment payment has no durable installment_sequence or payoff_sequences correlation' }
     }
+  }
+
+  if (reconciliation.paymentType === 'rent_to_buy_deposit' && achievedStatus === 'captured' && reconciliation.rentToBuyAgreementId) {
+    const { error } = await admin.rpc('record_rent_to_buy_deposit_payment', {
+      p_agreement_id: reconciliation.rentToBuyAgreementId,
+      p_payment_id: reconciliation.paymentId,
+      p_idempotency_key: `async-reconcile:${reconciliation.paymentId}`,
+    })
+    if (error) throw error
   }
 
   if (reconciliation.paymentType === 'rental_charge' && achievedStatus === 'captured' && reconciliation.bookingId) {

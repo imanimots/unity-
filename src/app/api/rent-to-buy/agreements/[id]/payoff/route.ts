@@ -156,9 +156,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
  * mutation, no ownership transfer) -- never silently reported as a
  * normal payoff, never auto-refunded/credited. Logged the same way
  * reconcileOrchestrationPayment's own manual_review outcomes already
- * are (structured console.error + the durable audit trail already
- * written for this request) -- no other "flag for review" mechanism
- * exists in this codebase without a new migration.
+ * are (structured console.error); durably operator-discoverable via the
+ * P5D-B.3 live-computed admin exceptions
+ * (rtb_payoff_payment_conflict/rtb_payoff_invalid_snapshot,
+ * src/lib/admin/exceptions-service.ts), never requiring this specific
+ * request's own log line to still exist. The response never claims a
+ * notification was sent -- none is.
  */
 async function respondWithPayoffCompletion(admin: SupabaseClient, actorUserId: string, agreementId: string, paymentId: string): Promise<NextResponse> {
   const { data, error } = await admin.rpc('payoff_rent_to_buy_agreement', {
@@ -178,7 +181,7 @@ async function respondWithPayoffCompletion(admin: SupabaseClient, actorUserId: s
 
   console.error('[rent-to-buy.payoff] payoff completion could not proceed safely', { agreementId, paymentId, result: data })
   return NextResponse.json(
-    { error: 'Your payment was received but could not be automatically finalized. Our team has been notified and will resolve this shortly.', status, payment_id: paymentId },
+    { error: 'Your payment was received but could not be automatically finalized. Please contact support with your payment reference so we can resolve this.', status, payment_id: paymentId },
     { status: 409 }
   )
 }

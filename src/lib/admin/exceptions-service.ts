@@ -15,6 +15,7 @@ export type ExceptionEntityType =
   | 'merchant_payout'
   | 'merchant_subscription'
   | 'unity_commission'
+  | 'payment'
 
 export interface AdminException {
   id: string
@@ -36,6 +37,150 @@ function hoursAgo(hours: number): string {
 
 function exceptionId(type: string, entityId: string): string {
   return `${type}:${entityId}`
+}
+
+export type RtbInstallmentExceptionType = 'rtb_installment_legacy_uncorrelated' | 'rtb_payoff_invalid_snapshot' | 'rtb_payoff_payment_conflict'
+
+export interface RtbInstallmentExceptionCandidate {
+  id: string
+  rent_to_buy_agreement_id: string | null
+  amount: string | number
+  metadata: Record<string, unknown> | null
+}
+
+export interface RtbInstallmentRow {
+  sequence: number
+  principal_amount: string | number
+  status: string
+  payment_id: string | null
+}
+
+export interface RtbInstallmentClassification {
+  type: RtbInstallmentExceptionType
+  summary: string
+}
+
+/**
+ * Pure, DB-free classification of a captured `rent_to_buy_installment`
+ * payment against its agreement's installment rows -- deliberately
+ * extracted from listOperationalExceptions() so it can be unit-tested
+ * directly (this file's own established convention, e.g.
+ * deriveOrderFinancialReadiness in orders-service.ts) rather than
+ * requiring a full Supabase-client mock of the multi-wave query
+ * orchestration below.
+ *
+ * Read-only by construction: takes already-fetched rows, never queries
+ * or mutates anything itself, and never invokes
+ * payoff_rent_to_buy_agreement (a mutation RPC). The payoff-specific
+ * branches (from the point `rent_to_buy_payoff_sequences` is confirmed
+ * present) deliberately reproduce that RPC's own validation order
+ * exactly (P5D-M3, 20260926090000_harden_rtb_payoff_snapshot_and_
+ * completion.sql) so this can never disagree with what the RPC would
+ * actually decide if invoked. Malformed metadata (wrong types, missing
+ * keys, non-array values) is handled as ordinary data, never thrown --
+ * one payment's malformed correlation must never crash the whole
+ * exceptions list.
+ *
+ * Returns null when the payment is healthy: an ordinary single-
+ * installment payment, or a payoff payment whose snapshot is valid,
+ * uncontested, and amount-matched (whether fully completed already, or
+ * simply awaiting async progression that hasn't run yet -- neither is a
+ * permanent condition worth flagging).
+ */
+export function classifyCapturedRtbInstallmentPayment(
+  payment: RtbInstallmentExceptionCandidate,
+  agreementInstallments: RtbInstallmentRow[]
+): RtbInstallmentClassification | null {
+  const metadata = (payment.metadata ?? {}) as Record<string, unknown>
+  const hasSingleSequenceKey = 'rent_to_buy_installment_sequence' in metadata
+  const hasPayoffSequencesKey = 'rent_to_buy_payoff_sequences' in metadata
+
+  if (!hasSingleSequenceKey && !hasPayoffSequencesKey) {
+    return {
+      type: 'rtb_installment_legacy_uncorrelated',
+      summary: 'Captured rent-to-buy installment payment has no durable installment or payoff correlation -- domain progression cannot proceed automatically',
+    }
+  }
+
+  if (!hasPayoffSequencesKey) return null // ordinary single-installment payment -- not a payoff, no payoff category applies
+
+  // From here on, payoff_rent_to_buy_agreement's own branch order,
+  // reproduced read-only.
+  if (hasSingleSequenceKey) {
+    // RPC's own first check: carrying both keys is itself the invalid shape.
+    return {
+      type: 'rtb_payoff_invalid_snapshot',
+      summary: 'Captured rent-to-buy payment carries both single-installment and payoff correlation metadata -- ambiguous, cannot complete automatically',
+    }
+  }
+
+  const rawSequences = metadata.rent_to_buy_payoff_sequences
+  const snapshot = Array.isArray(rawSequences) ? rawSequences.filter((s): s is number => typeof s === 'number' && Number.isInteger(s) && s > 0) : []
+  const snapshotWellFormed = Array.isArray(rawSequences) && rawSequences.length > 0 && snapshot.length === rawSequences.length
+  if (!snapshotWellFormed) {
+    return {
+      type: 'rtb_payoff_invalid_snapshot',
+      summary: 'Captured rent-to-buy payoff payment has an empty or malformed payoff sequence snapshot',
+    }
+  }
+
+  const snapshotSet = new Set(snapshot)
+  const matched = agreementInstallments.filter((i) => snapshotSet.has(i.sequence))
+
+  if (matched.length !== snapshot.length) {
+    return {
+      type: 'rtb_payoff_invalid_snapshot',
+      summary: 'Captured rent-to-buy payoff payment snapshot references one or more installment sequences that no longer exist for this agreement',
+    }
+  }
+
+  // Payment_conflict takes precedence over an amount mismatch -- matches the RPC's own order exactly.
+  const conflicting = matched.filter((i) => i.status === 'paid' && i.payment_id !== payment.id)
+  if (conflicting.length > 0) {
+    return {
+      type: 'rtb_payoff_payment_conflict',
+      summary: `Captured rent-to-buy payoff payment conflicts with ${conflicting.length} installment(s) already paid by a different payment -- possible duplicate financial payment`,
+    }
+  }
+
+  const snapshotSum = matched
+    .filter((i) => i.status === 'scheduled' || (i.status === 'paid' && i.payment_id === payment.id))
+    .reduce((sum, i) => sum + Number(i.principal_amount), 0)
+  const amountMatches = Math.round(Number(payment.amount) * 100) === Math.round(snapshotSum * 100)
+  if (!amountMatches) {
+    return {
+      type: 'rtb_payoff_invalid_snapshot',
+      summary: 'Captured rent-to-buy payoff payment amount does not match the exact snapshot principal sum',
+    }
+  }
+
+  // Snapshot valid, no conflict, amount matches -- either already
+  // completed (nothing scheduled) or simply awaiting async progression
+  // that hasn't run yet. Never flagged as "current unpaid" guessing;
+  // this only ever reads the exact frozen snapshot's own rows.
+  return null
+}
+
+export interface RtbDepositExceptionCandidate {
+  amount: string | number
+  agreement: { security_deposit_amount: string | number | null; deposit_funded_at: string | null } | null
+}
+
+/**
+ * Pure, DB-free classification of a captured `rent_to_buy_deposit`
+ * payment -- see classifyCapturedRtbInstallmentPayment's own doc
+ * comment for why this is extracted rather than tested through a full
+ * Supabase-client mock. Returns true only when the payment is a
+ * genuine, amount-matched canonical deposit (mirroring the same
+ * evidence P5D-M4/P5D-M4.1 both require) whose agreement has not yet
+ * recorded deposit_funded_at -- never for an amount-mismatched or
+ * otherwise invalid payment, which is left unflagged here rather than
+ * misreported as an ordinary "unfunded" case.
+ */
+export function isCapturedRtbDepositUnfunded(payment: RtbDepositExceptionCandidate): boolean {
+  const agreement = payment.agreement
+  if (!agreement || agreement.deposit_funded_at !== null || agreement.security_deposit_amount === null) return false
+  return Math.round(Number(payment.amount) * 100) === Math.round(Number(agreement.security_deposit_amount) * 100)
 }
 
 /**
@@ -175,6 +320,27 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
   const wave10P = Promise.all([
     admin.from('payments').select('id, booking_id, captured_at').eq('payment_type', 'rental_charge').in('status', ['captured', 'partially_captured']).lt('captured_at', threshold),
     admin.from('unity_commissions').select('payment_id').eq('transaction_type', 'rental'),
+  ])
+
+  // P5D-B.3: RTB permanent manual-review conditions -- the same
+  // captured, uncorrelated, or conflicted states
+  // completeAsyncPaymentBusinessProgression() (reconcile-orchestration-
+  // payment.ts) already returns `manual_review` for, and
+  // payoff_rent_to_buy_agreement()/record_rent_to_buy_deposit_payment
+  // already leave permanently unrecorded, made durably operator-
+  // discoverable here from persisted payment/installment/agreement
+  // state alone -- never from webhook inbox status, so these remain
+  // visible even after the triggering event was correctly marked
+  // processed (retrying it could never have resolved a permanent
+  // condition anyway).
+  const waveRtbP = Promise.all([
+    admin.from('payments').select('id, rent_to_buy_agreement_id, amount, metadata').eq('payment_type', 'rent_to_buy_installment').eq('status', 'captured'),
+    admin.from('rent_to_buy_installments').select('agreement_id, sequence, principal_amount, status, payment_id'),
+    admin
+      .from('payments')
+      .select('id, rent_to_buy_agreement_id, amount, rent_to_buy_agreements!inner(security_deposit_amount, deposit_funded_at)')
+      .eq('payment_type', 'rent_to_buy_deposit')
+      .eq('status', 'captured'),
   ])
 
   const [
@@ -1150,6 +1316,59 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
       detectedAt: payment.captured_at,
       suggestedAction: `Inspect payment ${payment.id} and, if genuinely missing, re-trigger qualification manually`,
       resolved: isResolved('unity_commission_missing_for_rental', 'booking', payment.booking_id),
+    })
+  }
+
+  // ------------------------------------------------------------
+  // P5D-B.3: RTB installment/payoff/deposit permanent manual-review
+  // categories. Read-only detection only -- nothing here mutates a
+  // payment, installment, or agreement, and payoff_rent_to_buy_agreement
+  // (a mutation RPC) is never invoked from this service. The
+  // installment-conflict logic below deliberately mirrors
+  // payoff_rent_to_buy_agreement's own validation order (P5D-M3,
+  // 20260926090000_harden_rtb_payoff_snapshot_and_completion.sql)
+  // exactly, so this can never disagree with what that RPC would
+  // actually decide if invoked.
+  // ------------------------------------------------------------
+  const [{ data: capturedRtbInstallmentPayments }, { data: allRtbInstallments }, { data: capturedRtbDepositPayments }] = await waveRtbP
+
+  const installmentsByAgreement = new Map<string, { sequence: number; principal_amount: string; status: string; payment_id: string | null }[]>()
+  for (const row of allRtbInstallments ?? []) {
+    const list = installmentsByAgreement.get(row.agreement_id) ?? []
+    list.push({ sequence: row.sequence, principal_amount: row.principal_amount, status: row.status, payment_id: row.payment_id })
+    installmentsByAgreement.set(row.agreement_id, list)
+  }
+
+  for (const payment of capturedRtbInstallmentPayments ?? []) {
+    const agreementInstallments = installmentsByAgreement.get(payment.rent_to_buy_agreement_id ?? '') ?? []
+    const classification = classifyCapturedRtbInstallmentPayment(payment, agreementInstallments)
+    if (!classification) continue
+    exceptions.push({
+      id: exceptionId(classification.type, payment.id),
+      type: classification.type,
+      severity: 'high',
+      entityType: 'payment',
+      entityId: payment.id,
+      summary: classification.summary,
+      detectedAt: now,
+      suggestedAction: `Manually investigate payment ${payment.id}`,
+      resolved: isResolved(classification.type, 'payment', payment.id),
+    })
+  }
+
+  for (const payment of capturedRtbDepositPayments ?? []) {
+    const agreement = payment.rent_to_buy_agreements as unknown as { security_deposit_amount: string | null; deposit_funded_at: string | null } | null
+    if (!isCapturedRtbDepositUnfunded({ amount: payment.amount, agreement })) continue
+    exceptions.push({
+      id: exceptionId('rtb_deposit_captured_unfunded', payment.id),
+      type: 'rtb_deposit_captured_unfunded',
+      severity: 'high',
+      entityType: 'payment',
+      entityId: payment.id,
+      summary: 'Captured rent-to-buy deposit payment has not yet been recorded as funded on its agreement',
+      detectedAt: now,
+      suggestedAction: `Manually investigate payment ${payment.id}`,
+      resolved: isResolved('rtb_deposit_captured_unfunded', 'payment', payment.id),
     })
   }
 
