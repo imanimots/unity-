@@ -1,0 +1,248 @@
+# Internal Cron Scheduler — GitHub Actions replacement for the 17
+# sub-daily Vercel crons that no longer fit in vercel.json (P5D-VERCEL-FIX).
+#
+# Vercel's Hobby plan rejects any cron expression that runs more than
+# once per day at DEPLOY time (see docs/PUBLIC_TEST_RUNBOOK.md and the
+# P5D-VERCEL-CRON-D/P5D-VERCEL-FIX phase reports for the full
+# investigation). Every route below previously ran as a Vercel Cron
+# entry at its EXACT current cadence; only the trigger mechanism moves,
+# never the schedule, the route implementation, or its authentication
+# contract. `advertising/purge-events` (already once-daily) deliberately
+# stays in vercel.json and is NOT duplicated here (see the "purge"
+# guard in the dispatch table below).
+#
+# Follows the exact authenticated-invocation pattern already proven live
+# by kyc-upload-intent-cleanup.yml: one bounded, authenticated HTTPS POST
+# per route per tick, no repository checkout, no write permissions, no
+# Supabase access, no caller-controlled parameters. That workflow is left
+# untouched — this is a separate file for a separate set of routes.
+#
+# Each internal route already accepts EITHER of two secrets
+# (src/lib/internal-cron/auth.ts): CRON_SECRET (Vercel Cron's own,
+# platform-attached) or INTERNAL_CRON_SECRET (this codebase's existing
+# manual/curl convention, used here — the same one KYC's workflow uses).
+#
+# Base URL, not 17 individual endpoint secrets: KYC's workflow stores one
+# full endpoint URL as a variable because it only ever calls one route.
+# This workflow calls 17 routes on the same host, so it stores ONE base
+# URL (INTERNAL_CRON_BASE_URL, a GitHub Actions variable — not a secret,
+# since a route's path is already public in this repository) and appends
+# each route's fixed, non-secret path. This is the narrowest convention
+# that still avoids declaring 17 near-duplicate variables.
+#
+# Multiple routes intentionally share the same cron expression exactly
+# as they did in vercel.json (e.g. "0 * * * *" fires both
+# reviews/process-deadlines and affiliate/review-and-approve). Dispatch
+# below is by exact string equality against github.event.schedule, never
+# a glob/case match (cron expressions contain "*", which a shell `case`
+# would otherwise interpret as a glob) -- every route mapped to a firing
+# schedule is invoked, and one route's failure never skips another's
+# attempt (see run_all below).
+#
+# Scheduled workflows run ONLY from this file on the repository's
+# default branch.
+
+name: Internal Cron Scheduler
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+    - cron: '*/10 * * * *'
+    - cron: '*/20 * * * *'
+    - cron: '10 * * * *'
+    - cron: '15 * * * *'
+    - cron: '30 * * * *'
+    - cron: '0 */4 * * *'
+    - cron: '20 * * * *'
+    - cron: '5 * * * *'
+    - cron: '10 */6 * * *'
+    - cron: '40 * * * *'
+    - cron: '50 * * * *'
+    - cron: '45 * * * *'
+    - cron: '0 */2 * * *'
+
+# Least privilege: this workflow only makes outbound HTTPS requests.
+permissions: {}
+
+# Serialize overlapping runs of the SAME schedule only -- a slow */10
+# run must not be cancelled by the next tick, but it must also not block
+# an unrelated schedule (e.g. the hourly group) from firing on time.
+concurrency:
+  group: internal-cron-scheduler-${{ github.event.schedule }}
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Invoke due internal cron routes
+    runs-on: ubuntu-latest
+    # 300s -- same budget as kyc-upload-intent-cleanup.yml, sized for the
+    # worst case of two routes sharing a schedule, each allowed one retry
+    # (2 routes * up to 2 attempts * 120s max-time = well under budget).
+    timeout-minutes: 5
+    steps:
+      - name: Invoke routes due for this schedule
+        env:
+          INTERNAL_CRON_SECRET: ${{ secrets.INTERNAL_CRON_SECRET }}
+          INTERNAL_CRON_BASE_URL: ${{ vars.INTERNAL_CRON_BASE_URL }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          set -euo pipefail
+
+          # --- Required configuration -------------------------------------------------
+          if [ -z "${INTERNAL_CRON_SECRET:-}" ]; then
+            echo "Required GitHub Actions secret INTERNAL_CRON_SECRET is not configured."
+            exit 1
+          fi
+          if [ -z "${INTERNAL_CRON_BASE_URL:-}" ]; then
+            echo "Required GitHub Actions variable INTERNAL_CRON_BASE_URL is not configured."
+            exit 1
+          fi
+          case "${INTERNAL_CRON_BASE_URL}" in
+            https://*) ;;
+            *)
+              echo "INTERNAL_CRON_BASE_URL must be an https:// URL. Refusing to proceed."
+              exit 1
+              ;;
+          esac
+          if [ -z "${SCHEDULE:-}" ]; then
+            echo "github.event.schedule was empty -- this workflow is schedule-triggered only. Refusing to proceed."
+            exit 1
+          fi
+
+          # --- Deterministic schedule -> route-path dispatch table -------------------
+          # Exact string equality only (never a glob/case match against a
+          # cron expression). Every path mapped to a firing schedule is
+          # invoked -- never just one of several sharing the same tick.
+          ROUTES=""
+          if [ "${SCHEDULE}" = "0 * * * *" ]; then
+            ROUTES="/api/internal/reviews/process-deadlines /api/internal/affiliate/review-and-approve"
+          elif [ "${SCHEDULE}" = "*/10 * * * *" ]; then
+            ROUTES="/api/internal/expire-unpaid-bookings /api/internal/expire-marketplace-requests"
+          elif [ "${SCHEDULE}" = "*/20 * * * *" ]; then
+            ROUTES="/api/internal/email/send-payment-reminders"
+          elif [ "${SCHEDULE}" = "10 * * * *" ]; then
+            ROUTES="/api/internal/email/retry-failed"
+          elif [ "${SCHEDULE}" = "15 * * * *" ]; then
+            ROUTES="/api/internal/affiliate/queue-payouts"
+          elif [ "${SCHEDULE}" = "30 * * * *" ]; then
+            ROUTES="/api/internal/affiliate/process-payouts"
+          elif [ "${SCHEDULE}" = "0 */4 * * *" ]; then
+            ROUTES="/api/internal/affiliate/reconcile-refunds /api/internal/commissions/reconcile-refunds"
+          elif [ "${SCHEDULE}" = "20 * * * *" ]; then
+            ROUTES="/api/internal/commissions/finalize-earned"
+          elif [ "${SCHEDULE}" = "5 * * * *" ]; then
+            ROUTES="/api/internal/payouts/reconcile-missing"
+          elif [ "${SCHEDULE}" = "10 */6 * * *" ]; then
+            ROUTES="/api/internal/payouts/reconcile"
+          elif [ "${SCHEDULE}" = "40 * * * *" ]; then
+            ROUTES="/api/internal/rent-to-buy/finalize-due-ownership"
+          elif [ "${SCHEDULE}" = "50 * * * *" ]; then
+            ROUTES="/api/internal/subscriptions/apply-due"
+          elif [ "${SCHEDULE}" = "45 * * * *" ]; then
+            ROUTES="/api/internal/subscriptions/execute-scheduled-publications"
+          elif [ "${SCHEDULE}" = "0 */2 * * *" ]; then
+            ROUTES="/api/internal/advertising/finalize-expired"
+          else
+            echo "Unrecognized schedule '${SCHEDULE}' -- no route mapped. Refusing to proceed."
+            exit 1
+          fi
+
+          # One bounded attempt against one route. Never verbose -- the
+          # Authorization header must never reach the log. No -L: never
+          # follow a redirect, so the bearer secret can never leak to a
+          # different host. Body -> file, HTTP status -> stdout.
+          invoke_once() {
+            local route="$1"
+            HTTP_CODE=$(curl -sS -X POST \
+              --max-time 120 \
+              -H "Authorization: Bearer ${INTERNAL_CRON_SECRET}" \
+              -H 'Accept: application/json' \
+              -o "${BODY_FILE}" \
+              -w '%{http_code}' \
+              "${INTERNAL_CRON_BASE_URL}${route}") && CURL_EXIT=0 || CURL_EXIT=$?
+          }
+
+          # Invokes one route to completion (initial attempt + at most one
+          # retry on transport failure or a transient 500/502/504; 503
+          # means "not configured" and is never retried, matching
+          # kyc-upload-intent-cleanup.yml's classification exactly).
+          # Returns 0 on success, 1 on failure. Never exits the script --
+          # callers must keep going so one route's failure never prevents
+          # an unrelated route (sharing the same tick) from being attempted.
+          invoke_route() {
+            local route="$1"
+            BODY_FILE="$(mktemp)"
+            CURL_EXIT=0
+            HTTP_CODE=""
+            RETRIED=0
+
+            invoke_once "${route}"
+
+            if [ "${CURL_EXIT}" -ne 0 ]; then
+              echo "[${route}] transport failure (curl exit ${CURL_EXIT})."
+              if [ "${RETRIED}" -eq 0 ]; then
+                RETRIED=1
+                echo "[${route}] retrying once in 10s..."
+                sleep 10
+                invoke_once "${route}"
+              fi
+              if [ "${CURL_EXIT}" -ne 0 ]; then
+                echo "[${route}] transport failure persists (curl exit ${CURL_EXIT})."
+                return 1
+              fi
+            fi
+
+            case "${HTTP_CODE}" in
+              500|502|504)
+                echo "[${route}] transient server error HTTP ${HTTP_CODE}."
+                if [ "${RETRIED}" -eq 0 ]; then
+                  RETRIED=1
+                  echo "[${route}] retrying once in 10s..."
+                  sleep 10
+                  invoke_once "${route}"
+                fi
+                ;;
+            esac
+
+            case "${HTTP_CODE}" in
+              200)
+                if ! jq -e . "${BODY_FILE}" >/dev/null 2>&1; then
+                  echo "[${route}] HTTP 200 but the response body is not valid JSON."
+                  return 1
+                fi
+                echo "[${route}] HTTP 200. Response:"
+                jq -c . "${BODY_FILE}"
+                return 0
+                ;;
+              401)
+                echo "[${route}] HTTP 401 Unauthorized -- INTERNAL_CRON_SECRET does not match the deployed app. Not retrying further."
+                return 1
+                ;;
+              503)
+                echo "[${route}] HTTP 503 -- endpoint reports it is not configured. Not retrying."
+                return 1
+                ;;
+              *)
+                echo "[${route}] unexpected HTTP ${HTTP_CODE}."
+                return 1
+                ;;
+            esac
+          }
+
+          # --- Invoke every route mapped to this tick, independently -----------------
+          FAILED=0
+          for route in ${ROUTES}; do
+            if invoke_route "${route}"; then
+              echo "[${route}] OK"
+            else
+              echo "::error::[${route}] failed for schedule '${SCHEDULE}'"
+              FAILED=1
+            fi
+          done
+
+          if [ "${FAILED}" -eq 1 ]; then
+            echo "One or more routes failed for schedule '${SCHEDULE}'."
+            exit 1
+          fi
+
+          echo "All routes for schedule '${SCHEDULE}' completed cleanly."
