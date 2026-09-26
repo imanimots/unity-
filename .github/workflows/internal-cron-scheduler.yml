@@ -17,6 +17,24 @@
 # Supabase access, no caller-controlled parameters. That workflow is left
 # untouched — this is a separate file for a separate set of routes.
 #
+# Exactly ONE request per route per tick, deliberately, never a retry
+# (P5D-VERCEL-FIX.1). A read-only review proved this is the only policy
+# safe across all 17 heterogeneous routes: several have no protection
+# against a genuinely concurrent second invocation of the SAME route
+# (e.g. expire-marketplace-requests writes marketplace_request_history
+# via an unlocked read-then-update with no re-check in the UPDATE's own
+# WHERE clause; email/retry-failed's retryDelivery() does an unlocked
+# status check before sending) -- a scheduler-level retry issued while
+# the first attempt's mutation may already be in flight server-side
+# (the request timing out client-side does not mean the server stopped
+# running) could double-write history or double-send an email for those
+# specific routes. Ambiguous-completion policy: if a request's outcome
+# is unknown (timeout, transport failure, or a 5xx that might mean the
+# server already committed), this workflow marks that route's tick
+# failed and moves on -- it never repeats the request. A route that
+# needs its own retry semantics implements them inside its own durable
+# business logic, not here.
+#
 # Each internal route already accepts EITHER of two secrets
 # (src/lib/internal-cron/auth.ts): CRON_SECRET (Vercel Cron's own,
 # platform-attached) or INTERNAL_CRON_SECRET (this codebase's existing
@@ -37,7 +55,7 @@
 # a glob/case match (cron expressions contain "*", which a shell `case`
 # would otherwise interpret as a glob) -- every route mapped to a firing
 # schedule is invoked, and one route's failure never skips another's
-# attempt (see run_all below).
+# attempt (see the dispatch loop at the end of the run step below).
 #
 # Scheduled workflows run ONLY from this file on the repository's
 # default branch.
@@ -75,9 +93,9 @@ jobs:
   dispatch:
     name: Invoke due internal cron routes
     runs-on: ubuntu-latest
-    # 300s -- same budget as kyc-upload-intent-cleanup.yml, sized for the
-    # worst case of two routes sharing a schedule, each allowed one retry
-    # (2 routes * up to 2 attempts * 120s max-time = well under budget).
+    # 300s -- same budget as kyc-upload-intent-cleanup.yml. Exactly one
+    # request per route, no retry: the worst case is two routes sharing a
+    # schedule at 120s max-time each, well under budget.
     timeout-minutes: 5
     steps:
       - name: Invoke routes due for this schedule
@@ -147,83 +165,62 @@ jobs:
             exit 1
           fi
 
-          # One bounded attempt against one route. Never verbose -- the
-          # Authorization header must never reach the log. No -L: never
-          # follow a redirect, so the bearer secret can never leak to a
-          # different host. Body -> file, HTTP status -> stdout.
-          invoke_once() {
+          # Exactly ONE bounded request against one route -- no retry, on
+          # ANY outcome (transport failure, timeout, or any HTTP status,
+          # 2xx included). Never verbose -- the Authorization header must
+          # never reach the log. No -L: never follow a redirect, so the
+          # bearer secret can never leak to a different host. Body -> file
+          # (never echoed -- avoids logging response fields that may carry
+          # identifiers such as agreement/commission/booking ids), HTTP
+          # status -> stdout. Returns 0 on success, 1 on failure. Never
+          # exits the script -- callers must keep going so one route's
+          # failure never prevents an unrelated route (sharing the same
+          # tick) from being attempted.
+          invoke_route() {
             local route="$1"
-            HTTP_CODE=$(curl -sS -X POST \
+            local body_file
+            body_file="$(mktemp)"
+            local http_code=""
+            local curl_exit=0
+
+            http_code=$(curl -sS -X POST \
               --max-time 120 \
               -H "Authorization: Bearer ${INTERNAL_CRON_SECRET}" \
               -H 'Accept: application/json' \
-              -o "${BODY_FILE}" \
+              -o "${body_file}" \
               -w '%{http_code}' \
-              "${INTERNAL_CRON_BASE_URL}${route}") && CURL_EXIT=0 || CURL_EXIT=$?
-          }
+              "${INTERNAL_CRON_BASE_URL}${route}") && curl_exit=0 || curl_exit=$?
 
-          # Invokes one route to completion (initial attempt + at most one
-          # retry on transport failure or a transient 500/502/504; 503
-          # means "not configured" and is never retried, matching
-          # kyc-upload-intent-cleanup.yml's classification exactly).
-          # Returns 0 on success, 1 on failure. Never exits the script --
-          # callers must keep going so one route's failure never prevents
-          # an unrelated route (sharing the same tick) from being attempted.
-          invoke_route() {
-            local route="$1"
-            BODY_FILE="$(mktemp)"
-            CURL_EXIT=0
-            HTTP_CODE=""
-            RETRIED=0
-
-            invoke_once "${route}"
-
-            if [ "${CURL_EXIT}" -ne 0 ]; then
-              echo "[${route}] transport failure (curl exit ${CURL_EXIT})."
-              if [ "${RETRIED}" -eq 0 ]; then
-                RETRIED=1
-                echo "[${route}] retrying once in 10s..."
-                sleep 10
-                invoke_once "${route}"
-              fi
-              if [ "${CURL_EXIT}" -ne 0 ]; then
-                echo "[${route}] transport failure persists (curl exit ${CURL_EXIT})."
-                return 1
-              fi
+            if [ "${curl_exit}" -ne 0 ]; then
+              echo "[${route}] transport failure or timeout (curl exit ${curl_exit}). Not retrying -- the server may already have started processing."
+              rm -f "${body_file}"
+              return 1
             fi
 
-            case "${HTTP_CODE}" in
-              500|502|504)
-                echo "[${route}] transient server error HTTP ${HTTP_CODE}."
-                if [ "${RETRIED}" -eq 0 ]; then
-                  RETRIED=1
-                  echo "[${route}] retrying once in 10s..."
-                  sleep 10
-                  invoke_once "${route}"
-                fi
-                ;;
-            esac
-
-            case "${HTTP_CODE}" in
+            case "${http_code}" in
               200)
-                if ! jq -e . "${BODY_FILE}" >/dev/null 2>&1; then
+                if ! jq -e . "${body_file}" >/dev/null 2>&1; then
                   echo "[${route}] HTTP 200 but the response body is not valid JSON."
+                  rm -f "${body_file}"
                   return 1
                 fi
-                echo "[${route}] HTTP 200. Response:"
-                jq -c . "${BODY_FILE}"
+                echo "[${route}] HTTP 200 OK."
+                rm -f "${body_file}"
                 return 0
                 ;;
               401)
-                echo "[${route}] HTTP 401 Unauthorized -- INTERNAL_CRON_SECRET does not match the deployed app. Not retrying further."
+                echo "[${route}] HTTP 401 Unauthorized -- INTERNAL_CRON_SECRET does not match the deployed app."
+                rm -f "${body_file}"
                 return 1
                 ;;
               503)
-                echo "[${route}] HTTP 503 -- endpoint reports it is not configured. Not retrying."
+                echo "[${route}] HTTP 503 -- endpoint reports it is not configured."
+                rm -f "${body_file}"
                 return 1
                 ;;
               *)
-                echo "[${route}] unexpected HTTP ${HTTP_CODE}."
+                echo "[${route}] unexpected HTTP ${http_code}. Not retrying -- the server may already have started processing."
+                rm -f "${body_file}"
                 return 1
                 ;;
             esac
