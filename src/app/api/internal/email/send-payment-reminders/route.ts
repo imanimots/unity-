@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendDuePaymentReminders } from '@/lib/email'
-import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
+import { hasCronAuthConfigured, isAuthorizedCronRequest, isAuthorizedGcpSchedulerRequest } from '@/lib/internal-cron/auth'
 
 /**
  * GET|POST /api/internal/email/send-payment-reminders -- the
@@ -15,7 +15,7 @@ async function handleCronRequest(request: NextRequest) {
   if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal reminder endpoint is not configured' }, { status: 503 })
   }
-  if (!isAuthorizedCronRequest(request)) {
+  if (!isAuthorizedCronRequest(request) && !(await isAuthorizedGcpSchedulerRequest(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

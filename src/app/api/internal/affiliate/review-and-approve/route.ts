@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { AFFILIATE_COMMISSION_REVIEW_HOURS, AFFILIATE_SWEEP_BATCH_LIMIT } from '@/lib/affiliate/constants'
 import { notifyAffiliateOfCommission } from '@/lib/affiliate/notify'
-import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
+import { hasCronAuthConfigured, isAuthorizedCronRequest, isAuthorizedGcpSchedulerRequest } from '@/lib/internal-cron/auth'
 
 /**
  * GET|POST /api/internal/affiliate/review-and-approve -- first step of
@@ -19,7 +19,7 @@ async function handleCronRequest(request: NextRequest) {
   if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal affiliate review endpoint is not configured' }, { status: 503 })
   }
-  if (!isAuthorizedCronRequest(request)) {
+  if (!isAuthorizedCronRequest(request) && !(await isAuthorizedGcpSchedulerRequest(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

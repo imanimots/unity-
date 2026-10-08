@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { notifyRentToBuyParty } from '@/lib/rent-to-buy/notify'
-import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
+import { hasCronAuthConfigured, isAuthorizedCronRequest, isAuthorizedGcpSchedulerRequest } from '@/lib/internal-cron/auth'
 
 /**
  * GET|POST /api/internal/rent-to-buy/finalize-due-ownership -- explicit
@@ -20,7 +20,7 @@ async function handleCronRequest(request: NextRequest) {
   if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal rent-to-buy sweep endpoint is not configured' }, { status: 503 })
   }
-  if (!isAuthorizedCronRequest(request)) {
+  if (!isAuthorizedCronRequest(request) && !(await isAuthorizedGcpSchedulerRequest(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

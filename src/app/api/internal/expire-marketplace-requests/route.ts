@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
+import { hasCronAuthConfigured, isAuthorizedCronRequest, isAuthorizedGcpSchedulerRequest } from '@/lib/internal-cron/auth'
 
 /**
  * GET|POST /api/internal/expire-marketplace-requests -- Step Z.
@@ -13,7 +13,7 @@ import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-c
 async function handleCronRequest(request: NextRequest) {
   if (!hasCronAuthConfigured()) return NextResponse.json({ error: 'Internal expiry endpoint is not configured' }, { status: 503 })
 
-  if (!isAuthorizedCronRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isAuthorizedCronRequest(request) && !(await isAuthorizedGcpSchedulerRequest(request))) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY

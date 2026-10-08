@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { finalizeEarnedCommissions } from '@/lib/commissions/finalize'
-import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
+import { hasCronAuthConfigured, isAuthorizedCronRequest, isAuthorizedGcpSchedulerRequest } from '@/lib/internal-cron/auth'
 
 /**
  * GET|POST /api/internal/commissions/finalize-earned -- promotes
@@ -16,7 +16,7 @@ async function handleCronRequest(request: NextRequest) {
   if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal commission finalization endpoint is not configured' }, { status: 503 })
   }
-  if (!isAuthorizedCronRequest(request)) {
+  if (!isAuthorizedCronRequest(request) && !(await isAuthorizedGcpSchedulerRequest(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

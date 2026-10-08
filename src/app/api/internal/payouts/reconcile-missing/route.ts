@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createMerchantPayout } from '@/lib/payments/orchestrator'
 import { notifyMerchantPayoutEvent } from '@/lib/payouts/notify'
-import { hasCronAuthConfigured, isAuthorizedCronRequest } from '@/lib/internal-cron/auth'
+import { hasCronAuthConfigured, isAuthorizedCronRequest, isAuthorizedGcpSchedulerRequest } from '@/lib/internal-cron/auth'
 
 const RECONCILE_MISSING_BATCH_LIMIT = 50
 
@@ -42,7 +42,7 @@ async function handleCronRequest(request: NextRequest) {
   if (!hasCronAuthConfigured()) {
     return NextResponse.json({ error: 'Internal payout reconciliation endpoint is not configured' }, { status: 503 })
   }
-  if (!isAuthorizedCronRequest(request)) {
+  if (!isAuthorizedCronRequest(request) && !(await isAuthorizedGcpSchedulerRequest(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
