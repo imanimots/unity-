@@ -201,6 +201,11 @@ describe('isAuthorizedGcpSchedulerRequest (category: P5D-GCP-AUTH-I)', () => {
     expect(await isAuthorizedGcpSchedulerRequest(gcpReq(ROUTE_A_URL, `Bearer ${token}`))).toBe(false)
   })
 
+  it('P5D-GCP-AUTH-I.1: rejects a token with the wrong subject even with NO azp claim at all -- isolates the sub check from the azp check, since the prior wrong-subject test sets both and the azp check alone could mask a missing sub check', async () => {
+    const token = await signToken(privateKeyA, { sub: 'some-other-service-account-id', azp: undefined })
+    expect(await isAuthorizedGcpSchedulerRequest(gcpReq(ROUTE_A_URL, `Bearer ${token}`))).toBe(false)
+  })
+
   it('rejects a token whose azp does not match the expected subject, even if sub is correct', async () => {
     const token = await signToken(privateKeyA, { sub: EXPECTED_SUB, azp: 'some-other-authorized-party' })
     expect(await isAuthorizedGcpSchedulerRequest(gcpReq(ROUTE_A_URL, `Bearer ${token}`))).toBe(false)
