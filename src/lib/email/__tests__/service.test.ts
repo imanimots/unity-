@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { sendTemplate, getDeliveryStatus, retryDelivery } from '../service'
 import { createFakeEmailAdmin } from './test-helpers'
+import { getEmailProvider } from '../registry'
 
 const BASE_REQUEST = {
   eventType: 'booking.accepted' as const,
@@ -116,5 +117,100 @@ describe('getDeliveryStatus (category: Dispatch)', () => {
   it('13. returns null for an unknown delivery id rather than throwing', async () => {
     const { admin } = createFakeEmailAdmin({ email: 'sam@example.com' })
     expect(await getDeliveryStatus(admin, 'does-not-exist')).toBeNull()
+  })
+})
+
+/**
+ * P5D-ROUTE-HARDEN-I: retryDelivery() must establish atomic ownership of
+ * a retry candidate (via the `attempts` column as a compare-and-swap
+ * token) BEFORE calling the external provider, so that duplicate or
+ * concurrent scheduler invocations can never both send the same
+ * recovered email.
+ */
+describe('retryDelivery duplicate/concurrency safety (category: P5D-ROUTE-HARDEN-I)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('14. sequential duplicate: retrying the same delivery twice in a row sends exactly once -- the second call is a no-op skip', async () => {
+    const send = vi.spyOn(getEmailProvider(), 'sendTransactionalEmail')
+    const failing = createFakeEmailAdmin({ email: 'sam+fail-retryable@example.com' })
+    const first = await sendTemplate(failing.admin, BASE_REQUEST)
+    expect(first.status).toBe('failed_retryable')
+
+    const row = failing.getDelivery(first.deliveryId!)
+    if (row) row.recipient_email = 'sam@example.com'
+    send.mockClear()
+
+    const firstRetry = await retryDelivery(failing.admin, first.deliveryId!)
+    const secondRetry = await retryDelivery(failing.admin, first.deliveryId!)
+
+    expect(firstRetry.status).toBe('sent')
+    expect(secondRetry.status).toBe('skipped_duplicate')
+    expect(send).toHaveBeenCalledTimes(1)
+    expect(failing.deliveryCount()).toBe(1)
+  })
+
+  /**
+   * LIMITATION (stated explicitly, per this phase's own instruction): this
+   * test proves that retryDelivery()'s compare-and-swap claim logic
+   * correctly rejects a second claim attempt once shared state has moved
+   * out from under it, using two real concurrent JS Promises racing
+   * against the same in-memory fake row with no `await` inside the
+   * fake's match-and-write step (so the two claims cannot interleave
+   * mid-write, the same way two real Postgres UPDATEs targeting the same
+   * row cannot interleave mid-write). It does NOT execute against a real
+   * Postgres instance and does NOT prove genuine multi-connection
+   * transaction-isolation/row-locking behavior -- no live database is
+   * available to this test environment. Do not read this as proof that
+   * real Postgres locking has been exercised; it has not.
+   */
+  it('15. concurrent duplicate: two simultaneous retries of the same delivery -- exactly one claims and sends, the other skips before ever calling the provider', async () => {
+    const send = vi.spyOn(getEmailProvider(), 'sendTransactionalEmail')
+    const failing = createFakeEmailAdmin({ email: 'sam+fail-retryable@example.com' })
+    const first = await sendTemplate(failing.admin, BASE_REQUEST)
+    expect(first.status).toBe('failed_retryable')
+
+    const row = failing.getDelivery(first.deliveryId!)
+    if (row) row.recipient_email = 'sam@example.com'
+    send.mockClear()
+
+    const [resultA, resultB] = await Promise.all([
+      retryDelivery(failing.admin, first.deliveryId!),
+      retryDelivery(failing.admin, first.deliveryId!),
+    ])
+
+    const statuses = [resultA.status, resultB.status].sort()
+    expect(statuses).toEqual(['sent', 'skipped_duplicate'])
+    expect(send).toHaveBeenCalledTimes(1)
+    expect(failing.deliveryCount()).toBe(1)
+    expect(failing.getDelivery(first.deliveryId!)?.attempts).toBe(2)
+  })
+
+  it('16. failure after claim: a claimed retry that still fails at the provider ends back in failed_retryable, not stuck claimed or silently losing retry eligibility', async () => {
+    const send = vi.spyOn(getEmailProvider(), 'sendTransactionalEmail')
+    const failing = createFakeEmailAdmin({ email: 'sam+fail-retryable@example.com' })
+    const first = await sendTemplate(failing.admin, BASE_REQUEST)
+    expect(first.status).toBe('failed_retryable')
+    send.mockClear()
+
+    // Recipient email is still the fail-retryable fixture -- the claim
+    // succeeds (attempts is a CAS token independent of the recipient),
+    // but the provider call after the claim fails again.
+    const retryResult = await retryDelivery(failing.admin, first.deliveryId!)
+    expect(retryResult.status).toBe('failed_retryable')
+    expect(send).toHaveBeenCalledTimes(1)
+
+    const row = failing.getDelivery(first.deliveryId!)
+    expect(row?.status).toBe('failed_retryable')
+    expect(['pending', 'sent', 'failed_retryable', 'failed_terminal']).toContain(row?.status)
+    expect(row?.attempts).toBe(2)
+
+    // Retry eligibility was not silently lost -- a later retry (once the
+    // recipient address is fixed) can still succeed against the SAME row.
+    if (row) row.recipient_email = 'sam@example.com'
+    const secondRetry = await retryDelivery(failing.admin, first.deliveryId!)
+    expect(secondRetry.status).toBe('sent')
+    expect(failing.deliveryCount()).toBe(1)
   })
 })

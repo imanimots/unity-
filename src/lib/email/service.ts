@@ -240,19 +240,62 @@ export async function emailHealthCheck() {
  * safe, non-sensitive snapshot that was actually shown), updates the SAME
  * row (never inserts a new one), so a retry never produces a duplicate
  * delivery record.
+ *
+ * P5D-ROUTE-HARDEN-I: the scheduler that calls this (via
+ * retryAllFailedDeliveries, or the admin manual-retry route) is
+ * documented at-least-once, not exactly-once -- two genuinely concurrent
+ * invocations for the SAME delivery are a real possibility, not merely
+ * theoretical. An unlocked "read eligibility, then later update" pattern
+ * (the prior implementation) lets both invocations see
+ * status='failed_retryable' before either writes, so both would call
+ * the external provider and send the same email twice.
+ *
+ * Fixed with an atomic claim BEFORE any provider call: the existing
+ * `attempts` integer column is reused as a compare-and-swap token --
+ * incremented by an UPDATE ... WHERE status = 'failed_retryable' AND
+ * attempts = <value just read>. Two concurrent callers can both pass the
+ * initial read, but Postgres serializes concurrent UPDATEs to the same
+ * row: only the first to commit still matches `attempts = <value>`; the
+ * second's WHERE clause no longer matches once the first's UPDATE lands,
+ * so its own update returns zero rows, and it skips -- before ever
+ * calling the provider. No schema change was needed: `attempts` already
+ * existed and already meant "how many times has this been attempted,"
+ * so folding the claim into it does not introduce a new lifecycle state.
+ * One deliberate, minor behavior refinement: a render failure now also
+ * counts as an attempt (since the claim -- which increments attempts --
+ * happens before rendering), where previously only a provider-level
+ * failure incremented it. This is more consistent, not less: a render
+ * failure is a genuine attempt that failed, just at an earlier step.
  */
 export async function retryDelivery(admin: SupabaseClient, deliveryId: string): Promise<SendTemplateResult> {
-  const { data: delivery } = await admin
+  const { data: candidate } = await admin
     .from('email_deliveries')
-    .select('id, template_id, template_vars, recipient_email, recipient_user_id, status, idempotency_key, attempts')
+    .select('attempts')
     .eq('id', deliveryId)
+    .eq('status', 'failed_retryable')
     .maybeSingle()
 
-  if (!delivery || delivery.status !== 'failed_retryable') {
+  if (!candidate) {
     return { status: 'skipped_duplicate', deliveryId: null }
   }
 
-  const email = delivery.recipient_email ?? (await resolveUserEmail(admin, delivery.recipient_user_id))
+  const { data: claimed, error: claimError } = await admin
+    .from('email_deliveries')
+    .update({ attempts: candidate.attempts + 1 })
+    .eq('id', deliveryId)
+    .eq('status', 'failed_retryable')
+    .eq('attempts', candidate.attempts)
+    .select('id, template_id, template_vars, recipient_email, recipient_user_id, idempotency_key')
+    .maybeSingle()
+
+  if (claimError || !claimed) {
+    // Another concurrent caller already claimed this row between our
+    // read and our attempted claim -- never reached, never retried
+    // twice by this caller.
+    return { status: 'skipped_duplicate', deliveryId: null }
+  }
+
+  const email = claimed.recipient_email ?? (await resolveUserEmail(admin, claimed.recipient_user_id))
   if (!email) {
     await admin.from('email_deliveries').update({ status: 'failed_terminal', last_error: 'no recipient email on file', failed_at: new Date().toISOString() }).eq('id', deliveryId)
     return { status: 'skipped_no_recipient_email', deliveryId }
@@ -260,14 +303,14 @@ export async function retryDelivery(admin: SupabaseClient, deliveryId: string): 
 
   let rendered
   try {
-    rendered = renderTemplate(delivery.template_id, delivery.template_vars as TemplateVars)
+    rendered = renderTemplate(claimed.template_id, claimed.template_vars as TemplateVars)
   } catch (err) {
     const message = err instanceof TemplateValidationError ? err.message : 'template render error'
     await admin.from('email_deliveries').update({ status: 'failed_terminal', last_error: message, failed_at: new Date().toISOString() }).eq('id', deliveryId)
     return { status: 'failed_terminal', deliveryId }
   }
 
-  return attemptProviderSendRetry(admin, deliveryId, email, rendered, delivery.idempotency_key, delivery.attempts)
+  return attemptProviderSendRetry(admin, deliveryId, email, rendered, claimed.idempotency_key)
 }
 
 async function attemptProviderSendRetry(
@@ -275,8 +318,7 @@ async function attemptProviderSendRetry(
   deliveryId: string,
   email: string,
   rendered: { subject: string; html: string; text: string },
-  idempotencyKey: string,
-  previousAttempts: number
+  idempotencyKey: string
 ): Promise<SendTemplateResult> {
   const provider = getEmailProvider()
   try {
@@ -296,7 +338,6 @@ async function attemptProviderSendRetry(
         provider: provider.name,
         provider_message_id: result.providerMessageId,
         sent_at: new Date().toISOString(),
-        attempts: previousAttempts + 1,
       })
       .eq('id', deliveryId)
     return { status: 'sent', deliveryId }
@@ -306,7 +347,7 @@ async function attemptProviderSendRetry(
     const safeMessage = err instanceof Error ? err.name : 'unknown provider error'
     await admin
       .from('email_deliveries')
-      .update({ status, last_error: safeMessage, failed_at: new Date().toISOString(), attempts: previousAttempts + 1 })
+      .update({ status, last_error: safeMessage, failed_at: new Date().toISOString() })
       .eq('id', deliveryId)
     return { status, deliveryId }
   }
