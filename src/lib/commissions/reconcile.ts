@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { UNITY_COMMISSION_SWEEP_BATCH_LIMIT } from './constants'
+import { computeAdjustmentHash } from './idempotency'
 
 interface CommissionRow {
   id: string
@@ -288,15 +289,28 @@ export async function reconcileCommissionRefunds(admin: SupabaseClient): Promise
         const delta = round2(targetCommission - currentEffective)
 
         if (delta !== 0) {
-          const { error } = await admin.rpc('create_unity_commission_adjustment', {
+          const reason = `partial refund of ${refundedAmount.toFixed(2)} against a payment of ${paymentAmount.toFixed(2)}`
+          // Deterministic identity for "this exact adjustment event" --
+          // same formula create_unity_commission_adjustment itself uses
+          // for its own request_hash (commission_id|amount|reason), so
+          // two concurrent sweep runs that read the same pre-adjustment
+          // state and compute the same delta produce the SAME key, and
+          // the RPC's own idempotency_key unique index (not merely this
+          // function's convergent-by-construction retry safety) is what
+          // actually stops a concurrent duplicate insert. Never derived
+          // from a timestamp, random id, or cron execution id -- those
+          // would make every call look like a different event.
+          const idempotencyKey = computeAdjustmentHash(row.id, delta, reason)
+          const { data, error } = await admin.rpc('create_unity_commission_adjustment', {
             p_actor_type: 'system',
             p_actor_id: null,
             p_commission_id: row.id,
             p_amount: delta,
-            p_reason: `partial refund of ${refundedAmount.toFixed(2)} against a payment of ${paymentAmount.toFixed(2)}`,
+            p_reason: reason,
+            p_idempotency_key: idempotencyKey,
           })
           if (error) failed++
-          else adjusted++
+          else if (!(data as { replay?: boolean } | null)?.replay) adjusted++
         }
       } catch {
         failed++
