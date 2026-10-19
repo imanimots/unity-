@@ -225,6 +225,21 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
     admin.from('financial_workflows').select('id, booking_id, updated_at, bookings(booking_reference)').eq('status', 'failed_retryable'),
     admin.from('financial_workflows').select('id, booking_id, updated_at, bookings(booking_reference)').eq('status', 'failed_terminal'),
     admin.from('email_deliveries').select('id, event_type, status, created_at').in('status', ['failed_retryable', 'failed_terminal']),
+    // P5D-SEND-PAYMENT-REMINDERS-STALE-PENDING-I: a 'pending' row this old
+    // means the dispatch process died between the email_deliveries INSERT
+    // and the provider call resolving (see sendTemplate(), src/lib/email/
+    // service.ts) -- normally a sub-second window, since the provider call
+    // is awaited synchronously right after the insert. Detection only:
+    // whether the provider actually sent before the crash is NOT knowable
+    // from this row alone (no proven provider-side idempotency/lookup --
+    // see docs/TRANSACTIONAL_EMAILS.md and resend-provider.ts's own
+    // "unconfirmed" disclosure), so this surfaces the row for manual
+    // reconciliation rather than ever auto-resending or auto-reclassifying
+    // it. REVIEW_OVERDUE_HOURS (48h) is reused rather than inventing a
+    // bespoke threshold -- same "stuck far longer than physically
+    // possible under normal operation" convention already used for
+    // moderation/KYC/dispute staleness above.
+    admin.from('email_deliveries').select('id, event_type, created_at').eq('status', 'pending').lt('created_at', threshold),
     admin.from('bookings').select('id, booking_reference, end_at').eq('status', 'active').lt('end_at', now),
     admin.from('profiles').select('id, full_name, display_name').eq('account_status', 'suspended'),
     // A provider success arriving after the booking already expired — the
@@ -351,6 +366,7 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
     { data: retryableWorkflows },
     { data: terminalWorkflows },
     { data: failedEmails },
+    { data: stalePendingEmails },
     { data: overdueRentals },
     { data: suspendedWithBookings },
     { data: lateSuccessfulPayments },
@@ -482,6 +498,20 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
       detectedAt: row.created_at,
       suggestedAction: row.status === 'failed_retryable' ? `Retry at /admin/email-deliveries` : 'Terminal failure — requires a configuration or code fix, not a retry',
       resolved: isResolved('email_delivery_failed', 'email_delivery', row.id),
+    })
+  }
+
+  for (const row of stalePendingEmails ?? []) {
+    exceptions.push({
+      id: exceptionId('email_delivery_stale_pending', row.id),
+      type: 'email_delivery_stale_pending',
+      severity: 'medium',
+      entityType: 'email_delivery',
+      entityId: row.id,
+      summary: `${row.event_type} email has been pending for over ${REVIEW_OVERDUE_HOURS}h — provider outcome is unknown`,
+      detectedAt: row.created_at,
+      suggestedAction: 'Manually verify provider-side delivery status before deciding whether to resend — do not resend automatically; provider idempotency is not proven for the active email provider',
+      resolved: isResolved('email_delivery_stale_pending', 'email_delivery', row.id),
     })
   }
 

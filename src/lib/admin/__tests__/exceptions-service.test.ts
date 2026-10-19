@@ -197,9 +197,10 @@ describe('durability -- classification depends only on persisted payment/install
  * the same function resolves to an empty array unconditionally, which is
  * exactly the inert state we want for all of them in this test.
  */
-function createFakeExceptionsAdmin(fixtures: { affiliate_commissions?: Row[]; exception_resolutions?: Row[] } = {}) {
+function createFakeExceptionsAdmin(fixtures: { affiliate_commissions?: Row[]; email_deliveries?: Row[]; exception_resolutions?: Row[] } = {}) {
   const tables: Record<string, Row[]> = {
     affiliate_commissions: fixtures.affiliate_commissions ?? [],
+    email_deliveries: fixtures.email_deliveries ?? [],
     exception_resolutions: fixtures.exception_resolutions ?? [],
   }
   const mutationCalls: Array<{ method: string; table: string }> = []
@@ -405,5 +406,116 @@ describe('listOperationalExceptions -- affiliate commission stuck-processing liv
     expect(exceptions.find((e) => e.type === 'affiliate_commission_payout_stuck' && e.entityId === 'comm-queued')).toBeDefined()
     expect(exceptions.find((e) => e.type === 'affiliate_commission_payout_failed' && e.entityId === 'comm-failed')).toBeDefined()
     expect(exceptions.find((e) => e.type === 'affiliate_commission_provider_result_not_reconciled' && e.entityId === 'comm-processing')).toBeDefined()
+  })
+})
+
+function pendingEmail(overrides: Row = {}): Row {
+  return { id: 'email-1', event_type: 'booking.payment_reminder', status: 'pending', created_at: hoursAgoIso(49), ...overrides }
+}
+
+/**
+ * P5D-SEND-PAYMENT-REMINDERS-STALE-PENDING-I: Branch C (fail-closed
+ * detection-only) coverage. Automatic resend/reclassification is NOT
+ * implemented in this phase -- repository evidence (resend-provider.ts's
+ * own "unconfirmed" disclosure, and the console provider's complete
+ * absence of any dedup at all) does not prove provider-side idempotency,
+ * so a stale 'pending' row is surfaced for manual operator reconciliation
+ * only. These tests exist to prove detection is accurate and inert: it
+ * finds the right rows and never mutates anything, regardless of how many
+ * times or how concurrently it runs.
+ */
+describe('listOperationalExceptions -- stale pending email delivery detection (category: P5D-SEND-PAYMENT-REMINDERS-STALE-PENDING-I)', () => {
+  it('28. a pending email older than the review-overdue threshold is surfaced as email_delivery_stale_pending', async () => {
+    const { admin } = createFakeExceptionsAdmin({ email_deliveries: [pendingEmail()] })
+    const exceptions = await listOperationalExceptions(admin)
+    const found = exceptions.find((e) => e.type === 'email_delivery_stale_pending')
+    expect(found).toBeDefined()
+    expect(found?.entityType).toBe('email_delivery')
+    expect(found?.entityId).toBe('email-1')
+    expect(found?.severity).toBe('medium')
+    expect(found?.resolved).toBe(false)
+  })
+
+  it('29. a fresh pending email (within the threshold) is NOT classified as stale', async () => {
+    const { admin } = createFakeExceptionsAdmin({ email_deliveries: [pendingEmail({ created_at: hoursAgoIso(1) })] })
+    const exceptions = await listOperationalExceptions(admin)
+    expect(exceptions.find((e) => e.type === 'email_delivery_stale_pending')).toBeUndefined()
+  })
+
+  it('30. a sent row, however old, is never classified as stale-pending recovery work', async () => {
+    const { admin } = createFakeExceptionsAdmin({ email_deliveries: [pendingEmail({ status: 'sent', created_at: hoursAgoIso(500) })] })
+    const exceptions = await listOperationalExceptions(admin)
+    expect(exceptions.find((e) => e.type === 'email_delivery_stale_pending')).toBeUndefined()
+  })
+
+  it('31. a failed_retryable row remains owned by the existing email_delivery_failed category, not reclassified as stale-pending', async () => {
+    const { admin } = createFakeExceptionsAdmin({ email_deliveries: [pendingEmail({ status: 'failed_retryable', created_at: hoursAgoIso(500) })] })
+    const exceptions = await listOperationalExceptions(admin)
+    expect(exceptions.find((e) => e.type === 'email_delivery_stale_pending')).toBeUndefined()
+    expect(exceptions.find((e) => e.type === 'email_delivery_failed' && e.entityId === 'email-1')).toBeDefined()
+  })
+
+  it('32. a failed_terminal row remains owned by the existing email_delivery_failed category, not reclassified as stale-pending', async () => {
+    const { admin } = createFakeExceptionsAdmin({ email_deliveries: [pendingEmail({ status: 'failed_terminal', created_at: hoursAgoIso(500) })] })
+    const exceptions = await listOperationalExceptions(admin)
+    expect(exceptions.find((e) => e.type === 'email_delivery_stale_pending')).toBeUndefined()
+    expect(exceptions.find((e) => e.type === 'email_delivery_failed' && e.entityId === 'email-1')).toBeDefined()
+  })
+
+  it('33. detection never mutates anything -- no update/insert/delete/rpc call is made while scanning for stale pending emails (no provider call, no second row, no reclassification)', async () => {
+    const { admin, mutationCalls } = createFakeExceptionsAdmin({ email_deliveries: [pendingEmail()] })
+    await listOperationalExceptions(admin)
+    expect(mutationCalls).toEqual([])
+  })
+
+  it('34. a stale pending row is never automatically marked sent, failed_retryable, or failed_terminal -- it stays exactly "pending" after detection runs', async () => {
+    const fixture = pendingEmail()
+    const { admin } = createFakeExceptionsAdmin({ email_deliveries: [fixture] })
+    await listOperationalExceptions(admin)
+    expect(fixture.status).toBe('pending')
+  })
+
+  it('35. repeated detection is harmless -- running the sweep twice in a row reports the identical exception both times, with no accumulation or double-counting', async () => {
+    const { admin } = createFakeExceptionsAdmin({ email_deliveries: [pendingEmail()] })
+    const first = await listOperationalExceptions(admin)
+    const second = await listOperationalExceptions(admin)
+    const firstMatches = first.filter((e) => e.type === 'email_delivery_stale_pending')
+    const secondMatches = second.filter((e) => e.type === 'email_delivery_stale_pending')
+    expect(firstMatches).toHaveLength(1)
+    expect(secondMatches).toHaveLength(1)
+    expect(firstMatches[0]).toEqual(secondMatches[0])
+  })
+
+  it('36. concurrent detection is harmless -- two simultaneous sweeps both report the same stale row and neither calls a mutation method or a provider', async () => {
+    const { admin, mutationCalls } = createFakeExceptionsAdmin({ email_deliveries: [pendingEmail()] })
+    const [first, second] = await Promise.all([listOperationalExceptions(admin), listOperationalExceptions(admin)])
+    expect(first.filter((e) => e.type === 'email_delivery_stale_pending')).toHaveLength(1)
+    expect(second.filter((e) => e.type === 'email_delivery_stale_pending')).toHaveLength(1)
+    expect(mutationCalls).toEqual([])
+  })
+
+  it('37. an admin-acknowledged stale pending email is reported as resolved without the underlying row being touched', async () => {
+    const fixture = pendingEmail()
+    const { admin } = createFakeExceptionsAdmin({
+      email_deliveries: [fixture],
+      exception_resolutions: [{ exception_type: 'email_delivery_stale_pending', entity_type: 'email_delivery', entity_id: 'email-1' }],
+    })
+    const exceptions = await listOperationalExceptions(admin)
+    const found = exceptions.find((e) => e.type === 'email_delivery_stale_pending')
+    expect(found?.resolved).toBe(true)
+    expect(fixture.status).toBe('pending')
+  })
+
+  it('38. multiple stale pending rows across different event types are each surfaced independently', async () => {
+    const { admin } = createFakeExceptionsAdmin({
+      email_deliveries: [
+        pendingEmail({ id: 'email-reminder', event_type: 'booking.payment_reminder' }),
+        pendingEmail({ id: 'email-expired', event_type: 'booking.payment_expired' }),
+      ],
+    })
+    const exceptions = await listOperationalExceptions(admin)
+    const matches = exceptions.filter((e) => e.type === 'email_delivery_stale_pending')
+    expect(matches).toHaveLength(2)
+    expect(matches.map((m) => m.entityId).sort()).toEqual(['email-expired', 'email-reminder'])
   })
 })
