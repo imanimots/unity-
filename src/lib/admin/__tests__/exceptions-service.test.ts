@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   classifyCapturedRtbInstallmentPayment,
   isCapturedRtbDepositUnfunded,
+  listOperationalExceptions,
   type RtbInstallmentExceptionCandidate,
   type RtbInstallmentRow,
 } from '../exceptions-service'
@@ -172,5 +174,236 @@ describe('durability -- classification depends only on persisted payment/install
     expect(capturedButNeverProgressed?.type).toBe('rtb_installment_legacy_uncorrelated')
     const depositCapturedButNeverProgressed = isCapturedRtbDepositUnfunded({ amount: '500.00', agreement: { security_deposit_amount: '500.00', deposit_funded_at: null } })
     expect(depositCapturedButNeverProgressed).toBe(true)
+  })
+})
+
+/**
+ * P5D-AFFILIATE-PAYOUT-LIVENESS-I: listOperationalExceptions() already
+ * contains a read-only "stale processing" detector for affiliate
+ * commissions (affiliate_commission_provider_result_not_reconciled,
+ * keyed on affiliate_commissions.status='processing' and
+ * payout_requested_at older than REVIEW_OVERDUE_HOURS) -- this was
+ * previously unverified by any test. These tests exercise the REAL
+ * function against a minimal fake Supabase client (not a
+ * reimplementation of its filtering logic), proving: a stale processing
+ * commission is surfaced; a fresh one is not; detection never mutates
+ * anything (the required safety invariant -- a processing timeout must
+ * never be auto-resolved, auto-retried, or auto-marked paid/failed); and
+ * duplicate/concurrent detection is harmless since it is a pure read.
+ *
+ * The fake only needs real filter semantics for the two tables this
+ * category actually reads (affiliate_commissions, exception_resolutions)
+ * -- every other table queried by the other ~20 exception categories in
+ * the same function resolves to an empty array unconditionally, which is
+ * exactly the inert state we want for all of them in this test.
+ */
+function createFakeExceptionsAdmin(fixtures: { affiliate_commissions?: Row[]; exception_resolutions?: Row[] } = {}) {
+  const tables: Record<string, Row[]> = {
+    affiliate_commissions: fixtures.affiliate_commissions ?? [],
+    exception_resolutions: fixtures.exception_resolutions ?? [],
+  }
+  const mutationCalls: Array<{ method: string; table: string }> = []
+
+  type Filter = ['eq' | 'neq' | 'lt' | 'gt' | 'gte' | 'in' | 'not_is_null', string, unknown]
+
+  function matches(row: Row, filters: Filter[]): boolean {
+    return filters.every(([op, col, val]) => {
+      const rowVal = row[col]
+      switch (op) {
+        case 'eq':
+          return rowVal === val
+        case 'neq':
+          return rowVal !== val
+        case 'lt':
+          return typeof rowVal === 'string' && typeof val === 'string' && rowVal < val
+        case 'gt':
+          return typeof rowVal === 'string' && typeof val === 'string' && rowVal > val
+        case 'gte':
+          return typeof rowVal === 'string' && typeof val === 'string' && rowVal >= val
+        case 'in':
+          return Array.isArray(val) && val.includes(rowVal)
+        case 'not_is_null':
+          return rowVal !== null && rowVal !== undefined
+      }
+    })
+  }
+
+  function from(table: string) {
+    function select() {
+      const filters: Filter[] = []
+      const builder = {
+        eq(col: string, val: unknown) {
+          filters.push(['eq', col, val])
+          return builder
+        },
+        neq(col: string, val: unknown) {
+          filters.push(['neq', col, val])
+          return builder
+        },
+        lt(col: string, val: unknown) {
+          filters.push(['lt', col, val])
+          return builder
+        },
+        gt(col: string, val: unknown) {
+          filters.push(['gt', col, val])
+          return builder
+        },
+        gte(col: string, val: unknown) {
+          filters.push(['gte', col, val])
+          return builder
+        },
+        or() {
+          return builder
+        },
+        in(col: string, val: unknown[]) {
+          filters.push(['in', col, val])
+          return builder
+        },
+        not(col: string, op: string, val: unknown) {
+          if (op === 'is' && val === null) filters.push(['not_is_null', col, null])
+          return builder
+        },
+        is(col: string, val: unknown) {
+          filters.push(['eq', col, val])
+          return builder
+        },
+        order() {
+          return builder
+        },
+        limit() {
+          return builder
+        },
+        then(onResolve: (v: { data: Row[]; error: null }) => unknown, onReject?: (e: unknown) => unknown) {
+          const rows = (tables[table] ?? []).filter((row) => matches(row, filters))
+          return Promise.resolve({ data: rows, error: null }).then(onResolve, onReject)
+        },
+      }
+      return builder
+    }
+    return {
+      select,
+      update: vi.fn(() => {
+        mutationCalls.push({ method: 'update', table })
+        return { eq: () => Promise.resolve({ data: null, error: null }) }
+      }),
+      insert: vi.fn(() => {
+        mutationCalls.push({ method: 'insert', table })
+        return { select: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) }
+      }),
+      delete: vi.fn(() => {
+        mutationCalls.push({ method: 'delete', table })
+        return { eq: () => Promise.resolve({ data: null, error: null }) }
+      }),
+    }
+  }
+
+  // listOperationalExceptions legitimately calls two READ-ONLY (SQL
+  // `stable`) RPCs for the unrelated merchant-payout exception
+  // categories (_merchant_payout_exception_candidates,
+  // _payout_reconcile_missing_candidates) -- those are not mutations and
+  // must not trip the "detection never mutates" assertion. Any OTHER rpc
+  // name would be a real affiliate-commission state-transition call
+  // (mark_affiliate_commission_processing, record_affiliate_payout_result,
+  // retry_affiliate_payout, mark_affiliate_commission_paid_manually, etc.)
+  // and is tracked as a genuine mutation.
+  const READ_ONLY_RPCS = new Set(['_merchant_payout_exception_candidates', '_payout_reconcile_missing_candidates'])
+  const rpc = vi.fn((fnName: string) => {
+    if (!READ_ONLY_RPCS.has(fnName)) mutationCalls.push({ method: 'rpc', table: fnName })
+    return Promise.resolve({ data: [], error: null })
+  })
+
+  return { admin: { from, rpc } as unknown as SupabaseClient, mutationCalls }
+}
+
+type Row = Record<string, unknown>
+
+function hoursAgoIso(hours: number): string {
+  return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
+}
+
+function processingCommission(overrides: Row = {}): Row {
+  return { id: 'comm-1', listing_id: 'listing-1', status: 'processing', payout_requested_at: hoursAgoIso(49), ...overrides }
+}
+
+describe('listOperationalExceptions -- affiliate commission stuck-processing liveness (category: P5D-AFFILIATE-PAYOUT-LIVENESS-I)', () => {
+  it('19. a processing commission older than the review-overdue threshold is surfaced as affiliate_commission_provider_result_not_reconciled', async () => {
+    const { admin } = createFakeExceptionsAdmin({ affiliate_commissions: [processingCommission()] })
+    const exceptions = await listOperationalExceptions(admin)
+    const found = exceptions.find((e) => e.type === 'affiliate_commission_provider_result_not_reconciled')
+    expect(found).toBeDefined()
+    expect(found?.entityType).toBe('affiliate_commission')
+    expect(found?.entityId).toBe('comm-1')
+    expect(found?.severity).toBe('high')
+    expect(found?.resolved).toBe(false)
+  })
+
+  it('20. a fresh processing commission (within the threshold) is NOT surfaced as stale', async () => {
+    const { admin } = createFakeExceptionsAdmin({ affiliate_commissions: [processingCommission({ payout_requested_at: hoursAgoIso(1) })] })
+    const exceptions = await listOperationalExceptions(admin)
+    expect(exceptions.find((e) => e.type === 'affiliate_commission_provider_result_not_reconciled')).toBeUndefined()
+  })
+
+  it('21. a non-processing commission (e.g. paid) is never classified as stuck-processing regardless of age', async () => {
+    const { admin } = createFakeExceptionsAdmin({ affiliate_commissions: [processingCommission({ status: 'paid', payout_requested_at: hoursAgoIso(500) })] })
+    const exceptions = await listOperationalExceptions(admin)
+    expect(exceptions.find((e) => e.type === 'affiliate_commission_provider_result_not_reconciled')).toBeUndefined()
+  })
+
+  it('22. detection never mutates anything -- no update/insert/delete/rpc call is ever made while scanning for stale processing commissions', async () => {
+    const { admin, mutationCalls } = createFakeExceptionsAdmin({ affiliate_commissions: [processingCommission()] })
+    await listOperationalExceptions(admin)
+    expect(mutationCalls).toEqual([])
+  })
+
+  it('23. a stale commission is never automatically marked paid or failed, and is never requeued -- it stays exactly "processing" after detection runs', async () => {
+    const fixture = processingCommission()
+    const { admin } = createFakeExceptionsAdmin({ affiliate_commissions: [fixture] })
+    await listOperationalExceptions(admin)
+    expect(fixture.status).toBe('processing')
+  })
+
+  it('24. duplicate detection is harmless -- running the sweep twice in a row reports the identical exception both times, with no accumulation or double-counting', async () => {
+    const { admin } = createFakeExceptionsAdmin({ affiliate_commissions: [processingCommission()] })
+    const first = await listOperationalExceptions(admin)
+    const second = await listOperationalExceptions(admin)
+    const firstMatches = first.filter((e) => e.type === 'affiliate_commission_provider_result_not_reconciled')
+    const secondMatches = second.filter((e) => e.type === 'affiliate_commission_provider_result_not_reconciled')
+    expect(firstMatches).toHaveLength(1)
+    expect(secondMatches).toHaveLength(1)
+    expect(firstMatches[0]).toEqual(secondMatches[0])
+  })
+
+  it('25. concurrent detection cannot trigger payout execution -- two simultaneous sweeps both report the same stale commission and neither calls a mutation method', async () => {
+    const { admin, mutationCalls } = createFakeExceptionsAdmin({ affiliate_commissions: [processingCommission()] })
+    const [first, second] = await Promise.all([listOperationalExceptions(admin), listOperationalExceptions(admin)])
+    expect(first.filter((e) => e.type === 'affiliate_commission_provider_result_not_reconciled')).toHaveLength(1)
+    expect(second.filter((e) => e.type === 'affiliate_commission_provider_result_not_reconciled')).toHaveLength(1)
+    expect(mutationCalls).toEqual([])
+  })
+
+  it('26. an admin-acknowledged stale commission is reported as resolved without the underlying commission being touched', async () => {
+    const fixture = processingCommission()
+    const { admin } = createFakeExceptionsAdmin({
+      affiliate_commissions: [fixture],
+      exception_resolutions: [{ exception_type: 'affiliate_commission_provider_result_not_reconciled', entity_type: 'affiliate_commission', entity_id: 'comm-1' }],
+    })
+    const exceptions = await listOperationalExceptions(admin)
+    const found = exceptions.find((e) => e.type === 'affiliate_commission_provider_result_not_reconciled')
+    expect(found?.resolved).toBe(true)
+    expect(fixture.status).toBe('processing')
+  })
+
+  it('27. existing payout_queued-stuck and failed-payout categories remain intact and distinct from the stale-processing category', async () => {
+    const { admin } = createFakeExceptionsAdmin({
+      affiliate_commissions: [
+        { id: 'comm-queued', listing_id: 'l1', status: 'payout_queued', updated_at: hoursAgoIso(49) },
+        { id: 'comm-failed', listing_id: 'l2', status: 'failed', updated_at: hoursAgoIso(1) },
+        processingCommission({ id: 'comm-processing' }),
+      ],
+    })
+    const exceptions = await listOperationalExceptions(admin)
+    expect(exceptions.find((e) => e.type === 'affiliate_commission_payout_stuck' && e.entityId === 'comm-queued')).toBeDefined()
+    expect(exceptions.find((e) => e.type === 'affiliate_commission_payout_failed' && e.entityId === 'comm-failed')).toBeDefined()
+    expect(exceptions.find((e) => e.type === 'affiliate_commission_provider_result_not_reconciled' && e.entityId === 'comm-processing')).toBeDefined()
   })
 })
