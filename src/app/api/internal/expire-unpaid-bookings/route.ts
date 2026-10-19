@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { triggerLazyExpirySweep } from '@/lib/bookings/lazy-expiry'
+import { recoverMissingPaymentExpiredEmails } from '@/lib/email/dispatch-expiry'
 import { hasCronAuthConfigured, isAuthorizedCronRequest, isAuthorizedGcpSchedulerRequest } from '@/lib/internal-cron/auth'
 
 /**
@@ -50,7 +51,26 @@ async function handleCronRequest(request: NextRequest) {
     if (!result) {
       return NextResponse.json({ error: 'Sweep failed' }, { status: 500 })
     }
-    return NextResponse.json({ expired_count: result.expiredCount, skipped_ready_count: result.skippedReadyCount })
+
+    // P5D-EXPIRE-UNPAID-NOTIFICATION-RECOVERY-I: a second, additive pass
+    // that only this scheduled route runs (never the shared lazy-expiry
+    // trigger used by user-facing read/write paths) -- recovers a
+    // payment_expired notification that a prior tick's crash left
+    // genuinely missing. Never competes with the email retry subsystem;
+    // see recoverMissingPaymentExpiredEmails()'s own doc comment.
+    let notificationsRecovered = 0
+    try {
+      const recovery = await recoverMissingPaymentExpiredEmails(admin)
+      notificationsRecovered = recovery.notificationsRecovered
+    } catch (recoveryErr) {
+      console.error('[internal.expire-unpaid-bookings] notification recovery failed', { recoveryErr })
+    }
+
+    return NextResponse.json({
+      expired_count: result.expiredCount,
+      skipped_ready_count: result.skippedReadyCount,
+      notifications_recovered: notificationsRecovered,
+    })
   } catch (err) {
     console.error('[internal.expire-unpaid-bookings] unexpected error', { err })
     return NextResponse.json({ error: 'Sweep failed' }, { status: 500 })

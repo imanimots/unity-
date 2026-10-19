@@ -43,11 +43,16 @@ export function createFakeEmailAdmin(opts: { email?: string | null } = {}) {
     },
   }
 
-  type Filter = [string, unknown]
+  type Filter = [string, unknown, 'eq' | 'in']
+
+  function filterMatches(row: Record<string, unknown>, [col, value, op]: Filter): boolean {
+    if (op === 'in') return Array.isArray(value) && value.includes(row[col])
+    return row[col] === value
+  }
 
   function findMatch(filters: Filter[]): [string, Record<string, unknown>] | undefined {
     for (const [id, row] of deliveries) {
-      if (filters.every(([col, value]) => row[col] === value)) return [id, row]
+      if (filters.every((f) => filterMatches(row, f))) return [id, row]
     }
     return undefined
   }
@@ -55,7 +60,7 @@ export function createFakeEmailAdmin(opts: { email?: string | null } = {}) {
   function findAllMatches(filters: Filter[]): Record<string, unknown>[] {
     const rows: Record<string, unknown>[] = []
     for (const [, row] of deliveries) {
-      if (filters.every(([col, value]) => row[col] === value)) rows.push(row)
+      if (filters.every((f) => filterMatches(row, f))) rows.push(row)
     }
     return rows
   }
@@ -87,7 +92,7 @@ export function createFakeEmailAdmin(opts: { email?: string | null } = {}) {
         const filters: Filter[] = []
         const builder = {
           eq(col: string, value: unknown) {
-            filters.push([col, value])
+            filters.push([col, value, 'eq'])
             return builder
           },
           select() {
@@ -126,7 +131,11 @@ export function createFakeEmailAdmin(opts: { email?: string | null } = {}) {
         const filters: Filter[] = []
         const builder = {
           eq(col: string, value: unknown) {
-            filters.push([col, value])
+            filters.push([col, value, 'eq'])
+            return builder
+          },
+          in(col: string, values: unknown[]) {
+            filters.push([col, values, 'in'])
             return builder
           },
           async maybeSingle() {
@@ -143,6 +152,13 @@ export function createFakeEmailAdmin(opts: { email?: string | null } = {}) {
                 return Promise.resolve({ data: findAllMatches(filters), error: null }).then(onResolve, onReject)
               },
             }
+          },
+          // Directly awaitable without a trailing .order()/.maybeSingle()
+          // -- a plain multi-row `.eq(...).eq(...).in(...)` select, as
+          // used by recoverMissingPaymentExpiredEmails()'s existing-
+          // deliveries lookup.
+          then(onResolve: (value: { data: Record<string, unknown>[]; error: null }) => unknown, onReject?: (reason: unknown) => unknown) {
+            return Promise.resolve({ data: findAllMatches(filters), error: null }).then(onResolve, onReject)
           },
         }
         return builder
