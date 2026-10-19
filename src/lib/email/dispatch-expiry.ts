@@ -55,10 +55,17 @@ export async function dispatchPaymentExpiredEmails(admin: SupabaseClient, expire
 }
 
 const RECOVERY_BATCH_LIMIT = 100
-const RECOVERY_LOOKBACK_DAYS = 7
 
 export interface PaymentExpiredNotificationRecoveryResult {
-  /** Bookings inspected because payment_expired_at falls within the lookback window -- not all of them were missing anything. */
+  /**
+   * P5D-EXPIRE-UNPAID-NOTIFICATION-RECOVERY-F1: rows returned by
+   * find_missing_payment_expired_notifications() are already known-missing
+   * by construction (a NOT EXISTS anti-join against email_deliveries,
+   * evaluated in the database before any LIMIT) -- unlike the prior
+   * "bookings inspected, not all missing" meaning, every candidate counted
+   * here is a genuine (booking, recipient) task that had no delivery row
+   * at all when the RPC ran.
+   */
   candidatesScanned: number
   /** A genuinely new email_deliveries row was created for a recipient that had none at all (renter and/or merchant counted independently). */
   notificationsRecovered: number
@@ -85,6 +92,24 @@ export interface PaymentExpiredNotificationRecoveryResult {
  * it alone entirely; recovering a true provider-send failure is the
  * retry subsystem's job, not this one's.
  *
+ * P5D-EXPIRE-UNPAID-NOTIFICATION-RECOVERY-F1: the original implementation
+ * selected "first 100 expired bookings within a 7-day lookback" and only
+ * filtered out already-resolved recipients IN APPLICATION MEMORY after
+ * that fetch. Because status='expired' and payment_expired_at never
+ * change once set, an already-fully-resolved booking stayed eligible for
+ * that same base query forever (until it aged out of the lookback), so
+ * under sustained volume the same oldest resolved rows could occupy every
+ * batch and starve a genuinely missing newer booking out of it entirely
+ * -- and the 7-day cutoff could then permanently drop that missing
+ * booking from consideration. This now delegates candidate selection to
+ * find_missing_payment_expired_notifications() (see the migration), a
+ * read-only RPC that evaluates the NOT EXISTS / unresolved predicate in
+ * the database BEFORE any LIMIT, returning only genuinely missing
+ * (booking, recipient) tasks with no age cutoff at all -- once a task's
+ * delivery row is created, that exact tuple stops matching on the next
+ * call, so the candidate set is self-draining under backlog without any
+ * cursor/checkpoint state.
+ *
  * Safety under concurrent/duplicate execution does NOT rest on this
  * function's own existence pre-check (which is a plain, racy
  * SELECT-then-decide, exactly like reconcile.ts's already-reviewed
@@ -103,75 +128,51 @@ export interface PaymentExpiredNotificationRecoveryResult {
  * act" race, the actual safety boundary here is the idempotency-key
  * constraint on the WRITE, not the timing of the READ, so running
  * recovery immediately after (or even nearly concurrently with) the
- * original dispatch is already safe -- adding an artificial delay would
- * only leave a genuinely-missing notification unsent for longer, with no
- * corresponding safety benefit. The lookback window below exists purely
- * to bound the candidate query's size (cheap, indexed), not for race
- * avoidance.
+ * original dispatch is already safe.
  */
 export async function recoverMissingPaymentExpiredEmails(admin: SupabaseClient): Promise<PaymentExpiredNotificationRecoveryResult> {
   let notificationsRecovered = 0
   let failed = 0
 
-  const lookbackIso = new Date(Date.now() - RECOVERY_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString()
-
-  const { data: candidates, error: candidatesError } = await admin
-    .from('bookings')
-    .select('id, renter_id, merchant_id')
-    .eq('status', 'expired')
-    .not('payment_expired_at', 'is', null)
-    .gt('payment_expired_at', lookbackIso)
-    .order('payment_expired_at', { ascending: true })
-    .limit(RECOVERY_BATCH_LIMIT)
+  const { data: candidates, error: candidatesError } = await admin.rpc('find_missing_payment_expired_notifications', {
+    p_limit: RECOVERY_BATCH_LIMIT,
+  })
 
   if (candidatesError || !candidates || candidates.length === 0) {
     return { candidatesScanned: 0, notificationsRecovered: 0, failed: candidatesError ? 1 : 0 }
   }
 
-  const bookingIds = candidates.map((c) => c.id as string)
-  const { data: existingDeliveries, error: existingError } = await admin
-    .from('email_deliveries')
-    .select('related_entity_id, recipient_user_id')
-    .eq('related_entity_type', 'booking')
-    .eq('event_type', PAYMENT_EXPIRED_EVENT_TYPE)
-    .in('related_entity_id', bookingIds)
+  const rows = candidates as Array<{ booking_id: string; recipient_role: 'renter' | 'merchant'; recipient_user_id: string }>
 
-  if (existingError) {
-    return { candidatesScanned: candidates.length, notificationsRecovered: 0, failed: 1 }
+  // Two rows (renter + merchant) can share the same booking_id when
+  // neither recipient has a delivery yet -- load each booking's context
+  // at most once regardless of how many of its recipient tasks appear.
+  const contextCache = new Map<string, BookingEmailContext | null>()
+  async function getContext(bookingId: string): Promise<BookingEmailContext | null> {
+    if (!contextCache.has(bookingId)) {
+      contextCache.set(bookingId, await loadBookingEmailContext(admin, bookingId))
+    }
+    return contextCache.get(bookingId) ?? null
   }
 
-  const hasDelivery = new Set((existingDeliveries ?? []).map((d) => `${d.related_entity_id}:${d.recipient_user_id}`))
-
-  for (const candidate of candidates) {
-    const bookingId = candidate.id as string
-    const renterId = candidate.renter_id as string
-    const merchantId = candidate.merchant_id as string
-
-    const renterMissing = !hasDelivery.has(`${bookingId}:${renterId}`)
-    const merchantMissing = !hasDelivery.has(`${bookingId}:${merchantId}`)
-    if (!renterMissing && !merchantMissing) continue
-
+  for (const row of rows) {
     try {
-      const ctx = await loadBookingEmailContext(admin, bookingId)
+      const ctx = await getContext(row.booking_id)
       if (!ctx) continue
 
-      if (renterMissing) {
-        const result = await sendPaymentExpiredEmailToRenter(admin, ctx)
-        // Any outcome other than skipped_duplicate means a genuinely new
-        // email_deliveries row was created (sent/failed_retryable/
-        // failed_terminal/skipped_no_recipient_email all insert a row --
-        // only skipped_duplicate means the insert found this exact
-        // idempotency key already claimed and created nothing).
-        if (result.status !== 'skipped_duplicate') notificationsRecovered++
-      }
-      if (merchantMissing) {
-        const result = await sendPaymentExpiredEmailToMerchant(admin, ctx)
-        if (result.status !== 'skipped_duplicate') notificationsRecovered++
-      }
+      // Any outcome other than skipped_duplicate means a genuinely new
+      // email_deliveries row was created (sent/failed_retryable/
+      // failed_terminal/skipped_no_recipient_email all insert a row --
+      // only skipped_duplicate means the insert found this exact
+      // idempotency key already claimed and created nothing).
+      const result = row.recipient_role === 'renter'
+        ? await sendPaymentExpiredEmailToRenter(admin, ctx)
+        : await sendPaymentExpiredEmailToMerchant(admin, ctx)
+      if (result.status !== 'skipped_duplicate') notificationsRecovered++
     } catch {
       failed++
     }
   }
 
-  return { candidatesScanned: candidates.length, notificationsRecovered, failed }
+  return { candidatesScanned: rows.length, notificationsRecovered, failed }
 }
