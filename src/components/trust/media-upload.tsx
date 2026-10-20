@@ -3,43 +3,66 @@
 import { useState, useRef, useCallback } from 'react'
 import { useRouter } from '@/i18n/navigation'
 import { useTranslations, useLocale } from 'next-intl'
-import { Camera, Upload, X, CheckCircle, Clock, Info } from 'lucide-react'
+import { Camera, Upload, X, CheckCircle, Clock, Info, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
 import { formatDate, formatDateTime } from '@/lib/i18n/format'
 import type { Locale } from '@/i18n/locales'
+import { validateBookingEvidenceFile, sanitizeBookingEvidenceExtension, bookingEvidenceFileType, ALLOWED_BOOKING_EVIDENCE_MIME_TYPES, MAX_BOOKING_EVIDENCE_SIZE_BYTES } from '@/lib/bookings/condition-evidence-upload'
 
-interface UploadedFile {
+interface PendingUpload {
   file: File
   preview: string
   timestamp: string
+  status: 'pending' | 'uploading' | 'done' | 'error'
+  error?: string
 }
 
 interface MediaUploadProps {
   bookingId: string
+  userId: string
   stage: 'pre' | 'post'
   listingTitle: string
   backHref: string
 }
 
-export function MediaUpload({ bookingId, stage, listingTitle, backHref }: MediaUploadProps) {
+/**
+ * Real, durable pre-handover/post-return condition evidence for
+ * ordinary rental bookings (P6-HANDOVER-EVIDENCE-AND-TRUST-GATES-I).
+ * Uploads directly to the existing private `rental-media` bucket
+ * (storage RLS enforces the {booking_id}/{uploader_uid}/ path prefix --
+ * supabase/migrations/20260731000001_rental_media_participant_scoping.sql),
+ * then registers each file via POST /api/bookings/[id]/evidence --
+ * mirrors src/components/rent-to-buy/evidence-upload.tsx's real
+ * browser-upload pattern exactly. A success state here means a real
+ * storage object AND a real booking_condition_evidence row exist --
+ * never a timer-only simulation.
+ */
+export function MediaUpload({ bookingId, userId, stage, listingTitle, backHref }: MediaUploadProps) {
   const router = useRouter()
   const t = useTranslations('rent.media')
   const locale = useLocale() as Locale
   const inputRef = useRef<HTMLInputElement>(null)
-  const [uploads, setUploads] = useState<UploadedFile[]>([])
+  const [uploads, setUploads] = useState<PendingUpload[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
   const isPre = stage === 'pre'
+  const evidenceStage = isPre ? 'pre_handover' : 'post_return'
 
   const addFiles = useCallback((files: FileList | null) => {
     if (!files) return
-    const newUploads: UploadedFile[] = Array.from(files)
-      .filter((f) => f.type.startsWith('image/') || f.type.startsWith('video/'))
+    const newUploads: PendingUpload[] = Array.from(files)
+      // Client-side pre-check only -- convenience/UX, never the
+      // security boundary (the bucket's own MIME allowlist/size limit
+      // remain authoritative). A rejected file is simply never added,
+      // so it can never reach Storage or the registration route.
+      .filter((f) => validateBookingEvidenceFile(f) === null)
       .map((file) => ({
         file,
         preview: URL.createObjectURL(file),
         timestamp: formatDateTime(new Date(), locale),
+        status: 'pending' as const,
       }))
     setUploads((prev) => [...prev, ...newUploads])
   }, [locale])
@@ -49,15 +72,56 @@ export function MediaUpload({ bookingId, stage, listingTitle, backHref }: MediaU
     setUploads((prev) => prev.filter((_, idx) => idx !== i))
   }
 
+  const uploadOne = useCallback(async (upload: PendingUpload, index: number): Promise<boolean> => {
+    const supabase = createClient()
+    const fileType = bookingEvidenceFileType(upload.file.type)
+    const ext = sanitizeBookingEvidenceExtension(upload.file.name)
+    const path = `${bookingId}/${userId}/${evidenceStage}-${Date.now()}-${index}.${ext}`
+
+    // Storage/registration failures never surface their raw
+    // provider/server message to the user (bucket/path/policy
+    // internals) -- a safe, generic message only.
+    const { error: uploadError } = await supabase.storage.from('rental-media').upload(path, upload.file, { contentType: upload.file.type })
+    if (uploadError) return false
+
+    try {
+      const res = await fetch(`/api/bookings/${bookingId}/evidence`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storage_path: path, file_type: fileType, evidence_stage: evidenceStage }),
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  }, [bookingId, userId, evidenceStage])
+
   const submit = async () => {
     if (uploads.length === 0) return
     setSubmitting(true)
-    await new Promise((r) => setTimeout(r, 1200))
+
+    const results = await Promise.all(
+      uploads.map(async (upload, i) => {
+        if (upload.status === 'done') return true
+        const ok = await uploadOne(upload, i)
+        return ok
+      })
+    )
+
+    setUploads((prev) => prev.map((u, i) => (results[i] ? { ...u, status: 'done' } : { ...u, status: 'error', error: t('uploadFailedOne') })))
     setSubmitting(false)
-    setSubmitted(true)
-    toast.success(t('uploadedToast', { stage: isPre ? t('preRental') : t('postRental') }))
-    setTimeout(() => router.push(backHref), 1800)
+
+    const allSucceeded = results.every(Boolean)
+    if (allSucceeded) {
+      setSubmitted(true)
+      toast.success(t('uploadedToast', { stage: isPre ? t('preRental') : t('postRental') }))
+      setTimeout(() => router.push(backHref), 1800)
+    } else {
+      toast.error(t('uploadFailedSome'))
+    }
   }
+
+  const successCount = uploads.filter((u) => u.status === 'done').length
 
   if (submitted) {
     return (
@@ -126,12 +190,13 @@ export function MediaUpload({ bookingId, stage, listingTitle, backHref }: MediaU
         <input
           ref={inputRef}
           type="file"
-          accept="image/*,video/mp4"
+          accept={ALLOWED_BOOKING_EVIDENCE_MIME_TYPES.join(',')}
           multiple
           className="hidden"
           onChange={(e) => addFiles(e.target.files)}
         />
       </div>
+      <p className="text-[11px] text-[#9B8B85] mb-4">{t('sizeLimitHint', { mb: MAX_BOOKING_EVIDENCE_SIZE_BYTES / 1024 / 1024 })}</p>
 
       {/* Preview grid */}
       {uploads.length > 0 && (
@@ -154,16 +219,31 @@ export function MediaUpload({ bookingId, stage, listingTitle, backHref }: MediaU
                 <div className="absolute bottom-0 left-0 right-0 bg-[#1A0A0A]/70 text-white text-[9px] px-1.5 py-1 flex items-center gap-1">
                   <Clock size={8} /> {u.timestamp}
                 </div>
+                {u.status === 'error' && (
+                  <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-red-600/90 text-white text-[9px] px-1.5 py-0.5 rounded-full">
+                    <AlertCircle size={9} /> {t('uploadFailedOne')}
+                  </div>
+                )}
+                {u.status === 'done' && (
+                  <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-green-600/90 text-white text-[9px] px-1.5 py-0.5 rounded-full">
+                    <CheckCircle size={9} />
+                  </div>
+                )}
                 {/* Remove */}
-                <button
-                  onClick={() => remove(i)}
-                  className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-[#1A0A0A]/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X size={11} />
-                </button>
+                {u.status !== 'done' && (
+                  <button
+                    onClick={() => remove(i)}
+                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-[#1A0A0A]/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X size={11} />
+                  </button>
+                )}
               </div>
             ))}
           </div>
+          {successCount > 0 && successCount < uploads.length && (
+            <p className="text-xs text-[#8B1A1A] mt-2">{t('partialSuccess', { done: successCount, total: uploads.length })}</p>
+          )}
         </div>
       )}
 
@@ -177,7 +257,7 @@ export function MediaUpload({ bookingId, stage, listingTitle, backHref }: MediaU
         </button>
         <button
           onClick={submit}
-          disabled={uploads.length === 0 || submitting}
+          disabled={uploads.length === 0 || submitting || uploads.every((u) => u.status === 'done')}
           className="flex-[2] py-3 bg-[#8B1A1A] text-white font-semibold rounded-xl hover:bg-[#7A1616] disabled:opacity-40 transition-colors flex items-center justify-center gap-2 text-sm"
         >
           {submitting ? (

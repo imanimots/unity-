@@ -106,6 +106,16 @@ export interface AdminDisputeDetail {
   dispute: Record<string, unknown>
   history: Record<string, unknown>[]
   evidence: Record<string, unknown>[]
+  /**
+   * P6-HANDOVER-EVIDENCE-AND-TRUST-GATES-I: when this dispute is tied
+   * to a booking, the booking's own real pre-handover/post-return
+   * condition evidence -- a DISTINCT evidence class from dispute_evidence
+   * (the allegation-side record a party submits once a dispute is
+   * already open), never merged with it. Empty for an order/barter
+   * dispute, since booking_condition_evidence only exists for ordinary
+   * rental bookings.
+   */
+  bookingConditionEvidence: Record<string, unknown>[]
 }
 
 export async function getAdminDisputeDetail(admin: SupabaseClient, disputeId: string): Promise<AdminDisputeDetail | null> {
@@ -117,5 +127,16 @@ export async function getAdminDisputeDetail(admin: SupabaseClient, disputeId: st
     admin.from('dispute_evidence').select('*').eq('dispute_id', disputeId).order('created_at', { ascending: true }),
   ])
 
-  return { dispute, history: history ?? [], evidence: evidence ?? [] }
+  let bookingConditionEvidence: Record<string, unknown>[] = []
+  if (dispute.booking_id) {
+    const { data } = await admin
+      .from('booking_condition_evidence')
+      .select('*')
+      .eq('booking_id', dispute.booking_id)
+      .order('evidence_stage', { ascending: true })
+      .order('created_at', { ascending: true })
+    bookingConditionEvidence = data ?? []
+  }
+
+  return { dispute, history: history ?? [], evidence: evidence ?? [], bookingConditionEvidence }
 }

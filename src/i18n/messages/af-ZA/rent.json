@@ -203,7 +203,14 @@
     "submitMedia": "Dien media in",
     "uploadedHeading": "Media opgelaai!",
     "uploadedDesc": "{count, plural, one {# lêer} other {# lêers}} tydgemerk en veilig gestoor. Herlei tans…",
-    "uploadedToast": "{stage} foto's opgelaai en tydgemerk."
+    "uploadedToast": "{stage} foto's opgelaai en tydgemerk.",
+    "sizeLimitHint": "Tot {mb}MB per lêer",
+    "uploadFailedOne": "Oplaai het misluk",
+    "uploadFailedSome": "Sommige lêers kon nie opgelaai word nie — probeer asseblief weer",
+    "partialSuccess": "{done} van {total} lêers opgelaai",
+    "viewEvidence": "Bekyk",
+    "couldNotAccessEvidence": "Kon hierdie lêer nie open nie — probeer asseblief weer",
+    "noEvidenceYet": "Geen toestandbewys is nog vir hierdie bespreking ingedien nie."
   },
   "dispute": {
     "raiseDispute": "Lê 'n geskil",

@@ -36,11 +36,15 @@ describe('page coverage manifest', () => {
   })
 
   it('4. current real coverage documented as ground truth (update when genuinely changed, not to force this to pass)', () => {
+    // P6-HANDOVER-EVIDENCE-AND-TRUST-GATES-I added one genuinely new,
+    // fully wired page: (dashboard)/dashboard/merchant/bookings/[id]/media/page.tsx
+    // (the merchant-side counterpart to the already-wired renter media
+    // page, which did not exist before this phase).
     const s = summarizePageCoverage()
-    expect(s.total).toBe(68)
-    expect(s.wired).toBe(56)
+    expect(s.total).toBe(69)
+    expect(s.wired).toBe(57)
     expect(s.sharedLayout).toBe(12)
-    expect(s.localizedTotal).toBe(68)
+    expect(s.localizedTotal).toBe(69)
   })
 
   it('5. page localization is genuinely, truthfully complete: zero unwired entries remain', () => {

@@ -203,7 +203,14 @@
     "submitMedia": "Thumela imidiya",
     "uploadedHeading": "Imidiya ilayishiwe!",
     "uploadedDesc": "{count, plural, one {# ifayela} other {# amafayela}} kufakwe isikhathi futhi kugcinwe ngokuphepha. Kuqondiswa kabusha…",
-    "uploadedToast": "Izithombe ze-{stage} zilayishiwe futhi zifakwe isikhathi."
+    "uploadedToast": "Izithombe ze-{stage} zilayishiwe futhi zifakwe isikhathi.",
+    "sizeLimitHint": "Kufikela ku-{mb}MB ngefayela",
+    "uploadFailedOne": "Ukulayisha kwehlulekile",
+    "uploadFailedSome": "Amanye amafayela awakwazi ukulayishwa — sicela uzame futhi",
+    "partialSuccess": "{done} kwe-{total} amafayela alayishiwe",
+    "viewEvidence": "Buka",
+    "couldNotAccessEvidence": "Ayikwazi ukuvula leli fayela — sicela uzame futhi",
+    "noEvidenceYet": "Abukho ubufakazi besimo obuthunyelwe kulokhu kubhukha okwamanje."
   },
   "dispute": {
     "raiseDispute": "Phakamisa ukuphikisana",

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
-import { MediaUpload } from '@/components/trust/media-upload'
-import { IS_MOCK_MODE, MOCK_RENTER_BOOKINGS } from '@/lib/mock/data'
+import { getRequestProfile } from '@/lib/supabase/require-admin'
+import { loadBookingConditionEvidencePageData } from '@/lib/bookings/condition-evidence-page-data'
+import { ConditionEvidencePanel } from '@/components/trust/condition-evidence-panel'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -8,26 +9,37 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps) {
   const { id } = await params
-  return { title: `Upload Media — Booking ${id.slice(-6).toUpperCase()} — Unity` }
+  return { title: `Condition Evidence — Booking ${id.slice(-6).toUpperCase()} — Unity` }
 }
 
+/**
+ * Real, durable condition-evidence page for the renter side of an
+ * ordinary rental booking (P6-HANDOVER-EVIDENCE-AND-TRUST-GATES-I --
+ * replaces the prior NEXT_PUBLIC_MOCK_MODE-only fake stub). Loaded via
+ * loadBookingConditionEvidencePageData(), which is RLS-gated to the
+ * authenticated caller's own session -- a non-participant gets exactly
+ * the same 404 as a nonexistent booking, never a leaked existence
+ * signal.
+ */
 export default async function MediaPage({ params }: PageProps) {
   const { id } = await params
-  const booking = IS_MOCK_MODE ? MOCK_RENTER_BOOKINGS.find((b) => b.id === id) : null
-  if (!booking) notFound()
-  // Reachable only when NEXT_PUBLIC_MOCK_MODE=true (currently unset in
-  // production/staging) -- localized regardless, since this is real
-  // shipped code, not a stub.
+  const requester = await getRequestProfile()
+  if (!requester) notFound()
 
-  const stage = (booking.status === 'approved' && !booking.pre_rental_media_url) ? 'pre' : 'post'
+  const data = await loadBookingConditionEvidencePageData(id, requester.userId)
+  if (!data || !data.isRenter) notFound()
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] dark:bg-[#0F0A0A]">
-      <MediaUpload
-        bookingId={id}
-        stage={stage}
-        listingTitle={booking.listing.title}
+      <ConditionEvidencePanel
+        bookingId={data.bookingId}
+        userId={requester.userId}
+        listingTitle={data.listingTitle}
         backHref="/dashboard/renter/bookings"
+        preHandoverEvidence={data.preHandoverEvidence}
+        postReturnEvidence={data.postReturnEvidence}
+        canUploadPreHandover={data.canUploadPreHandover}
+        canUploadPostReturn={data.canUploadPostReturn}
       />
     </div>
   )

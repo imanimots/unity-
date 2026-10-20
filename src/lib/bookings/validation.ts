@@ -33,8 +33,18 @@ export const bookingActionSchema = z.object({
   idempotency_key: idempotencyKeySchema.optional(),
 })
 
+export const bookingConditionEvidenceRegisterSchema = z.object({
+  storage_path: z.string().trim().min(1).max(500),
+  file_type: z.enum(['image', 'video'] as const),
+  evidence_stage: z.enum(['pre_handover', 'post_return'] as const),
+  caption: z.string().trim().max(500).optional(),
+  display_order: z.number().int().min(0).optional(),
+  idempotency_key: idempotencyKeySchema.optional(),
+})
+
 export type CreateBookingRequest = z.infer<typeof createBookingRequestSchema>
 export type AcceptBookingRequest = z.infer<typeof acceptBookingSchema>
 export type RejectBookingRequest = z.infer<typeof rejectBookingSchema>
 export type CancelBookingRequest = z.infer<typeof cancelBookingSchema>
 export type BookingActionRequest = z.infer<typeof bookingActionSchema>
+export type BookingConditionEvidenceRegisterRequest = z.infer<typeof bookingConditionEvidenceRegisterSchema>

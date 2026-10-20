@@ -83,6 +83,7 @@ export const PAGE_COVERAGE_MANIFEST: PageCoverageEntry[] = [
   { path: '(dashboard)/dashboard/merchant/tools/page.tsx', status: 'wired' },
   { path: '(dashboard)/dashboard/merchant/affiliates/page.tsx', status: 'wired' },
   { path: '(dashboard)/dashboard/merchant/bookings/[id]/dispute/page.tsx', status: 'wired' },
+  { path: '(dashboard)/dashboard/merchant/bookings/[id]/media/page.tsx', status: 'wired' },
   { path: '(dashboard)/dashboard/merchant/bookings/[id]/review/page.tsx', status: 'wired' },
   { path: '(dashboard)/dashboard/merchant/bookings/page.tsx', status: 'wired' },
   { path: '(dashboard)/dashboard/merchant/listings/[id]/rent-to-buy/page.tsx', status: 'wired' },

@@ -47,6 +47,11 @@ export function computeBookingIdOnlyHash(bookingId: string): string {
   return md5(bookingId)
 }
 
+/** Mirrors computeRegisterRentToBuyEvidenceHash's exact formula shape (src/lib/rent-to-buy/idempotency.ts). */
+export function computeRegisterBookingConditionEvidenceHash(bookingId: string, storagePath: string, fileType: string, evidenceStage: string): string {
+  return md5(`${bookingId}|${storagePath}|${fileType}|${evidenceStage}`)
+}
+
 export type ReplayCheckResult =
   | { status: 'none' }
   | { status: 'replay'; result: unknown }

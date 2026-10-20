@@ -203,7 +203,14 @@
     "submitMedia": "Submit media",
     "uploadedHeading": "Media uploaded!",
     "uploadedDesc": "{count, plural, one {# file} other {# files}} timestamped and stored securely. Redirecting…",
-    "uploadedToast": "{stage} photos uploaded and timestamped."
+    "uploadedToast": "{stage} photos uploaded and timestamped.",
+    "sizeLimitHint": "Up to {mb}MB per file",
+    "uploadFailedOne": "Upload failed",
+    "uploadFailedSome": "Some files could not be uploaded — please try again",
+    "partialSuccess": "{done} of {total} files uploaded",
+    "viewEvidence": "View",
+    "couldNotAccessEvidence": "Could not open this file — please try again",
+    "noEvidenceYet": "No condition evidence has been submitted for this booking yet."
   },
   "dispute": {
     "raiseDispute": "Raise a dispute",
