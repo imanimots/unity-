@@ -8,7 +8,7 @@ import {
   Sun, Moon, Menu, X, Home, Search,
   MessageCircle, User, ChevronDown, LogOut,
   Package, Calendar, ExternalLink, Link2,
-  ShoppingBag, Store, Repeat, AlertTriangle, Sparkles, Wallet,
+  ShoppingBag, Store, Repeat, AlertTriangle, Sparkles, Wallet, ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { CountrySelector } from '@/components/shared/country-selector'
@@ -159,6 +159,10 @@ export function Navbar({ personalizationEnabled = false, rentToBuyEnabled = fals
                           <ExternalLink size={14} className="text-[#9B8B85]" /> {t('ambassadorProgram')}
                         </a>
                       )}
+                      <Link href="/dashboard/privacy" onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                        <ShieldCheck size={14} className="text-[#9B8B85]" /> {t('privacy')}
+                      </Link>
                       <div className="border-t border-[#F2EDE8] dark:border-[#2A1A1A] mt-1 pt-1">
                         <button onClick={() => { setProfileOpen(false); signOut() }}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">

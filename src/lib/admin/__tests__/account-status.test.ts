@@ -39,4 +39,26 @@ describe('account-status: restricted behavior (category: Users)', () => {
     expect(body.error).toMatch(/suspended/i)
     expect(body.error).not.toMatch(/profiles|sql|database/i)
   })
+  it('11. erased blocks creation (category: P6-POPIA-ERASURE-AND-ANONYMIZATION-I)', () => {
+    expect(blocksCreation('erased')).toBe(true)
+  })
+  it('12. erased blocks new transactions', () => {
+    expect(blocksNewTransactions('erased')).toBe(true)
+  })
+  it('13. blockIfCannotCreate returns a 403 for an erased profile', () => {
+    const res = blockIfCannotCreate({ account_status: 'erased' })
+    expect(res).not.toBeNull()
+    expect(res?.status).toBe(403)
+  })
+  it('14. blockIfCannotTransact returns a 403 for an erased profile', () => {
+    const res = blockIfCannotTransact({ account_status: 'erased' })
+    expect(res).not.toBeNull()
+    expect(res?.status).toBe(403)
+  })
+  it('15. erased error response is distinct from the suspended/restricted message and never leaks internal state', async () => {
+    const res = accountStatusErrorResponse('erased')
+    const body = await res.json()
+    expect(body.error).toMatch(/erased/i)
+    expect(body.error).not.toMatch(/profiles|sql|database/i)
+  })
 })

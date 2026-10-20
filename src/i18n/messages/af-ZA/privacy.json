@@ -1,0 +1,21 @@
+{
+  "erasure": {
+    "heading": "Privaatheid & rekeninguitwissing",
+    "description": "Jy kan aanvra dat jou persoonlike inligting uitgewis word. Jou profiel sal geanonimiseer word, jou aanmelding gedeaktiveer word, en jou persoonlike besonderhede verwyder word — transaksie-, finansiële en wetlike rekords word slegs behou waar nodig, presies soos beskryf in ons Privaatheidsbeleid en POPIA-bladsy.",
+    "warningTitle": "Dit kan nie ontdoen word nie",
+    "warningBody": "Eers uitgewis, kan jou rekening nooit weer na aktief herstel word nie. Jou naam, avatar en kontakbesonderhede sal verwyder word, en jy sal oral afgemeld word.",
+    "confirmLabel": "Tik DELETE om te bevestig",
+    "confirmPlaceholder": "DELETE",
+    "confirmPhrase": "DELETE",
+    "confirmButton": "Wis my rekening uit",
+    "cancelButton": "Kanselleer",
+    "submittingButton": "Wis uit…",
+    "blockedTitle": "Ons kan jou rekening nog nie uitwis nie",
+    "blockedIntro": "Jou rekening het tans:",
+    "blockedOutro": "Los dit asseblief eers op, en probeer dan weer.",
+    "successTitle": "Jou rekening is uitgewis",
+    "successBody": "Jy is oral afgemeld. Dankie dat jy Unity gebruik het.",
+    "errorGeneric": "Iets het verkeerd geloop. Probeer asseblief weer.",
+    "startButton": "Begin rekeninguitwissing"
+  }
+}

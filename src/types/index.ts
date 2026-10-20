@@ -33,7 +33,12 @@ export type ModerationStatus = 'pending' | 'approved' | 'rejected' | 'requires_r
  */
 export type RiskTier = 'low' | 'medium' | 'high'
 
-export type AccountStatus = 'active' | 'restricted' | 'suspended'
+/**
+ * 'erased' is a terminal, one-way state (see
+ * supabase/migrations/20261022000000_account_erasure.sql) -- an erased
+ * account is never restored back to active, unlike restricted/suspended.
+ */
+export type AccountStatus = 'active' | 'restricted' | 'suspended' | 'erased'
 
 /**
  * See docs/BUYING_SELLING.md — 'both' means one listing row carries a

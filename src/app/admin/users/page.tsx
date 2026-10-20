@@ -129,6 +129,33 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function performErase() {
+    if (!selectedId) return
+    if (!window.confirm('This permanently anonymizes this account and cannot be undone. Continue?')) return
+    setActionPending(true)
+    setActionError(null)
+    try {
+      const res = await fetch(`/api/admin/users/${selectedId}/erase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ internal_note: reasonInput || null, idempotency_key: newIdempotencyKey() }),
+      })
+      const b = await res.json().catch(() => ({}))
+      if (res.status === 409 && b.status === 'blocked') {
+        throw new Error(`Cannot erase yet — this account currently has: ${(b.reasons ?? []).join(', ')}`)
+      }
+      if (!res.ok) {
+        throw new Error(b.error ?? 'Action failed')
+      }
+      await loadDetail(selectedId)
+      await load()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Action failed')
+    } finally {
+      setActionPending(false)
+    }
+  }
+
   async function submitNote() {
     if (!selectedId || !noteInput.trim()) return
     setActionPending(true)
@@ -191,6 +218,7 @@ export default function AdminUsersPage() {
           <option value="active">Active</option>
           <option value="restricted">Restricted</option>
           <option value="suspended">Suspended</option>
+          <option value="erased">Erased</option>
         </select>
         <a
           href={`/api/admin/users?format=csv${roleFilter !== 'all' ? `&role=${roleFilter}` : ''}${kycFilter !== 'all' ? `&kyc_status=${kycFilter}` : ''}${statusFilter !== 'all' ? `&account_status=${statusFilter}` : ''}`}
@@ -299,8 +327,13 @@ export default function AdminUsersPage() {
                     {detail.profile.accountStatus !== 'suspended' ? (
                       <button disabled={actionPending} onClick={() => performAction('suspend')} className={primaryButtonClass}>Suspend</button>
                     ) : null}
-                    {detail.profile.accountStatus !== 'active' ? (
+                    {detail.profile.accountStatus !== 'active' && detail.profile.accountStatus !== 'erased' ? (
                       <button disabled={actionPending} onClick={() => performAction('restore')} className={secondaryButtonClass}>Restore to active</button>
+                    ) : null}
+                    {detail.profile.accountStatus !== 'erased' ? (
+                      <button disabled={actionPending} onClick={performErase} className="px-3 py-2 rounded-lg text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition-colors">
+                        Erase account
+                      </button>
                     ) : null}
                   </div>
                 </div>

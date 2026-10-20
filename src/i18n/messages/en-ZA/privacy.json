@@ -1,0 +1,21 @@
+{
+  "erasure": {
+    "heading": "Privacy & account erasure",
+    "description": "You can request that your personal information be erased. Your profile will be anonymized, your login disabled, and your personal details removed — transaction, financial and legal records are retained only where required, exactly as described in our Privacy Policy and POPIA page.",
+    "warningTitle": "This cannot be undone",
+    "warningBody": "Once erased, your account can never be restored to active. Your name, avatar and contact details will be removed, and you will be signed out everywhere.",
+    "confirmLabel": "Type DELETE to confirm",
+    "confirmPlaceholder": "DELETE",
+    "confirmPhrase": "DELETE",
+    "confirmButton": "Erase my account",
+    "cancelButton": "Cancel",
+    "submittingButton": "Erasing…",
+    "blockedTitle": "We can't erase your account yet",
+    "blockedIntro": "Your account currently has:",
+    "blockedOutro": "Please resolve these first, then try again.",
+    "successTitle": "Your account has been erased",
+    "successBody": "You've been signed out. Thank you for using Unity.",
+    "errorGeneric": "Something went wrong. Please try again.",
+    "startButton": "Start account erasure"
+  }
+}

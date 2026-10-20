@@ -92,6 +92,10 @@ export const PAGE_COVERAGE_MANIFEST: PageCoverageEntry[] = [
   { path: '(dashboard)/dashboard/merchant/page.tsx', status: 'wired' },
   { path: '(dashboard)/dashboard/merchant/payouts/page.tsx', status: 'wired' },
   { path: '(dashboard)/dashboard/personalization/page.tsx', status: 'wired' },
+  // P6-POPIA-ERASURE-AND-ANONYMIZATION-I: self-service account erasure --
+  // useTranslations('privacy.erasure') throughout the form, getTranslations
+  // the same way in the server page itself.
+  { path: '(dashboard)/dashboard/privacy/page.tsx', status: 'wired' },
 
   // ---------------- MARKETING (public) ----------------
   // Gap-closure pass: genuinely wired now (common.home dictionary section,

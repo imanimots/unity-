@@ -26,6 +26,7 @@ export const ACCOUNT_STATUS_STYLES: Record<string, string> = {
   active: 'bg-green-100 text-green-700',
   restricted: 'bg-amber-100 text-amber-700',
   suspended: 'bg-red-100 text-red-700',
+  erased: 'bg-gray-200 text-gray-700',
 }
 
 export const SEVERITY_STYLES: Record<string, string> = {

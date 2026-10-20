@@ -1,0 +1,21 @@
+{
+  "erasure": {
+    "heading": "Ubumfihlo & ukususwa kwi-akhawunti",
+    "description": "Ungacela ukuthi ulwazi lwakho lomuntu siqu lususwe. Iphrofayela yakho izosuswa isibonakaliso, ukungena kwakho kuzovinjwa, nemininingwane yakho yomuntu siqu izosuswa — amarekhodi wokuthengiselana, ezezimali nawomthetho agcinwa kuphela lapho kudingeka, ngqo njengoba kuchazwe ku-Inqubomgomo Yethu Yobumfihlo nekhasi le-POPIA.",
+    "warningTitle": "Lokhu akungahlehliswa",
+    "warningBody": "Uma isisuswa, i-akhawunti yakho ayisoze isabuyiselwa ibe sebenzayo. Igama lakho, isithombe sakho nemininingwane yokuxhumana izosuswa, uzophuma kuwonke amawebhu.",
+    "confirmLabel": "Thayipha DELETE ukuqinisekisa",
+    "confirmPlaceholder": "DELETE",
+    "confirmPhrase": "DELETE",
+    "confirmButton": "Susa i-akhawunti yami",
+    "cancelButton": "Khansela",
+    "submittingButton": "Iyasuswa…",
+    "blockedTitle": "Asikakwazi ukususa i-akhawunti yakho",
+    "blockedIntro": "I-akhawunti yakho njengamanje ine:",
+    "blockedOutro": "Sicela uxazulule lezi kuqala, bese uzame futhi.",
+    "successTitle": "I-akhawunti yakho isisusiwe",
+    "successBody": "Ukhishwe kuwonke amawebhu. Siyabonga ngokusebenzisa i-Unity.",
+    "errorGeneric": "Kukhona okungahambile kahle. Sicela uzame futhi.",
+    "startButton": "Qala ukususwa kwe-akhawunti"
+  }
+}

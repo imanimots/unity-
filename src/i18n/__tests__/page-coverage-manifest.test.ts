@@ -40,11 +40,14 @@ describe('page coverage manifest', () => {
     // fully wired page: (dashboard)/dashboard/merchant/bookings/[id]/media/page.tsx
     // (the merchant-side counterpart to the already-wired renter media
     // page, which did not exist before this phase).
+    // P6-POPIA-ERASURE-AND-ANONYMIZATION-I added one more genuinely new,
+    // fully wired page: (dashboard)/dashboard/privacy/page.tsx (self-service
+    // account erasure).
     const s = summarizePageCoverage()
-    expect(s.total).toBe(69)
-    expect(s.wired).toBe(57)
+    expect(s.total).toBe(70)
+    expect(s.wired).toBe(58)
     expect(s.sharedLayout).toBe(12)
-    expect(s.localizedTotal).toBe(69)
+    expect(s.localizedTotal).toBe(70)
   })
 
   it('5. page localization is genuinely, truthfully complete: zero unwired entries remain', () => {

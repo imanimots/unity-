@@ -27,6 +27,7 @@ export const MESSAGE_NAMESPACES = [
   'emails',
   'legal',
   'personalization',
+  'privacy',
 ] as const
 
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number]
