@@ -50,6 +50,7 @@ export default function AdminUsersPage() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [reasonInput, setReasonInput] = useState('')
   const [noteInput, setNoteInput] = useState('')
+  const [cleanupNotice, setCleanupNotice] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -134,6 +135,7 @@ export default function AdminUsersPage() {
     if (!window.confirm('This permanently anonymizes this account and cannot be undone. Continue?')) return
     setActionPending(true)
     setActionError(null)
+    setCleanupNotice(null)
     try {
       const res = await fetch(`/api/admin/users/${selectedId}/erase`, {
         method: 'POST',
@@ -147,10 +149,37 @@ export default function AdminUsersPage() {
       if (!res.ok) {
         throw new Error(b.error ?? 'Action failed')
       }
+      if (b.cleanup_status === 'pending') {
+        setCleanupNotice(`Account erased. Cleanup still pending: ${(b.pending_cleanup ?? []).join(', ')} — retry below.`)
+      } else {
+        setCleanupNotice('Account erased. Cleanup complete.')
+      }
       await loadDetail(selectedId)
       await load()
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Action failed')
+    } finally {
+      setActionPending(false)
+    }
+  }
+
+  async function performRetryCleanup() {
+    if (!selectedId) return
+    setActionPending(true)
+    setActionError(null)
+    try {
+      const res = await fetch(`/api/admin/users/${selectedId}/retry-cleanup`, { method: 'POST' })
+      const b = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(b.error ?? 'Retry failed')
+      }
+      if (b.cleanup_status === 'pending') {
+        setCleanupNotice(`Still pending: ${(b.pending_cleanup ?? []).join(', ')}`)
+      } else {
+        setCleanupNotice('Cleanup complete.')
+      }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Retry failed')
     } finally {
       setActionPending(false)
     }
@@ -257,7 +286,7 @@ export default function AdminUsersPage() {
                     <td className="px-4 py-3"><Pill value={u.accountStatus} styles={ACCOUNT_STATUS_STYLES} /></td>
                     <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{formatDate(u.createdAt)}</td>
                     <td className="px-4 py-3">
-                      <button onClick={() => setSelectedId(u.id)} className={secondaryButtonClass}>View</button>
+                      <button onClick={() => { setCleanupNotice(null); setSelectedId(u.id) }} className={secondaryButtonClass}>View</button>
                     </td>
                   </tr>
                 ))
@@ -310,6 +339,13 @@ export default function AdminUsersPage() {
                 <p className="text-[11px] text-[#9B8B85]">Dispute count: not yet available (no dispute domain exists).</p>
 
                 {actionError ? <p className="text-xs text-red-600">{actionError}</p> : null}
+                {cleanupNotice ? <p className="text-xs text-amber-700 dark:text-amber-400">{cleanupNotice}</p> : null}
+
+                {detail.profile.accountStatus === 'erased' ? (
+                  <button disabled={actionPending} onClick={performRetryCleanup} className={secondaryButtonClass}>
+                    Retry cleanup
+                  </button>
+                ) : null}
 
                 <div className="space-y-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-4">
                   <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85]">Account action</p>

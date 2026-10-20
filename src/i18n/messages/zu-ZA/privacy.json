@@ -15,6 +15,7 @@
     "blockedOutro": "Sicela uxazulule lezi kuqala, bese uzame futhi.",
     "successTitle": "I-akhawunti yakho isisusiwe",
     "successBody": "Ukhishwe kuwonke amawebhu. Siyabonga ngokusebenzisa i-Unity.",
+    "successBodyCleanupPending": "I-akhawunti yakho isisusiwe futhi ivinjelwe ukusetshenziswa kwemakethe. Ukhishwe. Sisaqeda izinyathelo ezimbalwa zokuhlanza ngemuva — lokhu akudingi lutho kuwena.",
     "errorGeneric": "Kukhona okungahambile kahle. Sicela uzame futhi.",
     "startButton": "Qala ukususwa kwe-akhawunti"
   }

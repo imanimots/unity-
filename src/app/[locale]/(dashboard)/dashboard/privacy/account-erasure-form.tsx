@@ -18,6 +18,7 @@ export function AccountErasureForm() {
   const [confirmText, setConfirmText] = useState('')
   const [reasons, setReasons] = useState<string[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [cleanupPending, setCleanupPending] = useState(false)
 
   const confirmPhrase = t('confirmPhrase')
 
@@ -43,6 +44,7 @@ export function AccountErasureForm() {
         return
       }
 
+      setCleanupPending(body.cleanup_status === 'pending')
       setPhase('success')
       setTimeout(() => {
         signOut()
@@ -57,7 +59,9 @@ export function AccountErasureForm() {
     return (
       <div className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] p-6 space-y-2">
         <h2 className="text-lg font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('successTitle')}</h2>
-        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">{t('successBody')}</p>
+        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">
+          {cleanupPending ? t('successBodyCleanupPending') : t('successBody')}
+        </p>
       </div>
     )
   }

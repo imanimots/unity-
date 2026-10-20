@@ -55,7 +55,7 @@ export interface PublicProfileCore {
 
 export type PublicProfileResult =
   | { status: 'not_found' }
-  /** account_status = 'suspended' -- a neutral unavailable state, no private/marketplace data included. */
+  /** account_status = 'suspended' OR 'erased' -- a neutral unavailable/tombstoned state, no private/marketplace data included. */
   | { status: 'unavailable' }
   | { status: 'ok'; profile: PublicProfileCore }
 
@@ -127,7 +127,11 @@ export async function getPublicProfile(id: string): Promise<PublicProfileResult>
   }
 
   if (!row) return { status: 'not_found' }
-  if (row.account_status === 'suspended') return { status: 'unavailable' }
+  // 'erased' (P6-POPIA-ERASURE-AND-ANONYMIZATION-F1): an erased account's
+  // public profile must tombstone the same way a suspended one does --
+  // never render as an ordinary live profile, even though the underlying
+  // fields are already anonymized.
+  if (row.account_status === 'suspended' || row.account_status === 'erased') return { status: 'unavailable' }
 
   const [reviewAggregate, completedTransactionCount, entitlements] = await Promise.all([
     getPublicReviewAggregate(supabase, id),

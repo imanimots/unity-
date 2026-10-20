@@ -15,6 +15,7 @@
     "blockedOutro": "Los dit asseblief eers op, en probeer dan weer.",
     "successTitle": "Jou rekening is uitgewis",
     "successBody": "Jy is oral afgemeld. Dankie dat jy Unity gebruik het.",
+    "successBodyCleanupPending": "Jou rekening is uitgewis en gedeaktiveer vir marksgebruik. Jy is afgemeld. Ons voltooi nog 'n paar agtergrond-skoonmaakstappe — dit vereis geen aksie van jou nie.",
     "errorGeneric": "Iets het verkeerd geloop. Probeer asseblief weer.",
     "startButton": "Begin rekeninguitwissing"
   }

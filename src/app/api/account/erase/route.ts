@@ -57,7 +57,11 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  await runPostErasureCleanup(admin, requester.userId)
+  const cleanup = await runPostErasureCleanup(admin, requester.userId)
 
-  return NextResponse.json({ status: 'erased' })
+  return NextResponse.json({
+    status: 'erased',
+    cleanup_status: cleanup.complete ? 'complete' : 'pending',
+    ...(cleanup.complete ? {} : { pending_cleanup: cleanup.pending }),
+  })
 }

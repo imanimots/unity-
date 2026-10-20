@@ -15,6 +15,7 @@
     "blockedOutro": "Please resolve these first, then try again.",
     "successTitle": "Your account has been erased",
     "successBody": "You've been signed out. Thank you for using Unity.",
+    "successBodyCleanupPending": "Your account is erased and disabled for marketplace use. You've been signed out. We're still finishing a few background cleanup steps — this needs no action from you.",
     "errorGeneric": "Something went wrong. Please try again.",
     "startButton": "Start account erasure"
   }

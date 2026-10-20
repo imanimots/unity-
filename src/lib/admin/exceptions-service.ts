@@ -348,6 +348,19 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
   // visible even after the triggering event was correctly marked
   // processed (retrying it could never have resolved a permanent
   // condition anyway).
+  // P6-POPIA-ERASURE-AND-ANONYMIZATION-F1: an erased account whose
+  // post-erasure external cleanup (auth ban / avatar / KYC document
+  // storage deletion) hasn't fully completed -- see
+  // src/lib/privacy/account-erasure.ts. Unlike every other category
+  // above, this is never time-thresholded -- a single incomplete
+  // category is durably actionable the moment it's recorded, since an
+  // orphaned KYC file is privacy-sensitive regardless of how recently
+  // the attempt was made.
+  const waveErasureCleanupP = admin
+    .from('account_erasure_cleanup')
+    .select('user_id, auth_ban_complete, avatar_cleanup_complete, kyc_cleanup_complete, attempt_count, last_attempt_at')
+    .or('auth_ban_complete.eq.false,avatar_cleanup_complete.eq.false,kyc_cleanup_complete.eq.false')
+
   const waveRtbP = Promise.all([
     admin.from('payments').select('id, rent_to_buy_agreement_id, amount, metadata').eq('payment_type', 'rent_to_buy_installment').eq('status', 'captured'),
     admin.from('rent_to_buy_installments').select('agreement_id, sequence, principal_amount, status, payment_id'),
@@ -1399,6 +1412,26 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
       detectedAt: now,
       suggestedAction: `Manually investigate payment ${payment.id}`,
       resolved: isResolved('rtb_deposit_captured_unfunded', 'payment', payment.id),
+    })
+  }
+
+  const { data: pendingErasureCleanup } = await waveErasureCleanupP
+
+  for (const row of pendingErasureCleanup ?? []) {
+    const categories: string[] = []
+    if (!row.auth_ban_complete) categories.push('auth identity ban')
+    if (!row.avatar_cleanup_complete) categories.push('avatar storage')
+    if (!row.kyc_cleanup_complete) categories.push('KYC document storage')
+    exceptions.push({
+      id: exceptionId('privacy_cleanup_pending', row.user_id),
+      type: 'privacy_cleanup_pending',
+      severity: 'high',
+      entityType: 'user',
+      entityId: row.user_id,
+      summary: `Account erasure cleanup still pending: ${categories.join(', ')} (${row.attempt_count} attempt${row.attempt_count === 1 ? '' : 's'} so far)`,
+      detectedAt: row.last_attempt_at ?? now,
+      suggestedAction: `Retry cleanup at /admin/users (select the user and retry) -- never requires re-running erasure itself`,
+      resolved: isResolved('privacy_cleanup_pending', 'user', row.user_id),
     })
   }
 

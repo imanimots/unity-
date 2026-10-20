@@ -49,7 +49,7 @@ beforeEach(() => {
   getRequestProfile.mockReset().mockResolvedValue({ userId: USER_ID, profile: {} })
   getAdminServiceClient.mockReset().mockResolvedValue(FAKE_ADMIN_CLIENT)
   eraseAccount.mockReset().mockResolvedValue({ data: { blocked: false, already_erased: false }, error: null })
-  runPostErasureCleanup.mockReset().mockResolvedValue(undefined)
+  runPostErasureCleanup.mockReset().mockResolvedValue({ complete: true, pending: [] })
 })
 
 describe('POST /api/account/erase (category: P6-POPIA-ERASURE-AND-ANONYMIZATION-I)', () => {
@@ -106,5 +106,22 @@ describe('POST /api/account/erase (category: P6-POPIA-ERASURE-AND-ANONYMIZATION-
     getAdminServiceClient.mockResolvedValue(null)
     const res = await POST(req({}))
     expect(res.status).toBe(503)
+  })
+
+  it('9. complete cleanup is reported accurately', async () => {
+    runPostErasureCleanup.mockResolvedValue({ complete: true, pending: [] })
+    const res = await POST(req({}))
+    const body = await res.json()
+    expect(body).toEqual({ status: 'erased', cleanup_status: 'complete' })
+  })
+
+  it('10. partial cleanup is reported as pending, with the safe category list, never claimed as total success (P2 finding A)', async () => {
+    runPostErasureCleanup.mockResolvedValue({ complete: false, pending: ['auth_identity_ban'] })
+    const res = await POST(req({}))
+    const body = await res.json()
+    expect(res.status).toBe(200)
+    expect(body.status).toBe('erased')
+    expect(body.cleanup_status).toBe('pending')
+    expect(body.pending_cleanup).toEqual(['auth_identity_ban'])
   })
 })

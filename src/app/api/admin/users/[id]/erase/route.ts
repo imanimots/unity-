@@ -59,11 +59,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     )
   }
 
-  await runPostErasureCleanup(admin, userId)
+  const cleanup = await runPostErasureCleanup(admin, userId)
 
   if (parsed.data.internal_note) {
     await addAdminNote(admin, 'user', userId, gate.requester.userId, parsed.data.internal_note, undefined)
   }
 
-  return NextResponse.json({ status: 'erased' })
+  return NextResponse.json({
+    status: 'erased',
+    cleanup_status: cleanup.complete ? 'complete' : 'pending',
+    ...(cleanup.complete ? {} : { pending_cleanup: cleanup.pending }),
+  })
 }

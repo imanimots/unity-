@@ -56,7 +56,7 @@ beforeEach(() => {
   requireAdminForRoute.mockReset().mockResolvedValue({ ok: true, requester: { userId: ADMIN_ID, profile: {} } })
   getAdminServiceClient.mockReset().mockResolvedValue(FAKE_ADMIN_CLIENT)
   eraseAccount.mockReset().mockResolvedValue({ data: { blocked: false, already_erased: false }, error: null })
-  runPostErasureCleanup.mockReset().mockResolvedValue(undefined)
+  runPostErasureCleanup.mockReset().mockResolvedValue({ complete: true, pending: [] })
   addAdminNote.mockReset().mockResolvedValue({ data: {}, error: null })
 })
 
@@ -110,5 +110,15 @@ describe('POST /api/admin/users/[id]/erase (category: P6-POPIA-ERASURE-AND-ANONY
     getAdminServiceClient.mockResolvedValue(null)
     const res = await call({})
     expect(res.status).toBe(503)
+  })
+
+  it('9. partial cleanup is reported as pending, never claimed as total success (P2 finding A)', async () => {
+    runPostErasureCleanup.mockResolvedValue({ complete: false, pending: ['kyc_document_cleanup'] })
+    const res = await call({})
+    const body = await res.json()
+    expect(res.status).toBe(200)
+    expect(body.status).toBe('erased')
+    expect(body.cleanup_status).toBe('pending')
+    expect(body.pending_cleanup).toEqual(['kyc_document_cleanup'])
   })
 })

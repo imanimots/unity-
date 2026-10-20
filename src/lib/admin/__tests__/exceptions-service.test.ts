@@ -197,11 +197,12 @@ describe('durability -- classification depends only on persisted payment/install
  * the same function resolves to an empty array unconditionally, which is
  * exactly the inert state we want for all of them in this test.
  */
-function createFakeExceptionsAdmin(fixtures: { affiliate_commissions?: Row[]; email_deliveries?: Row[]; exception_resolutions?: Row[] } = {}) {
+function createFakeExceptionsAdmin(fixtures: { affiliate_commissions?: Row[]; email_deliveries?: Row[]; exception_resolutions?: Row[]; account_erasure_cleanup?: Row[] } = {}) {
   const tables: Record<string, Row[]> = {
     affiliate_commissions: fixtures.affiliate_commissions ?? [],
     email_deliveries: fixtures.email_deliveries ?? [],
     exception_resolutions: fixtures.exception_resolutions ?? [],
+    account_erasure_cleanup: fixtures.account_erasure_cleanup ?? [],
   }
   const mutationCalls: Array<{ method: string; table: string }> = []
 
@@ -517,5 +518,75 @@ describe('listOperationalExceptions -- stale pending email delivery detection (c
     const matches = exceptions.filter((e) => e.type === 'email_delivery_stale_pending')
     expect(matches).toHaveLength(2)
     expect(matches.map((m) => m.entityId).sort()).toEqual(['email-expired', 'email-reminder'])
+  })
+})
+
+/**
+ * P6-POPIA-ERASURE-AND-ANONYMIZATION-F1: durable operator visibility for
+ * incomplete post-erasure external cleanup (P2 findings A/B). Reuses the
+ * existing operational-exceptions surface rather than a new dashboard --
+ * these tests prove the row is surfaced with a safe, generic summary (no
+ * erased PII) and the correct entity reference for an admin to act on.
+ */
+describe('listOperationalExceptions -- account erasure cleanup pending (category: P6-POPIA-ERASURE-AND-ANONYMIZATION-F1)', () => {
+  it('39. an incomplete cleanup row is surfaced as privacy_cleanup_pending', async () => {
+    const { admin } = createFakeExceptionsAdmin({
+      account_erasure_cleanup: [
+        { user_id: 'user-erased-1', auth_ban_complete: false, avatar_cleanup_complete: true, kyc_cleanup_complete: true, attempt_count: 1, last_attempt_at: hoursAgoIso(2) },
+      ],
+    })
+    const exceptions = await listOperationalExceptions(admin)
+    const found = exceptions.find((e) => e.type === 'privacy_cleanup_pending')
+    expect(found).toBeDefined()
+    expect(found?.entityType).toBe('user')
+    expect(found?.entityId).toBe('user-erased-1')
+    expect(found?.severity).toBe('high')
+    expect(found?.resolved).toBe(false)
+  })
+
+  it('40. the summary names only safe, generic categories -- never a storage path, provider error, or any PII', async () => {
+    const { admin } = createFakeExceptionsAdmin({
+      account_erasure_cleanup: [
+        { user_id: 'user-erased-2', auth_ban_complete: false, avatar_cleanup_complete: false, kyc_cleanup_complete: true, attempt_count: 3, last_attempt_at: hoursAgoIso(1) },
+      ],
+    })
+    const exceptions = await listOperationalExceptions(admin)
+    const found = exceptions.find((e) => e.type === 'privacy_cleanup_pending')
+    expect(found?.summary).toMatch(/auth identity ban/)
+    expect(found?.summary).toMatch(/avatar storage/)
+    expect(found?.summary).not.toMatch(/KYC document storage/)
+    expect(found?.summary).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}|bucket|kyc-documents\/|avatars\//i)
+  })
+
+  it('41. multiple incomplete-cleanup accounts are each surfaced independently', async () => {
+    const { admin } = createFakeExceptionsAdmin({
+      account_erasure_cleanup: [
+        { user_id: 'user-erased-3', auth_ban_complete: false, avatar_cleanup_complete: true, kyc_cleanup_complete: true, attempt_count: 1, last_attempt_at: hoursAgoIso(1) },
+        { user_id: 'user-erased-4', auth_ban_complete: true, avatar_cleanup_complete: true, kyc_cleanup_complete: false, attempt_count: 2, last_attempt_at: hoursAgoIso(1) },
+      ],
+    })
+    const exceptions = await listOperationalExceptions(admin)
+    const matches = exceptions.filter((e) => e.type === 'privacy_cleanup_pending')
+    expect(matches).toHaveLength(2)
+    expect(matches.map((m) => m.entityId).sort()).toEqual(['user-erased-3', 'user-erased-4'])
+  })
+
+  it('42. an admin-acknowledged pending cleanup is reported as resolved without the underlying row being touched', async () => {
+    const { admin, mutationCalls } = createFakeExceptionsAdmin({
+      account_erasure_cleanup: [
+        { user_id: 'user-erased-5', auth_ban_complete: false, avatar_cleanup_complete: true, kyc_cleanup_complete: true, attempt_count: 1, last_attempt_at: hoursAgoIso(1) },
+      ],
+      exception_resolutions: [{ exception_type: 'privacy_cleanup_pending', entity_type: 'user', entity_id: 'user-erased-5' }],
+    })
+    const exceptions = await listOperationalExceptions(admin)
+    const found = exceptions.find((e) => e.type === 'privacy_cleanup_pending')
+    expect(found?.resolved).toBe(true)
+    expect(mutationCalls).toEqual([])
+  })
+
+  it('43. no incomplete-cleanup rows means no privacy_cleanup_pending exception at all', async () => {
+    const { admin } = createFakeExceptionsAdmin({})
+    const exceptions = await listOperationalExceptions(admin)
+    expect(exceptions.find((e) => e.type === 'privacy_cleanup_pending')).toBeUndefined()
   })
 })
