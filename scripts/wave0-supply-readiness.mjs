@@ -65,11 +65,14 @@ function reportProjectIdentity(url) {
   console.log(`Connected project ref: ${ref}`)
 
   if (!qaRef) {
-    console.log('WARNING: QA_SEED_PROJECT_REF is not set in this environment -- cannot even rule out the QA/seed project. Do not label this run "Production" without independent confirmation.')
+    console.log('ENVIRONMENT IDENTITY: NOT INDEPENDENTLY PROVEN')
+    console.log('QA_SEED_PROJECT_REF is not set in this environment -- cannot even rule out the QA/seed project. Do not label this run "Production" without independent confirmation.')
   } else if (ref === qaRef) {
-    console.log('WARNING: this project ref matches QA_SEED_PROJECT_REF. This run is reading the QA/seed project, NOT a confirmed production database. Treat every number below as a QA/seed-environment observation, not real marketplace supply, unless independently proven otherwise.')
+    console.log('ENVIRONMENT IDENTITY: NOT INDEPENDENTLY PROVEN')
+    console.log('This project ref matches QA_SEED_PROJECT_REF. This run is reading the QA/seed project, NOT a confirmed production database. Treat every number below as a QA/seed-environment observation, not real marketplace supply, unless independently proven otherwise.')
   } else {
-    console.log('This project ref does NOT match QA_SEED_PROJECT_REF. It may be production, but this script has no independent way to confirm that -- it only knows it is not the known QA/seed project.')
+    console.log('ENVIRONMENT IDENTITY: NOT INDEPENDENTLY PROVEN')
+    console.log('This project ref does NOT match QA_SEED_PROJECT_REF, so it is not the known QA/seed project -- but this script has no independent, positive way to confirm it is Production either. Counts below are reported as-is, never labeled Production.')
   }
   console.log('')
 }
