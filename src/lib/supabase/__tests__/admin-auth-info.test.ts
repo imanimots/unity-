@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { getAdminAuthInfo } from '../admin-auth-info'
+import { getAdminAuthInfo, getAdminAuthInfoRespectingErasure } from '../admin-auth-info'
 
 const USER_ID = '11111111-1111-1111-1111-111111111111'
 
@@ -35,6 +35,7 @@ describe('admin-auth-info: getAdminAuthInfo (category: ADMIN-CONTROL-CENTRE-BATC
     const info = await getAdminAuthInfo(fakeAdminClient(getUserById), USER_ID)
     expect(info).toEqual({
       authUserExists: true,
+      erased: false,
       email: 'test@example.com',
       emailConfirmedAt: '2026-01-01T00:00:00Z',
       phone: '+27820000000',
@@ -78,5 +79,69 @@ describe('admin-auth-info: getAdminAuthInfo (category: ADMIN-CONTROL-CENTRE-BATC
     const info = await getAdminAuthInfo(fakeAdminClient(getUserById), USER_ID)
     expect(info).not.toHaveProperty('failedLoginAttempts')
     expect(info).not.toHaveProperty('activeSessionList')
+  })
+})
+
+/**
+ * ADMIN-CONTROL-CENTRE-BATCH-A1-P1-REMEDIATION regression suite.
+ * getUserById is mocked to return the ORIGINAL pre-erasure email/phone in
+ * every case below -- exactly the scenario that leaked before this fix --
+ * so these tests fail loudly if the erasure gate is ever removed or
+ * bypassed, not just when the mock happens to omit the fields.
+ */
+describe('admin-auth-info: getAdminAuthInfoRespectingErasure (category: ADMIN-CONTROL-CENTRE-BATCH-A1-P1-REMEDIATION)', () => {
+  const ORIGINAL_EMAIL = 'original-before-erasure@example.com'
+  const ORIGINAL_PHONE = '+27821234567'
+
+  function fakeClientWithOriginalPii() {
+    const getUserById = vi.fn().mockResolvedValue({
+      data: {
+        user: {
+          id: USER_ID,
+          email: ORIGINAL_EMAIL,
+          phone: ORIGINAL_PHONE,
+          email_confirmed_at: '2025-01-01T00:00:00Z',
+          phone_confirmed_at: '2025-01-01T00:00:00Z',
+          created_at: '2025-01-01T00:00:00Z',
+        },
+      },
+      error: null,
+    })
+    return { getUserById, admin: fakeAdminClient(getUserById) }
+  }
+
+  it('1. ERASED CUSTOMER: the server-side result contains neither the original email nor phone string anywhere', async () => {
+    const { admin } = fakeClientWithOriginalPii()
+    const info = await getAdminAuthInfoRespectingErasure(admin, USER_ID, true)
+    const serialized = JSON.stringify(info)
+    expect(serialized).not.toContain(ORIGINAL_EMAIL)
+    expect(serialized).not.toContain(ORIGINAL_PHONE)
+    expect(info).toEqual({ authUserExists: true, erased: true })
+  })
+
+  it('2. SERVER-SIDE GUARANTEE: for an erased profile, the Admin Auth API is never even called -- the PII is never fetched, not merely hidden after the fact', async () => {
+    const { admin, getUserById } = fakeClientWithOriginalPii()
+    await getAdminAuthInfoRespectingErasure(admin, USER_ID, true)
+    expect(getUserById).not.toHaveBeenCalled()
+  })
+
+  it('3. ERASED MERCHANT: identical protection -- this function has no merchant/customer distinction at all, so the same guarantee covers both /admin/users/[id] and /admin/merchants/[id] (which call the same route)', async () => {
+    const { admin } = fakeClientWithOriginalPii()
+    const info = await getAdminAuthInfoRespectingErasure(admin, USER_ID, true)
+    expect(info).not.toHaveProperty('email')
+    expect(info).not.toHaveProperty('phone')
+  })
+
+  it('4. ACTIVE USER regression: isErased=false preserves the full, unmodified prior behavior', async () => {
+    const { admin, getUserById } = fakeClientWithOriginalPii()
+    const info = await getAdminAuthInfoRespectingErasure(admin, USER_ID, false)
+    expect(getUserById).toHaveBeenCalledWith(USER_ID)
+    expect(info).toMatchObject({ authUserExists: true, erased: false, email: ORIGINAL_EMAIL, phone: ORIGINAL_PHONE })
+  })
+
+  it('5. AUTH FAILURE for a non-erased user still degrades to null, same as before this fix', async () => {
+    const getUserById = vi.fn().mockResolvedValue({ data: { user: null }, error: { message: 'User not found' } })
+    const info = await getAdminAuthInfoRespectingErasure(fakeAdminClient(getUserById), USER_ID, false)
+    expect(info).toBeNull()
   })
 })

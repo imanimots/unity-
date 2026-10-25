@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface AdminAuthInfo {
   authUserExists: true
+  erased: false
   email: string | null
   emailConfirmedAt: string | null
   phone: string | null
@@ -14,6 +15,17 @@ export interface AdminAuthInfo {
   mfaVerifiedFactorCount: number
   lastRecoveryEmailSentAt: string | null
   lastConfirmationEmailSentAt: string | null
+}
+
+/**
+ * The entire response shape for an erased account's Auth & Access panel.
+ * Deliberately has NO email/phone/user_metadata/identities field at
+ * all -- not nulled, not present -- so there is no field for a future
+ * edit to accidentally repopulate. See getAdminAuthInfoRespectingErasure.
+ */
+export interface ErasedAdminAuthInfo {
+  authUserExists: true
+  erased: true
 }
 
 export const AUTH_FIELD_NOT_AVAILABLE = 'NOT AVAILABLE VIA CURRENT AUTH API' as const
@@ -36,6 +48,16 @@ export const AUTH_FIELD_NOT_AVAILABLE = 'NOT AVAILABLE VIA CURRENT AUTH API' as 
  * attempt count, and a list of currently active sessions. Never
  * fabricate either -- callers must render AUTH_FIELD_NOT_AVAILABLE
  * instead of guessing.
+ *
+ * CALLERS MUST NOT call this function directly for an erased profile --
+ * use getAdminAuthInfoRespectingErasure below, which is the only
+ * entry point that knows about erasure at all. This function has no
+ * way to protect anyone on its own: it is a pure, unconditional mirror
+ * of whatever auth.users currently holds, including email/phone that
+ * account erasure's own disableAuthIdentity() (src/lib/privacy/
+ * account-erasure.ts) deliberately never scrubs -- it only bans the
+ * identity (ban_duration), by design (see that function's own header
+ * comment on why a full session/field wipe isn't attempted there).
  */
 export async function getAdminAuthInfo(admin: SupabaseClient, authUserId: string): Promise<AdminAuthInfo | null> {
   const { data, error } = await admin.auth.admin.getUserById(authUserId)
@@ -46,6 +68,7 @@ export async function getAdminAuthInfo(admin: SupabaseClient, authUserId: string
 
   return {
     authUserExists: true,
+    erased: false,
     email: user.email ?? null,
     emailConfirmedAt: user.email_confirmed_at ?? null,
     phone: user.phone ?? null,
@@ -59,4 +82,28 @@ export async function getAdminAuthInfo(admin: SupabaseClient, authUserId: string
     lastRecoveryEmailSentAt: user.recovery_sent_at ?? null,
     lastConfirmationEmailSentAt: user.confirmation_sent_at ?? null,
   }
+}
+
+/**
+ * ADMIN-CONTROL-CENTRE-BATCH-A1-P1-REMEDIATION: the ONLY entry point the
+ * Customer 360 / Merchant 360 auth-info route should call -- it is the
+ * single place that knows erasure must change this panel's behavior at
+ * all. When `isErased` is true, this deliberately NEVER calls
+ * getAdminAuthInfo / auth.admin.getUserById in the first place ("skip
+ * the Auth PII lookup entirely for erased accounts") -- email, phone,
+ * and every other Auth-provider field are never fetched, never held in
+ * server memory for this request, and therefore structurally cannot
+ * appear in the JSON this route returns. The caller is responsible for
+ * knowing `isErased` from the profile row it already has (this module
+ * has no `profiles` table dependency of its own, by design).
+ */
+export async function getAdminAuthInfoRespectingErasure(
+  admin: SupabaseClient,
+  authUserId: string,
+  isErased: boolean
+): Promise<AdminAuthInfo | ErasedAdminAuthInfo | null> {
+  if (isErased) {
+    return { authUserExists: true, erased: true }
+  }
+  return getAdminAuthInfo(admin, authUserId)
 }

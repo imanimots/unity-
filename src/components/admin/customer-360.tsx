@@ -60,6 +60,7 @@ interface AdminUserDetail {
 
 interface AuthInfo {
   authUserExists: true
+  erased: false
   email: string | null
   emailConfirmedAt: string | null
   phone: string | null
@@ -74,12 +75,24 @@ interface AuthInfo {
   lastConfirmationEmailSentAt: string | null
 }
 
+/**
+ * ADMIN-CONTROL-CENTRE-BATCH-A1-P1-REMEDIATION: the server (GET /api/
+ * admin/users/[id]/auth-info) returns exactly this shape for an erased
+ * profile -- no email/phone/metadata field exists on it at all. This is
+ * read, not computed client-side: the protection is already enforced
+ * before the response ever reaches this component.
+ */
+interface ErasedAuthInfo {
+  authUserExists: true
+  erased: true
+}
+
 const NOT_AVAILABLE = 'NOT AVAILABLE VIA CURRENT AUTH API'
 
 /** One shared implementation for both /admin/users/[id] (Customer 360) and /admin/merchants/[id] (Merchant 360) -- a merchant is the same profile/user record, just with an extra Merchant section (mode='merchant'). Never duplicates the full domain interfaces it links out to (bookings/orders/barter/RTB/disputes/payouts/subscriptions) -- those stay on their own existing pages. */
 export function Customer360({ userId, mode }: { userId: string; mode: 'customer' | 'merchant' }) {
   const [detail, setDetail] = useState<AdminUserDetail | null>(null)
-  const [authInfo, setAuthInfo] = useState<AuthInfo | { authUserExists: false } | null>(null)
+  const [authInfo, setAuthInfo] = useState<AuthInfo | ErasedAuthInfo | { authUserExists: false } | null>(null)
   const [loading, setLoading] = useState(true)
   const [authLoading, setAuthLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -264,6 +277,10 @@ export function Customer360({ userId, mode }: { userId: string; mode: 'customer'
           <p className="text-sm text-[#9B8B85]">Loading…</p>
         ) : !authInfo || authInfo.authUserExists === false ? (
           <p className="text-sm text-red-600">No matching auth user found for this profile id.</p>
+        ) : authInfo.erased ? (
+          <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">
+            This account is erased. Auth & Access details (including email and phone) are not shown for erased accounts — the server never fetches them for an erased profile.
+          </p>
         ) : (
           <>
             <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm">
