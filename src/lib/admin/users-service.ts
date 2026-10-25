@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { countAdminDisputesForUser } from '@/lib/admin/disputes-service'
 
 export interface AdminUserFilters {
   search?: string
@@ -7,6 +8,8 @@ export interface AdminUserFilters {
   accountStatus?: string
   limit?: number
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export interface AdminUserRow {
   id: string
@@ -26,6 +29,19 @@ const DEFAULT_LIMIT = 100
  * those stay behind the dedicated identity-verification review page
  * (src/app/admin/verifications/[id]/page.tsx), which is the only place
  * sensitive document metadata is ever returned to an admin client.
+ *
+ * Search targets: name (full_name/display_name, substring) and phone
+ * (substring) via `profiles` directly, plus an exact user-id match when
+ * the query is itself a UUID. Deliberately does NOT search by email:
+ * `profiles` never stores email (confirmed -- see getAdminUserDetail's
+ * own comment), and Supabase's Admin Auth API (`auth.admin.listUsers`)
+ * takes no email filter parameter at all (confirmed directly from the
+ * installed @supabase/auth-js SDK's own type definitions) -- the only
+ * way to "search by email" would be paging through every auth user and
+ * filtering client-side, which is exactly the uncontrolled bulk
+ * auth-user enumeration this phase was told not to build. If email
+ * search becomes a real operational need, it requires its own narrow,
+ * rate-limited phase -- not a silent workaround here.
  */
 export async function listAdminUsers(admin: SupabaseClient, filters: AdminUserFilters): Promise<AdminUserRow[]> {
   let query = admin
@@ -39,7 +55,11 @@ export async function listAdminUsers(admin: SupabaseClient, filters: AdminUserFi
   if (filters.accountStatus && filters.accountStatus !== 'all') query = query.eq('account_status', filters.accountStatus)
   if (filters.search && filters.search.trim()) {
     const q = filters.search.trim()
-    query = query.or(`full_name.ilike.%${q}%,display_name.ilike.%${q}%`)
+    if (UUID_RE.test(q)) {
+      query = query.eq('id', q)
+    } else {
+      query = query.or(`full_name.ilike.%${q}%,display_name.ilike.%${q}%,phone.ilike.%${q}%`)
+    }
   }
 
   const { data, error } = await query
@@ -75,7 +95,13 @@ export interface AdminUserDetail {
   listingsCount: number
   bookingsAsRenterCount: number
   bookingsAsMerchantCount: number
-  disputeCount: null // not yet available — no disputes domain exists (see docs/ADMIN_OPERATIONS.md)
+  /** ADMIN-CONTROL-CENTRE-BATCH-A1: real count via disputes-service's countAdminDisputesForUser -- replaces the prior permanently-hardcoded null. */
+  disputeCount: number
+  ordersCount: number
+  barterCount: number
+  rentToBuyCount: number
+  lookingForCount: number
+  reviewsCount: number
   accountHistory: Array<{
     id: string
     actionType: string
@@ -99,11 +125,30 @@ export async function getAdminUserDetail(admin: SupabaseClient, userId: string):
   if (profileError) throw profileError
   if (!profile) return null
 
-  const [{ data: verification }, { count: listingsCount }, { count: renterCount }, { count: merchantCount }, { data: history }, { data: notes }] = await Promise.all([
+  const [
+    { data: verification },
+    { count: listingsCount },
+    { count: renterCount },
+    { count: merchantCount },
+    disputeCount,
+    { count: ordersCount },
+    { count: barterCount },
+    { count: rentToBuyCount },
+    { count: lookingForCount },
+    { count: reviewsCount },
+    { data: history },
+    { data: notes },
+  ] = await Promise.all([
     admin.from('identity_verifications').select('status, reviewed_at').eq('user_id', userId).maybeSingle(),
     admin.from('listings').select('id', { count: 'exact', head: true }).eq('merchant_id', userId),
     admin.from('bookings').select('id', { count: 'exact', head: true }).eq('renter_id', userId),
     admin.from('bookings').select('id', { count: 'exact', head: true }).eq('merchant_id', userId),
+    countAdminDisputesForUser(admin, userId),
+    admin.from('orders').select('id', { count: 'exact', head: true }).or(`buyer_id.eq.${userId},seller_id.eq.${userId}`),
+    admin.from('barter_agreements').select('id', { count: 'exact', head: true }).or(`party_a_id.eq.${userId},party_b_id.eq.${userId}`),
+    admin.from('rent_to_buy_agreements').select('id', { count: 'exact', head: true }).or(`merchant_id.eq.${userId},customer_id.eq.${userId}`),
+    admin.from('marketplace_requests').select('id', { count: 'exact', head: true }).eq('requester_id', userId),
+    admin.from('reviews_v2').select('id', { count: 'exact', head: true }).or(`reviewer_id.eq.${userId},reviewee_id.eq.${userId}`),
     admin.from('user_account_history').select('id, action_type, previous_status, new_status, user_reason, internal_note, admin_id, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
     admin.from('admin_notes').select('id, note, admin_id, created_at').eq('entity_type', 'user').eq('entity_id', userId).order('created_at', { ascending: false }),
   ])
@@ -126,7 +171,12 @@ export async function getAdminUserDetail(admin: SupabaseClient, userId: string):
     listingsCount: listingsCount ?? 0,
     bookingsAsRenterCount: renterCount ?? 0,
     bookingsAsMerchantCount: merchantCount ?? 0,
-    disputeCount: null,
+    disputeCount,
+    ordersCount: ordersCount ?? 0,
+    barterCount: barterCount ?? 0,
+    rentToBuyCount: rentToBuyCount ?? 0,
+    lookingForCount: lookingForCount ?? 0,
+    reviewsCount: reviewsCount ?? 0,
     accountHistory: (history ?? []).map((h) => ({
       id: h.id,
       actionType: h.action_type,

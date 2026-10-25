@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { Search, X, Download } from 'lucide-react'
 import { Pill, ACCOUNT_STATUS_STYLES, StatCard, AdminPageHeader, inputClass, primaryButtonClass, secondaryButtonClass, newIdempotencyKey, formatDate, formatDateTime } from '@/components/admin/ui'
 
@@ -21,7 +22,7 @@ interface AdminUserDetail {
   listingsCount: number
   bookingsAsRenterCount: number
   bookingsAsMerchantCount: number
-  disputeCount: null
+  disputeCount: number
   accountHistory: Array<{ id: string; actionType: string; previousStatus: string; newStatus: string; userReason: string | null; internalNote: string | null; adminId: string; createdAt: string }>
   notes: Array<{ id: string; note: string; adminId: string; createdAt: string }>
 }
@@ -304,6 +305,7 @@ export default function AdminUsersPage() {
               <h2 className="text-lg font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">User detail</h2>
               <button onClick={() => setSelectedId(null)} className="text-[#9B8B85] hover:text-[#1A0A0A]"><X size={18} /></button>
             </div>
+            <Link href={`/admin/users/${selectedId}`} className="text-xs text-[#8B1A1A] underline">Open full profile (Customer 360) →</Link>
 
             {detailLoading || !detail ? (
               <p className="text-sm text-[#9B8B85]">Loading…</p>
@@ -336,7 +338,7 @@ export default function AdminUsersPage() {
                     <p className="text-[10px] uppercase text-[#9B8B85]">As merchant</p>
                   </div>
                 </div>
-                <p className="text-[11px] text-[#9B8B85]">Dispute count: not yet available (no dispute domain exists).</p>
+                <p className="text-[11px] text-[#9B8B85]">Disputes involving this user: {detail.disputeCount}</p>
 
                 {actionError ? <p className="text-xs text-red-600">{actionError}</p> : null}
                 {cleanupNotice ? <p className="text-xs text-amber-700 dark:text-amber-400">{cleanupNotice}</p> : null}

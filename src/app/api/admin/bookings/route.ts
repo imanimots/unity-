@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminForRoute, getAdminServiceClient } from '@/lib/admin/route-helpers'
+import { requireAdminForRoute, getAdminServiceClient, isValidUuid } from '@/lib/admin/route-helpers'
 import { listAdminBookings } from '@/lib/admin/operations-service'
 import { csvResponse } from '@/lib/admin/csv'
 
@@ -14,7 +14,16 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url)
-  const filters = { status: searchParams.get('status') ?? undefined, search: searchParams.get('search') ?? undefined }
+  const userIdParam = searchParams.get('userId')
+  if (userIdParam && !isValidUuid(userIdParam)) {
+    return NextResponse.json({ error: 'Invalid userId' }, { status: 400 })
+  }
+  const filters = {
+    status: searchParams.get('status') ?? undefined,
+    search: searchParams.get('search') ?? undefined,
+    // Customer/Merchant 360 deep-link filter -- bookings where this user is the renter or the merchant.
+    participantUserId: userIdParam ?? undefined,
+  }
 
   try {
     const bookings = await listAdminBookings(admin, filters)

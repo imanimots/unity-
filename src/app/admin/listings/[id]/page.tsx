@@ -42,6 +42,13 @@ interface ReviewData {
   adminActionHistory: { id: string; action_type: string; reason_code: string | null; internal_note: string | null; merchant_feedback: string | null; created_at: string }[]
 }
 
+interface AdminNoteRow {
+  id: string
+  note: string
+  adminId: string
+  createdAt: string
+}
+
 function newIdempotencyKey() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `key-${Date.now()}-${Math.random()}`
 }
@@ -59,6 +66,43 @@ export default function AdminListingReviewPage({ params }: { params: Promise<{ i
   const [merchantFeedback, setMerchantFeedback] = useState('')
 
   const [evidenceUrls, setEvidenceUrls] = useState<Record<string, { url: string; expiresAt: string }>>({})
+
+  const [notes, setNotes] = useState<AdminNoteRow[]>([])
+  const [noteInput, setNoteInput] = useState('')
+  const [notePending, setNotePending] = useState(false)
+
+  const loadNotes = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/admin/listings/${listingId}/notes`)
+      if (!res.ok) return
+      const body = await res.json()
+      setNotes(body.notes ?? [])
+    } catch {
+      // Notes are supplementary -- a failed fetch here shouldn't block the rest of the review page.
+    }
+  }, [listingId])
+
+  const submitNote = useCallback(async () => {
+    if (!noteInput.trim()) return
+    setNotePending(true)
+    try {
+      const res = await fetch(`/api/admin/listings/${listingId}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: noteInput.trim(), idempotency_key: newIdempotencyKey() }),
+      })
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}))
+        throw new Error(b.error ?? 'Could not add note')
+      }
+      setNoteInput('')
+      await loadNotes()
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Could not add note' })
+    } finally {
+      setNotePending(false)
+    }
+  }, [listingId, noteInput, loadNotes])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -82,7 +126,8 @@ export default function AdminListingReviewPage({ params }: { params: Promise<{ i
     // setLoading(true) runs synchronously as load()'s first statement.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
-  }, [load])
+    loadNotes()
+  }, [load, loadNotes])
 
   const runAction = useCallback(
     async (endpoint: string, body: Record<string, unknown>) => {
@@ -151,7 +196,7 @@ export default function AdminListingReviewPage({ params }: { params: Promise<{ i
           </p>
           <h1 className="text-2xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED]">{listing.title}</h1>
           <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mt-1">
-            {listing.merchantName ?? listing.merchantId} · status: <span className="font-medium capitalize">{listing.status}</span>
+            <Link href={`/admin/merchants/${listing.merchantId}`} className="text-[#8B1A1A] underline">{listing.merchantName ?? listing.merchantId}</Link> · status: <span className="font-medium capitalize">{listing.status}</span>
           </p>
         </div>
         <div className="px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-[11px] font-medium text-amber-700 uppercase tracking-[0.1em]">
@@ -413,6 +458,32 @@ export default function AdminListingReviewPage({ params }: { params: Promise<{ i
             </li>
           ))}
         </ul>
+      </section>
+
+      {/* ── Internal admin notes ── */}
+      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Internal admin notes</h2>
+        <p className="text-[11px] text-[#9B8B85]">Admin-only, never visible to the merchant.</p>
+        {notes.map((n) => (
+          <div key={n.id} className="text-xs text-[#6B5B55] dark:text-[#9B8B85] bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg px-3 py-2">
+            {n.note}
+            <div className="text-[10px] text-[#9B8B85] mt-1">{new Date(n.createdAt).toLocaleString('en-ZA')}</div>
+          </div>
+        ))}
+        <textarea
+          placeholder="Add an internal note…"
+          value={noteInput}
+          onChange={(e) => setNoteInput(e.target.value)}
+          className="w-full border border-[#F2EDE8] dark:border-[#2A1A1A] bg-transparent rounded-lg text-sm px-3 py-2"
+          rows={2}
+        />
+        <button
+          disabled={notePending || !noteInput.trim()}
+          onClick={submitNote}
+          className="inline-flex items-center gap-1.5 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] hover:bg-[#F2EDE8] text-xs font-medium px-3 py-1.5 rounded-lg disabled:opacity-50"
+        >
+          Add note
+        </button>
       </section>
     </div>
   )

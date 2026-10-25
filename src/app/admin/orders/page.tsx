@@ -42,14 +42,28 @@ export default function AdminOrdersPage() {
   const [disputedOnly, setDisputedOnly] = useState(false)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
+  // Customer/Merchant 360 deep-link filter -- read once from the URL on
+  // mount, same pattern as /admin/bookings.
+  const [participantId, setParticipantId] = useState<{ role: 'buyerId' | 'sellerId'; id: string } | null>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const url = new URLSearchParams(window.location.search)
+    const buyerId = url.get('buyerId')
+    const sellerId = url.get('sellerId')
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (buyerId) setParticipantId({ role: 'buyerId', id: buyerId })
+    else if (sellerId) setParticipantId({ role: 'sellerId', id: sellerId })
+  }, [])
 
   const buildParams = useCallback(() => {
     const params = new URLSearchParams()
     if (statusFilter !== 'all') params.set('status', statusFilter)
     if (search.trim()) params.set('search', search.trim())
     if (disputedOnly) params.set('disputed', 'true')
+    if (participantId) params.set(participantId.role, participantId.id)
     return params
-  }, [statusFilter, search, disputedOnly])
+  }, [statusFilter, search, disputedOnly, participantId])
 
   // Filter/search changes always reset to page 1 -- a cursor is only ever
   // valid as a continuation of the exact filter state it was minted
@@ -110,6 +124,13 @@ export default function AdminOrdersPage() {
   return (
     <div className="p-6 lg:p-8 space-y-6">
       <AdminPageHeader eyebrow="Marketplace" title="Orders" />
+
+      {participantId ? (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+          Showing only orders where this user is the {participantId.role === 'buyerId' ? 'buyer' : 'seller'} ({participantId.id}).
+          <button onClick={() => setParticipantId(null)} className="underline font-medium">Clear filter</button>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <StatCard label="Total" value={orders.length} />

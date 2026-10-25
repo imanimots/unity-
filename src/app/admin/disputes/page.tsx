@@ -33,6 +33,15 @@ export default function AdminDisputesPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  // Customer/Merchant 360 deep-link filter -- read once from the URL on mount, same pattern as /admin/bookings.
+  const [participantUserId, setParticipantUserId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const fromUrl = new URLSearchParams(window.location.search).get('userId')
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (fromUrl) setParticipantUserId(fromUrl)
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -41,6 +50,7 @@ export default function AdminDisputesPage() {
       const params = new URLSearchParams()
       if (statusFilter !== 'all') params.set('status', statusFilter)
       if (search.trim()) params.set('search', search.trim())
+      if (participantUserId) params.set('userId', participantUserId)
       const res = await fetch(`/api/admin/disputes?${params.toString()}`)
       if (!res.ok) {
         const b = await res.json().catch(() => ({}))
@@ -53,7 +63,7 @@ export default function AdminDisputesPage() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, search])
+  }, [statusFilter, search, participantUserId])
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -68,6 +78,13 @@ export default function AdminDisputesPage() {
   return (
     <div className="p-6 lg:p-8 space-y-6">
       <AdminPageHeader eyebrow="Trust & Safety" title="Disputes" />
+
+      {participantUserId ? (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+          Showing only disputes involving one user ({participantUserId}).
+          <button onClick={() => setParticipantUserId(null)} className="underline font-medium">Clear filter</button>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label="Total" value={disputes.length} />

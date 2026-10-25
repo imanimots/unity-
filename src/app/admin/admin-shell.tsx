@@ -15,6 +15,7 @@ import { IS_MOCK_MODE } from '@/lib/mock/data'
 const NAV_ITEMS = [
   { href: '/admin',                     label: 'Overview',            icon: LayoutDashboard, exact: true },
   { href: '/admin/users',               label: 'Users',                icon: Users            },
+  { href: '/admin/merchants',           label: 'Merchants',            icon: Users            },
   { href: '/admin/verifications',       label: 'Verifications',        icon: UserCheck        },
   { href: '/admin/listings',            label: 'Listings',             icon: Package          },
   { href: '/admin/bookings',            label: 'Bookings',             icon: Calendar         },

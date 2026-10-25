@@ -27,6 +27,8 @@ export interface AdminBookingFilters {
   status?: string
   search?: string
   limit?: number
+  /** Customer/Merchant 360 deep-link filter -- bookings where this user is either the renter or the merchant. Caller must have already validated this is a real UUID. */
+  participantUserId?: string
 }
 
 /**
@@ -45,6 +47,9 @@ export async function listAdminBookings(admin: SupabaseClient, filters: AdminBoo
     .limit(filters.limit ?? DEFAULT_LIMIT)
 
   if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status)
+  if (filters.participantUserId) {
+    query = query.or(`renter_id.eq.${filters.participantUserId},merchant_id.eq.${filters.participantUserId}`)
+  }
 
   const { data: rows, error } = await query
   if (error) throw error

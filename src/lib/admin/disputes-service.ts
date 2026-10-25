@@ -22,6 +22,45 @@ export interface AdminDisputeFilters {
   status?: string
   search?: string
   limit?: number
+  /** Customer/Merchant 360 deep-link filter -- every dispute this user raised, or that touches a booking/order/barter agreement they're a party to. Caller must have already validated this is a real UUID (see isValidUuid in route-helpers). */
+  participantUserId?: string
+}
+
+/**
+ * `disputes` itself only has `raised_by` -- the OTHER party is only
+ * knowable by resolving the linked booking/order/barter_agreement and
+ * reading ITS participant columns. Shared by the participantUserId
+ * filter below and countAdminDisputesForUser, so a user's "disputes
+ * involving them" always means the same thing in both the Customer 360
+ * count and the filtered list.
+ */
+async function getDisputeParticipantEntityIds(admin: SupabaseClient, userId: string) {
+  const [{ data: bookings }, { data: orders }, { data: barters }] = await Promise.all([
+    admin.from('bookings').select('id').or(`renter_id.eq.${userId},merchant_id.eq.${userId}`),
+    admin.from('orders').select('id').or(`buyer_id.eq.${userId},seller_id.eq.${userId}`),
+    admin.from('barter_agreements').select('id').or(`party_a_id.eq.${userId},party_b_id.eq.${userId}`),
+  ])
+  return {
+    bookingIds: (bookings ?? []).map((b) => b.id as string),
+    orderIds: (orders ?? []).map((o) => o.id as string),
+    barterIds: (barters ?? []).map((b) => b.id as string),
+  }
+}
+
+function disputeParticipantOrClause(userId: string, ids: { bookingIds: string[]; orderIds: string[]; barterIds: string[] }): string {
+  const clauses = [`raised_by.eq.${userId}`]
+  if (ids.bookingIds.length) clauses.push(`booking_id.in.(${ids.bookingIds.join(',')})`)
+  if (ids.orderIds.length) clauses.push(`order_id.in.(${ids.orderIds.join(',')})`)
+  if (ids.barterIds.length) clauses.push(`barter_agreement_id.in.(${ids.barterIds.join(',')})`)
+  return clauses.join(',')
+}
+
+/** Customer/Merchant 360's real "Disputes" count -- replaces the prior hardcoded `disputeCount: null`. */
+export async function countAdminDisputesForUser(admin: SupabaseClient, userId: string): Promise<number> {
+  const ids = await getDisputeParticipantEntityIds(admin, userId)
+  const { count, error } = await admin.from('disputes').select('id', { count: 'exact', head: true }).or(disputeParticipantOrClause(userId, ids))
+  if (error) throw error
+  return count ?? 0
 }
 
 /**
@@ -39,6 +78,10 @@ export async function listAdminDisputes(admin: SupabaseClient, filters: AdminDis
     .limit(filters.limit ?? DEFAULT_LIMIT)
 
   if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status)
+  if (filters.participantUserId) {
+    const ids = await getDisputeParticipantEntityIds(admin, filters.participantUserId)
+    query = query.or(disputeParticipantOrClause(filters.participantUserId, ids))
+  }
 
   const { data: rows, error } = await query
   if (error) throw error

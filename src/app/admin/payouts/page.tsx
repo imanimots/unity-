@@ -9,6 +9,7 @@ import { PAYOUT_STATUS_LABELS, type PayoutStatus } from '@/lib/payouts/status-la
 interface AdminPayoutRow {
   id: string
   payoutReference: string | null
+  merchantId: string
   merchantName: string | null
   bookingReference: string | null
   listingTitle: string | null
@@ -30,6 +31,18 @@ export default function AdminPayoutsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [overdueOnly, setOverdueOnly] = useState(false)
   const [disputeRelated, setDisputeRelated] = useState(false)
+  // Merchant 360 deep-link filter -- client-side only (the underlying
+  // _admin_list_merchant_payouts RPC has no merchant_id parameter, and
+  // this phase is not authorized to add one via a migration). Read once
+  // from the URL on mount, same pattern as the other list pages.
+  const [merchantIdFilter, setMerchantIdFilter] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const fromUrl = new URLSearchParams(window.location.search).get('merchantId')
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (fromUrl) setMerchantIdFilter(fromUrl)
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -61,16 +74,25 @@ export default function AdminPayoutsPage() {
     return () => clearTimeout(t)
   }, [load])
 
-  const pendingCount = payouts.filter((p) => p.status === 'pending').length
-  const processingCount = payouts.filter((p) => p.status === 'processing').length
-  const failedCount = payouts.filter((p) => p.status === 'failed').length
+  const visiblePayouts = merchantIdFilter ? payouts.filter((p) => p.merchantId === merchantIdFilter) : payouts
+
+  const pendingCount = visiblePayouts.filter((p) => p.status === 'pending').length
+  const processingCount = visiblePayouts.filter((p) => p.status === 'processing').length
+  const failedCount = visiblePayouts.filter((p) => p.status === 'failed').length
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
       <AdminPageHeader eyebrow="Marketplace" title="Merchant Payouts" />
 
+      {merchantIdFilter ? (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+          Showing only this merchant&apos;s payouts (client-side filter, within the current page of results).
+          <button onClick={() => setMerchantIdFilter(null)} className="underline font-medium">Clear filter</button>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <StatCard label="Total" value={payouts.length} />
+        <StatCard label="Total" value={visiblePayouts.length} />
         <StatCard label="Pending" value={pendingCount} />
         <StatCard label="Processing" value={processingCount} />
         <StatCard label="Failed" value={failedCount} />
@@ -118,13 +140,13 @@ export default function AdminPayoutsPage() {
                 <tr><td colSpan={8} className="px-4 py-16 text-center text-sm text-[#9B8B85]">Loading…</td></tr>
               ) : error ? (
                 <tr><td colSpan={8} className="px-4 py-16 text-center text-sm text-red-600">{error}</td></tr>
-              ) : payouts.length === 0 ? (
+              ) : visiblePayouts.length === 0 ? (
                 <tr><td colSpan={8} className="px-4 py-16 text-center text-sm text-[#9B8B85]">No payouts match your filters.</td></tr>
               ) : (
-                payouts.map((p) => (
+                visiblePayouts.map((p) => (
                   <tr key={p.id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors last:border-0">
                     <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">
-                      {p.merchantName ?? '—'}
+                      <Link href={`/admin/merchants/${p.merchantId}`} className="text-[#8B1A1A] underline">{p.merchantName ?? '—'}</Link>
                       {p.merchantRestricted && <span className="ml-2 text-[10px] uppercase text-red-600">Restricted</span>}
                     </td>
                     <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{p.listingTitle ?? '—'}</td>

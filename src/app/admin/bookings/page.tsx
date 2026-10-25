@@ -1,14 +1,17 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { Search, X, Download } from 'lucide-react'
-import { Pill, ACCOUNT_STATUS_STYLES, StatCard, AdminPageHeader, inputClass, secondaryButtonClass, formatDate, formatDateTime, formatMoney } from '@/components/admin/ui'
+import { Pill, ACCOUNT_STATUS_STYLES, StatCard, AdminPageHeader, inputClass, secondaryButtonClass, formatDate, formatDateTime, formatMoney, newIdempotencyKey } from '@/components/admin/ui'
 
 interface AdminBookingRow {
   id: string
   bookingReference: string | null
   listingTitle: string | null
+  renterId: string
   renterName: string | null
+  merchantId: string
   merchantName: string | null
   status: string
   financialReadiness: string
@@ -17,6 +20,13 @@ interface AdminBookingRow {
   paymentDueAt: string | null
   createdAt: string
   lastLifecycleEvent: string | null
+}
+
+interface AdminNoteRow {
+  id: string
+  note: string
+  adminId: string
+  createdAt: string
 }
 
 interface AdminBookingDetail {
@@ -60,11 +70,25 @@ export default function AdminBookingsPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  // Customer/Merchant 360 deep-link filter -- read once from the URL on
+  // mount (not Next.js's useSearchParams hook, to avoid any Suspense-
+  // boundary requirement for what's a one-time initial read).
+  const [participantUserId, setParticipantUserId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const fromUrl = new URLSearchParams(window.location.search).get('userId')
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (fromUrl) setParticipantUserId(fromUrl)
+  }, [])
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<AdminBookingDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
+  const [notes, setNotes] = useState<AdminNoteRow[]>([])
+  const [noteInput, setNoteInput] = useState('')
+  const [notePending, setNotePending] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -73,6 +97,7 @@ export default function AdminBookingsPage() {
       const params = new URLSearchParams()
       if (statusFilter !== 'all') params.set('status', statusFilter)
       if (search.trim()) params.set('search', search.trim())
+      if (participantUserId) params.set('userId', participantUserId)
       const res = await fetch(`/api/admin/bookings?${params.toString()}`)
       if (!res.ok) {
         const b = await res.json().catch(() => ({}))
@@ -85,7 +110,7 @@ export default function AdminBookingsPage() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, search])
+  }, [statusFilter, search, participantUserId])
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -94,11 +119,23 @@ export default function AdminBookingsPage() {
     return () => clearTimeout(t)
   }, [load])
 
+  const loadNotes = useCallback(async (bookingId: string) => {
+    try {
+      const res = await fetch(`/api/admin/bookings/${bookingId}/notes`)
+      if (!res.ok) return
+      const body = await res.json()
+      setNotes(body.notes ?? [])
+    } catch {
+      // Notes are supplementary -- a failed fetch here shouldn't block the rest of the detail panel.
+    }
+  }, [])
+
   useEffect(() => {
     if (!selectedId) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setDetailLoading(true)
     setDetailError(null)
+    setNotes([])
     fetch(`/api/admin/bookings/${selectedId}`)
       .then(async (res) => {
         if (!res.ok) {
@@ -110,7 +147,30 @@ export default function AdminBookingsPage() {
       .then(setDetail)
       .catch((err) => setDetailError(err instanceof Error ? err.message : 'Could not load booking'))
       .finally(() => setDetailLoading(false))
-  }, [selectedId])
+    loadNotes(selectedId)
+  }, [selectedId, loadNotes])
+
+  async function submitNote() {
+    if (!selectedId || !noteInput.trim()) return
+    setNotePending(true)
+    try {
+      const res = await fetch(`/api/admin/bookings/${selectedId}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: noteInput.trim(), idempotency_key: newIdempotencyKey() }),
+      })
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}))
+        throw new Error(b.error ?? 'Could not add note')
+      }
+      setNoteInput('')
+      await loadNotes(selectedId)
+    } catch {
+      // Surfaced inline below rather than via the page-level error state, which is reserved for the list fetch.
+    } finally {
+      setNotePending(false)
+    }
+  }
 
   const activeCount = bookings.filter((b) => b.status === 'active').length
   const requestedCount = bookings.filter((b) => b.status === 'requested').length
@@ -119,6 +179,13 @@ export default function AdminBookingsPage() {
   return (
     <div className="p-6 lg:p-8 space-y-6">
       <AdminPageHeader eyebrow="Rental Lifecycle" title="Bookings" />
+
+      {participantUserId ? (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+          Showing only bookings involving one user ({participantUserId}).
+          <button onClick={() => setParticipantUserId(null)} className="underline font-medium">Clear filter</button>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <StatCard label="Total" value={bookings.length} />
@@ -210,8 +277,8 @@ export default function AdminBookingsPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-xs text-[#6B5B55] dark:text-[#9B8B85]">
-                  <div>Renter: {detail.booking.renterName} <Pill value={detail.renterAccountStatus ?? 'active'} styles={ACCOUNT_STATUS_STYLES} /></div>
-                  <div>Merchant: {detail.booking.merchantName} <Pill value={detail.merchantAccountStatus ?? 'active'} styles={ACCOUNT_STATUS_STYLES} /></div>
+                  <div>Renter: <Link href={`/admin/users/${detail.booking.renterId}`} className="text-[#8B1A1A] underline">{detail.booking.renterName}</Link> <Pill value={detail.renterAccountStatus ?? 'active'} styles={ACCOUNT_STATUS_STYLES} /></div>
+                  <div>Merchant: <Link href={`/admin/merchants/${detail.booking.merchantId}`} className="text-[#8B1A1A] underline">{detail.booking.merchantName}</Link> <Pill value={detail.merchantAccountStatus ?? 'active'} styles={ACCOUNT_STATUS_STYLES} /></div>
                   <div>Start: {formatDateTime(detail.booking.startAt)}</div>
                   <div>End: {formatDateTime(detail.booking.endAt)}</div>
                   <div>Payment due: {formatDateTime(detail.booking.paymentDueAt)}</div>
@@ -253,6 +320,18 @@ export default function AdminBookingsPage() {
                       ))}
                     </ul>
                   )}
+                </div>
+
+                <div className="space-y-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-4">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85]">Internal admin notes</p>
+                  {notes.map((n) => (
+                    <div key={n.id} className="text-xs text-[#6B5B55] dark:text-[#9B8B85] bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg px-3 py-2">
+                      {n.note}
+                      <div className="text-[10px] text-[#9B8B85] mt-1">{formatDateTime(n.createdAt)}</div>
+                    </div>
+                  ))}
+                  <textarea placeholder="Add an internal note…" value={noteInput} onChange={(e) => setNoteInput(e.target.value)} className={`w-full ${inputClass}`} rows={2} />
+                  <button disabled={notePending || !noteInput.trim()} onClick={submitNote} className={secondaryButtonClass}>Add note</button>
                 </div>
               </>
             )}
