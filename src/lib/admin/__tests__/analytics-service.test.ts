@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import {
   getMarketplaceOverview,
   getSupplyAnalytics,
@@ -42,6 +44,7 @@ function countQueryChain(getCount: (filters: Record<string, unknown>) => number)
   const obj: any = {
     select: () => obj,
     eq: (col: string, val: unknown) => { filters[col] = val; return obj },
+    in: (col: string, val: unknown) => { filters[`${col}__in`] = val; return obj },
     is: (col: string, val: unknown) => { filters[`${col}__is`] = val; return obj },
     not: (col: string, _op: string, val: unknown) => { filters[`${col}__not`] = val; return obj },
     gte: (col: string, val: unknown) => { filters[`${col}__gte`] = val; return obj },
@@ -241,20 +244,26 @@ describe('getTransactionAnalytics (category: ADMIN-CONTROL-CENTRE-BATCH-D1-F1) â
     expect(result.orders.mayIncludeTestData).toBe(false)
   })
 
-  it('3. BARTER: anchor_listing_id relational exclusion was verified unreliable against the real schema (see code comment) -- barter is reported via a plain per-status count with mayIncludeTestData: true, and the query never embeds listings at all', async () => {
-    const selectArgs: unknown[] = []
+  it('3. BARTER: combines BOTH anchor types (listing-anchored + skill/task-anchored) relationally excluding test activity from each, mayIncludeTestData is now false (D1-F2)', async () => {
     const admin = {
       from: (table: string) => {
         if (table === 'barter_agreements') {
-          return chainableQuery({ data: null, error: null, count: 7 }, { select: (...a: unknown[]) => selectArgs.push(a) })
+          return {
+            select: (cols: string) => {
+              if (cols.includes('listings!inner')) return countQueryChain((f) => (f.status === 'completed' && f['listings.is_test'] === false ? 3 : 0))
+              if (cols.includes('barter_skill_task_posts')) return countQueryChain((f) => (f.status === 'completed' && f['barter_skill_task_posts.is_test'] === false ? 2 : 0))
+              return countQueryChain(() => 0)
+            },
+          }
         }
         return chainableQuery({ data: [], error: null, count: 0 })
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any
     const result = await getTransactionAnalytics(admin, 'all')
-    expect(result.barter.mayIncludeTestData).toBe(true)
-    expect(selectArgs.some((a) => JSON.stringify(a).includes('listings'))).toBe(false)
+    expect(result.barter.mayIncludeTestData).toBe(false)
+    // 3 (real, listing-anchored) + 2 (real, skill/task-anchored) = 5
+    expect(result.barter.byStatus).toEqual([{ label: 'completed', count: 5 }])
   })
 
   it('4. RENT-TO-BUY and LOOKING FOR keep their existing direct is_test=false filter -- not regressed by this remediation', async () => {
@@ -316,6 +325,80 @@ describe('getTransactionAnalytics (category: ADMIN-CONTROL-CENTRE-BATCH-D1-F1) â
     } as any
     await getTransactionAnalytics(spyAdmin, 'all')
     expect(gteCalls).toEqual([])
+  })
+})
+
+describe('countBarterByStatusExcludingTestAnchors (category: ADMIN-CONTROL-CENTRE-BATCH-D1-F2) â€” two-anchor real-only exclusion', () => {
+  /** Builds a fake `barter_agreements` select that routes to the right fake branch based on which embed is requested, so each test can control the two branches independently. */
+  function barterAdmin(listingBranch: (f: Record<string, unknown>) => number, skillTaskBranch: (f: Record<string, unknown>) => number, skillTaskSelectArgs?: unknown[]) {
+    return {
+      from: (table: string) => {
+        if (table !== 'barter_agreements') return chainableQuery({ data: [], error: null, count: 0 })
+        return {
+          select: (cols: string) => {
+            if (cols.includes('listings!inner')) return countQueryChain(listingBranch)
+            if (cols.includes('barter_skill_task_posts')) {
+              skillTaskSelectArgs?.push(cols)
+              return countQueryChain(skillTaskBranch)
+            }
+            return countQueryChain(() => 0)
+          },
+        }
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+  }
+
+  it('1. listing-anchored real barter requires listings.is_test=false -- a test-flagged listing-anchored row is not counted', async () => {
+    const admin = barterAdmin((f) => (f.status === 'accepted' && f['listings.is_test'] === false ? 7 : 0), () => 0)
+    const result = await getTransactionAnalytics(admin, 'all')
+    expect(result.barter.byStatus).toEqual([{ label: 'accepted', count: 7 }])
+  })
+
+  it('2. skill/task-anchored real barter requires barter_skill_task_posts.is_test=false -- a test-flagged skill/task post is not counted', async () => {
+    const admin = barterAdmin(() => 0, (f) => (f.status === 'accepted' && f['barter_skill_task_posts.is_test'] === false ? 4 : 0))
+    const result = await getTransactionAnalytics(admin, 'all')
+    expect(result.barter.byStatus).toEqual([{ label: 'accepted', count: 4 }])
+  })
+
+  it('3. uses the correct, explicit FK-constraint hint for the skill/task anchor relationship', async () => {
+    const seenSelects: unknown[] = []
+    const admin = barterAdmin(() => 0, () => 0, seenSelects)
+    await getTransactionAnalytics(admin, 'all')
+    expect(seenSelects.some((s) => typeof s === 'string' && s.includes('barter_agreements_anchor_skill_task_post_id_fkey'))).toBe(true)
+  })
+
+  it('4. never uses source_skill_task_post_id (a different FK, not the anchor relationship) for this exclusion', async () => {
+    const seenSelects: unknown[] = []
+    const admin = barterAdmin(() => 0, () => 0, seenSelects)
+    await getTransactionAnalytics(admin, 'all')
+    expect(seenSelects.some((s) => typeof s === 'string' && s.includes('source_skill_task_post_id'))).toBe(false)
+  })
+
+  it('5. the combined per-status count equals listing-anchor real count + skill/task-anchor real count', async () => {
+    const admin = barterAdmin(
+      (f) => (f.status === 'proposed' ? 10 : f.status === 'completed' ? 3 : 0),
+      (f) => (f.status === 'proposed' ? 1 : f.status === 'completed' ? 6 : 0)
+    )
+    const result = await getTransactionAnalytics(admin, 'all')
+    expect(result.barter.byStatus).toEqual(
+      expect.arrayContaining([
+        { label: 'proposed', count: 11 },
+        { label: 'completed', count: 9 },
+      ])
+    )
+  })
+
+  it('6. barter.mayIncludeTestData is false now that a real-only exclusion exists', async () => {
+    const admin = barterAdmin(() => 0, () => 0)
+    const result = await getTransactionAnalytics(admin, 'all')
+    expect(result.barter.mayIncludeTestData).toBe(false)
+  })
+
+  it('7. the old "PostgREST relationship-resolution discrepancy" misdiagnosis is removed from source -- it was a misdiagnosis, not a real limitation, and must not remain in operator-facing metadata or comments', () => {
+    const content = readFileSync(join(__dirname, '../analytics-service.ts'), 'utf-8')
+    expect(content).not.toMatch(/relationship-resolution discrepancy/i)
+    expect(content).not.toMatch(/unavoidable QA inclusion/i)
   })
 })
 
@@ -517,5 +600,82 @@ describe('getGrowthAnalytics (category: ADMIN-CONTROL-CENTRE-BATCH-D1) â€” label
     const result = await getGrowthAnalytics(admin, '30d')
     expect(ltSpy).toHaveBeenCalled()
     expect(result.newUsers.previous).toBe(2)
+  })
+
+  it('8. GROWTH newBookings (current period): relationally excludes test-listing-linked bookings via the same listings!inner(is_test) join as Transaction Analytics (D1-F2)', async () => {
+    const admin = {
+      from: (table: string) => {
+        if (table === 'bookings') return countQueryChain((f) => (f['listings.is_test'] === false ? 9 : 0))
+        return countQueryChain(() => 0)
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getGrowthAnalytics(admin, '30d')
+    expect(result.newBookings.current).toBe(9)
+  })
+
+  it('9. GROWTH newBookings (previous period): the same relational exclusion applies to the previous-period count, not just the current one', async () => {
+    const admin = {
+      from: (table: string) => {
+        if (table === 'bookings') return countQueryChain((f) => (f['listings.is_test'] === false && f['created_at__lt'] ? 4 : 0))
+        return countQueryChain(() => 0)
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getGrowthAnalytics(admin, '30d')
+    expect(result.newBookings.previous).toBe(4)
+  })
+
+  it('10. GROWTH newBookings (all-time): remains a server-side count -- never fetches booking row data, and previous stays null', async () => {
+    const selectOptsSeen: unknown[] = []
+    const admin = {
+      from: (table: string) => {
+        if (table === 'bookings') {
+          return { select: (_cols: string, opts: unknown) => { selectOptsSeen.push(opts); return countQueryChain(() => 3) } }
+        }
+        return countQueryChain(() => 0)
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getGrowthAnalytics(admin, 'all')
+    expect(result.newBookings.previous).toBeNull()
+    expect(selectOptsSeen.every((o) => (o as { count?: string; head?: boolean })?.count === 'exact' && (o as { head?: boolean })?.head === true)).toBe(true)
+  })
+
+  it('11. GROWTH newOrders (current period): relationally excludes test-listing-linked orders', async () => {
+    const admin = {
+      from: (table: string) => {
+        if (table === 'orders') return countQueryChain((f) => (f['listings.is_test'] === false ? 6 : 0))
+        return countQueryChain(() => 0)
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getGrowthAnalytics(admin, '30d')
+    expect(result.newOrders.current).toBe(6)
+  })
+
+  it('12. GROWTH newOrders (previous period): the same relational exclusion applies to the previous-period count', async () => {
+    const admin = {
+      from: (table: string) => {
+        if (table === 'orders') return countQueryChain((f) => (f['listings.is_test'] === false && f['created_at__lt'] ? 2 : 0))
+        return countQueryChain(() => 0)
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getGrowthAnalytics(admin, '30d')
+    expect(result.newOrders.previous).toBe(2)
+  })
+
+  it('13. GROWTH newOrders (all-time): remains a server-side count, previous stays null, no fabricated comparison', async () => {
+    const admin = {
+      from: (table: string) => {
+        if (table === 'orders') return countQueryChain(() => 1)
+        return countQueryChain(() => 0)
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getGrowthAnalytics(admin, 'all')
+    expect(result.newOrders.previous).toBeNull()
+    expect(result.newOrders.current).toBe(1)
   })
 })

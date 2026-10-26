@@ -13,11 +13,17 @@ import { getDemandInsights, type DemandInsightsResult } from '@/lib/subscription
  * `search_demand_aggregates`, and `reviews` all carry a real `is_test`
  * column (confirmed directly from their migrations) and every query
  * against them here filters `is_test = false`. `bookings`, `orders`,
- * `barter_agreements`, `disputes`, `profiles`, `unity_commissions`,
- * `affiliate_commissions`, `merchant_payouts`, `merchant_subscriptions`,
- * and `support_cases` have NO such column -- there is no reliable way to
- * exclude QA activity from those domains today, so their counts are
- * reported as-is and the UI must not claim they are test-free.
+ * `unity_commissions`, `affiliate_commissions`, and listing-targeted
+ * `ad_campaigns` rows have no `is_test` column of their own but DO have
+ * a direct (or, for `barter_agreements`, two mutually-exclusive) FK to
+ * a table that does -- those are relationally excluded via an inner
+ * join instead (see `countRowsByStatusExcludingTestListings` and
+ * `countBarterByStatusExcludingTestAnchors`). `disputes`, `profiles`,
+ * `merchant_payouts`, `merchant_subscriptions`, and `support_cases`
+ * have no `is_test` column AND no reliable join path (too many hops,
+ * or no listing/booking relation at all) -- those counts are reported
+ * as-is, with explicit `mayIncludeTestData`/`notes` metadata the UI
+ * must surface rather than silently imply test-free.
  *
  * This is designed to be reused later by a future AI R&D/Intelligence
  * module (not built in this phase) -- every exported function returns a
@@ -134,25 +140,16 @@ async function countRowsByStatus(
  * (`listings!inner(is_test)` + `.eq('listings.is_test', false)`), never
  * by fetching listing ids into Node and building an IN/NOT IN filter.
  *
- * Verified directly against the real schema before shipping this
- * (D1-F1): for `bookings`/`orders`/`unity_commissions`/
- * `affiliate_commissions`/`ad_campaigns`, this join's real/test
- * partition sums exactly to each table's true total row count (e.g.
- * bookings: 2 real + 1556 test = 1558, the verified total) -- it is a
- * reliable exact count for a standard `listing_id` FK column name.
+ * Verified directly against the real schema (D1-F1, re-confirmed F2):
+ * for `bookings`/`orders`/`unity_commissions`/`affiliate_commissions`/
+ * `ad_campaigns`, this join's real/test partition sums exactly to each
+ * table's true total row count (e.g. bookings: 2 real + 1556 test =
+ * 1558, the verified total) -- it is a reliable exact count for a
+ * standard `listing_id` FK column name.
  *
- * `barter_agreements` is deliberately NOT routed through this helper:
- * its FK column is non-standard (`anchor_listing_id`), and the same
- * verification found the join's real+test partition undercounts the
- * table's true total by 14 rows regardless of which `is_test` value is
- * filtered for -- a genuine PostgREST relationship-resolution
- * discrepancy for this specific column, not a theoretical concern. Per
- * this phase's own instruction ("if the Supabase relationship syntax
- * cannot produce a reliable exact count, stop and report the technical
- * limitation rather than inventing semantics"), barter trades are
- * reported via `countRowsByStatus` instead with `mayIncludeTestData:
- * true`, not silently joined against a count this phase could not
- * verify as correct.
+ * `barter_agreements` is NOT routed through this helper -- it has two
+ * mutually-exclusive anchor types (see
+ * `countBarterByStatusExcludingTestAnchors` below), not one.
  */
 async function countRowsByStatusExcludingTestListings(
   admin: SupabaseClient,
@@ -171,6 +168,62 @@ async function countRowsByStatusExcludingTestListings(
       const { count, error } = await q
       if (error) throw error
       return { label: status, count: count ?? 0 }
+    })
+  )
+  return results.filter((r) => r.count > 0)
+}
+
+/**
+ * Per-status COUNT(*) for barter_agreements' real (non-test) activity,
+ * combining BOTH of its two mutually-exclusive anchor types (enforced
+ * by the `barter_agreements_exactly_one_anchor_chk` CHECK constraint --
+ * every row has exactly one of these, never both, never neither):
+ *
+ *   A. listing-anchored: anchor_listing_id -> listings.is_test
+ *   B. skill/task-anchored: anchor_skill_task_post_id ->
+ *      barter_skill_task_posts.is_test
+ *
+ * Branch B requires the explicit FK-constraint-name hint
+ * (`barter_agreements_anchor_skill_task_post_id_fkey`): verified live
+ * (D1-F1 re-review) that `barter_agreements` has TWO separate foreign
+ * keys to `barter_skill_task_posts` -- the other, `source_skill_task_
+ * post_id`, drives the Looking-For/offer-matching lifecycle and is
+ * never the trade's anchor. An unhinted embed fails outright with
+ * PostgREST's own "more than one relationship was found" ambiguity
+ * error rather than silently resolving to the wrong one, so the
+ * correct relationship is named explicitly, never left to inference.
+ *
+ * Two bounded COUNT queries per status (one per branch), summed in
+ * application code -- never a row fetch, never a per-row query.
+ * Verified live that the two branches' real+test partitions each sum
+ * exactly to their own subset's true total (listing-anchored: 0 real +
+ * 455 test = 455; skill/task-anchored: 0 real + 14 test = 14; combined
+ * 455 + 14 = 469, the table's full true total with zero rows
+ * unaccounted for) -- there was never a PostgREST relationship-
+ * resolution discrepancy, only an undiscovered second anchor path.
+ */
+async function countBarterByStatusExcludingTestAnchors(admin: SupabaseClient, statuses: readonly string[], sinceIso: string | null): Promise<Array<{ label: string; count: number }>> {
+  const results = await Promise.all(
+    statuses.map(async (status) => {
+      const [{ count: listingAnchored, error: e1 }, { count: skillTaskAnchored, error: e2 }] = await Promise.all([
+        (() => {
+          let q = admin.from('barter_agreements').select('id, listings!inner(is_test)', { count: 'exact', head: true }).eq('status', status).eq('listings.is_test', false)
+          if (sinceIso) q = q.gte('created_at', sinceIso)
+          return q
+        })(),
+        (() => {
+          let q = admin
+            .from('barter_agreements')
+            .select('id, barter_skill_task_posts!barter_agreements_anchor_skill_task_post_id_fkey!inner(is_test)', { count: 'exact', head: true })
+            .eq('status', status)
+            .eq('barter_skill_task_posts.is_test', false)
+          if (sinceIso) q = q.gte('created_at', sinceIso)
+          return q
+        })(),
+      ])
+      if (e1) throw e1
+      if (e2) throw e2
+      return { label: status, count: (listingAnchored ?? 0) + (skillTaskAnchored ?? 0) }
     })
   )
   return results.filter((r) => r.count > 0)
@@ -387,14 +440,11 @@ export async function getTransactionAnalytics(admin: SupabaseClient, period: Ana
   const since = periodSinceIso(period)
 
   const [bookingsByStatus, ordersByStatus, barterByStatus, rtbByStatus, lookingForByStatus] = await Promise.all([
-    // Relationally excludes bookings tied to a QA/test listing (D1-F1 P1 fix) -- verified exact.
+    // Relationally excludes bookings/orders tied to a QA/test listing (D1-F1 P1 fix) -- verified exact.
     countRowsByStatusExcludingTestListings(admin, 'bookings', BOOKING_STATUSES, since),
     countRowsByStatusExcludingTestListings(admin, 'orders', ORDER_STATUSES, since),
-    // barter_agreements: see countRowsByStatusExcludingTestListings's comment --
-    // the join was verified unreliable for this table's anchor_listing_id FK,
-    // so this is reported plainly with mayIncludeTestData: true rather than a
-    // count this phase could not verify as correct.
-    countRowsByStatus(admin, 'barter_agreements', BARTER_STATUSES, { sinceIso: since }),
+    // barter_agreements: relationally excludes BOTH anchor types (D1-F2) -- see countBarterByStatusExcludingTestAnchors's own comment.
+    countBarterByStatusExcludingTestAnchors(admin, BARTER_STATUSES, since),
     countRowsByStatus(admin, 'rent_to_buy_agreements', RTB_STATUSES, { isTestColumn: true, sinceIso: since }),
     countRowsByStatus(admin, 'marketplace_requests', MARKETPLACE_REQUEST_STATUSES, { isTestColumn: true, sinceIso: since }),
   ])
@@ -404,7 +454,7 @@ export async function getTransactionAnalytics(admin: SupabaseClient, period: Ana
   return {
     bookings: { domain: 'Rental bookings', total: total(bookingsByStatus), byStatus: bookingsByStatus, mayIncludeTestData: false },
     orders: { domain: 'Buy/sell orders', total: total(ordersByStatus), byStatus: ordersByStatus, mayIncludeTestData: false },
-    barter: { domain: 'Barter trades', total: total(barterByStatus), byStatus: barterByStatus, mayIncludeTestData: true },
+    barter: { domain: 'Barter trades', total: total(barterByStatus), byStatus: barterByStatus, mayIncludeTestData: false },
     rentToBuy: { domain: 'Rent-to-Buy', total: total(rtbByStatus), byStatus: rtbByStatus, mayIncludeTestData: false },
     lookingFor: { domain: 'Looking For requests', total: total(lookingForByStatus), byStatus: lookingForByStatus, mayIncludeTestData: false },
     revenueNote: 'not_available_mock_payment_provider',
@@ -580,8 +630,11 @@ export async function getGrowthAnalytics(admin: SupabaseClient, period: Analytic
     periodComparison(admin, 'profiles', {}, period),
     periodComparisonWithIn(admin, 'profiles', 'role', ['merchant', 'both'], period),
     periodComparison(admin, 'listings', { is_test: false }, period),
-    periodComparison(admin, 'bookings', {}, period),
-    periodComparison(admin, 'orders', {}, period),
+    // Relationally excludes test-listing-linked bookings/orders (D1-F2) --
+    // the same real-only rule Transaction Analytics already applies to
+    // these two tables.
+    periodComparisonExcludingTestListings(admin, 'bookings', period),
+    periodComparisonExcludingTestListings(admin, 'orders', period),
   ])
 
   return { newUsers, newMerchants, newRealListings, newBookings, newOrders }
@@ -601,5 +654,23 @@ async function periodComparisonWithIn(admin: SupabaseClient, table: string, col:
   const current = await countWhereIn(admin, table, col, values, since)
   const prevRange = previousPeriodRange(period)
   const previous = prevRange ? await countWhereIn(admin, table, col, values, prevRange.since, prevRange.until) : null
+  return { current, previous }
+}
+
+/** Same `listings!inner(is_test)` relational exclusion as countRowsByStatusExcludingTestListings, but over a date range (current/previous period) instead of a single status -- used by Growth Analytics' real-only new-bookings/new-orders counts. */
+async function countRealListingLinkedInRange(admin: SupabaseClient, table: string, sinceIso: string | null, untilIso?: string): Promise<number> {
+  let q = admin.from(table).select('id, listings!inner(is_test)', { count: 'exact', head: true }).eq('listings.is_test', false)
+  if (sinceIso) q = q.gte('created_at', sinceIso)
+  if (untilIso) q = q.lt('created_at', untilIso)
+  const { count, error } = await q
+  if (error) throw error
+  return count ?? 0
+}
+
+async function periodComparisonExcludingTestListings(admin: SupabaseClient, table: string, period: AnalyticsPeriod): Promise<PeriodComparison> {
+  const since = periodSinceIso(period)
+  const current = await countRealListingLinkedInRange(admin, table, since)
+  const prevRange = previousPeriodRange(period)
+  const previous = prevRange ? await countRealListingLinkedInRange(admin, table, prevRange.since, prevRange.until) : null
   return { current, previous }
 }
