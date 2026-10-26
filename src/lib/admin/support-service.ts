@@ -2,6 +2,27 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 const DEFAULT_LIMIT = 50
 
+/**
+ * Escapes a value for safe embedding inside a PostgREST `.or()`/`.in()`
+ * combinator filter string (the raw string syntax `column.operator.value`
+ * joined by commas, e.g. `a.eq.1,b.eq.2`, that supabase-js's `.or()` sends
+ * verbatim as the `or=` query param). Wrapping the value in double quotes
+ * is PostgREST's own documented escape for exactly this grammar: a comma,
+ * parenthesis, period, or colon inside the quotes loses its structural
+ * meaning and is treated as literal value content instead of a filter
+ * separator -- so a search term like `abc,(def):ghi` can never widen the
+ * filter into a second predicate or break the expression, without
+ * stripping characters a legitimate search might need (case numbers use
+ * hyphens, names can carry punctuation). Any literal backslash or double
+ * quote in the value is itself backslash-escaped first, per the same
+ * PostgREST rule, so the value can't prematurely close the quoted token.
+ * Does not touch `%`/`_` -- those remain real ILIKE wildcards, matching
+ * every other substring search already shipped in this codebase.
+ */
+export function quotePostgrestFilterValue(value: string): string {
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+}
+
 export interface AdminSupportCaseRow {
   id: string
   caseNumber: string
@@ -71,13 +92,14 @@ export async function listAdminSupportCases(admin: SupabaseClient, filters: Admi
 
   if (filters.search && filters.search.trim()) {
     const q = filters.search.trim()
+    const quotedLike = quotePostgrestFilterValue(`%${q}%`)
     const { data: matchingProfiles } = await admin
       .from('profiles')
       .select('id')
-      .or(`full_name.ilike.%${q}%,display_name.ilike.%${q}%`)
+      .or(`full_name.ilike.${quotedLike},display_name.ilike.${quotedLike}`)
     const profileIds = (matchingProfiles ?? []).map((p) => p.id as string)
 
-    const clauses = [`case_number.ilike.%${q}%`, `title.ilike.%${q}%`]
+    const clauses = [`case_number.ilike.${quotedLike}`, `title.ilike.${quotedLike}`]
     if (profileIds.length) {
       clauses.push(`customer_id.in.(${profileIds.join(',')})`)
       clauses.push(`merchant_id.in.(${profileIds.join(',')})`)

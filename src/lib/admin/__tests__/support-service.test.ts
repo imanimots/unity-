@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { listAdminSupportCases, getSupportCaseSummaryForUser } from '../support-service'
+import { listAdminSupportCases, getSupportCaseSummaryForUser, quotePostgrestFilterValue } from '../support-service'
 
 const USER_ID = '11111111-1111-1111-1111-111111111111'
 
@@ -19,6 +19,157 @@ function chainableQuery(result: { data?: unknown; error?: unknown; count?: numbe
   }
   return obj
 }
+
+/**
+ * Splits a PostgREST combinator-list filter string (`col.op.val,col.op.val`)
+ * into its top-level clauses, respecting double-quoted value segments --
+ * i.e. a comma/paren inside `"..."` is NOT a clause separator. This is a
+ * minimal stand-in for PostgREST's own parser, used here purely to prove
+ * that a malicious search term embedded in a quoted value can never
+ * appear to the real parser as an extra, injected top-level predicate.
+ */
+function splitTopLevelOrClauses(filterString: string): string[] {
+  const clauses: string[] = []
+  let current = ''
+  let inQuotes = false
+  for (let i = 0; i < filterString.length; i++) {
+    const ch = filterString[i]
+    if (ch === '"' && filterString[i - 1] !== '\\') inQuotes = !inQuotes
+    if (ch === ',' && !inQuotes) {
+      clauses.push(current)
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  clauses.push(current)
+  return clauses
+}
+
+describe('quotePostgrestFilterValue (category: ADMIN-CONTROL-CENTRE-BATCH-A2-NARROW-SEARCH-REMEDIATION) — PostgREST filter-value escaping', () => {
+  it('1. wraps a plain value in double quotes, unchanged inside', () => {
+    expect(quotePostgrestFilterValue('%John Smith%')).toBe('"%John Smith%"')
+  })
+
+  it('2. a literal double quote in the value is backslash-escaped so it cannot close the token early', () => {
+    expect(quotePostgrestFilterValue('%"quoted"%')).toBe('"%\\"quoted\\"%"')
+  })
+
+  it('3. a literal backslash is itself escaped first, so it cannot be used to unescape a following quote', () => {
+    expect(quotePostgrestFilterValue('%back\\slash%')).toBe('"%back\\\\slash%"')
+  })
+
+  it('4. hyphens, commas, parens, periods, and colons all pass through literally inside the quotes', () => {
+    expect(quotePostgrestFilterValue('%SUP-2026-000001%')).toBe('"%SUP-2026-000001%"')
+    expect(quotePostgrestFilterValue('%abc,(def):ghi.test%')).toBe('"%abc,(def):ghi.test%"')
+  })
+})
+
+describe('listAdminSupportCases search (category: ADMIN-CONTROL-CENTRE-BATCH-A2-NARROW-SEARCH-REMEDIATION) — adversarial search-term handling', () => {
+  const ADVERSARIAL_INPUTS = [
+    'abc,def',
+    'abc(def)',
+    'abc.def',
+    'abc:def',
+    'abc,(def):ghi.test',
+    'abc%def',
+    'abc_def',
+    "O'Brien",
+    '"quoted"',
+    'back\\slash',
+    'SUP-2026-000001',
+    'John Smith',
+  ]
+
+  it.each(ADVERSARIAL_INPUTS)('1. %s never produces more than the 2 (or 4) real clauses -- no injected predicate', async (input) => {
+    const orCalls: string[] = []
+    const admin = {
+      from: (table: string) => {
+        if (table === 'profiles') return chainableQuery({ data: [], error: null }, {})
+        return chainableQuery({ data: [], error: null, count: 0 }, { or: (clause: unknown) => orCalls.push(clause as string) })
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await listAdminSupportCases(admin, { search: input })
+
+    // No matching profiles in this test, so exactly 2 real clauses:
+    // case_number.ilike and title.ilike -- regardless of what punctuation
+    // the search term itself contains.
+    const supportCasesOrCall = orCalls.find((c) => c.includes('case_number'))
+    expect(supportCasesOrCall).toBeDefined()
+    const clauses = splitTopLevelOrClauses(supportCasesOrCall as string)
+    expect(clauses).toHaveLength(2)
+    expect(clauses[0]).toMatch(/^case_number\.ilike\./)
+    expect(clauses[1]).toMatch(/^title\.ilike\./)
+  })
+
+  it('2. a search term with a matching profile still yields exactly 4 real clauses, never a 5th injected one', async () => {
+    const orCalls: string[] = []
+    const admin = {
+      from: (table: string) => {
+        if (table === 'profiles') return chainableQuery({ data: [{ id: USER_ID }], error: null }, {})
+        return chainableQuery({ data: [], error: null, count: 0 }, { or: (clause: unknown) => orCalls.push(clause as string) })
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await listAdminSupportCases(admin, { search: 'abc,(def):ghi.test' })
+    const supportCasesOrCall = orCalls.find((c) => c.includes('case_number')) as string
+    const clauses = splitTopLevelOrClauses(supportCasesOrCall)
+    expect(clauses).toHaveLength(4)
+    expect(clauses[2]).toBe(`customer_id.in.(${USER_ID})`)
+    expect(clauses[3]).toBe(`merchant_id.in.(${USER_ID})`)
+  })
+
+  it('3. case-number search is preserved -- the hyphenated value survives quoting intact', async () => {
+    const orCalls: string[] = []
+    const admin = {
+      from: (table: string) => {
+        if (table === 'profiles') return chainableQuery({ data: [], error: null }, {})
+        return chainableQuery({ data: [], error: null, count: 0 }, { or: (clause: unknown) => orCalls.push(clause as string) })
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await listAdminSupportCases(admin, { search: 'SUP-2026-000001' })
+    const clause = orCalls.find((c) => c.includes('case_number')) as string
+    expect(clause).toContain('case_number.ilike."%SUP-2026-000001%"')
+  })
+
+  it('4. normal name search ("John Smith") still reaches the profiles lookup with a valid, space-preserving quoted value', async () => {
+    const profilesOrSpy = vi.fn()
+    const admin = {
+      from: (table: string) => {
+        if (table === 'profiles') return chainableQuery({ data: [], error: null }, { or: profilesOrSpy })
+        return chainableQuery({ data: [], error: null, count: 0 }, {})
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await listAdminSupportCases(admin, { search: 'John Smith' })
+    expect(profilesOrSpy).toHaveBeenCalledWith('full_name.ilike."%John Smith%",display_name.ilike."%John Smith%"')
+  })
+
+  it('5. search remains server-side (pushed via .or/.in), never fetched in full and filtered client-side -- same guarantee as before this fix', async () => {
+    let supportCasesFromCalled = false
+    const admin = {
+      from: (table: string) => {
+        if (table === 'profiles') return chainableQuery({ data: [], error: null }, {})
+        supportCasesFromCalled = true
+        return chainableQuery({ data: [], error: null, count: 0 }, {})
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const page = await listAdminSupportCases(admin, { search: 'abc,(def)', offset: 10, limit: 5 })
+    expect(supportCasesFromCalled).toBe(true)
+    expect(page.cases).toEqual([])
+  })
+
+  it('6. malformed-looking input (unbalanced quote/parens) does not throw -- it is quoted as a single literal value, not parsed as a mini-grammar', async () => {
+    const admin = {
+      from: () => chainableQuery({ data: [], error: null, count: 0 }, {}),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await expect(listAdminSupportCases(admin, { search: '"unbalanced(((' })).resolves.toBeDefined()
+  })
+})
 
 describe('listAdminSupportCases (category: ADMIN-CONTROL-CENTRE-BATCH-A2) — list filters + pagination (J)', () => {
   it('1. status/priority/category filters are pushed to Postgres via .eq, never applied in memory', async () => {
