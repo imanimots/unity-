@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { countAdminDisputesForUser } from '@/lib/admin/disputes-service'
+import { getSupportCaseSummaryForUser, type AdminSupportCaseSummary } from '@/lib/admin/support-service'
 
 export interface AdminUserFilters {
   search?: string
@@ -102,6 +103,9 @@ export interface AdminUserDetail {
   rentToBuyCount: number
   lookingForCount: number
   reviewsCount: number
+  /** ADMIN-CONTROL-CENTRE-BATCH-A2: Support Centre summary -- open cases where this profile is the customer or merchant, plus the most recent few (any status). */
+  openSupportCaseCount: number
+  recentSupportCases: AdminSupportCaseSummary[]
   accountHistory: Array<{
     id: string
     actionType: string
@@ -136,6 +140,7 @@ export async function getAdminUserDetail(admin: SupabaseClient, userId: string):
     { count: rentToBuyCount },
     { count: lookingForCount },
     { count: reviewsCount },
+    supportCaseSummary,
     { data: history },
     { data: notes },
   ] = await Promise.all([
@@ -149,6 +154,7 @@ export async function getAdminUserDetail(admin: SupabaseClient, userId: string):
     admin.from('rent_to_buy_agreements').select('id', { count: 'exact', head: true }).or(`merchant_id.eq.${userId},customer_id.eq.${userId}`),
     admin.from('marketplace_requests').select('id', { count: 'exact', head: true }).eq('requester_id', userId),
     admin.from('reviews_v2').select('id', { count: 'exact', head: true }).or(`reviewer_id.eq.${userId},reviewee_id.eq.${userId}`),
+    getSupportCaseSummaryForUser(admin, userId),
     admin.from('user_account_history').select('id, action_type, previous_status, new_status, user_reason, internal_note, admin_id, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
     admin.from('admin_notes').select('id, note, admin_id, created_at').eq('entity_type', 'user').eq('entity_id', userId).order('created_at', { ascending: false }),
   ])
@@ -177,6 +183,8 @@ export async function getAdminUserDetail(admin: SupabaseClient, userId: string):
     rentToBuyCount: rentToBuyCount ?? 0,
     lookingForCount: lookingForCount ?? 0,
     reviewsCount: reviewsCount ?? 0,
+    openSupportCaseCount: supportCaseSummary.openCount,
+    recentSupportCases: supportCaseSummary.recent,
     accountHistory: (history ?? []).map((h) => ({
       id: h.id,
       actionType: h.action_type,

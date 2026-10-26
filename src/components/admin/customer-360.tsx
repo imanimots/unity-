@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import {
   Pill,
@@ -45,6 +46,8 @@ interface AdminUserDetail {
   rentToBuyCount: number
   lookingForCount: number
   reviewsCount: number
+  openSupportCaseCount: number
+  recentSupportCases: Array<{ id: string; caseNumber: string; title: string; status: string; priority: string; createdAt: string }>
   accountHistory: Array<{
     id: string
     actionType: string
@@ -91,6 +94,7 @@ const NOT_AVAILABLE = 'NOT AVAILABLE VIA CURRENT AUTH API'
 
 /** One shared implementation for both /admin/users/[id] (Customer 360) and /admin/merchants/[id] (Merchant 360) -- a merchant is the same profile/user record, just with an extra Merchant section (mode='merchant'). Never duplicates the full domain interfaces it links out to (bookings/orders/barter/RTB/disputes/payouts/subscriptions) -- those stay on their own existing pages. */
 export function Customer360({ userId, mode }: { userId: string; mode: 'customer' | 'merchant' }) {
+  const router = useRouter()
   const [detail, setDetail] = useState<AdminUserDetail | null>(null)
   const [authInfo, setAuthInfo] = useState<AuthInfo | ErasedAuthInfo | { authUserExists: false } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -101,6 +105,8 @@ export function Customer360({ userId, mode }: { userId: string; mode: 'customer'
   const [reasonInput, setReasonInput] = useState('')
   const [noteInput, setNoteInput] = useState('')
   const [cleanupNotice, setCleanupNotice] = useState<string | null>(null)
+  const [creatingCase, setCreatingCase] = useState(false)
+  const [createCaseError, setCreateCaseError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -229,6 +235,34 @@ export function Customer360({ userId, mode }: { userId: string; mode: 'customer'
     }
   }
 
+  async function createSupportCase(category: string, defaultTitle: string) {
+    const title = window.prompt('Case title', defaultTitle)
+    if (!title || !title.trim()) return
+    setCreatingCase(true)
+    setCreateCaseError(null)
+    try {
+      const res = await fetch('/api/admin/support', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: title.trim(),
+          category,
+          ...(mode === 'merchant' ? { merchant_id: userId } : { customer_id: userId }),
+          linked_entity_type: mode === 'merchant' ? 'merchant' : 'customer',
+          linked_entity_id: userId,
+          idempotency_key: newIdempotencyKey(),
+        }),
+      })
+      const b = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(b.error ?? 'Could not create support case')
+      router.push(`/admin/support/${b.id}`)
+    } catch (err) {
+      setCreateCaseError(err instanceof Error ? err.message : 'Could not create support case')
+    } finally {
+      setCreatingCase(false)
+    }
+  }
+
   if (loading) return <div className="p-8 text-sm text-[#9B8B85]">Loading…</div>
   if (error || !detail) return <div className="p-8 text-sm text-red-600">{error ?? 'Not found'}</div>
 
@@ -300,6 +334,13 @@ export function Customer360({ userId, mode }: { userId: string; mode: 'customer'
             <p className="text-[11px] text-[#9B8B85]">
               Read-only this phase — no auth actions (password recovery, resend verification, session revocation) are available here yet; those are deferred to a later security-hardening phase.
             </p>
+            <button
+              disabled={creatingCase}
+              onClick={() => createSupportCase('account_access', `Account access — ${detail.profile.fullName ?? detail.profile.displayName ?? userId.slice(0, 8)}`)}
+              className={secondaryButtonClass}
+            >
+              Create account access support case
+            </button>
           </>
         )}
       </section>
@@ -326,6 +367,35 @@ export function Customer360({ userId, mode }: { userId: string; mode: 'customer'
           <SummaryLink label="Disputes" value={detail.disputeCount} href={`/admin/disputes?userId=${userId}`} />
           <SummaryLink label="Reviews" value={detail.reviewsCount} href="/admin/reviews" />
         </div>
+      </section>
+
+      {/* ── Support ── */}
+      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Support</h2>
+          <button disabled={creatingCase} onClick={() => createSupportCase('general_other', '')} className={secondaryButtonClass}>
+            Create support case
+          </button>
+        </div>
+        {createCaseError ? <p className="text-xs text-red-600">{createCaseError}</p> : null}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <SummaryLink label="Open cases" value={detail.openSupportCaseCount} href={`/admin/support?userId=${userId}`} />
+        </div>
+        {detail.recentSupportCases.length > 0 ? (
+          <ul className="space-y-1.5">
+            {detail.recentSupportCases.map((c) => (
+              <li key={c.id}>
+                <Link href={`/admin/support/${c.id}`} className="flex items-center justify-between gap-3 text-sm bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg px-3 py-2 hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors">
+                  <span className="truncate text-[#1A0A0A] dark:text-[#F5F0ED]">{c.caseNumber} — {c.title}</span>
+                  <span className="text-[#9B8B85] capitalize whitespace-nowrap">{c.status.replace(/_/g, ' ')}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-[#9B8B85]">No support cases yet.</p>
+        )}
+        <Link href={`/admin/support?userId=${userId}`} className="text-xs text-[#8B1A1A] underline">View all related cases</Link>
       </section>
 
       {/* ── Financial ── */}
