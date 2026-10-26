@@ -251,6 +251,9 @@ export default function AdminAnalyticsPage() {
               {[data.transactions.bookings, data.transactions.orders, data.transactions.barter, data.transactions.rentToBuy, data.transactions.lookingFor].map((d) => (
                 <div key={d.domain}>
                   <h3 className="text-xs font-bold uppercase tracking-[0.1em] text-[#9B8B85] mb-2">{d.domain} ({d.total})</h3>
+                  {d.mayIncludeTestData ? (
+                    <p className="text-[10px] text-amber-700 mb-1">May include QA/test activity — no reliable exclusion exists for this domain.</p>
+                  ) : null}
                   <BreakdownTable rows={d.byStatus} labelHeader="Status" />
                 </div>
               ))}
@@ -272,6 +275,9 @@ export default function AdminAnalyticsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-[0.1em] text-[#9B8B85] mb-2">Disputes ({data.trust.disputesByStatus.total} this period)</h3>
+                {data.trust.disputesByStatus.mayIncludeTestData ? (
+                  <p className="text-[10px] text-amber-700 mb-1">May include QA/test activity — no reliable exclusion exists for this domain.</p>
+                ) : null}
                 <BreakdownTable rows={data.trust.disputesByStatus.byStatus} labelHeader="Status" />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -287,6 +293,9 @@ export default function AdminAnalyticsPage() {
             <p className="text-[11px] text-[#9B8B85]">
               These are recorded rows in Unity&apos;s own ledger tables, not confirmed cash settlement — the live payment/payout provider is not fully connected yet.
             </p>
+            {data.commercial.notes.map((note) => (
+              <p key={note} className="text-[10px] text-amber-700">{note}</p>
+            ))}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-[0.1em] text-[#9B8B85] mb-2">Recorded Unity commissions</h3>
