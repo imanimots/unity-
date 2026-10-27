@@ -83,13 +83,46 @@ describe('D3-A-F1 profiles.data_classification three-state migration invariants 
     expect(fnBody).not.toMatch(/is_test/)
   })
 
-  it('9. preserves every pre-existing protected field in the same trigger -- role, kyc_status, unity_score, is_affiliate, affiliate_code', () => {
+  it('9. preserves every pre-existing protected field from the FIRST trigger definition (20260729000001) -- role, kyc_status, unity_score, is_affiliate, affiliate_code', () => {
     const fnBody = functionBody('protect_profile_privileged_fields')
     expect(fnBody).toMatch(/new\.role := old\.role;/)
     expect(fnBody).toMatch(/new\.kyc_status := old\.kyc_status;/)
     expect(fnBody).toMatch(/new\.unity_score := old\.unity_score;/)
     expect(fnBody).toMatch(/new\.is_affiliate := old\.is_affiliate;/)
     expect(fnBody).toMatch(/new\.affiliate_code := old\.affiliate_code;/)
+  })
+
+  it('9b. D3-A-F2 regression guard: preserves every protected field added by the SECOND, LATER trigger definition (20260808000001_account_status_and_admin_notes.sql) -- account_status, status_reason, status_changed_at, status_changed_by. This is the exact P1 this migration must never regress: a version of this function that omits any of these four fields would let an ordinary suspended/restricted user self-reactivate via a direct profile update.', () => {
+    const fnBody = functionBody('protect_profile_privileged_fields')
+    expect(fnBody, 'account_status protection missing -- P1 regression').toMatch(/new\.account_status := old\.account_status;/)
+    expect(fnBody, 'status_reason protection missing -- P1 regression').toMatch(/new\.status_reason := old\.status_reason;/)
+    expect(fnBody, 'status_changed_at protection missing -- P1 regression').toMatch(/new\.status_changed_at := old\.status_changed_at;/)
+    expect(fnBody, 'status_changed_by protection missing -- P1 regression').toMatch(/new\.status_changed_by := old\.status_changed_by;/)
+  })
+
+  it('9c. all ten protected fields (role, kyc_status, unity_score, is_affiliate, affiliate_code, account_status, status_reason, status_changed_at, status_changed_by, data_classification) sit inside the same outer auth.role() guard -- not merely present somewhere in the function', () => {
+    const fnBody = functionBody('protect_profile_privileged_fields')
+    const guardIdx = fnBody.indexOf("if auth.role() <> 'service_role' then")
+    const returnIdx = fnBody.indexOf('return new;')
+    const outerEndIfIdx = fnBody.lastIndexOf('end if;', returnIdx)
+    const protectedFieldAssignments = [
+      'new.role := old.role;',
+      'new.kyc_status := old.kyc_status;',
+      'new.unity_score := old.unity_score;',
+      'new.is_affiliate := old.is_affiliate;',
+      'new.affiliate_code := old.affiliate_code;',
+      'new.account_status := old.account_status;',
+      'new.status_reason := old.status_reason;',
+      'new.status_changed_at := old.status_changed_at;',
+      'new.status_changed_by := old.status_changed_by;',
+      'new.data_classification := old.data_classification;',
+    ]
+    for (const assignment of protectedFieldAssignments) {
+      const idx = fnBody.indexOf(assignment)
+      expect(idx, `expected to find "${assignment}"`).toBeGreaterThanOrEqual(0)
+      expect(idx, `"${assignment}" must be inside the outer guard`).toBeGreaterThan(guardIdx)
+      expect(idx, `"${assignment}" must be inside the outer guard`).toBeLessThan(outerEndIfIdx)
+    }
   })
 
   it('10. backfills @unitytest.internal to \'test\' via an exact, case-insensitive domain-suffix match against auth.users.email', () => {

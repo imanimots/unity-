@@ -51,16 +51,25 @@ alter table public.profiles
   add column if not exists data_classification text not null default 'unknown'
   check (data_classification in ('real', 'test', 'unknown'));
 
--- Extends the existing privilege-escalation-protection trigger
--- (20260729000001_fix_rls_privilege_escalation.sql) with
--- data_classification, rather than inventing a new mechanism -- same
--- pattern already protecting role/kyc_status/unity_score/
--- is_affiliate/affiliate_code: any non-service_role caller's
--- attempted change (real->test, real->unknown, unknown->real,
--- unknown->test, test->real, test->unknown -- every direction) is
--- silently reverted to the row's previous value, so an ordinary
--- profile update (e.g. changing display_name) can never also smuggle
--- in a classification change, without failing the whole request.
+-- Extends the LATEST effective privilege-escalation-protection
+-- trigger with data_classification, rather than inventing a new
+-- mechanism. This function has been redefined twice before this
+-- migration -- 20260729000001_fix_rls_privilege_escalation.sql
+-- (role/kyc_status/unity_score/is_affiliate/affiliate_code) and then
+-- 20260808000001_account_status_and_admin_notes.sql, which ADDED
+-- account_status/status_reason/status_changed_at/status_changed_by
+-- to the same guard. D3-A/F1's first version of this migration was
+-- written against only the first (older) definition and would have
+-- silently DROPPED the account-status protections on application --
+-- a real P1 regression (an ordinary suspended/restricted user could
+-- have self-reactivated via a direct profile update), caught by an
+-- independent live-trigger inspection before this migration was ever
+-- applied. This version preserves every field from BOTH prior
+-- definitions and adds only data_classification: any non-service_role
+-- caller's attempted change to any of these ten fields, in any
+-- direction, is silently reverted to the row's previous value, so an
+-- ordinary profile update (e.g. changing display_name) can never also
+-- smuggle in a privileged change, without failing the whole request.
 create or replace function public.protect_profile_privileged_fields()
 returns trigger
 language plpgsql
@@ -78,6 +87,14 @@ begin
 
     new.is_affiliate := old.is_affiliate;
     new.affiliate_code := old.affiliate_code;
+
+    -- account_status / status_reason / status_changed_at /
+    -- status_changed_by: added by 20260808000001_account_status_and_admin_notes.sql
+    -- -- preserved here unchanged, never dropped.
+    new.account_status := old.account_status;
+    new.status_reason := old.status_reason;
+    new.status_changed_at := old.status_changed_at;
+    new.status_changed_by := old.status_changed_by;
 
     -- data_classification (D3-A/F1): no client-facing path exists or
     -- will exist for this column -- it is migration/service-role
