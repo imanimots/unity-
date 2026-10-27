@@ -92,7 +92,8 @@ export async function POST(request: NextRequest) {
     // No profile-level is_test/QA marker exists in this codebase today
     // (confirmed D2 recon) -- classification stays 'unknown' rather
     // than guessing at real-vs-test for identity submissions.
-    void recordAnalyticsEvent({ eventName: 'kyc_submitted', actorState: 'authenticated', dataClassification: 'unknown' })
+    // Awaited, with a local .catch() safety net -- see the matching comment in src/app/api/bookings/route.ts (D2-F1 remediation).
+    await recordAnalyticsEvent({ eventName: 'kyc_submitted', actorState: 'authenticated', dataClassification: 'unknown' }).catch(() => {})
 
     return NextResponse.json(result, { status: 201 })
   } catch (err) {

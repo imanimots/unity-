@@ -13,6 +13,7 @@ import { sendTemplate, loadListingEmailContext } from '@/lib/email'
 import { blocksNewTransactions } from '@/lib/admin/account-status'
 import type { AccountStatus } from '@/types'
 import { recordAnalyticsEvent } from '@/lib/analytics/server'
+import { checkIdempotentReplay } from '@/lib/bookings/idempotency'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -135,6 +136,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'This listing is not eligible for activation', eligibility: finalEligibility, completeness }, { status: 422 })
   }
 
+  // D2-F1: determine BEFORE calling the RPC whether this exact
+  // (admin, idempotency_key) pair was already used -- activate_listing
+  // (20260803000003_admin_moderation_rpcs.sql) inserts its own
+  // idempotency_keys row as part of a FRESH activation, so checking
+  // only after the call would always find a row, including for a
+  // genuine first activation. Same reasoning and same shared helper
+  // as the listing-creation fix in src/app/api/listings/route.ts. A
+  // repeated activation request WITHOUT an idempotency key (or one
+  // targeting an already-active listing) is separately and already
+  // handled: the RPC's own status guard raises an exception for that
+  // case, which the existing `if (error)` branch above already
+  // excludes from reaching this point at all.
+  let wasReplay = false
+  if (parsed.data.idempotency_key) {
+    const replay = await checkIdempotentReplay(admin, gate.requester.userId, 'activate_listing', parsed.data.idempotency_key, '')
+    wasReplay = replay.status !== 'none'
+  }
+
   const { data, error } = await activateListing(admin, listingId, gate.requester.userId, parsed.data.idempotency_key)
 
   if (error) {
@@ -143,14 +162,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: mapped.error }, { status: mapped.status })
   }
 
-  void recordAnalyticsEvent({
-    eventName: 'listing_published',
-    actorState: 'admin',
-    entityType: 'listing',
-    entityId: listingId,
-    dataClassification: listing.is_test ? 'test' : 'real',
-    metadata: listing.category ? { category: listing.category } : {},
-  })
+  // listing_published: only on a genuine first transition into
+  // active, never on an idempotent replay of an already-completed
+  // activation request. Awaited, with a local .catch() safety net --
+  // see the matching comment in src/app/api/bookings/route.ts (D2-F1).
+  if (!wasReplay) {
+    await recordAnalyticsEvent({
+      eventName: 'listing_published',
+      actorState: 'admin',
+      entityType: 'listing',
+      entityId: listingId,
+      dataClassification: listing.is_test ? 'test' : 'real',
+      metadata: listing.category ? { category: listing.category } : {},
+    }).catch(() => {})
+  }
 
   try {
     const ctx = await loadListingEmailContext(admin, listingId)

@@ -6,6 +6,7 @@ import { validatePublicCategoryMetadata, validatePrivateCategoryMetadata } from 
 import { mapListingRpcError } from '@/lib/listings/rpc-errors'
 import { blockIfCannotCreate } from '@/lib/admin/account-status'
 import { recordAnalyticsEvent, deriveActorState } from '@/lib/analytics/server'
+import { checkIdempotentReplay } from '@/lib/bookings/idempotency'
 
 /**
  * POST /api/listings — create or update a draft listing.
@@ -102,6 +103,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Listing storage is not configured' }, { status: 503 })
     }
 
+    // D2-F1: determine BEFORE calling the RPC whether this exact
+    // (merchant, idempotency_key) pair was already used -- the RPC
+    // itself (20260729000008_listing_wizard_closure.sql) inserts its
+    // own idempotency_keys row as part of a FRESH creation, so
+    // checking AFTER the call would always find a row (including for
+    // a genuine first creation) and could never distinguish replay
+    // from fresh. Checking first, and relying on the RPC's own request-
+    // hash check to reject a true conflict, correctly identifies only
+    // a genuine prior attempt. Reuses the repository-native
+    // idempotency_keys table via the shared checkIdempotentReplay()
+    // helper already used by bookings/orders, rather than inventing a
+    // parallel mechanism -- the exact request-hash value passed here
+    // doesn't need to byte-for-byte match the RPC's own jsonb::text
+    // formula, since any non-'none' result (a real replay OR a hash
+    // mismatch the RPC would separately reject with an error) means
+    // "a prior attempt already exists for this key," which is all
+    // this check needs to safely avoid a double emission. Best-effort:
+    // if no service-role key is configured, this pre-check is skipped
+    // and the route falls back to its pre-F1 behavior rather than
+    // failing the whole request.
+    let wasReplay = false
+    if (!listing_id && idempotency_key) {
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      if (serviceKey) {
+        const { createClient: createServiceClient } = await import('@supabase/supabase-js')
+        const adminForReplayCheck = createServiceClient(url, serviceKey)
+        const replay = await checkIdempotentReplay(adminForReplayCheck, requester.userId, 'save_listing_draft', idempotency_key, '')
+        wasReplay = replay.status !== 'none'
+      }
+    }
+
     const { data, error } = await supabase.rpc('save_listing_draft', {
       p_listing_id: listing_id ?? null,
       p_listing: listing,
@@ -121,16 +153,20 @@ export async function POST(request: NextRequest) {
 
     // listing_creation_started: fires exactly once per listing, only on
     // the call that CREATES the draft (listing_id was absent from the
-    // request) -- every subsequent autosave call for the same draft
-    // carries a listing_id and is correctly excluded here.
-    if (!listing_id) {
-      void recordAnalyticsEvent({
+    // request) and only when the pre-check above found no prior
+    // attempt for this idempotency_key -- every subsequent autosave
+    // call for the same draft carries a listing_id and is correctly
+    // excluded here, and a replayed first-save call is correctly
+    // excluded by wasReplay.
+    // Awaited, with a local .catch() safety net -- see the matching comment in src/app/api/bookings/route.ts (D2-F1 remediation).
+    if (!listing_id && !wasReplay) {
+      await recordAnalyticsEvent({
         eventName: 'listing_creation_started',
         actorState: deriveActorState(requester.profile.role),
         entityType: 'listing',
         entityId: data as string,
         dataClassification: 'unknown',
-      })
+      }).catch(() => {})
     }
 
     return NextResponse.json({ listing_id: data, status: 'draft' })

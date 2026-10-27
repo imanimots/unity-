@@ -18,7 +18,7 @@ import { ProposeTradeButton } from '@/components/barter/propose-trade-button'
 import { getRequestProfile } from '@/lib/supabase/require-admin'
 import { ProfileLink } from '@/components/shared/profile-link'
 import { isListingBarterLocked, getAllBarterLockedListingIds } from '@/lib/barter/listing-lock'
-import { recordAnalyticsEvent } from '@/lib/analytics/server'
+import { ListingViewTracker } from '@/components/analytics/listing-view-tracker'
 import { isListingRentToBuyLocked } from '@/lib/rent-to-buy/listing-lock'
 import { getPublicRentToBuyTerms } from '@/lib/rent-to-buy/public-terms'
 import { isRentToBuyEnabled } from '@/lib/rent-to-buy/config'
@@ -88,14 +88,6 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
 
   if (!listing) notFound()
 
-  void recordAnalyticsEvent({
-    eventName: 'listing_viewed',
-    entityType: 'listing',
-    entityId: listing.id,
-    dataClassification: listing.is_test ? 'test' : 'real',
-    metadata: listing.category ? { category: listing.category } : {},
-  })
-
   const reviews = getListingReviews(listing.id)
   const avgRating = getAverageRating(reviews)
   const city = CITY_BY_MERCHANT[listing.merchant_id] ?? 'South Africa'
@@ -151,6 +143,7 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
   return (
     <NextIntlClientProvider messages={scoped}>
     <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen">
+      <ListingViewTracker listingId={listing.id} category={listing.category} />
       {isPersonalizationEnabled() && (
         <RecordListingView
           personalizationEnabled

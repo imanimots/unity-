@@ -381,12 +381,14 @@ export default function AdminAnalyticsPage() {
                 {data.behavior.dataQuality.notes.map((note) => (
                   <p key={note} className="text-[10px] text-amber-700">{note}</p>
                 ))}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                   <StatCard label="Page views" value={data.behavior.pageViews} />
+                  <StatCard label="Listing views" value={data.behavior.listingViews} />
                   <StatCard label="Searches started" value={data.behavior.searchStarted} />
+                  <StatCard label="Search result views" value={data.behavior.searchResultsViewed} />
                   <StatCard label="Zero-result searches" value={data.behavior.zeroResultSearches} />
                   <StatCard label="Zero-result rate" value={data.behavior.zeroResultRate === null ? '—' : `${Math.round(data.behavior.zeroResultRate * 100)}%`} />
-                  <StatCard label="Listing views" value={data.behavior.listingViews} />
+                  <StatCard label="Search refinements" value={data.behavior.searchRefinements} />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   <FunnelStat label="Signup" funnel={data.behavior.signupFunnel} />

@@ -16,7 +16,7 @@ import type { ListingFilters } from '@/lib/data/listings'
 import { Search } from 'lucide-react'
 import { absoluteUrl, isMarketplaceIndexingEnabled, getMarketplaceRobotsMeta } from '@/lib/seo/config'
 import { recordSearchDemandEvent } from '@/lib/subscriptions/demand-telemetry'
-import { recordAnalyticsEvent } from '@/lib/analytics/server'
+import { SearchAnalyticsTracker } from '@/components/analytics/search-analytics-tracker'
 
 const TITLE = 'Browse Listings — Unity'
 const DESCRIPTION = 'Find items to rent near you across South Africa.'
@@ -114,28 +114,26 @@ export default async function ListingsPage({ searchParams }: PageProps) {
     zeroResult: isZeroResult,
   })
 
-  // Behavioral search instrumentation (D2) -- distinct from the demand
-  // telemetry above: only fires when the visitor actually submitted a
-  // query or applied a filter, never for a bare, default /listings
+  // Behavioral search instrumentation (D2-F1): only the SAFE, already-
+  // final facts are computed here -- the actual event emission happens
+  // client-side (<SearchAnalyticsTracker>, rendered below) so it fires
+  // only on a genuine browser mount/hydration, never as a side effect
+  // of this Server Component's own execution (which Next.js prefetch,
+  // speculative rendering, or a crawler could otherwise trigger with
+  // no real visitor behind it). Only a real submitted query or applied
+  // filter counts as "a search" -- never a bare, default /listings
   // page load (that's just a page_view). filterCount deliberately
   // excludes `q` itself (counted separately via has_query) and `sort`
   // when it's the default 'relevance'/'newest' value.
   const hasQuery = !!params.q
   const filterCount = [params.category, params.maxPrice].filter(Boolean).length
   const isSearchExecution = hasQuery || filterCount > 0
-  if (isSearchExecution) {
-    const resultCount = listings.length + requests.length + skillTaskPosts.length
-    const categoryMetadata: Record<string, string> = params.category ? { category: params.category } : {}
-    void recordAnalyticsEvent({
-      eventName: 'search_started',
-      metadata: { has_query: hasQuery, filter_count: filterCount, ...categoryMetadata },
-    })
-    void recordAnalyticsEvent(
-      isZeroResult
-        ? { eventName: 'search_zero_results', metadata: { has_query: hasQuery, ...categoryMetadata } }
-        : { eventName: 'search_results_viewed', metadata: { result_count: resultCount, has_query: hasQuery, ...categoryMetadata } }
-    )
-  }
+  const searchResultCount = listings.length + requests.length + skillTaskPosts.length
+  // Canonical query-param identity for THIS request -- used only to dedupe
+  // the client tracker's effect across rerenders, never sent as analytics
+  // payload itself (the tracker only ever emits the already-validated
+  // has_query/filter_count/category/result_count fields).
+  const routeKey = [params.q ? '1' : '0', params.category ?? '', params.sort ?? '', params.maxPrice ?? '', params.mode ?? '', params.direction ?? '', params.kind ?? '', params.cursor ?? ''].join('|')
 
   const nextPageUrl = (() => {
     if (!nextCursor) return null
@@ -153,6 +151,14 @@ export default async function ListingsPage({ searchParams }: PageProps) {
 
   return (
     <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen">
+      <SearchAnalyticsTracker
+        routeKey={routeKey}
+        hasExecutedSearch={isSearchExecution}
+        resultCount={searchResultCount}
+        filterCount={filterCount}
+        hasQuery={hasQuery}
+        category={params.category}
+      />
 
       {/* ── PAGE HEADER ── */}
       <section className="bg-[#FAF8F5] dark:bg-[#0F0A0A] pt-24 pb-10 border-b border-[#F2EDE8] dark:border-[#2A1A1A]">

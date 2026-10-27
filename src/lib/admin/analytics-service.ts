@@ -705,8 +705,10 @@ export interface FunnelMetric {
 export interface BehaviorAnalytics {
   pageViews: number
   searchStarted: number
+  searchResultsViewed: number
   zeroResultSearches: number
   zeroResultRate: number | null
+  searchRefinements: number
   listingViews: number
   signupFunnel: FunnelMetric
   listingCreationFunnel: FunnelMetric
@@ -736,8 +738,10 @@ function emptyBehaviorAnalytics(extraNote?: string): BehaviorAnalytics {
   return {
     pageViews: 0,
     searchStarted: 0,
+    searchResultsViewed: 0,
     zeroResultSearches: 0,
     zeroResultRate: null,
+    searchRefinements: 0,
     listingViews: 0,
     signupFunnel: { started: 0, completed: 0, conversionRate: null },
     listingCreationFunnel: { started: 0, completed: 0, conversionRate: null },
@@ -768,23 +772,38 @@ async function countAnalyticsEvents(admin: SupabaseClient, eventName: string, si
  * D1-H1/H2 just fixed for two other sections. Any other, non-missing-
  * table error still throws, since that would be a genuine bug worth
  * surfacing rather than a deployment-ordering gap.
+ *
+ * D2-F1 fix: the existence probe below is deliberately NOT a
+ * `head: true` request. Live-verified (D2 independent review) that a
+ * `head: true` query against a genuinely nonexistent table returns
+ * `{ count: null, error: null }` -- no error object at all, not even
+ * the already-documented `{message: ''}` masked shape -- so the
+ * original `if (probe.error.code === 'PGRST205' ...)` check was
+ * unreachable dead code for the real deployment-ordering gap it was
+ * written for. A small, bounded, non-head `select(...).limit(1)`
+ * lets PostgREST return its real error body, so the intended
+ * PGRST205/42P01 check actually fires, and any OTHER real error
+ * (permissions, a bad column, a bad relationship, a network failure)
+ * still correctly propagates instead of being fake-zeroed.
  */
 export async function getBehaviorAnalytics(admin: SupabaseClient, period: AnalyticsPeriod): Promise<BehaviorAnalytics> {
   const since = periodSinceIso(period)
 
-  const probe = await admin.from('analytics_events').select('id', { count: 'exact', head: true })
+  const probe = await admin.from('analytics_events').select('event_id').limit(1)
   if (probe.error) {
     if (probe.error.code === 'PGRST205' || probe.error.code === '42P01') {
       return emptyBehaviorAnalytics('analytics_events does not exist yet in this environment -- the D2 migration has not been applied here.')
     }
     throw probe.error
   }
-  const totalEventRows = probe.count ?? 0
+  const hasAnyEventData = (probe.data?.length ?? 0) > 0
 
   const [
     pageViews,
     searchStarted,
+    searchResultsViewed,
     zeroResultSearches,
+    searchRefinements,
     listingViews,
     signupStarted,
     signupCompleted,
@@ -799,7 +818,9 @@ export async function getBehaviorAnalytics(admin: SupabaseClient, period: Analyt
   ] = await Promise.all([
     countAnalyticsEvents(admin, 'page_view', since),
     countAnalyticsEvents(admin, 'search_started', since),
+    countAnalyticsEvents(admin, 'search_results_viewed', since),
     countAnalyticsEvents(admin, 'search_zero_results', since),
+    countAnalyticsEvents(admin, 'search_refined', since),
     countAnalyticsEvents(admin, 'listing_viewed', since),
     countAnalyticsEvents(admin, 'signup_started', since),
     countAnalyticsEvents(admin, 'signup_completed', since),
@@ -816,8 +837,10 @@ export async function getBehaviorAnalytics(admin: SupabaseClient, period: Analyt
   return {
     pageViews,
     searchStarted,
+    searchResultsViewed,
     zeroResultSearches,
     zeroResultRate: safeConversionRate(searchStarted, zeroResultSearches),
+    searchRefinements,
     listingViews,
     signupFunnel: { started: signupStarted, completed: signupCompleted, conversionRate: safeConversionRate(signupStarted, signupCompleted) },
     listingCreationFunnel: { started: listingCreationStarted, completed: listingPublished, conversionRate: safeConversionRate(listingCreationStarted, listingPublished) },
@@ -825,7 +848,7 @@ export async function getBehaviorAnalytics(admin: SupabaseClient, period: Analyt
     orderFunnel: { started: orderCheckoutStarted, completed: ordersCreated, conversionRate: safeConversionRate(orderCheckoutStarted, ordersCreated) },
     kycFunnel: { started: kycStarted, completed: kycSubmitted, conversionRate: safeConversionRate(kycStarted, kycSubmitted) },
     dataQuality: {
-      hasAnyEventData: totalEventRows > 0,
+      hasAnyEventData,
       mayIncludeUnclassifiedActivity: true,
       notes: [
         'Most behavioral events have no authoritative per-row test/QA signal (no profile-level is_test marker exists) -- confirmed-test rows are excluded, but counts may still include some unclassified QA/test browsing activity.',

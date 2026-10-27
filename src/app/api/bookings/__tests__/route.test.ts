@@ -58,7 +58,8 @@ const VALID_BODY = {
 }
 
 beforeEach(() => {
-  recordAnalyticsEvent.mockClear()
+  recordAnalyticsEvent.mockReset()
+  recordAnalyticsEvent.mockResolvedValue(undefined)
   checkIdempotentReplay.mockReset()
   getRequestProfile.mockReset()
   getRequestProfile.mockResolvedValue({
@@ -97,5 +98,38 @@ describe('POST /api/bookings -- booking_created analytics instrumentation (categ
     const res = await POST(req({ ...VALID_BODY, idempotency_key: 'a-stable-client-key-123' }))
     expect(res.status).toBe(201)
     expect(recordAnalyticsEvent).not.toHaveBeenCalled()
+  })
+
+  describe('D2-F1: server-side reliability (await, not fire-and-forget) + failure isolation', () => {
+    it('5. the route awaits recordAnalyticsEvent -- by the time POST() resolves, the mocked promise has already settled, not merely been started', async () => {
+      nextAdmin = fakeServiceRoleClient({ listings: { data: { is_test: false } } }, { create_booking_request: { data: { booking_id: BOOKING_ID } } })
+      let settled = false
+      recordAnalyticsEvent.mockImplementation(() => new Promise((resolve) => setTimeout(() => { settled = true; resolve(undefined) }, 10)))
+      await POST(req(VALID_BODY))
+      expect(settled).toBe(true)
+    })
+
+    it('6. a rejecting recordAnalyticsEvent (simulating an internal analytics failure the helper failed to swallow) still returns the core operation\'s own 201 success -- analytics failure never turns a successful booking into a 500', async () => {
+      nextAdmin = fakeServiceRoleClient({ listings: { data: { is_test: false } } }, { create_booking_request: { data: { booking_id: BOOKING_ID } } })
+      recordAnalyticsEvent.mockRejectedValue(new Error('analytics storage unavailable'))
+      const res = await POST(req(VALID_BODY))
+      expect(res.status).toBe(201)
+      const body = await res.json()
+      expect(body.booking_id).toBe(BOOKING_ID)
+    })
+
+    it('7. recordAnalyticsEvent is called only after the RPC has already returned a successful booking_id -- never before the core operation succeeds', async () => {
+      const callOrder: string[] = []
+      nextAdmin = fakeServiceRoleClient({ listings: { data: { is_test: false } } }, { create_booking_request: { data: { booking_id: BOOKING_ID } } })
+      const originalRpc = nextAdmin.rpc
+      nextAdmin.rpc = ((...args: unknown[]) => {
+        callOrder.push('rpc')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (originalRpc as any)(...args)
+      }) as typeof nextAdmin.rpc
+      recordAnalyticsEvent.mockImplementation(() => { callOrder.push('analytics'); return Promise.resolve() })
+      await POST(req(VALID_BODY))
+      expect(callOrder.indexOf('rpc')).toBeLessThan(callOrder.indexOf('analytics'))
+    })
   })
 })

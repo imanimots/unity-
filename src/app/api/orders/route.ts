@@ -94,13 +94,14 @@ export async function POST(request: NextRequest) {
       // never on an idempotent replay (those return early above) and
       // never on a failed RPC call.
       const { data: listingRow } = await admin.from('listings').select('is_test').eq('id', parsed.data.listing_id).maybeSingle()
-      void recordAnalyticsEvent({
+      // Awaited, with a local .catch() safety net -- see the matching comment in src/app/api/bookings/route.ts (D2-F1 remediation).
+      await recordAnalyticsEvent({
         eventName: 'order_created',
         actorState: deriveActorState(requester.profile.role),
         entityType: 'order',
         entityId: orderId,
         dataClassification: listingRow ? (listingRow.is_test ? 'test' : 'real') : 'unknown',
-      })
+      }).catch(() => {})
 
       try {
         await notifyOrderParties(admin, orderId, 'order.created', [

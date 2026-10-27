@@ -91,7 +91,8 @@ export async function POST(request: NextRequest) {
       console.error('[verification.resubmit] email dispatch failed', { userId: requester.userId, emailErr })
     }
 
-    void recordAnalyticsEvent({ eventName: 'kyc_submitted', actorState: 'authenticated', dataClassification: 'unknown' })
+    // Awaited, with a local .catch() safety net -- see the matching comment in src/app/api/bookings/route.ts (D2-F1 remediation).
+    await recordAnalyticsEvent({ eventName: 'kyc_submitted', actorState: 'authenticated', dataClassification: 'unknown' }).catch(() => {})
 
     return NextResponse.json(result)
   } catch (err) {

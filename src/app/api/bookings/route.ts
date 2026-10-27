@@ -107,13 +107,22 @@ export async function POST(request: NextRequest) {
     // never on an idempotent replay (those return early above) and
     // never on a failed RPC call.
     const { data: listingRow } = await admin.from('listings').select('is_test').eq('id', parsed.data.listing_id).maybeSingle()
-    void recordAnalyticsEvent({
+    // Awaited (not fire-and-forget) so the serverless runtime has time
+    // to complete the insert before the response is returned.
+    // recordAnalyticsEvent() already catches every internal failure,
+    // but this call sits inside the outer try/catch below -- the
+    // trailing .catch() is a second, local safety net so even a
+    // hypothetical escaped rejection can never be caught by that
+    // outer block and turned into a 500 for an already-successful
+    // booking (D2-F1 remediation; a bare `await` here without this
+    // was verified live by this phase's own test to do exactly that).
+    await recordAnalyticsEvent({
       eventName: 'booking_created',
       actorState: deriveActorState(requester.profile.role),
       entityType: 'booking',
       entityId: data.booking_id as string,
       dataClassification: listingRow ? (listingRow.is_test ? 'test' : 'real') : 'unknown',
-    })
+    }).catch(() => {})
 
     try {
       const ctx = await loadBookingEmailContext(admin, data.booking_id)
