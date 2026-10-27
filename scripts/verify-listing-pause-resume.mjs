@@ -147,7 +147,8 @@ const DISPOSABLE_MERCHANT_PASSWORD = 'PauseResumeRegress123!'
 async function createDisposableMerchant(label) {
   const email = `qa-pauseresume-${label}-${RUN_ID}@unitytest.internal`
   const { data: user } = await admin.auth.admin.createUser({ email, password: DISPOSABLE_MERCHANT_PASSWORD, email_confirm: true })
-  await admin.from('profiles').update({ role: 'merchant', account_status: 'active', kyc_status: 'approved' }).eq('id', user.user.id)
+  // D3-A: profiles.is_test = true for every QA fixture this script creates.
+  await admin.from('profiles').update({ role: 'merchant', account_status: 'active', kyc_status: 'approved', is_test: true }).eq('id', user.user.id)
   const signedIn = await signIn(email, DISPOSABLE_MERCHANT_PASSWORD)
   return { userId: user.user.id, cookie: signedIn.cookie, client: signedIn.client }
 }

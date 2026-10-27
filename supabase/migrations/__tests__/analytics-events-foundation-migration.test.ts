@@ -8,7 +8,7 @@ import { join } from 'path'
 // migration SOURCE contains the invariants D2 requires, not that it has
 // been applied anywhere (it has not -- Section 9/36 of the brief).
 const REPO_ROOT = join(__dirname, '../../..')
-const migrationPath = join(REPO_ROOT, 'supabase/migrations/20261027000000_analytics_events_foundation.sql')
+const migrationPath = join(REPO_ROOT, 'supabase/migrations/20261027145645_analytics_events_foundation.sql')
 const sql = readFileSync(migrationPath, 'utf-8')
 
 describe('D2 analytics_events foundation migration invariants (category: ADMIN-CONTROL-CENTRE-BATCH-D2)', () => {

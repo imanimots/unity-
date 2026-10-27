@@ -94,6 +94,8 @@ export interface Profile {
   status_changed_at: string | null
   status_changed_by: string | null
   created_at: string
+  /** D3-A: server-controlled QA/test account marker (never client-settable) -- same optional-field convention as Listing.is_test. */
+  is_test?: boolean
 }
 
 /**

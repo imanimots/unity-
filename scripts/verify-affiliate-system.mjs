@@ -159,7 +159,8 @@ const DISPOSABLE_USER_PASSWORD = 'DowngradeRegress123!'
 async function createDisposableUser(label, suffix, extraProfileFields = {}) {
   const email = `qa-affiliate-dg-${label}-${suffix}@unitytest.internal`
   const { data: user } = await admin.auth.admin.createUser({ email, password: DISPOSABLE_USER_PASSWORD, email_confirm: true })
-  await admin.from('profiles').update({ kyc_status: 'approved', ...extraProfileFields }).eq('id', user.user.id)
+  // D3-A: profiles.is_test = true for every QA fixture this script creates.
+  await admin.from('profiles').update({ kyc_status: 'approved', ...extraProfileFields, is_test: true }).eq('id', user.user.id)
   const { cookie } = await cookieFor(email, DISPOSABLE_USER_PASSWORD)
   return { userId: user.user.id, cookie, email, password: DISPOSABLE_USER_PASSWORD }
 }

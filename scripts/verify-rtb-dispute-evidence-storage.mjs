@@ -88,7 +88,8 @@ async function cookieFor(email, password) {
 async function createDisposableUser(label) {
   const email = `qa-rtbdispute-${label}-${RUN_ID}@unitytest.internal`
   const { data: user } = await admin.auth.admin.createUser({ email, password: DISPOSABLE_USER_PASSWORD, email_confirm: true })
-  await admin.from('profiles').update({ kyc_status: 'approved', account_status: 'active' }).eq('id', user.user.id)
+  // D3-A: profiles.is_test = true for every QA fixture this script creates.
+  await admin.from('profiles').update({ kyc_status: 'approved', account_status: 'active', is_test: true }).eq('id', user.user.id)
   return { userId: user.user.id, ...(await cookieFor(email, DISPOSABLE_USER_PASSWORD)) }
 }
 async function api(cookie, method, path, body) {

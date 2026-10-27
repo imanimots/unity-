@@ -121,7 +121,11 @@ async function ensureUser(email, password, role) {
     if (error) throw new Error(`createUser failed for ${email}: ${error.message}`)
     userId = data.user.id
   }
-  await admin.from('profiles').update({ role, kyc_status: 'approved', account_status: 'active' }).eq('id', userId)
+  // D3-A: every QA account this script manages must carry profiles.is_test = true
+  // going forward -- is_test is migration/service-role only (see
+  // 20261027150000_profiles_is_test_classification.sql), and this script already
+  // runs with the service-role client, so this is the privileged path setting it.
+  await admin.from('profiles').update({ role, kyc_status: 'approved', account_status: 'active', is_test: true }).eq('id', userId)
   return userId
 }
 
@@ -779,9 +783,14 @@ async function seedEmailFailureFixtures() {
   const terminalEmail = 'qa-email-fixture+fail-terminal@unitytest.internal'
   for (const email of [retryableEmail, terminalEmail]) {
     const { data: existing } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 })
-    if (!existing?.users?.find((u) => u.email === email)) {
-      await admin.auth.admin.createUser({ email, password: genPassword(), email_confirm: true })
+    let userId = existing?.users?.find((u) => u.email === email)?.id
+    if (!userId) {
+      const { data, error } = await admin.auth.admin.createUser({ email, password: genPassword(), email_confirm: true })
+      if (error) throw new Error(`createUser failed for ${email}: ${error.message}`)
+      userId = data.user.id
     }
+    // D3-A: same is_test = true marking as ensureUser() above.
+    await admin.from('profiles').update({ is_test: true }).eq('id', userId)
   }
   console.log('  retryable/terminal email-failure fixture accounts ready (trigger via a KYC or booking action against them to produce a failed delivery row)')
 }
