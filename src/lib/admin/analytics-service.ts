@@ -690,3 +690,147 @@ async function periodComparisonExcludingTestListings(admin: SupabaseClient, tabl
   const previous = prevRange ? await countRealListingLinkedInRange(admin, table, prevRange.since, prevRange.until) : null
   return { current, previous }
 }
+
+// ============================================================
+// I. Behavior & conversion (D2 -- first-party event analytics)
+// ============================================================
+
+/** completed/started, or null (never Infinity/NaN/0%) when there is nothing to divide by. */
+export interface FunnelMetric {
+  started: number
+  completed: number
+  conversionRate: number | null
+}
+
+export interface BehaviorAnalytics {
+  pageViews: number
+  searchStarted: number
+  zeroResultSearches: number
+  zeroResultRate: number | null
+  listingViews: number
+  signupFunnel: FunnelMetric
+  listingCreationFunnel: FunnelMetric
+  rentalFunnel: FunnelMetric
+  orderFunnel: FunnelMetric
+  kycFunnel: FunnelMetric
+  dataQuality: {
+    /** False only when analytics_events has no rows at all yet -- distinguishes "genuinely zero activity this period" from "D2 instrumentation has no historical data at all" (Section 30/31: zero data is expected and must never be mistaken for a broken response). */
+    hasAnyEventData: boolean
+    /** Most D2 events have no authoritative per-row test/QA signal (no profile-level is_test marker exists in this codebase -- see analytics-service.ts's own D1 header comment for the equivalent database-side limitation). Confirmed-test rows (data_classification = 'test', derived server-side from a related listing's real is_test column) are always excluded from every count below; everything else ('real' or 'unknown') is counted, so these numbers may still include some unclassified QA/test browsing activity. */
+    mayIncludeUnclassifiedActivity: boolean
+    notes: string[]
+  }
+}
+
+function safeConversionRate(started: number, completed: number): number | null {
+  if (started <= 0) return null
+  return completed / started
+}
+
+function emptyBehaviorAnalytics(extraNote?: string): BehaviorAnalytics {
+  const notes = [
+    'Most behavioral events have no authoritative per-row test/QA signal (no profile-level is_test marker exists) -- confirmed-test rows are excluded, but counts may still include some unclassified QA/test browsing activity.',
+    'Behavioral event data begins from when D2 instrumentation was deployed -- no historical events were backfilled from existing database rows.',
+  ]
+  if (extraNote) notes.push(extraNote)
+  return {
+    pageViews: 0,
+    searchStarted: 0,
+    zeroResultSearches: 0,
+    zeroResultRate: null,
+    listingViews: 0,
+    signupFunnel: { started: 0, completed: 0, conversionRate: null },
+    listingCreationFunnel: { started: 0, completed: 0, conversionRate: null },
+    rentalFunnel: { started: 0, completed: 0, conversionRate: null },
+    orderFunnel: { started: 0, completed: 0, conversionRate: null },
+    kycFunnel: { started: 0, completed: 0, conversionRate: null },
+    dataQuality: { hasAnyEventData: false, mayIncludeUnclassifiedActivity: true, notes },
+  }
+}
+
+/** Server-side exact COUNT(*) for one event_name, over the period window, always excluding confirmed-test rows (data_classification = 'test') -- never a full-row fetch, matching every other count in this file. */
+async function countAnalyticsEvents(admin: SupabaseClient, eventName: string, sinceIso: string | null): Promise<number> {
+  let q = admin.from('analytics_events').select('id', { count: 'exact', head: true }).eq('event_name', eventName).neq('data_classification', 'test')
+  if (sinceIso) q = q.gte('occurred_at', sinceIso)
+  const { count, error } = await q
+  if (error) throw error
+  return count ?? 0
+}
+
+/**
+ * Behavior & Conversion (D2). This is the one analytics section backed
+ * by a table that may not exist yet in a given environment -- the D2
+ * migration is deliberately NOT applied as part of this same phase
+ * (Section 9/36). A missing-relation error here must degrade to the
+ * same safe all-zero/null shape zero *data* already requires (Section
+ * 30), not throw -- throwing would fail the whole /api/admin/analytics
+ * response via its Promise.all, exactly the class of production bug
+ * D1-H1/H2 just fixed for two other sections. Any other, non-missing-
+ * table error still throws, since that would be a genuine bug worth
+ * surfacing rather than a deployment-ordering gap.
+ */
+export async function getBehaviorAnalytics(admin: SupabaseClient, period: AnalyticsPeriod): Promise<BehaviorAnalytics> {
+  const since = periodSinceIso(period)
+
+  const probe = await admin.from('analytics_events').select('id', { count: 'exact', head: true })
+  if (probe.error) {
+    if (probe.error.code === 'PGRST205' || probe.error.code === '42P01') {
+      return emptyBehaviorAnalytics('analytics_events does not exist yet in this environment -- the D2 migration has not been applied here.')
+    }
+    throw probe.error
+  }
+  const totalEventRows = probe.count ?? 0
+
+  const [
+    pageViews,
+    searchStarted,
+    zeroResultSearches,
+    listingViews,
+    signupStarted,
+    signupCompleted,
+    listingCreationStarted,
+    listingPublished,
+    rentalCheckoutStarted,
+    bookingsCreated,
+    orderCheckoutStarted,
+    ordersCreated,
+    kycStarted,
+    kycSubmitted,
+  ] = await Promise.all([
+    countAnalyticsEvents(admin, 'page_view', since),
+    countAnalyticsEvents(admin, 'search_started', since),
+    countAnalyticsEvents(admin, 'search_zero_results', since),
+    countAnalyticsEvents(admin, 'listing_viewed', since),
+    countAnalyticsEvents(admin, 'signup_started', since),
+    countAnalyticsEvents(admin, 'signup_completed', since),
+    countAnalyticsEvents(admin, 'listing_creation_started', since),
+    countAnalyticsEvents(admin, 'listing_published', since),
+    countAnalyticsEvents(admin, 'rental_checkout_started', since),
+    countAnalyticsEvents(admin, 'booking_created', since),
+    countAnalyticsEvents(admin, 'order_checkout_started', since),
+    countAnalyticsEvents(admin, 'order_created', since),
+    countAnalyticsEvents(admin, 'kyc_started', since),
+    countAnalyticsEvents(admin, 'kyc_submitted', since),
+  ])
+
+  return {
+    pageViews,
+    searchStarted,
+    zeroResultSearches,
+    zeroResultRate: safeConversionRate(searchStarted, zeroResultSearches),
+    listingViews,
+    signupFunnel: { started: signupStarted, completed: signupCompleted, conversionRate: safeConversionRate(signupStarted, signupCompleted) },
+    listingCreationFunnel: { started: listingCreationStarted, completed: listingPublished, conversionRate: safeConversionRate(listingCreationStarted, listingPublished) },
+    rentalFunnel: { started: rentalCheckoutStarted, completed: bookingsCreated, conversionRate: safeConversionRate(rentalCheckoutStarted, bookingsCreated) },
+    orderFunnel: { started: orderCheckoutStarted, completed: ordersCreated, conversionRate: safeConversionRate(orderCheckoutStarted, ordersCreated) },
+    kycFunnel: { started: kycStarted, completed: kycSubmitted, conversionRate: safeConversionRate(kycStarted, kycSubmitted) },
+    dataQuality: {
+      hasAnyEventData: totalEventRows > 0,
+      mayIncludeUnclassifiedActivity: true,
+      notes: [
+        'Most behavioral events have no authoritative per-row test/QA signal (no profile-level is_test marker exists) -- confirmed-test rows are excluded, but counts may still include some unclassified QA/test browsing activity.',
+        'Behavioral event data begins from when D2 instrumentation was deployed -- no historical events were backfilled from existing database rows.',
+      ],
+    },
+  }
+}

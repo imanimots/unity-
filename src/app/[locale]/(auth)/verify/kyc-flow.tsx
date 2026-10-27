@@ -11,6 +11,7 @@ import { useRouter, Link } from '@/i18n/navigation'
 import { useAuth } from '@/hooks/use-auth'
 import { createClient } from '@/lib/supabase/client'
 import { getSafeRedirectPath } from '@/lib/safe-redirect'
+import { trackEvent } from '@/lib/analytics/client'
 
 /**
  * Real, provider-neutral KYC submission flow -- replaces the prior
@@ -368,7 +369,10 @@ function KycFlowInner() {
 
           <button
             disabled={!canProceedDetails}
-            onClick={() => setStep('documents')}
+            onClick={() => {
+              trackEvent('kyc_started')
+              setStep('documents')
+            }}
             className="w-full h-12 flex items-center justify-center gap-2 bg-[#8B1A1A] text-white font-extrabold text-sm uppercase tracking-[0.08em] rounded-lg hover:bg-[#7A1616] transition-colors disabled:opacity-40"
           >
             {tDetails('continue')} <ChevronRight size={16} />

@@ -6,6 +6,7 @@ import { checkSubmissionCompleteness, submitOrResubmitIdentityVerification } fro
 import { IdentityVerificationError } from '@/lib/identity-verification'
 import { getAdminServiceClient } from '@/lib/admin/route-helpers'
 import { sendTemplate, loadUserDisplayName } from '@/lib/email'
+import { recordAnalyticsEvent } from '@/lib/analytics/server'
 
 /**
  * POST /api/verification/resubmit -- same underlying RPC as .../submit
@@ -89,6 +90,8 @@ export async function POST(request: NextRequest) {
     } catch (emailErr) {
       console.error('[verification.resubmit] email dispatch failed', { userId: requester.userId, emailErr })
     }
+
+    void recordAnalyticsEvent({ eventName: 'kyc_submitted', actorState: 'authenticated', dataClassification: 'unknown' })
 
     return NextResponse.json(result)
   } catch (err) {

@@ -7,6 +7,7 @@ import { IdentityVerificationError } from '@/lib/identity-verification'
 import { getAdminServiceClient } from '@/lib/admin/route-helpers'
 import { sendTemplate, loadUserDisplayName } from '@/lib/email'
 import { blockIfCannotTransact } from '@/lib/admin/account-status'
+import { recordAnalyticsEvent } from '@/lib/analytics/server'
 
 /**
  * POST /api/verification/submit -- first-time KYC submission. Document
@@ -87,6 +88,11 @@ export async function POST(request: NextRequest) {
     } catch (emailErr) {
       console.error('[verification.submit] email dispatch failed', { userId: requester.userId, emailErr })
     }
+
+    // No profile-level is_test/QA marker exists in this codebase today
+    // (confirmed D2 recon) -- classification stays 'unknown' rather
+    // than guessing at real-vs-test for identity submissions.
+    void recordAnalyticsEvent({ eventName: 'kyc_submitted', actorState: 'authenticated', dataClassification: 'unknown' })
 
     return NextResponse.json(result, { status: 201 })
   } catch (err) {

@@ -12,6 +12,7 @@ import type { OwnershipVerificationStatus } from '@/lib/ownership-verification'
 import { sendTemplate, loadListingEmailContext } from '@/lib/email'
 import { blocksNewTransactions } from '@/lib/admin/account-status'
 import type { AccountStatus } from '@/types'
+import { recordAnalyticsEvent } from '@/lib/analytics/server'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -141,6 +142,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const mapped = mapAdminRpcError(error.message)
     return NextResponse.json({ error: mapped.error }, { status: mapped.status })
   }
+
+  void recordAnalyticsEvent({
+    eventName: 'listing_published',
+    actorState: 'admin',
+    entityType: 'listing',
+    entityId: listingId,
+    dataClassification: listing.is_test ? 'test' : 'real',
+    metadata: listing.category ? { category: listing.category } : {},
+  })
 
   try {
     const ctx = await loadListingEmailContext(admin, listingId)

@@ -4,6 +4,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useCallback, Suspense } from 'react'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { CATEGORIES } from '@/types'
+import { trackEvent } from '@/lib/analytics/client'
 
 export type FilterBarEntity = 'listings' | 'requests' | 'skill_task'
 
@@ -64,6 +65,16 @@ function FilterBarInner({ entity }: { entity: FilterBarEntity }) {
 
   const activeFiltersCount = [category, maxPrice].filter(Boolean).length
 
+  // search_refined (D2): fired on every genuine filter change (category,
+  // max price, or clearing filters), carrying the resulting filter count
+  // -- not on the sort change alone, since sort reorders the same result
+  // set rather than materially refining it.
+  const refineAndNavigate = (url: string, nextCategory: string, nextMaxPrice: string) => {
+    const filterCount = [nextCategory, nextMaxPrice].filter(Boolean).length
+    trackEvent('search_refined', { metadata: { filter_count: filterCount } })
+    router.push(url, { scroll: false })
+  }
+
   return (
     <div className="space-y-4">
       {/* Sort row -- the query text itself is entered via the page's own
@@ -84,7 +95,7 @@ function FilterBarInner({ entity }: { entity: FilterBarEntity }) {
       {/* Category pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
         <button
-          onClick={() => router.push(createURL('category', null), { scroll: false })}
+          onClick={() => refineAndNavigate(createURL('category', null), '', maxPrice)}
           className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
             !category
               ? 'bg-[#8B1A1A] text-white border-[#8B1A1A]'
@@ -96,12 +107,10 @@ function FilterBarInner({ entity }: { entity: FilterBarEntity }) {
         {CATEGORIES.map((cat) => (
           <button
             key={cat.id}
-            onClick={() =>
-              router.push(
-                createURL('category', category === cat.id ? null : cat.id),
-                { scroll: false }
-              )
-            }
+            onClick={() => {
+              const nextCategory = category === cat.id ? '' : cat.id
+              refineAndNavigate(createURL('category', nextCategory || null), nextCategory, maxPrice)
+            }}
             className={`shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
               category === cat.id
                 ? 'bg-[#8B1A1A] text-white border-[#8B1A1A]'
@@ -122,7 +131,7 @@ function FilterBarInner({ entity }: { entity: FilterBarEntity }) {
             <span className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">Max price:</span>
             <select
               value={maxPrice}
-              onChange={(e) => router.push(createURL('maxPrice', e.target.value || null), { scroll: false })}
+              onChange={(e) => refineAndNavigate(createURL('maxPrice', e.target.value || null), category, e.target.value)}
               className="px-3 py-1.5 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A] transition-colors"
             >
               <option value="">Any</option>
@@ -136,7 +145,7 @@ function FilterBarInner({ entity }: { entity: FilterBarEntity }) {
 
         {activeFiltersCount > 0 && (
           <button
-            onClick={() => router.push(pathname, { scroll: false })}
+            onClick={() => refineAndNavigate(pathname, '', '')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#8B1A1A] border border-[#F2EDE8] dark:border-[#2A1A1A] hover:border-[#8B1A1A] transition-colors"
           >
             <X size={12} /> Clear filters ({activeFiltersCount})

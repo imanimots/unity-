@@ -8,7 +8,7 @@ import { AdminPageHeader, StatCard } from '@/components/admin/ui'
 import type {
   AnalyticsPeriod, MarketplaceOverview, SupplyAnalytics, DemandAnalytics,
   TransactionAnalytics, TrustAnalytics, CommercialAnalytics, SupportAnalytics,
-  GrowthAnalytics, PeriodComparison,
+  GrowthAnalytics, PeriodComparison, BehaviorAnalytics, FunnelMetric,
 } from '@/lib/admin/analytics-service'
 
 interface AnalyticsResponse {
@@ -21,6 +21,7 @@ interface AnalyticsResponse {
   commercial: CommercialAnalytics
   support: SupportAnalytics
   growth: GrowthAnalytics
+  behavior: BehaviorAnalytics
 }
 
 const PERIODS: { value: AnalyticsPeriod; label: string }[] = [
@@ -83,6 +84,21 @@ function TrendStat({ label, trend, helper }: { label: string; trend: PeriodCompa
         <p className="text-xs text-[#9B8B85] mt-1">No comparable previous period</p>
       )}
       {helper ? <p className="text-[10px] text-[#9B8B85] mt-1">{helper}</p> : null}
+    </div>
+  )
+}
+
+/** A simple aggregate started/completed ratio -- deliberately labeled as an event-count rate, never a per-user cohort conversion (Section 28). Shows "—" rather than 0%/NaN/Infinity when there is nothing to divide by. */
+function FunnelStat({ label, funnel }: { label: string; funnel: FunnelMetric }) {
+  return (
+    <div className="bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg px-4 py-3">
+      <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">{label}</p>
+      <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">
+        {funnel.started} → {funnel.completed}
+      </p>
+      <p className="text-xs text-[#9B8B85] mt-1">
+        {funnel.conversionRate === null ? '—' : `${Math.round(funnel.conversionRate * 100)}% completion rate`}
+      </p>
     </div>
   )
 }
@@ -354,6 +370,33 @@ export default function AdminAnalyticsPage() {
               <TrendStat label="New bookings" trend={data.growth.newBookings} />
               <TrendStat label="New orders" trend={data.growth.newOrders} />
             </div>
+          </Section>
+
+          {/* ── Behavior & Conversion (D2) ── */}
+          <Section eyebrow="Behavioral" title="Behavior & Conversion">
+            {!data.behavior.dataQuality.hasAnyEventData ? (
+              <p className="text-xs text-[#9B8B85]">No activity yet — first-party event tracking has no data for this environment yet.</p>
+            ) : (
+              <>
+                {data.behavior.dataQuality.notes.map((note) => (
+                  <p key={note} className="text-[10px] text-amber-700">{note}</p>
+                ))}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                  <StatCard label="Page views" value={data.behavior.pageViews} />
+                  <StatCard label="Searches started" value={data.behavior.searchStarted} />
+                  <StatCard label="Zero-result searches" value={data.behavior.zeroResultSearches} />
+                  <StatCard label="Zero-result rate" value={data.behavior.zeroResultRate === null ? '—' : `${Math.round(data.behavior.zeroResultRate * 100)}%`} />
+                  <StatCard label="Listing views" value={data.behavior.listingViews} />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                  <FunnelStat label="Signup" funnel={data.behavior.signupFunnel} />
+                  <FunnelStat label="Listing publishing" funnel={data.behavior.listingCreationFunnel} />
+                  <FunnelStat label="Rental checkout" funnel={data.behavior.rentalFunnel} />
+                  <FunnelStat label="Buy checkout" funnel={data.behavior.orderFunnel} />
+                  <FunnelStat label="KYC submission" funnel={data.behavior.kycFunnel} />
+                </div>
+              </>
+            )}
           </Section>
         </>
       )}

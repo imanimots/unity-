@@ -9,6 +9,7 @@ import {
   getCommercialAnalytics,
   getSupportAnalytics,
   getGrowthAnalytics,
+  getBehaviorAnalytics,
 } from '../analytics-service'
 
 vi.mock('@/lib/subscriptions/demand', () => ({
@@ -44,6 +45,7 @@ function countQueryChain(getCount: (filters: Record<string, unknown>) => number)
   const obj: any = {
     select: () => obj,
     eq: (col: string, val: unknown) => { filters[col] = val; return obj },
+    neq: (col: string, val: unknown) => { filters[`${col}__neq`] = val; return obj },
     in: (col: string, val: unknown) => { filters[`${col}__in`] = val; return obj },
     is: (col: string, val: unknown) => { filters[`${col}__is`] = val; return obj },
     not: (col: string, _op: string, val: unknown) => { filters[`${col}__not`] = val; return obj },
@@ -869,5 +871,171 @@ describe('getGrowthAnalytics (category: ADMIN-CONTROL-CENTRE-BATCH-D1) — label
     const result = await getGrowthAnalytics(admin, 'all')
     expect(result.newOrders.previous).toBeNull()
     expect(result.newOrders.current).toBe(1)
+  })
+})
+
+describe('getBehaviorAnalytics (category: ADMIN-CONTROL-CENTRE-BATCH-D2) — first-party event analytics, server-side counts, safe zero/missing-table handling', () => {
+  it('1. counts each event by exact event_name match, excluding confirmed-test rows, as a server-side head:true count', async () => {
+    const seenFilters: Record<string, unknown>[] = []
+    const admin = {
+      from: (table: string) => {
+        if (table !== 'analytics_events') return countQueryChain(() => 0)
+        return countQueryChain((f) => { seenFilters.push(f); return f.event_name === 'page_view' ? 7 : 0 })
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getBehaviorAnalytics(admin, 'all')
+    expect(result.pageViews).toBe(7)
+    expect(seenFilters.some((f) => f['data_classification__neq'] === 'test')).toBe(true)
+  })
+
+  it('2. applies the occurred_at lower bound for finite periods (7d/30d/90d), not created_at or any other column', async () => {
+    const seenFilters: Record<string, unknown>[] = []
+    const admin = {
+      from: (table: string) => {
+        if (table !== 'analytics_events') return countQueryChain(() => 0)
+        return countQueryChain((f) => { seenFilters.push(f); return 0 })
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await getBehaviorAnalytics(admin, '30d')
+    expect(seenFilters.some((f) => 'occurred_at__gte' in f)).toBe(true)
+    expect(seenFilters.every((f) => !('created_at__gte' in f))).toBe(true)
+  })
+
+  it('3. applies no occurred_at lower bound for the "all" period', async () => {
+    const seenFilters: Record<string, unknown>[] = []
+    const admin = {
+      from: (table: string) => {
+        if (table !== 'analytics_events') return countQueryChain(() => 0)
+        return countQueryChain((f) => { seenFilters.push(f); return 0 })
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await getBehaviorAnalytics(admin, 'all')
+    expect(seenFilters.every((f) => !('occurred_at__gte' in f))).toBe(true)
+  })
+
+  it('4. funnel conversionRate is null (never Infinity/NaN/0%) when the start count is zero', async () => {
+    const admin = {
+      from: (table: string) => (table === 'analytics_events' ? countQueryChain(() => 0) : countQueryChain(() => 0)),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getBehaviorAnalytics(admin, 'all')
+    expect(result.signupFunnel.conversionRate).toBeNull()
+    expect(result.rentalFunnel.conversionRate).toBeNull()
+    expect(result.orderFunnel.conversionRate).toBeNull()
+    expect(result.listingCreationFunnel.conversionRate).toBeNull()
+    expect(result.kycFunnel.conversionRate).toBeNull()
+    expect(result.zeroResultRate).toBeNull()
+  })
+
+  it('5. funnel conversionRate is a real completed/started ratio when the start count is positive', async () => {
+    const admin = {
+      from: (table: string) => {
+        if (table !== 'analytics_events') return countQueryChain(() => 0)
+        return countQueryChain((f) => {
+          if (f.event_name === 'signup_started') return 10
+          if (f.event_name === 'signup_completed') return 4
+          return 0
+        })
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getBehaviorAnalytics(admin, 'all')
+    expect(result.signupFunnel).toEqual({ started: 10, completed: 4, conversionRate: 0.4 })
+  })
+
+  it('6. zero event data of every kind still returns a fully-defined, non-throwing shape -- no 500/NaN/undefined/Infinity', async () => {
+    const admin = {
+      from: () => countQueryChain(() => 0),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getBehaviorAnalytics(admin, '7d')
+    expect(result.pageViews).toBe(0)
+    expect(result.listingViews).toBe(0)
+    expect(Number.isNaN(result.pageViews)).toBe(false)
+    expect(result.dataQuality.hasAnyEventData).toBe(false)
+  })
+
+  it('7. hasAnyEventData is true once the table has any row at all, regardless of the current period\'s own counts', async () => {
+    const admin = {
+      from: (table: string) => {
+        if (table !== 'analytics_events') return countQueryChain(() => 0)
+        // The initial unfiltered probe returns a positive total; every per-event count for THIS period is still 0.
+        return countQueryChain((f) => (Object.keys(f).length === 0 ? 50 : 0))
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getBehaviorAnalytics(admin, '7d')
+    expect(result.dataQuality.hasAnyEventData).toBe(true)
+    expect(result.pageViews).toBe(0)
+  })
+
+  it('8. degrades to a safe all-zero/null shape (never throws, never breaks the wider /api/admin/analytics response) when analytics_events does not exist yet (PGRST205)', async () => {
+    const admin = {
+      from: (table: string) => {
+        if (table !== 'analytics_events') return countQueryChain(() => 0)
+        return {
+          select: () => ({
+            then: (resolve: (v: { count: null; error: { code: string; message: string } }) => void) =>
+              resolve({ count: null, error: { code: 'PGRST205', message: "Could not find the table 'public.analytics_events' in the schema cache" } }),
+          }),
+        }
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getBehaviorAnalytics(admin, '30d')
+    expect(result.dataQuality.hasAnyEventData).toBe(false)
+    expect(result.pageViews).toBe(0)
+    expect(result.signupFunnel).toEqual({ started: 0, completed: 0, conversionRate: null })
+    expect(result.dataQuality.notes.some((n) => /migration has not been applied/i.test(n))).toBe(true)
+  })
+
+  it('9. a genuine, non-missing-table error still throws -- the safe degradation is specific to a missing relation, not a blanket swallow of every error', async () => {
+    const admin = {
+      from: (table: string) => {
+        if (table !== 'analytics_events') return countQueryChain(() => 0)
+        return {
+          select: () => ({
+            then: (resolve: (v: { count: null; error: { code: string; message: string } }) => void) =>
+              resolve({ count: null, error: { code: '42501', message: 'permission denied for table analytics_events' } }),
+          }),
+        }
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await expect(getBehaviorAnalytics(admin, '30d')).rejects.toMatchObject({ code: '42501' })
+  })
+
+  it('10. dataQuality.mayIncludeUnclassifiedActivity is honestly true -- never silently implies every count is confirmed-real', async () => {
+    const admin = {
+      from: () => countQueryChain(() => 0),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getBehaviorAnalytics(admin, '7d')
+    expect(result.dataQuality.mayIncludeUnclassifiedActivity).toBe(true)
+    expect(result.dataQuality.notes.length).toBeGreaterThan(0)
+  })
+
+  it('11. covers every one of the 13 instrumented event names across pageViews/searchStarted/zeroResultSearches/listingViews and the five funnels -- no section is silently omitted', async () => {
+    const EXPECTED_EVENT_NAMES = [
+      'page_view', 'search_started', 'search_zero_results', 'listing_viewed',
+      'signup_started', 'signup_completed', 'listing_creation_started', 'listing_published',
+      'rental_checkout_started', 'booking_created', 'order_checkout_started', 'order_created',
+      'kyc_started', 'kyc_submitted',
+    ]
+    const queriedEventNames: unknown[] = []
+    const admin = {
+      from: (table: string) => {
+        if (table !== 'analytics_events') return countQueryChain(() => 0)
+        return countQueryChain((f) => { if ('event_name' in f) queriedEventNames.push(f.event_name); return 0 })
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await getBehaviorAnalytics(admin, 'all')
+    for (const name of EXPECTED_EVENT_NAMES) {
+      expect(queriedEventNames, `expected a query for event_name '${name}'`).toContain(name)
+    }
   })
 })

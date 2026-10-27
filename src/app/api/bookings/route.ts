@@ -8,6 +8,7 @@ import { isKycApproved } from '@/lib/verification/eligibility'
 import { triggerLazyExpirySweep } from '@/lib/bookings/lazy-expiry'
 import { sendTemplate, loadBookingEmailContext } from '@/lib/email'
 import { blockIfCannotCreate } from '@/lib/admin/account-status'
+import { recordAnalyticsEvent, deriveActorState } from '@/lib/analytics/server'
 
 /**
  * POST /api/bookings -- create a booking request.
@@ -101,6 +102,18 @@ export async function POST(request: NextRequest) {
       const mapped = mapBookingRpcError(error.message)
       return NextResponse.json({ error: mapped.error }, { status: mapped.status })
     }
+
+    // booking_created: only reached on a genuine new booking insert --
+    // never on an idempotent replay (those return early above) and
+    // never on a failed RPC call.
+    const { data: listingRow } = await admin.from('listings').select('is_test').eq('id', parsed.data.listing_id).maybeSingle()
+    void recordAnalyticsEvent({
+      eventName: 'booking_created',
+      actorState: deriveActorState(requester.profile.role),
+      entityType: 'booking',
+      entityId: data.booking_id as string,
+      dataClassification: listingRow ? (listingRow.is_test ? 'test' : 'real') : 'unknown',
+    })
 
     try {
       const ctx = await loadBookingEmailContext(admin, data.booking_id)

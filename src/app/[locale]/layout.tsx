@@ -6,6 +6,7 @@ import { Plus_Jakarta_Sans } from 'next/font/google'
 import { ThemeProvider } from 'next-themes'
 import { Toaster } from 'sonner'
 import { AssistantWidgetLoader } from '@/components/assistant/assistant-widget-loader'
+import { PageViewTracker } from '@/components/analytics/page-view-tracker'
 import { getAppUrl, getDefaultRobotsMeta } from '@/lib/seo/config'
 import { routing } from '@/i18n/routing'
 import { LOCALE_OG_TAGS, type Locale } from '@/i18n/locales'
@@ -104,6 +105,7 @@ export default async function LocaleRootLayout({
         <NextIntlClientProvider messages={publicClientMessages}>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             {children}
+            <PageViewTracker />
             <AssistantWidgetLoader />
             <Toaster position="top-center" richColors />
           </ThemeProvider>

@@ -9,6 +9,7 @@ import {
   getCommercialAnalytics,
   getSupportAnalytics,
   getGrowthAnalytics,
+  getBehaviorAnalytics,
   type AnalyticsPeriod,
 } from '@/lib/admin/analytics-service'
 
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
   const period: AnalyticsPeriod = VALID_PERIODS.includes(periodParam as AnalyticsPeriod) ? (periodParam as AnalyticsPeriod) : '30d'
 
   try {
-    const [marketplace, supply, demand, transactions, trust, commercial, support, growth] = await Promise.all([
+    const [marketplace, supply, demand, transactions, trust, commercial, support, growth, behavior] = await Promise.all([
       getMarketplaceOverview(admin, period),
       getSupplyAnalytics(admin, period),
       getDemandAnalytics(admin, period),
@@ -38,9 +39,10 @@ export async function GET(request: NextRequest) {
       getCommercialAnalytics(admin),
       getSupportAnalytics(admin, period),
       getGrowthAnalytics(admin, period),
+      getBehaviorAnalytics(admin, period),
     ])
 
-    return NextResponse.json({ period, marketplace, supply, demand, transactions, trust, commercial, support, growth })
+    return NextResponse.json({ period, marketplace, supply, demand, transactions, trust, commercial, support, growth, behavior })
   } catch (err) {
     console.error('[admin.analytics] error', err)
     return NextResponse.json({ error: 'Could not load analytics' }, { status: 500 })

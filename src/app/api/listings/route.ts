@@ -5,6 +5,7 @@ import { saveDraftRequestSchema } from '@/lib/listings/validation'
 import { validatePublicCategoryMetadata, validatePrivateCategoryMetadata } from '@/lib/listings/category-fields'
 import { mapListingRpcError } from '@/lib/listings/rpc-errors'
 import { blockIfCannotCreate } from '@/lib/admin/account-status'
+import { recordAnalyticsEvent, deriveActorState } from '@/lib/analytics/server'
 
 /**
  * POST /api/listings — create or update a draft listing.
@@ -116,6 +117,20 @@ export async function POST(request: NextRequest) {
       console.error('[listings.save_draft] RPC error', { userId: requester.userId, error })
       const mapped = mapListingRpcError(error.message)
       return NextResponse.json({ error: mapped.error }, { status: mapped.status })
+    }
+
+    // listing_creation_started: fires exactly once per listing, only on
+    // the call that CREATES the draft (listing_id was absent from the
+    // request) -- every subsequent autosave call for the same draft
+    // carries a listing_id and is correctly excluded here.
+    if (!listing_id) {
+      void recordAnalyticsEvent({
+        eventName: 'listing_creation_started',
+        actorState: deriveActorState(requester.profile.role),
+        entityType: 'listing',
+        entityId: data as string,
+        dataClassification: 'unknown',
+      })
     }
 
     return NextResponse.json({ listing_id: data, status: 'draft' })

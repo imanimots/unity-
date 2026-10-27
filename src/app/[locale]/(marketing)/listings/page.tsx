@@ -16,6 +16,7 @@ import type { ListingFilters } from '@/lib/data/listings'
 import { Search } from 'lucide-react'
 import { absoluteUrl, isMarketplaceIndexingEnabled, getMarketplaceRobotsMeta } from '@/lib/seo/config'
 import { recordSearchDemandEvent } from '@/lib/subscriptions/demand-telemetry'
+import { recordAnalyticsEvent } from '@/lib/analytics/server'
 
 const TITLE = 'Browse Listings — Unity'
 const DESCRIPTION = 'Find items to rent near you across South Africa.'
@@ -105,12 +106,36 @@ export default async function ListingsPage({ searchParams }: PageProps) {
   // Aggregate demand telemetry (Section 24-27) -- fire-and-forget,
   // never awaited by the response, never touches Search Ranking's own
   // result computation above (this reads its already-final output).
+  const isZeroResult = listings.length === 0 && requests.length === 0 && skillTaskPosts.length === 0
   void recordSearchDemandEvent({
     mode: isBarter ? 'barter' : mode === 'rent_to_buy' ? 'rent' : mode,
     category: params.category ?? null,
     province: null,
-    zeroResult: listings.length === 0 && requests.length === 0 && skillTaskPosts.length === 0,
+    zeroResult: isZeroResult,
   })
+
+  // Behavioral search instrumentation (D2) -- distinct from the demand
+  // telemetry above: only fires when the visitor actually submitted a
+  // query or applied a filter, never for a bare, default /listings
+  // page load (that's just a page_view). filterCount deliberately
+  // excludes `q` itself (counted separately via has_query) and `sort`
+  // when it's the default 'relevance'/'newest' value.
+  const hasQuery = !!params.q
+  const filterCount = [params.category, params.maxPrice].filter(Boolean).length
+  const isSearchExecution = hasQuery || filterCount > 0
+  if (isSearchExecution) {
+    const resultCount = listings.length + requests.length + skillTaskPosts.length
+    const categoryMetadata: Record<string, string> = params.category ? { category: params.category } : {}
+    void recordAnalyticsEvent({
+      eventName: 'search_started',
+      metadata: { has_query: hasQuery, filter_count: filterCount, ...categoryMetadata },
+    })
+    void recordAnalyticsEvent(
+      isZeroResult
+        ? { eventName: 'search_zero_results', metadata: { has_query: hasQuery, ...categoryMetadata } }
+        : { eventName: 'search_results_viewed', metadata: { result_count: resultCount, has_query: hasQuery, ...categoryMetadata } }
+    )
+  }
 
   const nextPageUrl = (() => {
     if (!nextCursor) return null

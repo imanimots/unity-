@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { trackEvent } from '@/lib/analytics/client'
 import { useTranslations, useLocale } from 'next-intl'
 import { Link } from '@/i18n/navigation'
 import { DayPicker, type DateRange } from 'react-day-picker'
@@ -103,6 +104,15 @@ export function BookingFlow({ listing }: { listing: Listing & { daily_rate: numb
   const [confirmedReference, setConfirmedReference] = useState<string | null>(null)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const idempotencyKeyRef = useRef<string>(crypto.randomUUID())
+
+  // Fires once per mount of the dedicated booking/checkout page -- a
+  // real, distinct "the renter opened checkout" moment, separate from
+  // booking_created (emitted server-side only on an actual successful
+  // booking insert in src/app/api/bookings/route.ts).
+  useEffect(() => {
+    trackEvent('rental_checkout_started', { entityType: 'listing', entityId: listing.id })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const coverImage = listing.media?.[0]?.url
 

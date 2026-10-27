@@ -7,6 +7,7 @@ import { computeCreateOrderHash, checkIdempotentReplay } from '@/lib/orders/idem
 import { isKycApproved } from '@/lib/verification/eligibility'
 import { blockIfCannotCreate } from '@/lib/admin/account-status'
 import { notifyOrderParties } from '@/lib/orders/notify'
+import { recordAnalyticsEvent, deriveActorState } from '@/lib/analytics/server'
 
 /**
  * POST /api/orders -- buy a sale-eligible listing (listing_type 'sale' or
@@ -89,6 +90,18 @@ export async function POST(request: NextRequest) {
 
     const orderId = (data as { order_id?: string } | null)?.order_id
     if (orderId) {
+      // order_created: only reached on a genuine new order insert --
+      // never on an idempotent replay (those return early above) and
+      // never on a failed RPC call.
+      const { data: listingRow } = await admin.from('listings').select('is_test').eq('id', parsed.data.listing_id).maybeSingle()
+      void recordAnalyticsEvent({
+        eventName: 'order_created',
+        actorState: deriveActorState(requester.profile.role),
+        entityType: 'order',
+        entityId: orderId,
+        dataClassification: listingRow ? (listingRow.is_test ? 'test' : 'real') : 'unknown',
+      })
+
       try {
         await notifyOrderParties(admin, orderId, 'order.created', [
           { role: 'buyer', templateId: 'order-created-buyer' },

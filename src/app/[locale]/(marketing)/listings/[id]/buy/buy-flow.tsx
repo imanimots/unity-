@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, Link } from '@/i18n/navigation'
 import { useTranslations, useLocale } from 'next-intl'
 import Image from 'next/image'
@@ -8,6 +8,7 @@ import { ArrowLeft, Minus, Plus } from 'lucide-react'
 import { formatMoneyFromRands } from '@/lib/i18n/format'
 import type { Locale } from '@/i18n/locales'
 import type { Listing } from '@/types'
+import { trackEvent } from '@/lib/analytics/client'
 
 export function BuyFlow({ listing }: { listing: Listing & { sale_price: number } }) {
   const router = useRouter()
@@ -16,6 +17,14 @@ export function BuyFlow({ listing }: { listing: Listing & { sale_price: number }
   const [quantity, setQuantity] = useState(1)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Fires once per mount of the dedicated buy/checkout page -- see the
+  // matching comment in booking-flow.tsx. order_created is emitted
+  // server-side only on an actual successful order insert.
+  useEffect(() => {
+    trackEvent('order_checkout_started', { entityType: 'listing', entityId: listing.id })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const maxQuantity = Math.max(1, listing.quantity_available ?? 1)
   const total = listing.sale_price * quantity

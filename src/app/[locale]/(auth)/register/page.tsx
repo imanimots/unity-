@@ -9,6 +9,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/client'
 import { Eye, EyeOff, Check } from 'lucide-react'
 import type { UserRole } from '@/types'
+import { trackEvent } from '@/lib/analytics/client'
 
 export default function RegisterPage() {
   const t = useTranslations('auth.register')
@@ -33,6 +34,7 @@ export default function RegisterPage() {
   const onSubmit = async (data: FormData) => {
     setLoading(true)
     setError(null)
+    trackEvent('signup_started', { metadata: { role } })
     const supabase = createClient()
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -50,6 +52,7 @@ export default function RegisterPage() {
     }
 
     if (authData.user) {
+      trackEvent('signup_completed', { metadata: { role } })
       await supabase.from('profiles').upsert({
         id: authData.user.id,
         full_name: data.full_name,

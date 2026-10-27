@@ -19,6 +19,7 @@ const getTrustAnalytics = vi.fn()
 const getCommercialAnalytics = vi.fn()
 const getSupportAnalytics = vi.fn()
 const getGrowthAnalytics = vi.fn()
+const getBehaviorAnalytics = vi.fn()
 vi.mock('@/lib/admin/analytics-service', () => ({
   getMarketplaceOverview: (...a: unknown[]) => getMarketplaceOverview(...a),
   getSupplyAnalytics: (...a: unknown[]) => getSupplyAnalytics(...a),
@@ -28,6 +29,7 @@ vi.mock('@/lib/admin/analytics-service', () => ({
   getCommercialAnalytics: (...a: unknown[]) => getCommercialAnalytics(...a),
   getSupportAnalytics: (...a: unknown[]) => getSupportAnalytics(...a),
   getGrowthAnalytics: (...a: unknown[]) => getGrowthAnalytics(...a),
+  getBehaviorAnalytics: (...a: unknown[]) => getBehaviorAnalytics(...a),
 }))
 
 const { GET } = await import('../route')
@@ -41,7 +43,7 @@ function call(qs = '') {
 beforeEach(() => {
   requireAdminForRoute.mockReset().mockResolvedValue({ ok: true, requester: { userId: ADMIN_ID, profile: {} } })
   getAdminServiceClient.mockReset().mockResolvedValue({})
-  for (const fn of [getMarketplaceOverview, getSupplyAnalytics, getDemandAnalytics, getTransactionAnalytics, getTrustAnalytics, getCommercialAnalytics, getSupportAnalytics, getGrowthAnalytics]) {
+  for (const fn of [getMarketplaceOverview, getSupplyAnalytics, getDemandAnalytics, getTransactionAnalytics, getTrustAnalytics, getCommercialAnalytics, getSupportAnalytics, getGrowthAnalytics, getBehaviorAnalytics]) {
     fn.mockReset().mockResolvedValue({})
   }
 })
@@ -72,12 +74,13 @@ describe('GET /api/admin/analytics (category: ADMIN-CONTROL-CENTRE-BATCH-D1) —
     await call('?period=90d')
     expect(getSupplyAnalytics).toHaveBeenCalledWith(expect.anything(), '90d')
     expect(getSupportAnalytics).toHaveBeenCalledWith(expect.anything(), '90d')
+    expect(getBehaviorAnalytics).toHaveBeenCalledWith(expect.anything(), '90d')
   })
 
-  it('5. all eight sections run in one call and are present in the response', async () => {
+  it('5. all nine sections run in one call and are present in the response', async () => {
     const res = await call()
     const body = await res.json()
-    expect(Object.keys(body).sort()).toEqual(['commercial', 'demand', 'growth', 'marketplace', 'period', 'supply', 'support', 'transactions', 'trust'])
+    expect(Object.keys(body).sort()).toEqual(['behavior', 'commercial', 'demand', 'growth', 'marketplace', 'period', 'supply', 'support', 'transactions', 'trust'])
   })
 
   it('6. an underlying query failure returns a safe 500, never a raw error leaking storage details', async () => {
