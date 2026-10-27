@@ -231,8 +231,8 @@ const DISPOSABLE_MERCHANT_PASSWORD = 'CommissionRegress123!'
 async function createDisposableMerchant(label) {
   const email = `qa-commission-${label}-${RUN_ID}@unitytest.internal`
   const { data: user } = await admin.auth.admin.createUser({ email, password: DISPOSABLE_MERCHANT_PASSWORD, email_confirm: true })
-  // D3-A: profiles.is_test = true for every QA fixture this script creates.
-  await admin.from('profiles').update({ role: 'merchant', kyc_status: 'approved', account_status: 'active', is_test: true }).eq('id', user.user.id)
+  // D3-A/F1: profiles.data_classification = 'test' for every QA fixture this script creates.
+  await admin.from('profiles').update({ role: 'merchant', kyc_status: 'approved', account_status: 'active', data_classification: 'test' }).eq('id', user.user.id)
   const signedIn = await signIn(email, DISPOSABLE_MERCHANT_PASSWORD)
   return { userId: user.user.id, cookie: signedIn.cookie, client: signedIn.client }
 }

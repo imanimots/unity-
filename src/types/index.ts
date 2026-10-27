@@ -94,8 +94,16 @@ export interface Profile {
   status_changed_at: string | null
   status_changed_by: string | null
   created_at: string
-  /** D3-A: server-controlled QA/test account marker (never client-settable) -- same optional-field convention as Listing.is_test. */
-  is_test?: boolean
+  /**
+   * D3-A/F1: server-controlled account provenance (never client-settable).
+   * 'real' is the ordinary default for new signups; 'test' is a
+   * positively confirmed QA/seed account; 'unknown' is an unresolved
+   * legacy account. Real Data admin filtering MUST compare with
+   * `=== 'real'`, never `!== 'test'` -- the latter would silently
+   * treat 'unknown' as real. Same optional-field convention as
+   * Listing.is_test (a narrow select may omit this entirely).
+   */
+  data_classification?: 'real' | 'test' | 'unknown'
 }
 
 /**

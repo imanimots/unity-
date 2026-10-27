@@ -221,8 +221,8 @@ async function createDisposableQaMerchant(purpose, { withSubscriptionRow = false
   const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true })
   if (error) throw new Error(`createDisposableQaMerchant(${purpose}): createUser failed: ${error.message}`)
   const userId = data.user.id
-  // D3-A: profiles.is_test = true for every QA fixture this script creates.
-  await admin.from('profiles').update({ role: 'merchant', kyc_status: 'approved', account_status: 'active', is_test: true }).eq('id', userId)
+  // D3-A/F1: profiles.data_classification = 'test' for every QA fixture this script creates.
+  await admin.from('profiles').update({ role: 'merchant', kyc_status: 'approved', account_status: 'active', data_classification: 'test' }).eq('id', userId)
   if (withSubscriptionRow) {
     // Every column defaults to exactly what's wanted (current_plan_id
     // 'starter', publication_frozen false, status 'active') -- this
