@@ -400,6 +400,69 @@ describe('countBarterByStatusExcludingTestAnchors (category: ADMIN-CONTROL-CENTR
     expect(content).not.toMatch(/relationship-resolution discrepancy/i)
     expect(content).not.toMatch(/unavoidable QA inclusion/i)
   })
+
+  describe('D1-H1 hotfix: proposed_at, not created_at (barter_agreements has no created_at column)', () => {
+    it.each(['7d', '30d', '90d'] as const)('8-10. %s finite period: both branches filter on proposed_at', async (period) => {
+      const listingFilters: Record<string, unknown>[] = []
+      const skillTaskFilters: Record<string, unknown>[] = []
+      const admin = {
+        from: (table: string) => {
+          if (table !== 'barter_agreements') return chainableQuery({ data: [], error: null, count: 0 })
+          return {
+            select: (cols: string) => {
+              if (cols.includes('listings!inner')) {
+                return countQueryChain((f) => { listingFilters.push(f); return 0 })
+              }
+              if (cols.includes('barter_skill_task_posts')) {
+                return countQueryChain((f) => { skillTaskFilters.push(f); return 0 })
+              }
+              return countQueryChain(() => 0)
+            },
+          }
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any
+      await getTransactionAnalytics(admin, period)
+      expect(listingFilters.some((f) => 'proposed_at__gte' in f)).toBe(true)
+      expect(skillTaskFilters.some((f) => 'proposed_at__gte' in f)).toBe(true)
+    })
+
+    it('11. all-time applies no proposed_at (or any) lower bound on either branch', async () => {
+      const listingFilters: Record<string, unknown>[] = []
+      const skillTaskFilters: Record<string, unknown>[] = []
+      const admin = {
+        from: (table: string) => {
+          if (table !== 'barter_agreements') return chainableQuery({ data: [], error: null, count: 0 })
+          return {
+            select: (cols: string) => {
+              if (cols.includes('listings!inner')) return countQueryChain((f) => { listingFilters.push(f); return 0 })
+              if (cols.includes('barter_skill_task_posts')) return countQueryChain((f) => { skillTaskFilters.push(f); return 0 })
+              return countQueryChain(() => 0)
+            },
+          }
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any
+      await getTransactionAnalytics(admin, 'all')
+      expect(listingFilters.every((f) => !('proposed_at__gte' in f))).toBe(true)
+      expect(skillTaskFilters.every((f) => !('proposed_at__gte' in f))).toBe(true)
+    })
+
+    it('7b. neither branch ever filters on created_at (the production 42703 bug: "column barter_agreements.created_at does not exist")', async () => {
+      const allFilters: Record<string, unknown>[] = []
+      const admin = {
+        from: (table: string) => {
+          if (table !== 'barter_agreements') return chainableQuery({ data: [], error: null, count: 0 })
+          return {
+            select: () => countQueryChain((f) => { allFilters.push(f); return 0 }),
+          }
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any
+      await getTransactionAnalytics(admin, '30d')
+      expect(allFilters.every((f) => !('created_at__gte' in f))).toBe(true)
+    })
+  })
 })
 
 describe('getTrustAnalytics (category: ADMIN-CONTROL-CENTRE-BATCH-D1-F1) — server-side counts, honest QA-inclusive disputes label', () => {
@@ -451,6 +514,67 @@ describe('getTrustAnalytics (category: ADMIN-CONTROL-CENTRE-BATCH-D1-F1) — ser
     const result = await getTrustAnalytics(admin, 'all')
     expect(result.disputesByStatus.mayIncludeTestData).toBe(true)
     expect(result.disputesByStatus.byStatus).toEqual([{ label: 'open', count: 2 }])
+  })
+})
+
+describe('getTrustAnalytics ownership-verification column (category: ADMIN-CONTROL-CENTRE-BATCH-D1-H1) — production hotfix: no id column on this table', () => {
+  it('1. selects listing_id for listing_ownership_verification, never the nonexistent id column', async () => {
+    const seenSelects: string[] = []
+    const admin = {
+      from: (table: string) => {
+        if (table === 'listing_ownership_verification') {
+          return { select: (cols: string) => { seenSelects.push(cols); return countQueryChain((f) => (f.status === 'verified' ? 5 : 0)) } }
+        }
+        return countQueryChain(() => 0)
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await getTrustAnalytics(admin, 'all')
+    expect(seenSelects.length).toBeGreaterThan(0)
+    expect(seenSelects.every((c) => c === 'listing_id')).toBe(true)
+  })
+
+  it('2. never selects the bare "id" column for this table (that is the production 42703 bug: "column listing_ownership_verification.id does not exist")', async () => {
+    const seenSelects: string[] = []
+    const admin = {
+      from: (table: string) => {
+        if (table === 'listing_ownership_verification') {
+          return { select: (cols: string) => { seenSelects.push(cols); return countQueryChain(() => 0) } }
+        }
+        return countQueryChain(() => 0)
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await getTrustAnalytics(admin, 'all')
+    expect(seenSelects.every((c) => c !== 'id')).toBe(true)
+  })
+
+  it('3. status filtering by each real ownership-verification status value is unchanged', async () => {
+    const admin = {
+      from: (table: string) => {
+        if (table === 'listing_ownership_verification') return countQueryChain((f) => (f.status === 'under_review' ? 3 : 0))
+        return countQueryChain(() => 0)
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getTrustAnalytics(admin, 'all')
+    expect(result.ownershipVerificationByStatus).toEqual([{ label: 'under_review', count: 3 }])
+  })
+
+  it('4. remains a server-side exact/head count, never a row fetch', async () => {
+    const selectOptsSeen: unknown[] = []
+    const admin = {
+      from: (table: string) => {
+        if (table === 'listing_ownership_verification') {
+          return { select: (_cols: string, opts: unknown) => { selectOptsSeen.push(opts); return countQueryChain(() => 0) } }
+        }
+        return countQueryChain(() => 0)
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await getTrustAnalytics(admin, 'all')
+    expect(selectOptsSeen.length).toBeGreaterThan(0)
+    for (const opts of selectOptsSeen) expect(opts).toMatchObject({ count: 'exact', head: true })
   })
 })
 

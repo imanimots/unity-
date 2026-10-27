@@ -117,12 +117,16 @@ async function countRowsByStatus(
   admin: SupabaseClient,
   table: string,
   statuses: readonly string[],
-  opts: { isTestColumn?: boolean; sinceIso?: string | null; statusColumn?: string } = {}
+  opts: { isTestColumn?: boolean; sinceIso?: string | null; statusColumn?: string; idColumn?: string } = {}
 ): Promise<Array<{ label: string; count: number }>> {
   const statusColumn = opts.statusColumn ?? 'status'
+  // Most tables here have a real `id` primary key; listing_ownership_verification
+  // does not (its PK is listing_id) -- D1-H1 hotfix, confirmed 42703 in
+  // production ("column listing_ownership_verification.id does not exist").
+  const idColumn = opts.idColumn ?? 'id'
   const results = await Promise.all(
     statuses.map(async (status) => {
-      let q = admin.from(table).select('id', { count: 'exact', head: true }).eq(statusColumn, status)
+      let q = admin.from(table).select(idColumn, { count: 'exact', head: true }).eq(statusColumn, status)
       if (opts.isTestColumn) q = q.eq('is_test', false)
       if (opts.sinceIso) q = q.gte('created_at', opts.sinceIso)
       const { count, error } = await q
@@ -201,6 +205,14 @@ async function countRowsByStatusExcludingTestListings(
  * 455 + 14 = 469, the table's full true total with zero rows
  * unaccounted for) -- there was never a PostgREST relationship-
  * resolution discrepancy, only an undiscovered second anchor path.
+ *
+ * D1-H1 hotfix: the finite-period lower bound filters on `proposed_at`,
+ * NOT `created_at` -- `barter_agreements` has no `created_at` column
+ * at all (confirmed live: Postgres 42703 "column barter_agreements.
+ * created_at does not exist", with its own hint pointing at the
+ * similarly-named but semantically wrong `accepted_at`/`updated_at`).
+ * `proposed_at` is the real creation timestamp, set once when a trade
+ * is first proposed and never touched again.
  */
 async function countBarterByStatusExcludingTestAnchors(admin: SupabaseClient, statuses: readonly string[], sinceIso: string | null): Promise<Array<{ label: string; count: number }>> {
   const results = await Promise.all(
@@ -208,7 +220,7 @@ async function countBarterByStatusExcludingTestAnchors(admin: SupabaseClient, st
       const [{ count: listingAnchored, error: e1 }, { count: skillTaskAnchored, error: e2 }] = await Promise.all([
         (() => {
           let q = admin.from('barter_agreements').select('id, listings!inner(is_test)', { count: 'exact', head: true }).eq('status', status).eq('listings.is_test', false)
-          if (sinceIso) q = q.gte('created_at', sinceIso)
+          if (sinceIso) q = q.gte('proposed_at', sinceIso)
           return q
         })(),
         (() => {
@@ -217,7 +229,7 @@ async function countBarterByStatusExcludingTestAnchors(admin: SupabaseClient, st
             .select('id, barter_skill_task_posts!barter_agreements_anchor_skill_task_post_id_fkey!inner(is_test)', { count: 'exact', head: true })
             .eq('status', status)
             .eq('barter_skill_task_posts.is_test', false)
-          if (sinceIso) q = q.gte('created_at', sinceIso)
+          if (sinceIso) q = q.gte('proposed_at', sinceIso)
           return q
         })(),
       ])
@@ -480,7 +492,7 @@ export async function getTrustAnalytics(admin: SupabaseClient, period: Analytics
   const [kycByStatus, ownershipVerificationByStatus, disputesByStatus, { count: publishedReviews }, { count: restricted }, { count: suspended }] = await Promise.all([
     // Server-side per-status counts (D1-F1 performance fix) -- never a full profiles.kyc_status row fetch.
     countRowsByStatus(admin, 'profiles', KYC_STATUSES, { statusColumn: 'kyc_status' }),
-    countRowsByStatus(admin, 'listing_ownership_verification', OWNERSHIP_VERIFICATION_STATUSES, {}),
+    countRowsByStatus(admin, 'listing_ownership_verification', OWNERSHIP_VERIFICATION_STATUSES, { idColumn: 'listing_id' }),
     // disputes: no reliable, verified relational exclusion path within this
     // phase's narrow scope (2-hop via booking_id/order_id/barter_agreement_id,
     // each a different join target) -- reported plainly, labeled
