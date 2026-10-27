@@ -633,11 +633,11 @@ describe('getCommercialAnalytics (category: ADMIN-CONTROL-CENTRE-BATCH-D1-F1) â€
     expect(result.notes.some((n) => /subscription/i.test(n))).toBe(true)
   })
 
-  it('5. subscription plan breakdown groups by plan_id (starter/pro/elite), not a display name it never queried', async () => {
+  it('5. subscription plan breakdown groups by current_plan_id (starter/pro/elite), not a display name it never queried', async () => {
     const admin = {
       from: (table: string) => {
         if (table === 'merchant_subscriptions') {
-          return countQueryChain((f) => (f.plan_id === 'pro' ? 2 : 0))
+          return countQueryChain((f) => (f.current_plan_id === 'pro' ? 2 : 0))
         }
         return countQueryChain(() => 0)
       },
@@ -645,6 +645,74 @@ describe('getCommercialAnalytics (category: ADMIN-CONTROL-CENTRE-BATCH-D1-F1) â€
     } as any
     const result = await getCommercialAnalytics(admin)
     expect(result.subscriptionsByPlan).toEqual([{ label: 'pro', count: 2 }])
+  })
+
+  describe('D1-H2 hotfix: current_plan_id, not plan_id (merchant_subscriptions has no plan_id column)', () => {
+    it('5b. filters the plan breakdown on current_plan_id, never the nonexistent plan_id column', async () => {
+      const seenFilters: Record<string, unknown>[] = []
+      const admin = {
+        from: (table: string) => {
+          if (table === 'merchant_subscriptions') {
+            return countQueryChain((f) => { seenFilters.push(f); return f.current_plan_id === 'starter' ? 1 : 0 })
+          }
+          return countQueryChain(() => 0)
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any
+      await getCommercialAnalytics(admin)
+      const planFilters = seenFilters.filter((f) => 'current_plan_id' in f)
+      expect(planFilters.length).toBeGreaterThan(0)
+      expect(seenFilters.every((f) => !('plan_id' in f))).toBe(true)
+    })
+
+    it('5c. never filters the plan breakdown on pending_plan_id (that is the scheduled future plan, not the current one)', async () => {
+      const seenFilters: Record<string, unknown>[] = []
+      const admin = {
+        from: (table: string) => {
+          if (table === 'merchant_subscriptions') {
+            return countQueryChain((f) => { seenFilters.push(f); return 0 })
+          }
+          return countQueryChain(() => 0)
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any
+      await getCommercialAnalytics(admin)
+      expect(seenFilters.every((f) => !('pending_plan_id' in f))).toBe(true)
+    })
+
+    it('5d. covers the exact current plan values (starter/pro/elite) and no others', async () => {
+      const planValuesSeen: unknown[] = []
+      const admin = {
+        from: (table: string) => {
+          if (table === 'merchant_subscriptions') {
+            return countQueryChain((f) => { if ('current_plan_id' in f) planValuesSeen.push(f.current_plan_id); return 1 })
+          }
+          return countQueryChain(() => 0)
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any
+      await getCommercialAnalytics(admin)
+      expect(new Set(planValuesSeen)).toEqual(new Set(['starter', 'pro', 'elite']))
+    })
+
+    it('5e. the merchant_subscriptions STATUS breakdown remains on the status column, unaffected by the plan-column fix', async () => {
+      const seenFilters: Record<string, unknown>[] = []
+      const admin = {
+        from: (table: string) => {
+          if (table === 'merchant_subscriptions') {
+            return countQueryChain((f) => { seenFilters.push(f); return f.status === 'active' ? 3 : 0 })
+          }
+          return countQueryChain(() => 0)
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any
+      const result = await getCommercialAnalytics(admin)
+      expect(result.subscriptionsByStatus).toEqual([{ label: 'active', count: 3 }])
+      const statusFilters = seenFilters.filter((f) => 'status' in f)
+      expect(statusFilters.length).toBeGreaterThan(0)
+      // The status-breakdown calls must never also carry a plan filter, and vice versa (two independent breakdowns, not one merged query).
+      expect(statusFilters.every((f) => !('current_plan_id' in f) && !('plan_id' in f))).toBe(true)
+    })
   })
 
   it('6. returns empty breakdowns for every domain without throwing on all-zero data', async () => {

@@ -580,7 +580,11 @@ export async function getCommercialAnalytics(admin: SupabaseClient): Promise<Com
     countRowsByStatus(admin, 'merchant_payouts', PAYOUT_STATUSES),
     countRowsByStatusExcludingTestListings(admin, 'affiliate_commissions', AFFILIATE_COMMISSION_STATUSES, null),
     countRowsByStatus(admin, 'merchant_subscriptions', MERCHANT_SUBSCRIPTION_STATUSES),
-    countRowsByStatus(admin, 'merchant_subscriptions', MERCHANT_SUBSCRIPTION_PLANS, { statusColumn: 'plan_id' }),
+    // D1-H2 hotfix: the live column is current_plan_id -- there is no bare
+    // plan_id column, and pending_plan_id is a different, future-scheduled
+    // plan (confirmed live: 42703 "column merchant_subscriptions.plan_id
+    // does not exist").
+    countRowsByStatus(admin, 'merchant_subscriptions', MERCHANT_SUBSCRIPTION_PLANS, { statusColumn: 'current_plan_id' }),
     countAdCampaignsByStatusExcludingTestListings(admin, AD_CAMPAIGN_STATUSES),
   ])
 
