@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadBookingFinancialState } from '@/lib/checkout/load-financial-state'
 import { deriveFinancialReadiness } from '@/lib/checkout/financial-readiness'
 import { decodeAndValidateCursor, encodeKeysetCursor, computeCursorContextHash } from '@/lib/admin/cursor'
+import { classifyEntityWithOwners } from '@/lib/admin/data-scope'
 
 const DEFAULT_LIMIT = 100
 const FIN_OPS_CURSOR_ENTITY = 'admin_financial_operations'
@@ -39,10 +40,29 @@ export interface AdminBookingFilters {
  * Acceptable at the current QA/public-test data volume (documented as a
  * known scaling limitation for a much larger booking table).
  */
+/**
+ * D3-D: real booking requires EVERY required participant positively
+ * real -- renter AND merchant (bookings.renter_id/.merchant_id ->
+ * profiles.id, FKs `bookings_renter_id_fkey`/`bookings_merchant_id_fkey`,
+ * confirmed from supabase/migrations/20260613000001_initial_schema.sql)
+ * -- AND the underlying listing not explicitly test
+ * (bookings.listing_id -> listings.id, listings.is_test). bookings
+ * itself has no is_test column of its own. Scoped at the database level
+ * via inner-joined profiles (aliased per side, since both FKs target
+ * the same table) and an inner-joined listing, before `.limit()`.
+ */
 export async function listAdminBookings(admin: SupabaseClient, filters: AdminBookingFilters): Promise<AdminBookingRow[]> {
   let query = admin
     .from('bookings')
-    .select('id, booking_reference, listing_id, renter_id, merchant_id, status, start_at, end_at, payment_due_at, created_at, listings(title)')
+    .select(
+      `id, booking_reference, listing_id, renter_id, merchant_id, status, start_at, end_at, payment_due_at, created_at,
+      listings!inner(title, is_test),
+      renter_profile:profiles!bookings_renter_id_fkey!inner(data_classification),
+      merchant_profile:profiles!bookings_merchant_id_fkey!inner(data_classification)`
+    )
+    .eq('listings.is_test', false)
+    .eq('renter_profile.data_classification', 'real')
+    .eq('merchant_profile.data_classification', 'real')
     .order('created_at', { ascending: false })
     .limit(filters.limit ?? DEFAULT_LIMIT)
 
@@ -131,22 +151,34 @@ export interface AdminBookingDetail {
 export async function getAdminBookingDetail(admin: SupabaseClient, bookingId: string): Promise<AdminBookingDetail | null> {
   const { data: booking, error } = await admin
     .from('bookings')
-    .select('id, booking_reference, listing_id, renter_id, merchant_id, status, start_at, end_at, payment_due_at, created_at, subtotal_amount, deposit_amount_snapshot, renter_total_amount, currency, listings(title)')
+    .select('id, booking_reference, listing_id, renter_id, merchant_id, status, start_at, end_at, payment_due_at, created_at, subtotal_amount, deposit_amount_snapshot, renter_total_amount, currency, listings(title, is_test)')
     .eq('id', bookingId)
     .maybeSingle()
 
   if (error) throw error
   if (!booking) return null
 
-  const [state, { data: profiles }, { data: historyRows }, { data: emailRows }] = await Promise.all([
+  const { data: scopeProfiles } = await admin
+    .from('profiles')
+    .select('id, full_name, display_name, account_status, data_classification')
+    .in('id', [booking.renter_id, booking.merchant_id])
+
+  const renterProfile = scopeProfiles?.find((p) => p.id === booking.renter_id)
+  const merchantProfile = scopeProfiles?.find((p) => p.id === booking.merchant_id)
+  const bookingListing = booking.listings as unknown as { title: string; is_test: boolean } | null
+
+  // D3-D: a known test/unknown-linked booking id must not load as an
+  // ordinary Real Data booking detail. Checked before the financial
+  // state/history/email fetches below, not merely before the response.
+  if (classifyEntityWithOwners({ is_test: bookingListing?.is_test === true }, [renterProfile ?? {}, merchantProfile ?? {}]) !== 'real') {
+    return null
+  }
+
+  const [state, { data: historyRows }, { data: emailRows }] = await Promise.all([
     loadBookingFinancialState(admin, bookingId),
-    admin.from('profiles').select('id, full_name, display_name, account_status').in('id', [booking.renter_id, booking.merchant_id]),
     admin.from('booking_history').select('id, event_type, previous_status, new_status, created_at').eq('booking_id', bookingId).order('created_at', { ascending: false }),
     admin.from('email_deliveries').select('id, event_type, status, created_at').eq('related_entity_type', 'booking').eq('related_entity_id', bookingId).order('created_at', { ascending: false }),
   ])
-
-  const renterProfile = profiles?.find((p) => p.id === booking.renter_id)
-  const merchantProfile = profiles?.find((p) => p.id === booking.merchant_id)
 
   const financialReadiness = state.booking
     ? deriveFinancialReadiness({
@@ -164,7 +196,7 @@ export async function getAdminBookingDetail(admin: SupabaseClient, bookingId: st
     booking: {
       id: booking.id,
       bookingReference: booking.booking_reference,
-      listingTitle: (booking.listings as unknown as { title: string } | null)?.title ?? null,
+      listingTitle: bookingListing?.title ?? null,
       renterId: booking.renter_id,
       renterName: renterProfile?.full_name ?? renterProfile?.display_name ?? null,
       merchantId: booking.merchant_id,

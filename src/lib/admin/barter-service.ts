@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { classifyEntityWithOwners } from '@/lib/admin/data-scope'
 
 const DEFAULT_LIMIT = 100
 
@@ -27,11 +28,29 @@ export interface AdminBarterFilters {
  * Mirrors listAdminDisputes' exact shape (disputes-service.ts): one base
  * query + Promise.all of related rows + in-memory joins, no separate
  * "service class".
+ *
+ * D3-D: real requires BOTH parties positively real -- party_a_id/
+ * party_b_id -> profiles.id (FKs `barter_agreements_party_a_id_fkey`/
+ * `barter_agreements_party_b_id_fkey`, confirmed from
+ * supabase/migrations/20260810000003_barter_schema.sql). barter_agreements
+ * has no is_test column of its own, and anchor_listing_id is deliberately
+ * NOT treated as an authoritative test signal -- its own schema comment
+ * documents it as "informational context only, not necessarily part of
+ * the final offered item set" (a counter-offer may trade entirely
+ * different items), so a test anchor listing would not reliably prove
+ * the actual trade is test. Scoped via inner-joined, aliased profiles,
+ * before `.limit()`.
  */
 export async function listAdminBarterAgreements(admin: SupabaseClient, filters: AdminBarterFilters): Promise<AdminBarterRow[]> {
   let query = admin
     .from('barter_agreements')
-    .select('*')
+    .select(
+      `id, agreement_reference, status, party_a_id, party_b_id, anchor_listing_id, source_skill_task_post_id, admin_hold, proposed_at, updated_at,
+      party_a_profile:profiles!barter_agreements_party_a_id_fkey!inner(data_classification),
+      party_b_profile:profiles!barter_agreements_party_b_id_fkey!inner(data_classification)`
+    )
+    .eq('party_a_profile.data_classification', 'real')
+    .eq('party_b_profile.data_classification', 'real')
     .order('proposed_at', { ascending: false })
     .limit(filters.limit ?? DEFAULT_LIMIT)
 
@@ -104,6 +123,19 @@ export interface AdminBarterDetail {
 export async function getAdminBarterDetail(admin: SupabaseClient, agreementId: string): Promise<AdminBarterDetail | null> {
   const { data: agreement } = await admin.from('barter_agreements').select('*').eq('id', agreementId).maybeSingle()
   if (!agreement) return null
+
+  // D3-D: a known test/unknown-linked agreement id must not load as an
+  // ordinary Real Data barter detail -- same positive-proof boundary as
+  // the list above. Checked before offers/history/confirmations/payments.
+  const { data: partyProfiles } = await admin
+    .from('profiles')
+    .select('id, data_classification')
+    .in('id', [agreement.party_a_id, agreement.party_b_id])
+  const partyA = partyProfiles?.find((p) => p.id === agreement.party_a_id)
+  const partyB = partyProfiles?.find((p) => p.id === agreement.party_b_id)
+  if (classifyEntityWithOwners({ is_test: false }, [partyA ?? {}, partyB ?? {}]) !== 'real') {
+    return null
+  }
 
   const [{ data: offers }, { data: history }, { data: confirmations }, { data: payments }] = await Promise.all([
     admin.from('barter_offers').select('*').eq('agreement_id', agreementId).order('version', { ascending: true }),

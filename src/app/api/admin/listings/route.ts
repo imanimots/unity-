@@ -4,6 +4,16 @@ import { getRiskRequirements } from '@/lib/risk/engine'
 import type { RiskTier } from '@/lib/risk/engine'
 
 /**
+ * D3-D: real listing requires BOTH listings.is_test = false AND the
+ * owning merchant profile positively data_classification = 'real'
+ * (confirmed relationship: listings.merchant_id -> profiles.id, FK
+ * `listings_merchant_id_fkey`, the same relation this queue already
+ * embeds for merchant name/account_status). Scoped at the database
+ * level via an inner join + positive-equality filters, before
+ * `.limit()` -- never fetched-then-filtered in JS.
+ */
+
+/**
  * GET /api/admin/listings -- the moderation queue. Reads real persisted
  * state (listings + listing_moderation + listing_ownership_verification),
  * replacing the local-state mock queue in src/app/admin/listings/page.tsx.
@@ -37,11 +47,13 @@ export async function GET(request: NextRequest) {
       id, title, category, risk_tier, status, daily_rate, replacement_value,
       requested_deposit_amount:listing_requirements(requested_deposit_amount),
       merchant_id, created_at,
-      profiles!listings_merchant_id_fkey(full_name, account_status),
+      profiles!listings_merchant_id_fkey!inner(full_name, account_status),
       listing_moderation(moderation_status, moderated_at),
       listing_ownership_verification(status)
     `
     )
+    .eq('is_test', false)
+    .eq('profiles.data_classification', 'real')
     .order('created_at', { ascending: true })
     .limit(200)
 

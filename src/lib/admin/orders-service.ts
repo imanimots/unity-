@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { decodeAndValidateCursor, encodeKeysetCursor, computeCursorContextHash } from '@/lib/admin/cursor'
+import { classifyEntityWithOwners } from '@/lib/admin/data-scope'
 
 const DEFAULT_LIMIT = 100
 const CURSOR_ENTITY = 'admin_orders'
@@ -229,17 +230,30 @@ export async function getAdminOrderDetail(admin: SupabaseClient, orderId: string
   if (error) throw error
   if (!order) return null
 
-  const [{ data: listing }, { data: profiles }, { data: payment }, { data: historyRows }, { data: dispute }, { data: emailRows }] = await Promise.all([
+  const { data: profiles } = await admin
+    .from('profiles')
+    .select('id, full_name, display_name, account_status, kyc_status, data_classification')
+    .in('id', [order.buyer_id, order.seller_id])
+
+  const buyerProfile = profiles?.find((p) => p.id === order.buyer_id) ?? null
+  const sellerProfile = profiles?.find((p) => p.id === order.seller_id) ?? null
+
+  // D3-D: a known test/unknown-linked order id must not load as an
+  // ordinary Real Data order detail -- checked before listing/payment/
+  // history/dispute/email fetches below. orders has no is_test column
+  // of its own (confirmed from source) -- both buyer and seller
+  // positively real is the whole rule.
+  if (classifyEntityWithOwners({ is_test: false }, [buyerProfile ?? {}, sellerProfile ?? {}]) !== 'real') {
+    return null
+  }
+
+  const [{ data: listing }, { data: payment }, { data: historyRows }, { data: dispute }, { data: emailRows }] = await Promise.all([
     admin.from('listings').select('title, shipping_payer, delivery_available, merchant_delivery_available').eq('id', order.listing_id).maybeSingle(),
-    admin.from('profiles').select('id, full_name, display_name, account_status, kyc_status').in('id', [order.buyer_id, order.seller_id]),
     admin.from('payments').select('*').eq('order_id', orderId).eq('payment_type', 'order_payment').maybeSingle(),
     admin.from('order_history').select('id, event_type, previous_status, new_status, actor_role, created_at').eq('order_id', orderId).order('created_at', { ascending: false }),
     admin.from('disputes').select('id, status, title').eq('order_id', orderId).maybeSingle(),
     admin.from('email_deliveries').select('id, event_type, status, created_at').eq('related_entity_type', 'order').eq('related_entity_id', orderId).order('created_at', { ascending: false }),
   ])
-
-  const buyerProfile = profiles?.find((p) => p.id === order.buyer_id) ?? null
-  const sellerProfile = profiles?.find((p) => p.id === order.seller_id) ?? null
 
   let attempts: Record<string, unknown>[] = []
   let events: Record<string, unknown>[] = []

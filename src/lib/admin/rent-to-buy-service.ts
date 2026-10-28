@@ -1,9 +1,30 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { classifyEntityWithOwners } from '@/lib/admin/data-scope'
 
 const DEFAULT_LIMIT = 100
 
+/**
+ * D3-D: real requires rent_to_buy_agreements.is_test = false AND BOTH
+ * merchant_id and customer_id positively real (FKs
+ * `rent_to_buy_agreements_merchant_id_fkey`/`_customer_id_fkey`,
+ * confirmed from supabase/migrations/20260827000003_rtb_schema.sql).
+ * Scoped via inner-joined, aliased profiles, before `.limit()` -- `*`
+ * is kept so every existing agreement column this file already spreads
+ * downstream remains present.
+ */
 export async function listAdminRentToBuyAgreements(admin: SupabaseClient, filters: { status?: string; search?: string } = {}) {
-  let query = admin.from('rent_to_buy_agreements').select('*').order('created_at', { ascending: false }).limit(DEFAULT_LIMIT)
+  let query = admin
+    .from('rent_to_buy_agreements')
+    .select(
+      `*,
+      merchant_profile:profiles!rent_to_buy_agreements_merchant_id_fkey!inner(data_classification),
+      customer_profile:profiles!rent_to_buy_agreements_customer_id_fkey!inner(data_classification)`
+    )
+    .eq('is_test', false)
+    .eq('merchant_profile.data_classification', 'real')
+    .eq('customer_profile.data_classification', 'real')
+    .order('created_at', { ascending: false })
+    .limit(DEFAULT_LIMIT)
   if (filters.status) query = query.eq('status', filters.status)
   const { data: agreements, error } = await query
   if (error || !agreements) return []
@@ -22,12 +43,19 @@ export async function listAdminRentToBuyAgreements(admin: SupabaseClient, filter
   const customerById = new Map((customers ?? []).map((c) => [c.id, c]))
   const listingById = new Map((listings ?? []).map((l) => [l.id, l]))
 
-  let rows = agreements.map((a) => ({
-    ...a,
-    merchant: merchantById.get(a.merchant_id) ?? null,
-    customer: customerById.get(a.customer_id) ?? null,
-    listing: listingById.get(a.listing_id) ?? null,
-  }))
+  let rows = agreements.map((a) => {
+    // merchant_profile/customer_profile exist only to express the D3-D
+    // real-data join filter above -- never part of the response shape.
+    const agreement = { ...a } as typeof a & { merchant_profile?: unknown; customer_profile?: unknown }
+    delete agreement.merchant_profile
+    delete agreement.customer_profile
+    return {
+      ...agreement,
+      merchant: merchantById.get(a.merchant_id) ?? null,
+      customer: customerById.get(a.customer_id) ?? null,
+      listing: listingById.get(a.listing_id) ?? null,
+    }
+  })
 
   if (filters.search) {
     const q = filters.search.toLowerCase()
@@ -45,6 +73,18 @@ export async function listAdminRentToBuyAgreements(admin: SupabaseClient, filter
 export async function getAdminRentToBuyAgreementDetail(admin: SupabaseClient, agreementId: string) {
   const { data: agreement } = await admin.from('rent_to_buy_agreements').select('*').eq('id', agreementId).maybeSingle()
   if (!agreement) return null
+
+  const { data: scopeProfiles } = await admin
+    .from('profiles')
+    .select('id, data_classification')
+    .in('id', [agreement.merchant_id, agreement.customer_id])
+  const merchantScope = scopeProfiles?.find((p) => p.id === agreement.merchant_id)
+  const customerScope = scopeProfiles?.find((p) => p.id === agreement.customer_id)
+  // D3-D: a known test/unknown-linked agreement id must not load as an
+  // ordinary Real Data RTB detail -- checked before every other fetch.
+  if (classifyEntityWithOwners({ is_test: agreement.is_test === true }, [merchantScope ?? {}, customerScope ?? {}]) !== 'real') {
+    return null
+  }
 
   const [{ data: installments }, { data: history }, { data: returnCases }, { data: listing }, { data: merchant }, { data: customer }, { data: disputes }, { data: commissions }, { data: payouts }, { data: evidence }, { data: amendments }] = await Promise.all([
     admin.from('rent_to_buy_installments').select('*').eq('agreement_id', agreementId).order('sequence', { ascending: true }),

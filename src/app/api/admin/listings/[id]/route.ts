@@ -7,6 +7,7 @@ import type { RiskTier } from '@/lib/risk/engine'
 import { listOwnershipEvidence } from '@/lib/listings/evidence-access'
 import type { OwnershipVerificationStatus } from '@/lib/ownership-verification'
 import type { KycStatus } from '@/types'
+import { classifyEntityWithOwner } from '@/lib/admin/data-scope'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -38,7 +39,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   const [{ data: listing, error: listingError }, { data: privateDetails }, { data: requirements }, { data: mediaRows }, { data: moderation }, { data: ownership }, { data: history }, { data: adminHistory }, { data: declarations }] =
     await Promise.all([
-      admin.from('listings').select('*, profiles!listings_merchant_id_fkey(full_name, kyc_status, unity_score, created_at)').eq('id', listingId).maybeSingle(),
+      admin
+        .from('listings')
+        .select('*, profiles!listings_merchant_id_fkey(full_name, kyc_status, unity_score, created_at, data_classification)')
+        .eq('id', listingId)
+        .maybeSingle(),
       admin.from('listing_private_details').select('*').eq('listing_id', listingId).maybeSingle(),
       admin.from('listing_requirements').select('*').eq('listing_id', listingId).maybeSingle(),
       admin.from('listing_media').select('id, type, shot_type, url, display_order').eq('listing_id', listingId).neq('type', 'ownership_proof'),
@@ -50,6 +55,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     ])
 
   if (listingError || !listing) {
+    return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
+  }
+
+  // D3-D: a known test/unknown-owner listing id must not load as an
+  // ordinary Real Data listing detail -- same positive-proof boundary
+  // as the queue above. Checked before the (otherwise unconditional)
+  // ownership-evidence fetch below, not merely before the response.
+  const detailMerchantProfile = (listing as unknown as { profiles?: { data_classification?: 'real' | 'test' | 'unknown' } }).profiles
+  if (classifyEntityWithOwner({ is_test: listing.is_test === true }, { data_classification: detailMerchantProfile?.data_classification }) !== 'real') {
     return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
   }
 
