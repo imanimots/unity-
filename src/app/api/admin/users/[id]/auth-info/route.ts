@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminForRoute, getAdminServiceClient, isValidUuid } from '@/lib/admin/route-helpers'
 import { getAdminAuthInfoRespectingErasure } from '@/lib/supabase/admin-auth-info'
+import { classifyProfile } from '@/lib/admin/data-scope'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -31,6 +32,19 @@ interface RouteParams {
  * Never mutates anything. ADMIN-CONTROL-CENTRE-BATCH-A1 deliberately
  * ships this read-only; send-recovery/resend-verification/revoke-
  * sessions are deferred to the security batch (see design report §6).
+ *
+ * D3-C-F1: this route is the one place the D3-C independent review
+ * found still reachable for a known test/unknown profile id, even
+ * though GET /api/admin/users/[id] (the main detail lookup) is now
+ * scoped to profiles.data_classification = 'real'. The same positive
+ * check now runs here too, BEFORE any Admin Auth API call -- a profile
+ * that exists but is not confirmed real degrades to the exact same
+ * `{ authUserExists: false }` shape this route already returns when no
+ * auth user exists at all, so the response never distinguishes "hidden
+ * by Real Data scope" from "nothing here." A profile row that cannot be
+ * found at all (pre-existing behavior, unrelated to this fix) is left
+ * untouched -- it still falls through to the Admin Auth API call below,
+ * exactly as before.
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { id: userId } = await params
@@ -47,8 +61,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
-    const { data: profile, error: profileError } = await admin.from('profiles').select('account_status').eq('id', userId).maybeSingle()
+    const { data: profile, error: profileError } = await admin.from('profiles').select('account_status, data_classification').eq('id', userId).maybeSingle()
     if (profileError) throw profileError
+
+    if (profile && classifyProfile(profile) !== 'real') {
+      return NextResponse.json({ authUserExists: false })
+    }
 
     const isErased = profile?.account_status === 'erased'
     const info = await getAdminAuthInfoRespectingErasure(admin, userId, isErased)

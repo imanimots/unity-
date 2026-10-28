@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 process.env.NEXT_PUBLIC_SUPABASE_URL ||= 'https://fake-project.supabase.co'
 process.env.SUPABASE_SERVICE_ROLE_KEY ||= 'fake-service-role-key'
@@ -22,15 +24,23 @@ const { GET } = await import('../route')
 const ADMIN_ID = '99999999-9999-9999-9999-999999999999'
 const TARGET_ID = '11111111-1111-1111-1111-111111111111'
 
-/** account_status is read via `.from('profiles').select('account_status').eq('id', id).maybeSingle()`. */
-function fakeAdminClient(accountStatus: string | null, profileError: unknown = null) {
+/**
+ * account_status + data_classification are read via
+ * `.from('profiles').select('account_status, data_classification').eq('id', id).maybeSingle()`.
+ * `accountStatus: null` means "no profile row at all" (the pre-existing
+ * missing-profile case), independent of `dataClassification`.
+ */
+function fakeAdminClient(accountStatus: string | null, dataClassification: 'real' | 'test' | 'unknown' = 'real', profileError: unknown = null) {
   return {
     from: (table: string) => {
       if (table !== 'profiles') throw new Error(`unexpected table: ${table}`)
       return {
         select: () => ({
           eq: () => ({
-            maybeSingle: async () => ({ data: accountStatus === null ? null : { account_status: accountStatus }, error: profileError }),
+            maybeSingle: async () => ({
+              data: accountStatus === null ? null : { account_status: accountStatus, data_classification: dataClassification },
+              error: profileError,
+            }),
           }),
         }),
       }
@@ -145,9 +155,99 @@ describe('GET /api/admin/users/[id]/auth-info — erasure gating (category: ADMI
   })
 
   it('6. a profile lookup error returns 500 rather than silently treating the account as non-erased', async () => {
-    getAdminServiceClient.mockResolvedValue(fakeAdminClient('active', { message: 'db error' }))
+    getAdminServiceClient.mockResolvedValue(fakeAdminClient('active', 'real', { message: 'db error' }))
     const res = await call()
     expect(res.status).toBe(500)
     expect(getAdminAuthInfoRespectingErasure).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * D3-C-F1: closes the D3-C independent review's sole P2 finding -- this
+ * route had no profiles.data_classification awareness at all, so a
+ * known test/unknown profile id could still retrieve real auth/email/
+ * phone metadata even though the main Customer/Merchant detail lookup
+ * (GET /api/admin/users/[id]) was already scoped to confirmed real
+ * profiles only.
+ */
+describe('GET /api/admin/users/[id]/auth-info — real-data scope (category: ADMIN-CONTROL-CENTRE-BATCH-D3-C-F1)', () => {
+  it('1. a confirmed-real profile still returns ordinary auth-info -- existing behavior continues', async () => {
+    getAdminServiceClient.mockResolvedValue(fakeAdminClient('active', 'real'))
+    getAdminAuthInfoRespectingErasure.mockResolvedValue({ authUserExists: true, erased: false, email: 'a@b.com' })
+    const res = await call()
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.authUserExists).toBe(true)
+    expect(body.email).toBe('a@b.com')
+  })
+
+  it('2. a test-classified profile never returns auth info -- degrades to the same {authUserExists:false} shape as "no auth user"', async () => {
+    getAdminServiceClient.mockResolvedValue(fakeAdminClient('active', 'test'))
+    const res = await call()
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual({ authUserExists: false })
+  })
+
+  it('3. an unknown-classified profile never returns auth info -- same non-visible shape as test', async () => {
+    getAdminServiceClient.mockResolvedValue(fakeAdminClient('active', 'unknown'))
+    const res = await call()
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual({ authUserExists: false })
+  })
+
+  it('4. a genuinely missing profile row is unaffected by this guard -- existing not-found behavior (falls through to the Admin Auth API call) is preserved exactly as before', async () => {
+    getAdminServiceClient.mockResolvedValue(fakeAdminClient(null))
+    getAdminAuthInfoRespectingErasure.mockResolvedValue(null)
+    const res = await call()
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual({ authUserExists: false })
+    expect(getAdminAuthInfoRespectingErasure).toHaveBeenCalledWith(expect.anything(), TARGET_ID, false)
+  })
+
+  it('5. an erased-but-real profile keeps its existing erasure protection -- the real-data guard does not weaken or bypass it', async () => {
+    getAdminServiceClient.mockResolvedValue(fakeAdminClient('erased', 'real'))
+    getAdminAuthInfoRespectingErasure.mockResolvedValue({ authUserExists: true, erased: true })
+    const res = await call()
+    const body = await res.json()
+    expect(body).toEqual({ authUserExists: true, erased: true })
+    expect(getAdminAuthInfoRespectingErasure).toHaveBeenCalledWith(expect.anything(), TARGET_ID, true)
+  })
+
+  it('6. admin authorization is still required and still checked first -- a non-admin caller never reaches the classification check', async () => {
+    requireAdminForRoute.mockResolvedValue({ ok: false, response: new Response(JSON.stringify({ error: 'nope' }), { status: 401 }) })
+    getAdminServiceClient.mockResolvedValue(fakeAdminClient('active', 'test'))
+    const res = await call()
+    expect(res.status).toBe(401)
+    expect(getAdminServiceClient).not.toHaveBeenCalled()
+  })
+
+  it('7. a test/unknown profile never reaches the sensitive Admin Auth API call -- the classification check runs strictly before it, not merely before the response is rendered', async () => {
+    getAdminServiceClient.mockResolvedValue(fakeAdminClient('active', 'test'))
+    await call()
+    expect(getAdminAuthInfoRespectingErasure).not.toHaveBeenCalled()
+
+    getAdminAuthInfoRespectingErasure.mockClear()
+    getAdminServiceClient.mockResolvedValue(fakeAdminClient('active', 'unknown'))
+    await call()
+    expect(getAdminAuthInfoRespectingErasure).not.toHaveBeenCalled()
+  })
+
+  it('8. no email/domain/name heuristic exists anywhere in this route\'s source -- classification comes only from the profiles row\'s own column', () => {
+    const source = readFileSync(join(__dirname, '../route.ts'), 'utf-8')
+    expect(source).not.toMatch(/unitytest\.internal/)
+    expect(source).not.toMatch(/unitytest\.co\.za/)
+    expect(source).not.toMatch(/gmail\.com/)
+    expect(source).not.toMatch(/\.endsWith\(/)
+    expect(source).not.toMatch(/data_classification\s*(!==|<>|!=)/)
+  })
+
+  it('9. the response never reveals the classification value itself, only the existing authUserExists/erased shape', async () => {
+    getAdminServiceClient.mockResolvedValue(fakeAdminClient('active', 'test'))
+    const res = await call()
+    const body = await res.json()
+    expect(JSON.stringify(body)).not.toMatch(/test|unknown|classification/i)
   })
 })
