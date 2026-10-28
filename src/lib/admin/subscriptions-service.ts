@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getEffectiveMerchantPlan } from '@/lib/subscriptions/effective-plan'
 import { getPublicationUsage } from '@/lib/subscriptions/entitlements'
+import { classifyProfile } from '@/lib/admin/data-scope'
 
 const DEFAULT_LIMIT = 100
 
@@ -31,10 +32,21 @@ export interface AdminSubscriptionFilters {
  * individually via getAdminSubscriptionDetail(), which resolves any
  * merchant id to Starter when no row exists.
  */
+/**
+ * D3-E: real requires the authoritative merchant profile
+ * (merchant_subscriptions.merchant_id -> profiles.id, FK
+ * `merchant_subscriptions_merchant_id_fkey`) positively real. No
+ * entity-level is_test column exists on merchant_subscriptions.
+ * Scoped at the database level via an inner-joined profile, before
+ * `.limit()`.
+ */
 export async function listAdminSubscriptions(admin: SupabaseClient, filters: AdminSubscriptionFilters): Promise<AdminSubscriptionRow[]> {
   let query = admin
     .from('merchant_subscriptions')
-    .select('merchant_id, current_plan_id, status, pending_plan_id, pending_plan_effective_at, last_transition_category, created_at, updated_at')
+    .select(
+      'merchant_id, current_plan_id, status, pending_plan_id, pending_plan_effective_at, last_transition_category, created_at, updated_at, profiles!merchant_subscriptions_merchant_id_fkey!inner(data_classification)'
+    )
+    .eq('profiles.data_classification', 'real')
     .order('updated_at', { ascending: false })
     .limit(filters.limit ?? DEFAULT_LIMIT)
 
@@ -104,8 +116,12 @@ export interface AdminSubscriptionDetail {
  * Starter-by-default merchant's plan too.
  */
 export async function getAdminSubscriptionDetail(admin: SupabaseClient, merchantId: string): Promise<AdminSubscriptionDetail | null> {
-  const { data: profile } = await admin.from('profiles').select('id, full_name, display_name, account_status').eq('id', merchantId).maybeSingle()
+  const { data: profile } = await admin.from('profiles').select('id, full_name, display_name, account_status, data_classification').eq('id', merchantId).maybeSingle()
   if (!profile) return null
+  // D3-E: a known test/unknown-classified merchant id must not load as
+  // an ordinary Real Data subscription detail -- checked before the
+  // plan/usage/history/billing fetches below.
+  if (classifyProfile(profile) !== 'real') return null
 
   const [{ planId, plan, subscription }, listingUsage, { data: historyRows }, { data: billingRows }] = await Promise.all([
     getEffectiveMerchantPlan(admin, merchantId),
@@ -184,3 +200,48 @@ export async function exportAdminSubscriptionsCsv(admin: SupabaseClient, filters
 }
 
 export const SUBSCRIPTION_CSV_COLUMNS = CSV_COLUMNS
+
+export interface RealSubscriptionOverviewCounts {
+  merchantSubscriptionsPro: number
+  merchantSubscriptionsElite: number
+  merchantSubscriptionsPendingChange: number
+  merchantSubscriptionsCancelled: number
+  merchantSubscriptionsDueForReversion: number
+}
+
+/**
+ * D3-E: the 5 merchant-subscription-derived Admin Overview metrics,
+ * scoped to confirmed real merchants only -- the exact same rule
+ * listAdminSubscriptions already applies. Preserves every existing
+ * status/plan/timestamp definition from get_admin_overview_stats()
+ * verbatim.
+ */
+export async function getRealSubscriptionOverviewCounts(admin: SupabaseClient): Promise<RealSubscriptionOverviewCounts> {
+  const scoped = () =>
+    admin
+      .from('merchant_subscriptions')
+      .select('merchant_id, profiles!merchant_subscriptions_merchant_id_fkey!inner(data_classification)', { count: 'exact', head: true })
+      .eq('profiles.data_classification', 'real')
+
+  const [
+    { count: merchantSubscriptionsPro },
+    { count: merchantSubscriptionsElite },
+    { count: merchantSubscriptionsPendingChange },
+    { count: merchantSubscriptionsCancelled },
+    { count: merchantSubscriptionsDueForReversion },
+  ] = await Promise.all([
+    scoped().eq('current_plan_id', 'pro'),
+    scoped().eq('current_plan_id', 'elite'),
+    scoped().eq('status', 'pending_change'),
+    scoped().eq('status', 'cancelled'),
+    scoped().in('status', ['pending_change', 'cancelled']).lte('pending_plan_effective_at', new Date().toISOString()),
+  ])
+
+  return {
+    merchantSubscriptionsPro: merchantSubscriptionsPro ?? 0,
+    merchantSubscriptionsElite: merchantSubscriptionsElite ?? 0,
+    merchantSubscriptionsPendingChange: merchantSubscriptionsPendingChange ?? 0,
+    merchantSubscriptionsCancelled: merchantSubscriptionsCancelled ?? 0,
+    merchantSubscriptionsDueForReversion: merchantSubscriptionsDueForReversion ?? 0,
+  }
+}

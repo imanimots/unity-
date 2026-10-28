@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { classifyProfile, classifyEntityWithOwners } from '@/lib/admin/data-scope'
 
 const DEFAULT_LIMIT = 100
 
@@ -19,12 +20,21 @@ export interface AdminAffiliateFilters {
   limit?: number
 }
 
-/** Mirrors listAdminOrders' exact shape: one base query + Promise.all of related-table lookups + in-memory joins. */
+/**
+ * Mirrors listAdminOrders' exact shape: one base query + Promise.all of
+ * related-table lookups + in-memory joins.
+ *
+ * D3-E: real requires the affiliate's own profile positively real --
+ * this is a direct `profiles` query (the affiliate roster IS a view
+ * over `profiles`, same relationship as merchants in D3-C), so the
+ * filter is a plain `.eq()`, not an embedded join.
+ */
 export async function listAdminAffiliates(admin: SupabaseClient, filters: AdminAffiliateFilters): Promise<AdminAffiliateRow[]> {
   const { data: profiles, error } = await admin
     .from('profiles')
     .select('id, full_name, display_name, affiliate_code, account_status, created_at')
     .eq('is_affiliate', true)
+    .eq('data_classification', 'real')
     .order('created_at', { ascending: false })
     .limit(filters.limit ?? DEFAULT_LIMIT)
 
@@ -85,13 +95,17 @@ export interface AdminAffiliateDetail {
 export async function getAdminAffiliateDetail(admin: SupabaseClient, affiliateId: string): Promise<AdminAffiliateDetail | null> {
   const { data: profile, error } = await admin
     .from('profiles')
-    .select('id, full_name, display_name, affiliate_code, account_status, created_at')
+    .select('id, full_name, display_name, affiliate_code, account_status, created_at, data_classification')
     .eq('id', affiliateId)
     .eq('is_affiliate', true)
     .maybeSingle()
 
   if (error) throw error
   if (!profile) return null
+  // D3-E: a known test/unknown-classified affiliate id must not load
+  // as an ordinary Real Data affiliate detail -- checked before the
+  // attributions/commissions fetches below.
+  if (classifyProfile(profile) !== 'real') return null
 
   const [{ data: attributions }, { data: commissions }] = await Promise.all([
     admin.from('affiliate_attributions').select('*, listings(title)').eq('affiliate_id', affiliateId).order('attributed_at', { ascending: false }),
@@ -148,10 +162,29 @@ export interface AdminCommissionFilters {
   limit?: number
 }
 
+/**
+ * D3-E: unlike unity_commissions, affiliate_commissions has every
+ * required actor as a DIRECT column -- affiliate_id, merchant_id, AND
+ * referred_user_id (the referred buyer/renter) all reference profiles
+ * directly, with no need to trace through order_id/booking_id for
+ * provenance. Real requires all three positively real AND the linked
+ * listing not test -- scoped at the database level via inner-joined,
+ * aliased profiles plus an inner-joined listing, before `.limit()`.
+ */
 export async function listAdminAffiliateCommissions(admin: SupabaseClient, filters: AdminCommissionFilters): Promise<AdminCommissionRow[]> {
   let query = admin
     .from('affiliate_commissions')
-    .select('id, transaction_type, status, affiliate_id, merchant_id, listing_id, order_id, booking_id, payment_id, commission_amount, currency, created_at, approved_at, payout_confirmed_at, listings(title)')
+    .select(
+      `id, transaction_type, status, affiliate_id, merchant_id, referred_user_id, listing_id, order_id, booking_id, payment_id, commission_amount, currency, created_at, approved_at, payout_confirmed_at,
+      listings!inner(title, is_test),
+      affiliate_profile:profiles!affiliate_commissions_affiliate_id_fkey!inner(data_classification),
+      merchant_profile:profiles!affiliate_commissions_merchant_id_fkey!inner(data_classification),
+      referred_profile:profiles!affiliate_commissions_referred_user_id_fkey!inner(data_classification)`
+    )
+    .eq('listings.is_test', false)
+    .eq('affiliate_profile.data_classification', 'real')
+    .eq('merchant_profile.data_classification', 'real')
+    .eq('referred_profile.data_classification', 'real')
     .order('created_at', { ascending: false })
     .limit(filters.limit ?? DEFAULT_LIMIT)
 
@@ -224,6 +257,24 @@ export async function getAdminAffiliateCommissionDetail(admin: SupabaseClient, c
   if (error) throw error
   if (!commission) return null
 
+  const [{ data: scopeProfiles }, { data: scopeListing }] = await Promise.all([
+    admin.from('profiles').select('id, data_classification').in('id', [commission.affiliate_id, commission.merchant_id, commission.referred_user_id]),
+    admin.from('listings').select('is_test').eq('id', commission.listing_id).maybeSingle(),
+  ])
+  const scopeAffiliate = scopeProfiles?.find((p) => p.id === commission.affiliate_id)
+  const scopeMerchant = scopeProfiles?.find((p) => p.id === commission.merchant_id)
+  const scopeReferred = scopeProfiles?.find((p) => p.id === commission.referred_user_id)
+  // D3-E: a known test/unknown-linked commission id must not load as
+  // an ordinary Real Data detail -- checked before history/adjustments/
+  // payment/profile-name/listing-title fetches below. All three actors
+  // (affiliate, merchant, referred user) plus the listing's is_test
+  // are direct columns on this row -- no transaction tracing needed.
+  if (
+    classifyEntityWithOwners({ is_test: scopeListing?.is_test === true }, [scopeAffiliate ?? {}, scopeMerchant ?? {}, scopeReferred ?? {}]) !== 'real'
+  ) {
+    return null
+  }
+
   const [{ data: history }, { data: adjustments }, { data: payment }, { data: profiles }, { data: listing }] = await Promise.all([
     admin.from('affiliate_commission_history').select('*').eq('commission_id', commissionId).order('created_at', { ascending: false }),
     admin.from('affiliate_commission_adjustments').select('*').eq('commission_id', commissionId).order('created_at', { ascending: false }),
@@ -262,3 +313,61 @@ const COMMISSION_CSV_COLUMNS: (keyof AdminCommissionRow)[] = [
 ]
 
 export const AFFILIATE_COMMISSION_CSV_COLUMNS = COMMISSION_CSV_COLUMNS
+
+export interface RealAffiliateOverviewCounts {
+  activeAffiliates: number
+  affiliateCommissionsPending: number
+  affiliateCommissionsHeld: number
+  affiliateCommissionsPayoutQueued: number
+  affiliateCommissionsFailed: number
+}
+
+/**
+ * D3-E: the 5 affiliate-derived Admin Overview metrics, scoped to
+ * confirmed real actors only. active_affiliates requires the
+ * affiliate's own profile real (the same rule listAdminAffiliates
+ * already applies). The 4 commission status counts require affiliate
+ * real AND merchant real AND referred_user real AND the linked
+ * listing.is_test=false -- the exact same rule
+ * listAdminAffiliateCommissions already applies. Preserves every
+ * existing status definition from get_admin_overview_stats() verbatim.
+ */
+export async function getRealAffiliateOverviewCounts(admin: SupabaseClient): Promise<RealAffiliateOverviewCounts> {
+  const scopedCommissions = () =>
+    admin
+      .from('affiliate_commissions')
+      .select(
+        `id,
+        listings!inner(is_test),
+        affiliate_profile:profiles!affiliate_commissions_affiliate_id_fkey!inner(data_classification),
+        merchant_profile:profiles!affiliate_commissions_merchant_id_fkey!inner(data_classification),
+        referred_profile:profiles!affiliate_commissions_referred_user_id_fkey!inner(data_classification)`,
+        { count: 'exact', head: true }
+      )
+      .eq('listings.is_test', false)
+      .eq('affiliate_profile.data_classification', 'real')
+      .eq('merchant_profile.data_classification', 'real')
+      .eq('referred_profile.data_classification', 'real')
+
+  const [
+    { count: activeAffiliates },
+    { count: affiliateCommissionsPending },
+    { count: affiliateCommissionsHeld },
+    { count: affiliateCommissionsPayoutQueued },
+    { count: affiliateCommissionsFailed },
+  ] = await Promise.all([
+    admin.from('profiles').select('id', { count: 'exact', head: true }).eq('is_affiliate', true).eq('data_classification', 'real'),
+    scopedCommissions().eq('status', 'pending'),
+    scopedCommissions().eq('status', 'held'),
+    scopedCommissions().eq('status', 'payout_queued'),
+    scopedCommissions().eq('status', 'failed'),
+  ])
+
+  return {
+    activeAffiliates: activeAffiliates ?? 0,
+    affiliateCommissionsPending: affiliateCommissionsPending ?? 0,
+    affiliateCommissionsHeld: affiliateCommissionsHeld ?? 0,
+    affiliateCommissionsPayoutQueued: affiliateCommissionsPayoutQueued ?? 0,
+    affiliateCommissionsFailed: affiliateCommissionsFailed ?? 0,
+  }
+}

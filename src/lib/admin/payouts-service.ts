@@ -1,6 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { classifyEntityWithOwners } from '@/lib/admin/data-scope'
 
 const DEFAULT_LIMIT = 100
+
+/**
+ * D3-E: listAdminPayouts() below is backed entirely by
+ * _admin_list_merchant_payouts (migration
+ * 20260904000022_admin_payout_search_relational.sql), the same
+ * kind of CREATE OR REPLACE RPC blocker _admin_list_orders_page was in
+ * D3-D -- editing it to add Real Data provenance is itself a database
+ * migration, and this phase's expected migration count is zero. This
+ * is reported as a blocker in the final report, not worked around
+ * here. getAdminPayoutDetail below is a plain table query with no such
+ * constraint, so it is scoped directly.
+ */
 
 export interface AdminPayoutRow {
   id: string
@@ -118,6 +131,26 @@ export async function getAdminPayoutDetail(admin: SupabaseClient, payoutId: stri
   if (error) throw error
   if (!payout) return null
 
+  // D3-E: a known test/unknown-linked payout id must not load as an
+  // ordinary Real Data payout detail -- checked before the merchant/
+  // booking/payments/history/email fetches below. A payout always has
+  // merchant_id; when booking_id is also set, the payout inherits the
+  // COMPLETE booking rule (renter+merchant+listing.is_test), never
+  // merchant-real alone -- the same relationship bookings' own
+  // real-data rule already uses.
+  const { data: scopeMerchant } = await admin.from('profiles').select('id, data_classification').eq('id', payout.merchant_id).maybeSingle()
+  if (payout.booking_id) {
+    const { data: scopeBooking } = await admin.from('bookings').select('renter_id, listing_id').eq('id', payout.booking_id).maybeSingle()
+    if (!scopeBooking) return null
+    const [{ data: scopeRenter }, { data: scopeListing }] = await Promise.all([
+      admin.from('profiles').select('id, data_classification').eq('id', scopeBooking.renter_id).maybeSingle(),
+      admin.from('listings').select('is_test').eq('id', scopeBooking.listing_id).maybeSingle(),
+    ])
+    if (classifyEntityWithOwners({ is_test: scopeListing?.is_test === true }, [scopeRenter ?? {}, scopeMerchant ?? {}]) !== 'real') return null
+  } else if (classifyEntityWithOwners({ is_test: false }, [scopeMerchant ?? {}]) !== 'real') {
+    return null
+  }
+
   const [{ data: merchant }, { data: booking }, { data: payments }, { data: history }, { data: emailDeliveries }] = await Promise.all([
     admin.from('profiles').select('full_name, display_name, account_status').eq('id', payout.merchant_id).maybeSingle(),
     payout.booking_id ? admin.from('bookings').select('*').eq('id', payout.booking_id).maybeSingle() : Promise.resolve({ data: null }),
@@ -172,3 +205,81 @@ const PAYOUT_CSV_COLUMNS: (keyof AdminPayoutRow)[] = [
 ]
 
 export const ADMIN_PAYOUT_CSV_COLUMNS = PAYOUT_CSV_COLUMNS
+
+export interface RealPayoutOverviewCounts {
+  merchantPayoutsPending: number
+  merchantPayoutsProcessing: number
+  merchantPayoutsFailed: number
+  merchantPayoutsPendingOverdue: number
+  merchantPayoutsProcessingOverdue: number
+}
+
+/**
+ * D3-E: the 5 payout-derived Admin Overview metrics, scoped to
+ * confirmed real payouts only -- the exact same rule getAdminPayoutDetail
+ * applies (merchant real, and the COMPLETE booking rule when
+ * booking_id is set, never merchant-real alone). Deliberately does NOT
+ * call _admin_list_merchant_payouts (the RPC blocker noted above) --
+ * this is an independent, direct scoped query against
+ * merchant_payouts/profiles/bookings/listings. booking_id is nullable,
+ * so this cannot be a single embedded-join filter (an inner join on
+ * bookings would wrongly exclude every payout with no booking at all)
+ * -- rows are fetched per status, classified in batch (never per-row),
+ * then counted. Preserves every existing status/timestamp definition
+ * from get_admin_overview_stats() verbatim.
+ */
+export async function getRealPayoutOverviewCounts(admin: SupabaseClient): Promise<RealPayoutOverviewCounts> {
+  const overdueThreshold = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+
+  async function countRealForStatus(status: string, overdueColumn?: 'created_at' | 'processing_started_at'): Promise<number> {
+    const query = admin.from('merchant_payouts').select('id, merchant_id, booking_id, created_at, processing_started_at').eq('status', status)
+    const { data: rows } = await (overdueColumn ? query.lt(overdueColumn, overdueThreshold) : query)
+    if (!rows || rows.length === 0) return 0
+
+    const merchantIds = Array.from(new Set(rows.map((r) => r.merchant_id)))
+    const bookingIds = Array.from(new Set(rows.filter((r) => r.booking_id).map((r) => r.booking_id as string)))
+
+    const [{ data: merchants }, { data: bookings }] = await Promise.all([
+      admin.from('profiles').select('id, data_classification').in('id', merchantIds),
+      bookingIds.length ? admin.from('bookings').select('id, renter_id, listing_id').in('id', bookingIds) : Promise.resolve({ data: [] }),
+    ])
+    const merchantById = new Map((merchants ?? []).map((m) => [m.id, { data_classification: m.data_classification }]))
+    const bookingById = new Map((bookings ?? []).map((b) => [b.id, b]))
+
+    const renterIds = Array.from(new Set((bookings ?? []).map((b) => b.renter_id)))
+    const listingIds = Array.from(new Set((bookings ?? []).map((b) => b.listing_id)))
+    const [{ data: renters }, { data: listings }] = await Promise.all([
+      renterIds.length ? admin.from('profiles').select('id, data_classification').in('id', renterIds) : Promise.resolve({ data: [] }),
+      listingIds.length ? admin.from('listings').select('id, is_test').in('id', listingIds) : Promise.resolve({ data: [] }),
+    ])
+    const renterById = new Map((renters ?? []).map((r) => [r.id, { data_classification: r.data_classification }]))
+    const listingIsTestById = new Map((listings ?? []).map((l) => [l.id, l.is_test]))
+
+    return rows.filter((r) => {
+      const merchant = merchantById.get(r.merchant_id) ?? {}
+      if (!r.booking_id) return classifyEntityWithOwners({ is_test: false }, [merchant]) === 'real'
+      const booking = bookingById.get(r.booking_id)
+      if (!booking) return false
+      const renter = renterById.get(booking.renter_id) ?? {}
+      const isTest = listingIsTestById.get(booking.listing_id) === true
+      return classifyEntityWithOwners({ is_test: isTest }, [renter, merchant]) === 'real'
+    }).length
+  }
+
+  const [merchantPayoutsPending, merchantPayoutsProcessing, merchantPayoutsFailed, merchantPayoutsPendingOverdue, merchantPayoutsProcessingOverdue] =
+    await Promise.all([
+      countRealForStatus('pending'),
+      countRealForStatus('processing'),
+      countRealForStatus('failed'),
+      countRealForStatus('pending', 'created_at'),
+      countRealForStatus('processing', 'processing_started_at'),
+    ])
+
+  return {
+    merchantPayoutsPending,
+    merchantPayoutsProcessing,
+    merchantPayoutsFailed,
+    merchantPayoutsPendingOverdue,
+    merchantPayoutsProcessingOverdue,
+  }
+}

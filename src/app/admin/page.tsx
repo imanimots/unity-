@@ -6,6 +6,11 @@ import { getRealBookingOverviewCounts } from '@/lib/admin/operations-service'
 import { getRealBarterOverviewCounts } from '@/lib/admin/barter-service'
 import { getRealOrderOverviewCounts } from '@/lib/admin/orders-service'
 import { getRealRentToBuyOverviewCounts } from '@/lib/admin/rent-to-buy-service'
+import { getRealPayoutOverviewCounts } from '@/lib/admin/payouts-service'
+import { getRealSubscriptionOverviewCounts } from '@/lib/admin/subscriptions-service'
+import { getRealUnityCommissionOverviewCounts } from '@/lib/admin/commissions-service'
+import { getRealAffiliateOverviewCounts } from '@/lib/admin/affiliate-service'
+import { getRealEscrowOverviewCounts } from '@/lib/admin/escrow-service'
 import { StatCard, AdminPageHeader, formatDateTime } from '@/components/admin/ui'
 
 interface OverviewStats {
@@ -87,7 +92,20 @@ export default async function AdminOverviewPage() {
     return <div className="p-8 text-sm text-[#9B8B85]">Overview storage is not configured.</div>
   }
 
-  const [{ data, error }, realUserCounts, realListingCounts, realBookingCounts, realBarterCounts, realOrderCounts, realRtbCounts] = await Promise.all([
+  const [
+    { data, error },
+    realUserCounts,
+    realListingCounts,
+    realBookingCounts,
+    realBarterCounts,
+    realOrderCounts,
+    realRtbCounts,
+    realPayoutCounts,
+    realSubscriptionCounts,
+    realUnityCommissionCounts,
+    realAffiliateCounts,
+    realEscrowCounts,
+  ] = await Promise.all([
     admin.rpc('get_admin_overview_stats'),
     getRealUserOverviewCounts(admin),
     getRealListingOverviewCounts(admin),
@@ -95,20 +113,29 @@ export default async function AdminOverviewPage() {
     getRealBarterOverviewCounts(admin),
     getRealOrderOverviewCounts(admin),
     getRealRentToBuyOverviewCounts(admin),
+    getRealPayoutOverviewCounts(admin),
+    getRealSubscriptionOverviewCounts(admin),
+    getRealUnityCommissionOverviewCounts(admin),
+    getRealAffiliateOverviewCounts(admin),
+    getRealEscrowOverviewCounts(admin),
   ])
   if (error || !data) {
     return <div className="p-8 text-sm text-red-600">Could not load the overview.</div>
   }
-  // D3-C/D3-D-F1: the account/listing/booking/barter/order/RTB metrics
-  // below are overridden with confirmed-real-only counts --
+  // D3-C/D3-D-F1/D3-E: the account/listing/booking/barter/order/RTB/
+  // payout/subscription/unity-commission/affiliate/escrow metrics below
+  // are overridden with confirmed-real-only counts --
   // get_admin_overview_stats() itself counts every row with no
   // classification awareness and this phase does not migrate it in
   // place. pending_kyc_reviews/pending_ownership_reviews/
-  // pending_listing_moderation and every Finance/Advertising/Support
-  // field remain the RPC's own unscoped value deliberately -- the
-  // first three are operational work queues (an admin must see and
-  // act on every pending item regardless of classification), and the
-  // rest are out of scope for this phase.
+  // pending_listing_moderation, failed_financial_workflows, and
+  // retryable_email_failures remain the RPC's own unscoped,
+  // deliberately all-system value -- they are operational work queues
+  // (an admin must see and act on every pending/failed item regardless
+  // of classification), not business-volume metrics. Advertising has
+  // no Overview presence at all (confirmed: get_admin_overview_stats()
+  // has zero advertising fields). Every remaining field (Support, KYC)
+  // is out of scope for this phase.
   const stats: OverviewStats = {
     ...(data as OverviewStats),
     total_users: realUserCounts.totalUsers,
@@ -139,6 +166,31 @@ export default async function AdminOverviewPage() {
     rtb_agreements_defaulted: realRtbCounts.rtbAgreementsDefaulted,
     rtb_agreements_return_required: realRtbCounts.rtbAgreementsReturnRequired,
     rtb_agreements_completed: realRtbCounts.rtbAgreementsCompleted,
+    merchant_payouts_pending: realPayoutCounts.merchantPayoutsPending,
+    merchant_payouts_processing: realPayoutCounts.merchantPayoutsProcessing,
+    merchant_payouts_failed: realPayoutCounts.merchantPayoutsFailed,
+    merchant_payouts_pending_overdue: realPayoutCounts.merchantPayoutsPendingOverdue,
+    merchant_payouts_processing_overdue: realPayoutCounts.merchantPayoutsProcessingOverdue,
+    merchant_subscriptions_pro: realSubscriptionCounts.merchantSubscriptionsPro,
+    merchant_subscriptions_elite: realSubscriptionCounts.merchantSubscriptionsElite,
+    merchant_subscriptions_pending_change: realSubscriptionCounts.merchantSubscriptionsPendingChange,
+    merchant_subscriptions_cancelled: realSubscriptionCounts.merchantSubscriptionsCancelled,
+    merchant_subscriptions_due_for_reversion: realSubscriptionCounts.merchantSubscriptionsDueForReversion,
+    unity_commissions_pending: realUnityCommissionCounts.unityCommissionsPending,
+    unity_commissions_held: realUnityCommissionCounts.unityCommissionsHeld,
+    unity_commissions_earned: realUnityCommissionCounts.unityCommissionsEarned,
+    unity_commissions_voided: realUnityCommissionCounts.unityCommissionsVoided,
+    unity_commissions_high_value_sales: realUnityCommissionCounts.unityCommissionsHighValueSales,
+    active_affiliates: realAffiliateCounts.activeAffiliates,
+    affiliate_commissions_pending: realAffiliateCounts.affiliateCommissionsPending,
+    affiliate_commissions_held: realAffiliateCounts.affiliateCommissionsHeld,
+    affiliate_commissions_payout_queued: realAffiliateCounts.affiliateCommissionsPayoutQueued,
+    affiliate_commissions_failed: realAffiliateCounts.affiliateCommissionsFailed,
+    escrow_transactions_pending: realEscrowCounts.escrowTransactionsPending,
+    escrow_transactions_funded: realEscrowCounts.escrowTransactionsFunded,
+    escrow_transactions_released: realEscrowCounts.escrowTransactionsReleased,
+    escrow_transactions_refunded: realEscrowCounts.escrowTransactionsRefunded,
+    escrow_transactions_failed: realEscrowCounts.escrowTransactionsFailed,
   }
 
   return (
