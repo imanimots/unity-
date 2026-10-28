@@ -9,7 +9,7 @@ import { join } from 'path'
 // contains the invariants D3-A-F1 requires, not that it has been
 // applied anywhere (it has not -- this phase does not apply it).
 const REPO_ROOT = join(__dirname, '../../..')
-const migrationPath = join(REPO_ROOT, 'supabase/migrations/20261027150000_profiles_data_classification.sql')
+const migrationPath = join(REPO_ROOT, 'supabase/migrations/20261028083649_profiles_data_classification.sql')
 const sql = readFileSync(migrationPath, 'utf-8')
 
 function functionBody(name: string): string {
