@@ -1,6 +1,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { countAdminDisputesForUser } from '@/lib/admin/disputes-service'
 import { getSupportCaseSummaryForUser, type AdminSupportCaseSummary } from '@/lib/admin/support-service'
+import { profileScopeFilterValue, classifyProfile } from '@/lib/admin/data-scope'
+
+/**
+ * D3-C: every query in this file that lists/counts/looks up profiles is
+ * scoped to confirmed real accounts only (profiles.data_classification
+ * = 'real'), via the canonical D3-B contract rather than a duplicated
+ * literal. No public/client-controlled scope parameter exists yet
+ * (deliberately deferred) -- this phase hardcodes 'real', the only
+ * scope Admin Customers/Merchants surface right now.
+ */
+const REAL_DATA_SCOPE = profileScopeFilterValue('real')
 
 export interface AdminUserFilters {
   search?: string
@@ -51,6 +62,7 @@ export async function listAdminUsers(admin: SupabaseClient, filters: AdminUserFi
     .order('created_at', { ascending: false })
     .limit(filters.limit ?? DEFAULT_LIMIT)
 
+  if (REAL_DATA_SCOPE) query = query.eq('data_classification', REAL_DATA_SCOPE)
   if (filters.role && filters.role !== 'all') query = query.eq('role', filters.role)
   if (filters.kycStatus && filters.kycStatus !== 'all') query = query.eq('kyc_status', filters.kycStatus)
   if (filters.accountStatus && filters.accountStatus !== 'all') query = query.eq('account_status', filters.accountStatus)
@@ -122,12 +134,19 @@ export interface AdminUserDetail {
 export async function getAdminUserDetail(admin: SupabaseClient, userId: string): Promise<AdminUserDetail | null> {
   const { data: profile, error: profileError } = await admin
     .from('profiles')
-    .select('id, full_name, display_name, phone, role, kyc_status, account_status, status_reason, status_changed_at, unity_score, created_at')
+    .select('id, full_name, display_name, phone, role, kyc_status, account_status, status_reason, status_changed_at, unity_score, created_at, data_classification')
     .eq('id', userId)
     .maybeSingle()
 
   if (profileError) throw profileError
   if (!profile) return null
+  // D3-C: this detail lookup is shared by both the Customers and
+  // Merchants 360 views (a merchant is just profiles.role IN
+  // ('merchant','both')) -- a known test/unknown UUID must not bypass
+  // the list-level real-data scope just because the caller already
+  // knows its id. Reported as "not found" rather than a distinguishable
+  // error, matching how the route already treats a missing row.
+  if (REAL_DATA_SCOPE && classifyProfile(profile) !== REAL_DATA_SCOPE) return null
 
   const [
     { data: verification },
@@ -233,4 +252,56 @@ export async function addAdminNote(
     p_note: note,
     p_idempotency_key: idempotencyKey ?? null,
   })
+}
+
+export interface RealUserOverviewCounts {
+  totalUsers: number
+  activeUsers: number
+  merchants: number
+  renters: number
+  suspendedUsers: number
+  restrictedUsers: number
+}
+
+/**
+ * D3-C: the 6 account-derived Admin Overview metrics (Total/Active
+ * users, Merchants, Renters, Restricted, Suspended), scoped to
+ * confirmed real profiles only. get_admin_overview_stats() (the RPC
+ * both src/app/admin/page.tsx and /api/admin/overview otherwise rely
+ * on for every Overview number) counts the whole `profiles` table with
+ * no classification awareness at all, and this phase does not create a
+ * migration to edit that RPC in place -- so these 6 fields are computed
+ * here, server-side, and used to OVERRIDE the RPC's mixed-population
+ * values for exactly these 6 keys. Every other Overview metric
+ * (listings, bookings, barter, orders, affiliate, payouts,
+ * subscriptions, commissions, escrow, RTB, review queues, financial
+ * workflows, email failures) belongs to a domain this phase does not
+ * touch (Listings/Transactions/Finance/Advertising/Support/Trust &
+ * Safety) and is left exactly as the RPC reports it, unscoped, until
+ * that domain's own future D3 phase.
+ */
+export async function getRealUserOverviewCounts(admin: SupabaseClient): Promise<RealUserOverviewCounts> {
+  const scoped = () => {
+    const q = admin.from('profiles').select('id', { count: 'exact', head: true })
+    return REAL_DATA_SCOPE ? q.eq('data_classification', REAL_DATA_SCOPE) : q
+  }
+
+  const [{ count: totalUsers }, { count: activeUsers }, { count: merchants }, { count: renters }, { count: suspendedUsers }, { count: restrictedUsers }] =
+    await Promise.all([
+      scoped(),
+      scoped().eq('account_status', 'active'),
+      scoped().in('role', ['merchant', 'both']),
+      scoped().in('role', ['renter', 'both']),
+      scoped().eq('account_status', 'suspended'),
+      scoped().eq('account_status', 'restricted'),
+    ])
+
+  return {
+    totalUsers: totalUsers ?? 0,
+    activeUsers: activeUsers ?? 0,
+    merchants: merchants ?? 0,
+    renters: renters ?? 0,
+    suspendedUsers: suspendedUsers ?? 0,
+    restrictedUsers: restrictedUsers ?? 0,
+  }
 }

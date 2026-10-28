@@ -1,4 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { profileScopeFilterValue } from '@/lib/admin/data-scope'
+
+/**
+ * D3-C: a merchant IS a profile (role IN ('merchant','both')), so real
+ * scoping here is the owner-only rule from src/lib/admin/data-scope.ts
+ * -- `data_classification = 'real'` on the same `profiles` row, the
+ * exact positive-equality contract the D3-B module defines. The
+ * per-merchant listing counts below additionally require
+ * `listings.is_test = false` (the entity+owner rule: real requires
+ * BOTH the entity not being explicitly test AND the owner being
+ * positively real) since listings carry their own is_test flag that
+ * profiles does not.
+ */
+const REAL_DATA_SCOPE = profileScopeFilterValue('real')
 
 const DEFAULT_LIMIT = 100
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -49,6 +63,7 @@ export async function listAdminMerchants(admin: SupabaseClient, filters: AdminMe
     .order('created_at', { ascending: false })
     .limit(filters.limit ?? DEFAULT_LIMIT)
 
+  if (REAL_DATA_SCOPE) query = query.eq('data_classification', REAL_DATA_SCOPE)
   if (filters.kycStatus && filters.kycStatus !== 'all') query = query.eq('kyc_status', filters.kycStatus)
   if (filters.accountStatus && filters.accountStatus !== 'all') query = query.eq('account_status', filters.accountStatus)
   if (filters.search && filters.search.trim()) {
@@ -72,7 +87,7 @@ export async function listAdminMerchants(admin: SupabaseClient, filters: AdminMe
   // both for the active-listing count and to resolve
   // listing_ownership_verification rows (which have no merchant_id
   // column of their own) back to a merchant.
-  const { data: allListingRows } = await admin.from('listings').select('id, merchant_id, status').in('merchant_id', merchantIds)
+  const { data: allListingRows } = await admin.from('listings').select('id, merchant_id, status').in('merchant_id', merchantIds).eq('is_test', false)
   const listingIds = (allListingRows ?? []).map((l) => l.id)
 
   const [{ data: ownershipRows }, { data: payoutRows }, { data: subRows }] = await Promise.all([

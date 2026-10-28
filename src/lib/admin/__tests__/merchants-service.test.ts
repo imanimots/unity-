@@ -88,3 +88,80 @@ describe('merchants-service: listAdminMerchants (category: ADMIN-CONTROL-CENTRE-
     expect(m2.subscriptionPlanId).toBe('starter') // no merchant_subscriptions row -- defaults, never fabricated as "pro"
   })
 })
+
+interface RecordedCall {
+  method: string
+  args: unknown[]
+}
+
+function recordingChainable(result: { data?: unknown; error?: unknown }, calls: RecordedCall[]) {
+  const obj: Record<string, unknown> = {}
+  for (const method of ['select', 'eq', 'or', 'order', 'limit', 'in']) {
+    obj[method] = (...args: unknown[]) => {
+      calls.push({ method, args })
+      return obj
+    }
+  }
+  obj.then = (resolve: (v: typeof result) => void) => resolve(result)
+  return obj
+}
+
+describe('merchants-service: D3-C real-data scope adoption (category: ADMIN-CONTROL-CENTRE-BATCH-D3-C)', () => {
+  it('4. the profiles query filters on data_classification = \'real\' -- a merchant owned by a test or unknown profile is excluded at the query level, never fetched then filtered', async () => {
+    const profileCalls: RecordedCall[] = []
+    const admin = {
+      from: (table: string) => {
+        if (table === 'profiles') return recordingChainable({ data: [], error: null }, profileCalls)
+        return recordingChainable({ data: [], error: null }, [])
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await listAdminMerchants(admin, {})
+    expect(profileCalls.some((c) => c.method === 'eq' && c.args[0] === 'data_classification' && c.args[1] === 'real')).toBe(true)
+    expect(profileCalls.some((c) => c.method === 'in' && c.args[0] === 'role')).toBe(true)
+  })
+
+  it('5. the listings query underlying activeListingCount/pendingOwnershipCount requires is_test = false -- an is_test=true listing is excluded even for an already-real merchant (entity+owner rule, not owner alone)', async () => {
+    const listingCalls: RecordedCall[] = []
+    const admin = {
+      from: (table: string) => {
+        if (table === 'profiles') return { select: () => ({ in: () => recordingChainable({ data: MERCHANTS, error: null }, []) }) }
+        if (table === 'listings') return recordingChainable({ data: [], error: null }, listingCalls)
+        return recordingChainable({ data: [], error: null }, [])
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await listAdminMerchants(admin, {})
+    expect(listingCalls.some((c) => c.method === 'eq' && c.args[0] === 'is_test' && c.args[1] === false)).toBe(true)
+  })
+
+  it('6. search preserves real scope -- the data_classification filter and the search predicate are both applied to the same query, not search-then-filter', async () => {
+    const profileCalls: RecordedCall[] = []
+    const admin = {
+      from: (table: string) => {
+        if (table === 'profiles') return recordingChainable({ data: [], error: null }, profileCalls)
+        return recordingChainable({ data: [], error: null }, [])
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await listAdminMerchants(admin, { search: 'Acme' })
+    const scopeIdx = profileCalls.findIndex((c) => c.method === 'eq' && c.args[0] === 'data_classification')
+    const orIdx = profileCalls.findIndex((c) => c.method === 'or')
+    expect(scopeIdx).toBeGreaterThanOrEqual(0)
+    expect(orIdx).toBeGreaterThanOrEqual(0)
+  })
+
+  it('7. the real-data filter composes with an existing status filter, not replaces it', async () => {
+    const profileCalls: RecordedCall[] = []
+    const admin = {
+      from: (table: string) => {
+        if (table === 'profiles') return recordingChainable({ data: [], error: null }, profileCalls)
+        return recordingChainable({ data: [], error: null }, [])
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await listAdminMerchants(admin, { accountStatus: 'active' })
+    expect(profileCalls.some((c) => c.method === 'eq' && c.args[0] === 'data_classification' && c.args[1] === 'real')).toBe(true)
+    expect(profileCalls.some((c) => c.method === 'eq' && c.args[0] === 'account_status' && c.args[1] === 'active')).toBe(true)
+  })
+})

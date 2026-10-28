@@ -1,5 +1,6 @@
 import { requireAdmin } from '@/lib/supabase/require-admin'
 import { getAdminServiceClient } from '@/lib/admin/route-helpers'
+import { getRealUserOverviewCounts } from '@/lib/admin/users-service'
 import { StatCard, AdminPageHeader, formatDateTime } from '@/components/admin/ui'
 
 interface OverviewStats {
@@ -76,11 +77,29 @@ export default async function AdminOverviewPage() {
     return <div className="p-8 text-sm text-[#9B8B85]">Overview storage is not configured.</div>
   }
 
-  const { data, error } = await admin.rpc('get_admin_overview_stats')
+  const [{ data, error }, realUserCounts] = await Promise.all([
+    admin.rpc('get_admin_overview_stats'),
+    getRealUserOverviewCounts(admin),
+  ])
   if (error || !data) {
     return <div className="p-8 text-sm text-red-600">Could not load the overview.</div>
   }
-  const stats = data as OverviewStats
+  // D3-C: total_users/active_users/merchants/renters/suspended_users/
+  // restricted_users are overridden with confirmed-real-only counts --
+  // get_admin_overview_stats() itself counts every profile with no
+  // classification awareness and this phase does not migrate it in
+  // place. Every other field below is still the RPC's own unscoped
+  // value (out of scope for this phase -- see getRealUserOverviewCounts'
+  // own doc comment for which domains that covers).
+  const stats: OverviewStats = {
+    ...(data as OverviewStats),
+    total_users: realUserCounts.totalUsers,
+    active_users: realUserCounts.activeUsers,
+    merchants: realUserCounts.merchants,
+    renters: realUserCounts.renters,
+    suspended_users: realUserCounts.suspendedUsers,
+    restricted_users: realUserCounts.restrictedUsers,
+  }
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
