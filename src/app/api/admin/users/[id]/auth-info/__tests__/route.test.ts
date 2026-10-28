@@ -146,12 +146,13 @@ describe('GET /api/admin/users/[id]/auth-info — erasure gating (category: ADMI
     expect(getAdminAuthInfoRespectingErasure).toHaveBeenCalledWith(expect.anything(), TARGET_ID, false)
   })
 
-  it('5. a missing profile row (not found) safely defaults to isErased=false rather than throwing', async () => {
+  it('5. [D3-C-F2 UPDATED] a missing profile row is NOT positive proof of a real record -- it no longer falls through to the Admin Auth API call at all; it degrades to {authUserExists:false} without ever reaching getAdminAuthInfoRespectingErasure (superseded by the positive-proof suite below, kept here for erasure-gating-suite continuity)', async () => {
     getAdminServiceClient.mockResolvedValue(fakeAdminClient(null))
-    getAdminAuthInfoRespectingErasure.mockResolvedValue({ authUserExists: true, erased: false })
     const res = await call()
     expect(res.status).toBe(200)
-    expect(getAdminAuthInfoRespectingErasure).toHaveBeenCalledWith(expect.anything(), TARGET_ID, false)
+    const body = await res.json()
+    expect(body).toEqual({ authUserExists: false })
+    expect(getAdminAuthInfoRespectingErasure).not.toHaveBeenCalled()
   })
 
   it('6. a profile lookup error returns 500 rather than silently treating the account as non-erased', async () => {
@@ -197,14 +198,13 @@ describe('GET /api/admin/users/[id]/auth-info — real-data scope (category: ADM
     expect(body).toEqual({ authUserExists: false })
   })
 
-  it('4. a genuinely missing profile row is unaffected by this guard -- existing not-found behavior (falls through to the Admin Auth API call) is preserved exactly as before', async () => {
+  it('4. [SUPERSEDED BY D3-C-F2] a missing profile row is NOT positive proof of real -- same non-visible shape as test/unknown, auth helper never called', async () => {
     getAdminServiceClient.mockResolvedValue(fakeAdminClient(null))
-    getAdminAuthInfoRespectingErasure.mockResolvedValue(null)
     const res = await call()
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body).toEqual({ authUserExists: false })
-    expect(getAdminAuthInfoRespectingErasure).toHaveBeenCalledWith(expect.anything(), TARGET_ID, false)
+    expect(getAdminAuthInfoRespectingErasure).not.toHaveBeenCalled()
   })
 
   it('5. an erased-but-real profile keeps its existing erasure protection -- the real-data guard does not weaken or bypass it', async () => {
@@ -249,5 +249,101 @@ describe('GET /api/admin/users/[id]/auth-info — real-data scope (category: ADM
     const res = await call()
     const body = await res.json()
     expect(JSON.stringify(body)).not.toMatch(/test|unknown|classification/i)
+  })
+})
+
+/**
+ * D3-C-F2: F1's guard was `if (profile && classifyProfile(profile) !== 'real')`,
+ * which only blocked a profile that EXISTS and isn't real -- a missing
+ * profile (`profile === null`) skipped the guard entirely and fell
+ * through to getAdminAuthInfoRespectingErasure() with isErased:false.
+ * A missing row is not positive proof of anything, so it must be
+ * treated the same as test/unknown: non-visible, auth helper never
+ * called. The guard is now `if (!profile || classifyProfile(profile) !== 'real')`.
+ */
+describe('GET /api/admin/users/[id]/auth-info — positive-proof guard (category: ADMIN-CONTROL-CENTRE-BATCH-D3-C-F2)', () => {
+  it('1. real + normal: auth helper is called and the existing response is preserved', async () => {
+    getAdminServiceClient.mockResolvedValue(fakeAdminClient('active', 'real'))
+    getAdminAuthInfoRespectingErasure.mockResolvedValue({ authUserExists: true, erased: false, email: 'a@b.com' })
+    const res = await call()
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.email).toBe('a@b.com')
+    expect(getAdminAuthInfoRespectingErasure).toHaveBeenCalledWith(expect.anything(), TARGET_ID, false)
+  })
+
+  it('2. real + erased: auth helper is called with isErased:true and the privacy-safe erased response is preserved', async () => {
+    getAdminServiceClient.mockResolvedValue(fakeAdminClient('erased', 'real'))
+    getAdminAuthInfoRespectingErasure.mockResolvedValue({ authUserExists: true, erased: true })
+    const res = await call()
+    const body = await res.json()
+    expect(body).toEqual({ authUserExists: true, erased: true })
+    expect(getAdminAuthInfoRespectingErasure).toHaveBeenCalledWith(expect.anything(), TARGET_ID, true)
+  })
+
+  it('3. test profile: non-visible, auth helper never called', async () => {
+    getAdminServiceClient.mockResolvedValue(fakeAdminClient('active', 'test'))
+    const res = await call()
+    const body = await res.json()
+    expect(res.status).toBe(200)
+    expect(body).toEqual({ authUserExists: false })
+    expect(getAdminAuthInfoRespectingErasure).not.toHaveBeenCalled()
+  })
+
+  it('4. unknown profile: non-visible, auth helper never called', async () => {
+    getAdminServiceClient.mockResolvedValue(fakeAdminClient('active', 'unknown'))
+    const res = await call()
+    const body = await res.json()
+    expect(res.status).toBe(200)
+    expect(body).toEqual({ authUserExists: false })
+    expect(getAdminAuthInfoRespectingErasure).not.toHaveBeenCalled()
+  })
+
+  it('5. missing profile: non-visible, auth helper never called -- the exact gap this phase closes', async () => {
+    getAdminServiceClient.mockResolvedValue(fakeAdminClient(null))
+    const res = await call()
+    const body = await res.json()
+    expect(res.status).toBe(200)
+    expect(body).toEqual({ authUserExists: false })
+    expect(getAdminAuthInfoRespectingErasure).not.toHaveBeenCalled()
+  })
+
+  it('6. non-admin caller is rejected before any profile lookup or auth helper work', async () => {
+    requireAdminForRoute.mockResolvedValue({ ok: false, response: new Response(JSON.stringify({ error: 'nope' }), { status: 401 }) })
+    getAdminServiceClient.mockResolvedValue(fakeAdminClient(null))
+    const res = await call()
+    expect(res.status).toBe(401)
+    expect(getAdminServiceClient).not.toHaveBeenCalled()
+    expect(getAdminAuthInfoRespectingErasure).not.toHaveBeenCalled()
+  })
+
+  it('7. no email/domain classification heuristic exists in this route\'s source', () => {
+    const source = readFileSync(join(__dirname, '../route.ts'), 'utf-8')
+    expect(source).not.toMatch(/unitytest\.internal/)
+    expect(source).not.toMatch(/unitytest\.co\.za/)
+    expect(source).not.toMatch(/gmail\.com/)
+    expect(source).not.toMatch(/\.endsWith\(/)
+  })
+
+  it('8. POSITIVE-PROOF INVARIANT: across every combination of (profile missing/test/unknown/real) x (erased true/false where applicable), the auth helper is reached if and only if a profile row exists AND classifyProfile(profile) === \'real\'', async () => {
+    const cases: Array<{ accountStatus: string | null; classification: 'real' | 'test' | 'unknown'; shouldReachHelper: boolean }> = [
+      { accountStatus: null, classification: 'real', shouldReachHelper: false }, // missing profile -- classification argument is moot, accountStatus=null means no row
+      { accountStatus: 'active', classification: 'real', shouldReachHelper: true },
+      { accountStatus: 'erased', classification: 'real', shouldReachHelper: true },
+      { accountStatus: 'active', classification: 'test', shouldReachHelper: false },
+      { accountStatus: 'active', classification: 'unknown', shouldReachHelper: false },
+    ]
+
+    for (const { accountStatus, classification, shouldReachHelper } of cases) {
+      getAdminAuthInfoRespectingErasure.mockClear()
+      getAdminServiceClient.mockResolvedValue(fakeAdminClient(accountStatus, classification))
+      getAdminAuthInfoRespectingErasure.mockResolvedValue({ authUserExists: true, erased: accountStatus === 'erased' })
+      await call()
+      if (shouldReachHelper) {
+        expect(getAdminAuthInfoRespectingErasure).toHaveBeenCalledTimes(1)
+      } else {
+        expect(getAdminAuthInfoRespectingErasure).not.toHaveBeenCalled()
+      }
+    }
   })
 })
