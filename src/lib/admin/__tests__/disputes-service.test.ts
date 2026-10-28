@@ -223,4 +223,28 @@ describe('disputes-service: real-data provenance inherited from the linked paren
     const results = await listAdminDisputes(admin, {})
     expect(results.map((r) => r.id)).toEqual(['d-real'])
   })
+
+  it('12. [D3-D-F1] getAdminDisputeDetail: an order-linked dispute requires the SAME complete order rule as orders-service -- a test-flagged listing blocks it even though both buyer and seller are real', async () => {
+    const admin = fakeTableData({
+      disputes: [{ id: 'd5', booking_id: null, order_id: 'o1', barter_agreement_id: null, rent_to_buy_agreement_id: null }],
+      orders: [{ id: 'o1', buyer_id: 'b1', seller_id: 's1', listing_id: 'l1' }],
+      listings: [{ id: 'l1', is_test: true }],
+      profiles: [{ id: 'b1', data_classification: 'real' }, { id: 's1', data_classification: 'real' }],
+      dispute_history: [],
+      dispute_evidence: [],
+    })
+    expect(await getAdminDisputeDetail(admin, 'd5')).toBeNull()
+  })
+
+  it('13. [D3-D-F1] getAdminDisputeDetail: an order-linked dispute resolves real when buyer+seller are real AND the listing is not test', async () => {
+    const admin = fakeTableData({
+      disputes: [{ id: 'd6', booking_id: null, order_id: 'o2', barter_agreement_id: null, rent_to_buy_agreement_id: null }],
+      orders: [{ id: 'o2', buyer_id: 'b2', seller_id: 's2', listing_id: 'l2' }],
+      listings: [{ id: 'l2', is_test: false }],
+      profiles: [{ id: 'b2', data_classification: 'real' }, { id: 's2', data_classification: 'real' }],
+      dispute_history: [],
+      dispute_evidence: [],
+    })
+    expect(await getAdminDisputeDetail(admin, 'd6')).not.toBeNull()
+  })
 })

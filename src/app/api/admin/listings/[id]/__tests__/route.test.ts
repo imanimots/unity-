@@ -14,14 +14,22 @@ vi.mock('@/lib/admin/route-helpers', () => ({
 
 vi.mock('@/lib/listings/completeness', () => ({ computeListingCompleteness: vi.fn().mockReturnValue({ score: 100, missing: [] }) }))
 vi.mock('@/lib/listings/activation', () => ({ checkActivationEligibility: vi.fn().mockReturnValue({ eligible: true, reasons: [] }) }))
-vi.mock('@/lib/listings/evidence-access', () => ({ listOwnershipEvidence: vi.fn().mockResolvedValue([]) }))
+const listOwnershipEvidence = vi.fn().mockResolvedValue([])
+vi.mock('@/lib/listings/evidence-access', () => ({ listOwnershipEvidence: (...args: unknown[]) => listOwnershipEvidence(...args) }))
 
 const { GET } = await import('../route')
 
 const LISTING_ID = '11111111-1111-1111-1111-111111111111'
 
-/** Terminal, empty-by-default per-table mock for the detail route's wide Promise.all fan-out, with the listings row/profile embed under direct test control. */
-function fakeListingDetailAdmin(listingRow: Record<string, unknown> | null) {
+/**
+ * Terminal, empty-by-default per-table mock for the detail route's wide
+ * Promise.all fan-out, with the listings row/profile embed under
+ * direct test control. `subFetchSpy`, when provided, records every
+ * non-`listings` table touched -- used to prove the D3-D-F1 guard
+ * blocks a non-real listing BEFORE any of those sub-fetches run, not
+ * merely before the response.
+ */
+function fakeListingDetailAdmin(listingRow: Record<string, unknown> | null, subFetchSpy?: string[]) {
   const listingQuery: Record<string, unknown> = {}
   for (const method of ['select', 'eq']) listingQuery[method] = () => listingQuery
   listingQuery.maybeSingle = () => Promise.resolve({ data: listingRow, error: null })
@@ -32,7 +40,11 @@ function fakeListingDetailAdmin(listingRow: Record<string, unknown> | null) {
   empty.maybeSingle = () => Promise.resolve({ data: null, error: null })
 
   return {
-    from: (table: string) => (table === 'listings' ? listingQuery : empty),
+    from: (table: string) => {
+      if (table === 'listings') return listingQuery
+      subFetchSpy?.push(table)
+      return empty
+    },
   }
 }
 
@@ -43,6 +55,7 @@ function call(id = LISTING_ID) {
 beforeEach(() => {
   requireAdminForRoute.mockReset().mockResolvedValue({ ok: true, requester: { userId: 'admin', profile: {} } })
   getAdminServiceClient.mockReset()
+  listOwnershipEvidence.mockClear()
 })
 
 describe('GET /api/admin/listings/[id] — real-data scope (category: ADMIN-CONTROL-CENTRE-BATCH-D3-D)', () => {
@@ -97,5 +110,54 @@ describe('GET /api/admin/listings/[id] — real-data scope (category: ADMIN-CONT
     const res = await call()
     expect(res.status).toBe(401)
     expect(getAdminServiceClient).not.toHaveBeenCalled()
+  })
+
+  it('7. [D3-D-F1] an is_test=true listing never reaches any supporting sub-fetch (private details, requirements, media, moderation, ownership, history, admin history, declarations, or ownership evidence)', async () => {
+    const touched: string[] = []
+    getAdminServiceClient.mockResolvedValue(fakeListingDetailAdmin({ ...baseListing, is_test: true }, touched))
+    const res = await call()
+    expect(res.status).toBe(404)
+    expect(touched).toEqual([])
+    expect(listOwnershipEvidence).not.toHaveBeenCalled()
+  })
+
+  it('8. [D3-D-F1] a test-classified merchant owner never reaches any supporting sub-fetch', async () => {
+    const touched: string[] = []
+    getAdminServiceClient.mockResolvedValue(
+      fakeListingDetailAdmin({ ...baseListing, profiles: { ...baseListing.profiles, data_classification: 'test' } }, touched)
+    )
+    const res = await call()
+    expect(res.status).toBe(404)
+    expect(touched).toEqual([])
+    expect(listOwnershipEvidence).not.toHaveBeenCalled()
+  })
+
+  it('9. [D3-D-F1] an unknown-classified merchant owner never reaches any supporting sub-fetch', async () => {
+    const touched: string[] = []
+    getAdminServiceClient.mockResolvedValue(
+      fakeListingDetailAdmin({ ...baseListing, profiles: { ...baseListing.profiles, data_classification: 'unknown' } }, touched)
+    )
+    const res = await call()
+    expect(res.status).toBe(404)
+    expect(touched).toEqual([])
+    expect(listOwnershipEvidence).not.toHaveBeenCalled()
+  })
+
+  it('10. [D3-D-F1] a genuinely missing listing row never reaches any supporting sub-fetch', async () => {
+    const touched: string[] = []
+    getAdminServiceClient.mockResolvedValue(fakeListingDetailAdmin(null, touched))
+    const res = await call()
+    expect(res.status).toBe(404)
+    expect(touched).toEqual([])
+    expect(listOwnershipEvidence).not.toHaveBeenCalled()
+  })
+
+  it('11. [D3-D-F1] a confirmed-real listing DOES reach the supporting sub-fetches and ownership evidence -- the guard only blocks non-real records, not real ones', async () => {
+    const touched: string[] = []
+    getAdminServiceClient.mockResolvedValue(fakeListingDetailAdmin(baseListing, touched))
+    const res = await call()
+    expect(res.status).toBe(200)
+    expect(touched.length).toBeGreaterThan(0)
+    expect(listOwnershipEvidence).toHaveBeenCalledTimes(1)
   })
 })

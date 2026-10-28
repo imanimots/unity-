@@ -37,13 +37,38 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Listing storage is not configured' }, { status: 503 })
   }
 
-  const [{ data: listing, error: listingError }, { data: privateDetails }, { data: requirements }, { data: mediaRows }, { data: moderation }, { data: ownership }, { data: history }, { data: adminHistory }, { data: declarations }] =
+  // D3-D-F1: fetch ONLY the listing row (+ its merchant classification)
+  // first -- the minimum provenance needed to decide visibility -- and
+  // establish Real Data BEFORE running any of the other supporting/
+  // sensitive sub-fetches below (private_details, requirements, media,
+  // moderation, ownership, history, admin history, declarations,
+  // ownership evidence). The prior version ran all of those in the same
+  // Promise.all as the listing row itself, so a test/unknown-owner
+  // listing id still triggered every one of those fetches before being
+  // blocked -- no data reached the response, but the fetches themselves
+  // were unnecessary server-side access to a non-visible record's
+  // supporting data (same class of concern the D3-C-F1/F2 auth-info fix
+  // addressed for sensitive Admin Auth API calls).
+  const { data: listing, error: listingError } = await admin
+    .from('listings')
+    .select('*, profiles!listings_merchant_id_fkey(full_name, kyc_status, unity_score, created_at, data_classification)')
+    .eq('id', listingId)
+    .maybeSingle()
+
+  if (listingError || !listing) {
+    return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
+  }
+
+  // A known test/unknown-owner listing id must not load as an ordinary
+  // Real Data listing detail -- same positive-proof boundary as the
+  // queue above.
+  const detailMerchantProfile = (listing as unknown as { profiles?: { data_classification?: 'real' | 'test' | 'unknown' } }).profiles
+  if (classifyEntityWithOwner({ is_test: listing.is_test === true }, { data_classification: detailMerchantProfile?.data_classification }) !== 'real') {
+    return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
+  }
+
+  const [{ data: privateDetails }, { data: requirements }, { data: mediaRows }, { data: moderation }, { data: ownership }, { data: history }, { data: adminHistory }, { data: declarations }, evidence] =
     await Promise.all([
-      admin
-        .from('listings')
-        .select('*, profiles!listings_merchant_id_fkey(full_name, kyc_status, unity_score, created_at, data_classification)')
-        .eq('id', listingId)
-        .maybeSingle(),
       admin.from('listing_private_details').select('*').eq('listing_id', listingId).maybeSingle(),
       admin.from('listing_requirements').select('*').eq('listing_id', listingId).maybeSingle(),
       admin.from('listing_media').select('id, type, shot_type, url, display_order').eq('listing_id', listingId).neq('type', 'ownership_proof'),
@@ -52,22 +77,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       admin.from('listing_history').select('*').eq('listing_id', listingId).order('created_at', { ascending: false }),
       admin.from('admin_action_history').select('*').eq('listing_id', listingId).order('created_at', { ascending: false }),
       admin.from('listing_declarations').select('declaration_type, accepted, accepted_at').eq('listing_id', listingId).order('accepted_at', { ascending: false }),
+      listOwnershipEvidence(admin, listingId),
     ])
-
-  if (listingError || !listing) {
-    return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
-  }
-
-  // D3-D: a known test/unknown-owner listing id must not load as an
-  // ordinary Real Data listing detail -- same positive-proof boundary
-  // as the queue above. Checked before the (otherwise unconditional)
-  // ownership-evidence fetch below, not merely before the response.
-  const detailMerchantProfile = (listing as unknown as { profiles?: { data_classification?: 'real' | 'test' | 'unknown' } }).profiles
-  if (classifyEntityWithOwner({ is_test: listing.is_test === true }, { data_classification: detailMerchantProfile?.data_classification }) !== 'real') {
-    return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
-  }
-
-  const evidence = await listOwnershipEvidence(admin, listingId)
 
   const photos = (mediaRows ?? []).filter((m) => m.type === 'photo')
   const hasOwnershipProof = evidence.length > 0

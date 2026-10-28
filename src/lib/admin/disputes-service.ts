@@ -12,8 +12,10 @@ const DEFAULT_LIMIT = 100
  * barter_agreement/rent_to_buy_agreement). Each parent's rule reuses
  * the exact same positive-proof logic already applied to that parent's
  * own list/detail (bookings: renter+merchant+listing.is_test; orders:
- * buyer+seller; barter: party_a+party_b; rent_to_buy: merchant+customer
- * +agreement.is_test) -- never a dispute-specific reimplementation.
+ * buyer+seller+listing.is_test [D3-D-F1: orders.listing_id -> listings.id
+ * is NOT NULL and authoritative, same relationship as bookings]; barter:
+ * party_a+party_b; rent_to_buy: merchant+customer+agreement.is_test) --
+ * never a dispute-specific reimplementation.
  */
 async function resolveDisputeRealClassification(admin: SupabaseClient, dispute: Record<string, unknown>): Promise<ProfileDataClassification> {
   if (dispute.booking_id) {
@@ -26,12 +28,18 @@ async function resolveDisputeRealClassification(admin: SupabaseClient, dispute: 
     return classifyEntityWithOwners({ is_test: listing?.is_test === true }, [renter ?? {}, merchant ?? {}])
   }
   if (dispute.order_id) {
-    const { data: order } = await admin.from('orders').select('buyer_id, seller_id').eq('id', dispute.order_id).maybeSingle()
+    const { data: order } = await admin.from('orders').select('buyer_id, seller_id, listing_id').eq('id', dispute.order_id).maybeSingle()
     if (!order) return 'unknown'
-    const { data: profiles } = await admin.from('profiles').select('id, data_classification').in('id', [order.buyer_id, order.seller_id])
+    const [{ data: profiles }, { data: listing }] = await Promise.all([
+      admin.from('profiles').select('id, data_classification').in('id', [order.buyer_id, order.seller_id]),
+      admin.from('listings').select('is_test').eq('id', order.listing_id).maybeSingle(),
+    ])
     const buyer = profiles?.find((p) => p.id === order.buyer_id)
     const seller = profiles?.find((p) => p.id === order.seller_id)
-    return classifyEntityWithOwners({ is_test: false }, [buyer ?? {}, seller ?? {}])
+    // D3-D-F1: inherit the COMPLETE order rule (buyer+seller+listing.is_test),
+    // the same rule getAdminOrderDetail applies -- never a weaker,
+    // dispute-specific version.
+    return classifyEntityWithOwners({ is_test: listing?.is_test === true }, [buyer ?? {}, seller ?? {}])
   }
   if (dispute.barter_agreement_id) {
     const { data: agreement } = await admin.from('barter_agreements').select('party_a_id, party_b_id').eq('id', dispute.barter_agreement_id).maybeSingle()

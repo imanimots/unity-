@@ -380,3 +380,84 @@ export async function listFinancialOperations(admin: SupabaseClient, filters: Ad
 
   return { operations, hasMore, nextCursor }
 }
+
+export interface RealBookingOverviewCounts {
+  requestedBookings: number
+  acceptedAwaitingPaymentBookings: number
+  financiallyReadyBookings: number
+  activeRentals: number
+  overduePaymentDeadlines: number
+}
+
+/**
+ * D3-D-F1: the 5 booking-derived Admin Overview metrics, scoped to
+ * confirmed real bookings only -- listings.is_test=false AND renter
+ * real AND merchant real (the exact same rule listAdminBookings
+ * already applies). Preserves every existing status/payment-state
+ * definition from get_admin_overview_stats() verbatim -- this changes
+ * WHO counts, never WHAT counts as e.g. "financially ready".
+ *
+ * accepted_awaiting_payment_bookings/financially_ready_bookings mirror
+ * a NOT EXISTS / EXISTS captured rental_charge payment check the RPC
+ * expresses in one SQL statement -- PostgREST cannot express an EXISTS
+ * subquery directly, so this fetches the real-scoped, status='accepted'
+ * booking ids first (a bounded set -- only currently-accepted bookings,
+ * not the whole table), then counts via a single batched `payments`
+ * query, never per-row.
+ */
+export async function getRealBookingOverviewCounts(admin: SupabaseClient): Promise<RealBookingOverviewCounts> {
+  const scopedBase = () =>
+    admin
+      .from('bookings')
+      .select(
+        'id, payment_due_at, payment_expired_at, listings!inner(is_test), renter_profile:profiles!bookings_renter_id_fkey!inner(data_classification), merchant_profile:profiles!bookings_merchant_id_fkey!inner(data_classification)',
+        { count: 'exact', head: true }
+      )
+      .eq('listings.is_test', false)
+      .eq('renter_profile.data_classification', 'real')
+      .eq('merchant_profile.data_classification', 'real')
+
+  const [{ count: requestedBookings }, { count: activeRentals }] = await Promise.all([
+    scopedBase().eq('status', 'requested'),
+    scopedBase().eq('status', 'active'),
+  ])
+
+  const { count: overduePaymentDeadlines } = await scopedBase()
+    .eq('status', 'accepted')
+    .not('payment_due_at', 'is', null)
+    .lt('payment_due_at', new Date().toISOString())
+    .is('payment_expired_at', null)
+
+  const { data: acceptedRows } = await admin
+    .from('bookings')
+    .select(
+      'id, listings!inner(is_test), renter_profile:profiles!bookings_renter_id_fkey!inner(data_classification), merchant_profile:profiles!bookings_merchant_id_fkey!inner(data_classification)'
+    )
+    .eq('listings.is_test', false)
+    .eq('renter_profile.data_classification', 'real')
+    .eq('merchant_profile.data_classification', 'real')
+    .eq('status', 'accepted')
+
+  const acceptedIds = (acceptedRows ?? []).map((r) => r.id)
+  let financiallyReadyBookings = 0
+  let acceptedAwaitingPaymentBookings = 0
+  if (acceptedIds.length > 0) {
+    const { data: capturedPayments } = await admin
+      .from('payments')
+      .select('booking_id')
+      .eq('payment_type', 'rental_charge')
+      .eq('status', 'captured')
+      .in('booking_id', acceptedIds)
+    const capturedBookingIds = new Set((capturedPayments ?? []).map((p) => p.booking_id))
+    financiallyReadyBookings = acceptedIds.filter((id) => capturedBookingIds.has(id)).length
+    acceptedAwaitingPaymentBookings = acceptedIds.length - financiallyReadyBookings
+  }
+
+  return {
+    requestedBookings: requestedBookings ?? 0,
+    acceptedAwaitingPaymentBookings,
+    financiallyReadyBookings,
+    activeRentals: activeRentals ?? 0,
+    overduePaymentDeadlines: overduePaymentDeadlines ?? 0,
+  }
+}

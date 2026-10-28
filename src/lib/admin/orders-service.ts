@@ -230,20 +230,22 @@ export async function getAdminOrderDetail(admin: SupabaseClient, orderId: string
   if (error) throw error
   if (!order) return null
 
-  const { data: profiles } = await admin
-    .from('profiles')
-    .select('id, full_name, display_name, account_status, kyc_status, data_classification')
-    .in('id', [order.buyer_id, order.seller_id])
+  const [{ data: profiles }, { data: listingProvenance }] = await Promise.all([
+    admin.from('profiles').select('id, full_name, display_name, account_status, kyc_status, data_classification').in('id', [order.buyer_id, order.seller_id]),
+    admin.from('listings').select('is_test').eq('id', order.listing_id).maybeSingle(),
+  ])
 
   const buyerProfile = profiles?.find((p) => p.id === order.buyer_id) ?? null
   const sellerProfile = profiles?.find((p) => p.id === order.seller_id) ?? null
 
-  // D3-D: a known test/unknown-linked order id must not load as an
-  // ordinary Real Data order detail -- checked before listing/payment/
-  // history/dispute/email fetches below. orders has no is_test column
-  // of its own (confirmed from source) -- both buyer and seller
-  // positively real is the whole rule.
-  if (classifyEntityWithOwners({ is_test: false }, [buyerProfile ?? {}, sellerProfile ?? {}]) !== 'real') {
+  // D3-D-F1: a known test/unknown-linked order id must not load as an
+  // ordinary Real Data order detail -- checked before listing-detail/
+  // payment/history/dispute/email fetches below. orders has no is_test
+  // column of its own, but orders.listing_id -> listings.id is NOT
+  // NULL and authoritative (same relationship bookings already checks)
+  // -- real requires buyer real AND seller real AND the linked
+  // listing.is_test = false.
+  if (classifyEntityWithOwners({ is_test: listingProvenance?.is_test === true }, [buyerProfile ?? {}, sellerProfile ?? {}]) !== 'real') {
     return null
   }
 
@@ -349,3 +351,76 @@ export async function exportAdminOrdersCsv(admin: SupabaseClient, filters: Admin
 }
 
 export const ORDER_CSV_COLUMNS = CSV_COLUMNS
+
+export interface RealOrderOverviewCounts {
+  ordersAwaitingPayment: number
+  ordersPaidAwaitingShipment: number
+  ordersShippedAwaitingDelivery: number
+  ordersDisputed: number
+  ordersPaymentFailed: number
+}
+
+/**
+ * D3-D-F1: the 5 order-derived Admin Overview metrics, scoped to
+ * confirmed real orders only -- buyer real AND seller real AND the
+ * linked listing.is_test=false, the same complete rule
+ * getAdminOrderDetail now applies. Deliberately does NOT call
+ * _admin_list_orders_page (the paginated/searchable list RPC) --
+ * these are independent, direct scoped COUNT queries against
+ * orders/profiles/listings, since Overview counts need no pagination
+ * or search and the RPC remains the separately-tracked list blocker
+ * (see supabase/migrations/20261028090000_admin_orders_real_data_scope.sql,
+ * which fixes the RPC itself, independently of this file). Preserves
+ * every existing status/payment-state definition from
+ * get_admin_overview_stats() verbatim.
+ */
+export async function getRealOrderOverviewCounts(admin: SupabaseClient): Promise<RealOrderOverviewCounts> {
+  const scoped = () =>
+    admin
+      .from('orders')
+      .select(
+        'id, listings!inner(is_test), buyer_profile:profiles!orders_buyer_id_fkey!inner(data_classification), seller_profile:profiles!orders_seller_id_fkey!inner(data_classification)',
+        { count: 'exact', head: true }
+      )
+      .eq('listings.is_test', false)
+      .eq('buyer_profile.data_classification', 'real')
+      .eq('seller_profile.data_classification', 'real')
+
+  const [{ count: ordersAwaitingPayment }, { count: ordersPaidAwaitingShipment }, { count: ordersShippedAwaitingDelivery }, { count: ordersDisputed }] =
+    await Promise.all([
+      scoped().eq('status', 'pending'),
+      scoped().eq('status', 'paid'),
+      scoped().eq('status', 'shipped'),
+      scoped().eq('status', 'disputed'),
+    ])
+
+  const { data: pendingRows } = await admin
+    .from('orders')
+    .select(
+      'id, listings!inner(is_test), buyer_profile:profiles!orders_buyer_id_fkey!inner(data_classification), seller_profile:profiles!orders_seller_id_fkey!inner(data_classification)'
+    )
+    .eq('listings.is_test', false)
+    .eq('buyer_profile.data_classification', 'real')
+    .eq('seller_profile.data_classification', 'real')
+    .eq('status', 'pending')
+
+  const pendingIds = (pendingRows ?? []).map((r) => r.id)
+  let ordersPaymentFailed = 0
+  if (pendingIds.length > 0) {
+    const { data: failedPayments } = await admin
+      .from('payments')
+      .select('order_id')
+      .eq('payment_type', 'order_payment')
+      .eq('status', 'failed')
+      .in('order_id', pendingIds)
+    ordersPaymentFailed = new Set((failedPayments ?? []).map((p) => p.order_id)).size
+  }
+
+  return {
+    ordersAwaitingPayment: ordersAwaitingPayment ?? 0,
+    ordersPaidAwaitingShipment: ordersPaidAwaitingShipment ?? 0,
+    ordersShippedAwaitingDelivery: ordersShippedAwaitingDelivery ?? 0,
+    ordersDisputed: ordersDisputed ?? 0,
+    ordersPaymentFailed,
+  }
+}

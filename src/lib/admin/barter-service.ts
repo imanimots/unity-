@@ -188,3 +188,53 @@ export async function getAdminBarterDetail(admin: SupabaseClient, agreementId: s
     evidenceByMilestone,
   }
 }
+
+export interface RealBarterOverviewCounts {
+  proposedBarterAgreements: number
+  acceptedBarterAgreements: number
+  inProgressBarterAgreements: number
+  disputedBarterAgreements: number
+  adminHeldBarterAgreements: number
+}
+
+/**
+ * D3-D-F1: the 5 barter-derived Admin Overview metrics, scoped to
+ * confirmed real agreements only -- both parties positively real, the
+ * exact same rule listAdminBarterAgreements already applies (no own
+ * is_test column; anchor_listing_id deliberately not treated as
+ * authoritative, same reasoning as the list). Preserves every existing
+ * status grouping from get_admin_overview_stats() verbatim.
+ */
+export async function getRealBarterOverviewCounts(admin: SupabaseClient): Promise<RealBarterOverviewCounts> {
+  const scoped = () =>
+    admin
+      .from('barter_agreements')
+      .select(
+        'id, party_a_profile:profiles!barter_agreements_party_a_id_fkey!inner(data_classification), party_b_profile:profiles!barter_agreements_party_b_id_fkey!inner(data_classification)',
+        { count: 'exact', head: true }
+      )
+      .eq('party_a_profile.data_classification', 'real')
+      .eq('party_b_profile.data_classification', 'real')
+
+  const [
+    { count: proposedBarterAgreements },
+    { count: acceptedBarterAgreements },
+    { count: inProgressBarterAgreements },
+    { count: disputedBarterAgreements },
+    { count: adminHeldBarterAgreements },
+  ] = await Promise.all([
+    scoped().in('status', ['proposed', 'countered']),
+    scoped().eq('status', 'accepted'),
+    scoped().in('status', ['preparing', 'in_transit', 'awaiting_confirmation']),
+    scoped().eq('status', 'disputed'),
+    scoped().eq('admin_hold', true),
+  ])
+
+  return {
+    proposedBarterAgreements: proposedBarterAgreements ?? 0,
+    acceptedBarterAgreements: acceptedBarterAgreements ?? 0,
+    inProgressBarterAgreements: inProgressBarterAgreements ?? 0,
+    disputedBarterAgreements: disputedBarterAgreements ?? 0,
+    adminHeldBarterAgreements: adminHeldBarterAgreements ?? 0,
+  }
+}

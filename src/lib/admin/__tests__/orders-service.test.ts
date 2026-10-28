@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deriveOrderFinancialReadiness, deriveDeliveryMethodHint, ORDER_CSV_COLUMNS, getAdminOrderDetail } from '../orders-service'
+import { deriveOrderFinancialReadiness, deriveDeliveryMethodHint, ORDER_CSV_COLUMNS, getAdminOrderDetail, getRealOrderOverviewCounts } from '../orders-service'
 
 describe('orders-service: deriveOrderFinancialReadiness (category: Financial)', () => {
   it('1. a pending order with a failed payment is payment_failed', () => {
@@ -59,7 +59,7 @@ describe('orders-service: CSV export column list (category: CSV Exports)', () =>
  * getAdminOrderDetail is a plain table query with no such constraint,
  * so it is scoped directly.
  */
-function fakeOrderDetailAdmin(orderRow: Record<string, unknown> | null, profileRows: Record<string, unknown>[]) {
+function fakeOrderDetailAdmin(orderRow: Record<string, unknown> | null, profileRows: Record<string, unknown>[], listingIsTest = false) {
   const orderQuery: Record<string, unknown> = {}
   for (const method of ['select', 'eq']) orderQuery[method] = () => orderQuery
   orderQuery.maybeSingle = () => Promise.resolve({ data: orderRow, error: null })
@@ -67,6 +67,14 @@ function fakeOrderDetailAdmin(orderRow: Record<string, unknown> | null, profileR
   const profilesQuery: Record<string, unknown> = {}
   for (const method of ['select', 'in']) profilesQuery[method] = () => profilesQuery
   profilesQuery.then = (resolve: (v: { data: typeof profileRows; error: null }) => void) => resolve({ data: profileRows, error: null })
+
+  // D3-D-F1: getAdminOrderDetail now fetches `listings` TWICE -- once for
+  // just `is_test` (pre-guard provenance), once for the full display
+  // fields (post-guard) -- both must resolve from this same stub.
+  const listingsQuery: Record<string, unknown> = {}
+  for (const method of ['select', 'eq']) listingsQuery[method] = () => listingsQuery
+  listingsQuery.maybeSingle = () =>
+    Promise.resolve({ data: { is_test: listingIsTest, title: 'Item', shipping_payer: 'seller', delivery_available: false, merchant_delivery_available: false }, error: null })
 
   const empty: Record<string, unknown> = {}
   for (const method of ['select', 'eq', 'order']) empty[method] = () => empty
@@ -77,6 +85,7 @@ function fakeOrderDetailAdmin(orderRow: Record<string, unknown> | null, profileR
     from: (table: string) => {
       if (table === 'orders') return orderQuery
       if (table === 'profiles') return profilesQuery
+      if (table === 'listings') return listingsQuery
       return empty
     },
   } as unknown as Parameters<typeof getAdminOrderDetail>[0]
@@ -88,11 +97,29 @@ describe('orders-service: getAdminOrderDetail real-data scope (category: ADMIN-C
     status: 'paid', quantity: 1, unit_price: 100, shipping_fee: 0, total_amount: 100, created_at: '2026-01-01T00:00:00Z',
   }
 
-  it('12. real buyer + real seller resolves normally -- orders has no is_test column of its own', async () => {
+  it('12. real buyer + real seller + non-test listing resolves normally -- orders has no is_test column of its own, so the linked listing\'s is_test is the entity signal', async () => {
     const admin = fakeOrderDetailAdmin(baseOrder, [
       { id: 'buy1', full_name: 'Buyer', display_name: null, account_status: 'active', kyc_status: 'approved', data_classification: 'real' },
       { id: 'sell1', full_name: 'Seller', display_name: null, account_status: 'active', kyc_status: 'approved', data_classification: 'real' },
-    ])
+    ], false)
+    const detail = await getAdminOrderDetail(admin, 'o1')
+    expect(detail).not.toBeNull()
+  })
+
+  it('16. [D3-D-F1] a test-flagged listing blocks the order even though both buyer and seller are real -- the exact gap this phase closes', async () => {
+    const admin = fakeOrderDetailAdmin(baseOrder, [
+      { id: 'buy1', full_name: 'Buyer', display_name: null, account_status: 'active', kyc_status: 'approved', data_classification: 'real' },
+      { id: 'sell1', full_name: 'Seller', display_name: null, account_status: 'active', kyc_status: 'approved', data_classification: 'real' },
+    ], true)
+    const detail = await getAdminOrderDetail(admin, 'o1')
+    expect(detail).toBeNull()
+  })
+
+  it('17. [D3-D-F1] a non-test listing is required, not merely assumed -- explicit false still resolves normally (regression companion to 16)', async () => {
+    const admin = fakeOrderDetailAdmin(baseOrder, [
+      { id: 'buy1', full_name: 'Buyer', display_name: null, account_status: 'active', kyc_status: 'approved', data_classification: 'real' },
+      { id: 'sell1', full_name: 'Seller', display_name: null, account_status: 'active', kyc_status: 'approved', data_classification: 'real' },
+    ], false)
     const detail = await getAdminOrderDetail(admin, 'o1')
     expect(detail).not.toBeNull()
   })
@@ -119,5 +146,77 @@ describe('orders-service: getAdminOrderDetail real-data scope (category: ADMIN-C
     const admin = fakeOrderDetailAdmin(null, [])
     const detail = await getAdminOrderDetail(admin, 'missing')
     expect(detail).toBeNull()
+  })
+})
+
+/**
+ * D3-D-F1: fake admin for getRealOrderOverviewCounts -- mirrors
+ * fakeBookingOverviewAdmin's shape (operations-service.test.ts): a
+ * status-keyed head:true count table for the 4 simple metrics, plus
+ * pendingRows/failedOrderIds for the orders_payment_failed
+ * EXISTS-replacement (fetch pending real-scoped order ids once, then a
+ * single batched `payments` lookup).
+ */
+function fakeOrderOverviewAdmin(countByStatus: Record<string, number>, pendingRows: { id: string }[], failedOrderIds: string[]) {
+  return {
+    from: (table: string) => {
+      if (table === 'orders') {
+        let lastStatus: string | undefined
+        let isHead = false
+        const obj: Record<string, unknown> = {}
+        obj.select = (_cols: string, opts?: { head?: boolean }) => {
+          isHead = !!opts?.head
+          return obj
+        }
+        obj.eq = (col: string, val: unknown) => {
+          if (col === 'status') lastStatus = val as string
+          return obj
+        }
+        obj.then = (resolve: (v: { count?: number; data?: { id: string }[]; error: null }) => void) => {
+          if (isHead) {
+            resolve({ count: lastStatus ? countByStatus[lastStatus] ?? 0 : 0, error: null })
+          } else {
+            resolve({ data: pendingRows, error: null })
+          }
+        }
+        return obj
+      }
+      if (table === 'payments') {
+        const obj: Record<string, unknown> = {}
+        for (const method of ['select', 'eq', 'in']) obj[method] = () => obj
+        obj.then = (resolve: (v: { data: { order_id: string }[]; error: null }) => void) =>
+          resolve({ data: failedOrderIds.map((id) => ({ order_id: id })), error: null })
+        return obj
+      }
+      throw new Error(`unexpected table: ${table}`)
+    },
+  } as unknown as Parameters<typeof getRealOrderOverviewCounts>[0]
+}
+
+describe('orders-service: getRealOrderOverviewCounts (category: ADMIN-CONTROL-CENTRE-BATCH-D3-D-F1)', () => {
+  it('16. each status-based count reflects the scoped query results exactly', async () => {
+    const admin = fakeOrderOverviewAdmin({ pending: 2, paid: 4, shipped: 1, disputed: 0 }, [], [])
+    const counts = await getRealOrderOverviewCounts(admin)
+    expect(counts.ordersPaidAwaitingShipment).toBe(4)
+    expect(counts.ordersShippedAwaitingDelivery).toBe(1)
+    expect(counts.ordersDisputed).toBe(0)
+  })
+
+  it('17. orders_payment_failed counts only pending orders with a matching failed order_payment, via one batched payments lookup -- never per-row', async () => {
+    const admin = fakeOrderOverviewAdmin({}, [{ id: 'o1' }, { id: 'o2' }], ['o2'])
+    const counts = await getRealOrderOverviewCounts(admin)
+    expect(counts.ordersPaymentFailed).toBe(1)
+  })
+
+  it('18. zero pending real orders never queries payments and returns 0 safely', async () => {
+    const admin = fakeOrderOverviewAdmin({}, [], [])
+    const counts = await getRealOrderOverviewCounts(admin)
+    expect(counts.ordersPaymentFailed).toBe(0)
+  })
+
+  it('19. a null count resolves to 0, never undefined/NaN', async () => {
+    const admin = fakeOrderOverviewAdmin({}, [], [])
+    const counts = await getRealOrderOverviewCounts(admin)
+    expect(counts.ordersAwaitingPayment).toBe(0)
   })
 })

@@ -135,3 +135,55 @@ export async function getAdminRentToBuyAgreementDetail(admin: SupabaseClient, ag
     },
   }
 }
+
+export interface RealRentToBuyOverviewCounts {
+  rtbAgreementsAwaitingFirstPayment: number
+  rtbAgreementsActive: number
+  rtbAgreementsDefaulted: number
+  rtbAgreementsReturnRequired: number
+  rtbAgreementsCompleted: number
+}
+
+/**
+ * D3-D-F1: the 5 rent-to-buy-derived Admin Overview metrics, scoped to
+ * confirmed real agreements only -- is_test=false AND merchant real
+ * AND customer real, the exact same rule listAdminRentToBuyAgreements
+ * already applies. Preserves every existing status/possession_status
+ * grouping from get_admin_overview_stats() verbatim (note:
+ * rtb_commission_events_policy_pending is Finance-adjacent and
+ * deliberately NOT included here -- out of scope for this phase).
+ */
+export async function getRealRentToBuyOverviewCounts(admin: SupabaseClient): Promise<RealRentToBuyOverviewCounts> {
+  const scoped = () =>
+    admin
+      .from('rent_to_buy_agreements')
+      .select(
+        'id, merchant_profile:profiles!rent_to_buy_agreements_merchant_id_fkey!inner(data_classification), customer_profile:profiles!rent_to_buy_agreements_customer_id_fkey!inner(data_classification)',
+        { count: 'exact', head: true }
+      )
+      .eq('is_test', false)
+      .eq('merchant_profile.data_classification', 'real')
+      .eq('customer_profile.data_classification', 'real')
+
+  const [
+    { count: rtbAgreementsAwaitingFirstPayment },
+    { count: rtbAgreementsActive },
+    { count: rtbAgreementsDefaulted },
+    { count: rtbAgreementsReturnRequired },
+    { count: rtbAgreementsCompleted },
+  ] = await Promise.all([
+    scoped().eq('status', 'awaiting_first_payment'),
+    scoped().eq('status', 'active'),
+    scoped().eq('status', 'defaulted'),
+    scoped().eq('possession_status', 'return_required'),
+    scoped().eq('status', 'completed'),
+  ])
+
+  return {
+    rtbAgreementsAwaitingFirstPayment: rtbAgreementsAwaitingFirstPayment ?? 0,
+    rtbAgreementsActive: rtbAgreementsActive ?? 0,
+    rtbAgreementsDefaulted: rtbAgreementsDefaulted ?? 0,
+    rtbAgreementsReturnRequired: rtbAgreementsReturnRequired ?? 0,
+    rtbAgreementsCompleted: rtbAgreementsCompleted ?? 0,
+  }
+}

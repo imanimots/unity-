@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { listAdminBarterAgreements, getAdminBarterDetail } from '../barter-service'
+import { listAdminBarterAgreements, getAdminBarterDetail, getRealBarterOverviewCounts } from '../barter-service'
 
 interface RecordedCall {
   method: string
@@ -104,5 +104,42 @@ describe('barter-service: getAdminBarterDetail real-data scope (category: ADMIN-
     const admin = fakeBarterDetailAdmin(null, [])
     const detail = await getAdminBarterDetail(admin, 'missing')
     expect(detail).toBeNull()
+  })
+})
+
+function fakeCountQuery(count: number | null, calls: RecordedCall[]) {
+  const obj: Record<string, unknown> = {}
+  for (const method of ['select', 'eq', 'in']) {
+    obj[method] = (...args: unknown[]) => {
+      calls.push({ method, args })
+      return obj
+    }
+  }
+  obj.then = (resolve: (v: { count: number | null; error: null }) => void) => resolve({ count, error: null })
+  return obj
+}
+
+describe('barter-service: getRealBarterOverviewCounts (category: ADMIN-CONTROL-CENTRE-BATCH-D3-D-F1)', () => {
+  it('9. every count filters both party_a and party_b embedded profile data_classification=\'real\'', async () => {
+    const calls: RecordedCall[] = []
+    const admin = { from: () => fakeCountQuery(1, calls) } as unknown as Parameters<typeof getRealBarterOverviewCounts>[0]
+    await getRealBarterOverviewCounts(admin)
+    const partyACalls = calls.filter((c) => c.method === 'eq' && c.args[0] === 'party_a_profile.data_classification' && c.args[1] === 'real')
+    const partyBCalls = calls.filter((c) => c.method === 'eq' && c.args[0] === 'party_b_profile.data_classification' && c.args[1] === 'real')
+    expect(partyACalls.length).toBe(5)
+    expect(partyBCalls.length).toBe(5)
+  })
+
+  it('10. admin_held_barter_agreements filters admin_hold=true specifically', async () => {
+    const calls: RecordedCall[] = []
+    const admin = { from: () => fakeCountQuery(1, calls) } as unknown as Parameters<typeof getRealBarterOverviewCounts>[0]
+    await getRealBarterOverviewCounts(admin)
+    expect(calls.some((c) => c.method === 'eq' && c.args[0] === 'admin_hold' && c.args[1] === true)).toBe(true)
+  })
+
+  it('11. a null count resolves to 0 for every field', async () => {
+    const admin = { from: () => fakeCountQuery(null, []) } as unknown as Parameters<typeof getRealBarterOverviewCounts>[0]
+    const counts = await getRealBarterOverviewCounts(admin)
+    expect(Object.values(counts)).toEqual([0, 0, 0, 0, 0])
   })
 })

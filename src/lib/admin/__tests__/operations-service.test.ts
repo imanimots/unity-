@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { listAdminBookings, getAdminBookingDetail } from '../operations-service'
+import { listAdminBookings, getAdminBookingDetail, getRealBookingOverviewCounts } from '../operations-service'
 
 vi.mock('@/lib/checkout/load-financial-state', () => ({
   loadBookingFinancialState: vi.fn().mockResolvedValue({ booking: null, workflowStatus: null, rentalPaymentStatus: null, depositPaymentStatus: null }),
@@ -122,5 +122,82 @@ describe('operations-service: getAdminBookingDetail real-data scope (category: A
     const admin = fakeBookingDetailAdmin(null, [])
     const detail = await getAdminBookingDetail(admin, 'missing')
     expect(detail).toBeNull()
+  })
+})
+
+/**
+ * D3-D-F1: fake admin for getRealBookingOverviewCounts. `countByStatus`
+ * maps a status value to the head:true count the mocked query should
+ * resolve to; `acceptedRows`/`capturedBookingIds` drive the
+ * accepted_awaiting_payment_bookings/financially_ready_bookings
+ * EXISTS-replacement (fetch accepted real-scoped booking ids, then a
+ * single batched `payments` lookup -- never per-row).
+ */
+function fakeBookingOverviewAdmin(countByStatus: Record<string, number>, acceptedRows: { id: string }[], capturedBookingIds: string[]) {
+  return {
+    from: (table: string) => {
+      if (table === 'bookings') {
+        let lastStatus: string | undefined
+        const obj: Record<string, unknown> = {}
+        let isHead = false
+        obj.select = (_cols: string, opts?: { head?: boolean }) => {
+          isHead = !!opts?.head
+          return obj
+        }
+        for (const method of ['not', 'lt', 'is']) obj[method] = () => obj
+        obj.eq = (col: string, val: unknown) => {
+          if (col === 'status') lastStatus = val as string
+          return obj
+        }
+        obj.then = (resolve: (v: { count?: number; data?: { id: string }[]; error: null }) => void) => {
+          if (isHead) {
+            resolve({ count: lastStatus ? countByStatus[lastStatus] ?? 0 : 0, error: null })
+          } else {
+            resolve({ data: acceptedRows, error: null })
+          }
+        }
+        return obj
+      }
+      if (table === 'payments') {
+        const obj: Record<string, unknown> = {}
+        for (const method of ['select', 'eq', 'in']) obj[method] = () => obj
+        obj.then = (resolve: (v: { data: { booking_id: string }[]; error: null }) => void) =>
+          resolve({ data: capturedBookingIds.map((id) => ({ booking_id: id })), error: null })
+        return obj
+      }
+      throw new Error(`unexpected table: ${table}`)
+    },
+  } as unknown as Parameters<typeof getRealBookingOverviewCounts>[0]
+}
+
+describe('operations-service: getRealBookingOverviewCounts (category: ADMIN-CONTROL-CENTRE-BATCH-D3-D-F1)', () => {
+  it('9. requested/active/overdue counts reflect the scoped query results exactly', async () => {
+    const admin = fakeBookingOverviewAdmin({ requested: 3, active: 7, accepted: 0 }, [], [])
+    const counts = await getRealBookingOverviewCounts(admin)
+    expect(counts.requestedBookings).toBe(3)
+    expect(counts.activeRentals).toBe(7)
+  })
+
+  it('10. financially_ready_bookings counts only accepted bookings with a captured rental_charge payment; the rest are accepted_awaiting_payment_bookings -- the split always sums to the total accepted count', async () => {
+    const admin = fakeBookingOverviewAdmin({}, [{ id: 'bk1' }, { id: 'bk2' }, { id: 'bk3' }], ['bk1', 'bk3'])
+    const counts = await getRealBookingOverviewCounts(admin)
+    expect(counts.financiallyReadyBookings).toBe(2)
+    expect(counts.acceptedAwaitingPaymentBookings).toBe(1)
+    expect(counts.financiallyReadyBookings + counts.acceptedAwaitingPaymentBookings).toBe(3)
+  })
+
+  it('11. zero accepted real bookings never queries payments and returns 0/0 safely', async () => {
+    const admin = fakeBookingOverviewAdmin({}, [], [])
+    const counts = await getRealBookingOverviewCounts(admin)
+    expect(counts.financiallyReadyBookings).toBe(0)
+    expect(counts.acceptedAwaitingPaymentBookings).toBe(0)
+  })
+
+  it('12. a null/undefined count resolves to 0, never undefined/NaN', async () => {
+    const admin = fakeBookingOverviewAdmin({}, [], [])
+    const counts = await getRealBookingOverviewCounts(admin)
+    expect(counts.requestedBookings).toBe(0)
+    expect(counts.activeRentals).toBe(0)
+    expect(counts.overduePaymentDeadlines).toBe(0)
   })
 })

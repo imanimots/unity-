@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { listAdminRentToBuyAgreements, getAdminRentToBuyAgreementDetail } from '../rent-to-buy-service'
+import { listAdminRentToBuyAgreements, getAdminRentToBuyAgreementDetail, getRealRentToBuyOverviewCounts } from '../rent-to-buy-service'
 
 interface RecordedCall {
   method: string
@@ -101,5 +101,41 @@ describe('rent-to-buy-service: getAdminRentToBuyAgreementDetail real-data scope 
     const admin = fakeRtbDetailAdmin(null, [])
     const detail = await getAdminRentToBuyAgreementDetail(admin, 'missing')
     expect(detail).toBeNull()
+  })
+})
+
+function fakeCountQuery(count: number | null, calls: RecordedCall[]) {
+  const obj: Record<string, unknown> = {}
+  for (const method of ['select', 'eq']) {
+    obj[method] = (...args: unknown[]) => {
+      calls.push({ method, args })
+      return obj
+    }
+  }
+  obj.then = (resolve: (v: { count: number | null; error: null }) => void) => resolve({ count, error: null })
+  return obj
+}
+
+describe('rent-to-buy-service: getRealRentToBuyOverviewCounts (category: ADMIN-CONTROL-CENTRE-BATCH-D3-D-F1)', () => {
+  it('8. every count filters is_test=false and both embedded merchant/customer profile data_classification=\'real\'', async () => {
+    const calls: RecordedCall[] = []
+    const admin = { from: () => fakeCountQuery(1, calls) } as unknown as Parameters<typeof getRealRentToBuyOverviewCounts>[0]
+    await getRealRentToBuyOverviewCounts(admin)
+    expect(calls.filter((c) => c.method === 'eq' && c.args[0] === 'is_test' && c.args[1] === false).length).toBe(5)
+    expect(calls.filter((c) => c.method === 'eq' && c.args[0] === 'merchant_profile.data_classification' && c.args[1] === 'real').length).toBe(5)
+    expect(calls.filter((c) => c.method === 'eq' && c.args[0] === 'customer_profile.data_classification' && c.args[1] === 'real').length).toBe(5)
+  })
+
+  it('9. return_required is scoped by possession_status, not status', async () => {
+    const calls: RecordedCall[] = []
+    const admin = { from: () => fakeCountQuery(1, calls) } as unknown as Parameters<typeof getRealRentToBuyOverviewCounts>[0]
+    await getRealRentToBuyOverviewCounts(admin)
+    expect(calls.some((c) => c.method === 'eq' && c.args[0] === 'possession_status' && c.args[1] === 'return_required')).toBe(true)
+  })
+
+  it('10. a null count resolves to 0 for every field', async () => {
+    const admin = { from: () => fakeCountQuery(null, []) } as unknown as Parameters<typeof getRealRentToBuyOverviewCounts>[0]
+    const counts = await getRealRentToBuyOverviewCounts(admin)
+    expect(Object.values(counts)).toEqual([0, 0, 0, 0, 0])
   })
 })
