@@ -125,4 +125,16 @@ describe('data-scope: canonical real/test/unknown classification contract (categ
     expect(isAdminSystemAuditTable('profiles')).toBe(false)
     expect(isAdminSystemAuditTable('bookings')).toBe(false)
   })
+
+  it('20. D3-B-F1 vacuous-truth guard: zero owners + is_test=false => unknown, never real. Protects against accidental removal of the `ownerClassifications.length > 0` guard before `.every(...)`, which would otherwise let [].every(...) === true silently prove REAL for an entity with no resolved owner.', () => {
+    expect(classifyEntityWithOwners({ is_test: false }, [])).toBe('unknown')
+  })
+
+  it('21. D3-B-F1 vacuous-truth guard: zero owners + is_test undefined (entity object omits the field entirely) => unknown. Absence of entity test evidence plus absence of owner provenance must never prove real.', () => {
+    expect(classifyEntityWithOwners({} as { is_test: boolean }, [])).toBe('unknown')
+  })
+
+  it('22. D3-B-F1 vacuous-truth guard: zero owners + is_test=true => test. Explicit test evidence retains precedence even when no owner classifications are available at all.', () => {
+    expect(classifyEntityWithOwners({ is_test: true }, [])).toBe('test')
+  })
 })
