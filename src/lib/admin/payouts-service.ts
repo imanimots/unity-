@@ -138,23 +138,49 @@ export async function getAdminPayoutDetail(admin: SupabaseClient, payoutId: stri
   if (error) throw error
   if (!payout) return null
 
-  // D3-E: a known test/unknown-linked payout id must not load as an
+  // D3-E-F2: a known test/unknown-linked payout id must not load as an
   // ordinary Real Data payout detail -- checked before the merchant/
-  // booking/payments/history/email fetches below. A payout always has
-  // merchant_id; when booking_id is also set, the payout inherits the
-  // COMPLETE booking rule (renter+merchant+listing.is_test), never
-  // merchant-real alone -- the same relationship bookings' own
-  // real-data rule already uses.
-  const { data: scopeMerchant } = await admin.from('profiles').select('id, data_classification').eq('id', payout.merchant_id).maybeSingle()
+  // booking/payments/history/email fetches below.
+  // merchant_payouts_one_transaction_chk guarantees exactly one of
+  // booking_id/rent_to_buy_agreement_id is set on every row -- there is
+  // no unparented "merchant-only" state. A booking-linked payout
+  // inherits the COMPLETE booking rule (renter+merchant+listing.is_test).
+  // An RTB-linked payout inherits the COMPLETE RTB rule (agreement.is_test
+  // =false + RTB merchant + RTB customer real, the exact rule already
+  // established in src/lib/admin/rent-to-buy-service.ts) -- resolved via
+  // the RTB agreement's OWN merchant_id, never by reusing the payout's
+  // own merchant_id alone (payout.merchant_id and the agreement's
+  // merchant_id are expected identical by create_merchant_payout(), but
+  // this is proven from the actual agreement row rather than relying on
+  // that invariant alone).
   if (payout.booking_id) {
-    const { data: scopeBooking } = await admin.from('bookings').select('renter_id, listing_id').eq('id', payout.booking_id).maybeSingle()
+    const [{ data: scopeMerchant }, { data: scopeBooking }] = await Promise.all([
+      admin.from('profiles').select('id, data_classification').eq('id', payout.merchant_id).maybeSingle(),
+      admin.from('bookings').select('renter_id, listing_id').eq('id', payout.booking_id).maybeSingle(),
+    ])
     if (!scopeBooking) return null
     const [{ data: scopeRenter }, { data: scopeListing }] = await Promise.all([
       admin.from('profiles').select('id, data_classification').eq('id', scopeBooking.renter_id).maybeSingle(),
       admin.from('listings').select('is_test').eq('id', scopeBooking.listing_id).maybeSingle(),
     ])
     if (classifyEntityWithOwners({ is_test: scopeListing?.is_test === true }, [scopeRenter ?? {}, scopeMerchant ?? {}]) !== 'real') return null
-  } else if (classifyEntityWithOwners({ is_test: false }, [scopeMerchant ?? {}]) !== 'real') {
+  } else if (payout.rent_to_buy_agreement_id) {
+    const { data: scopeAgreement } = await admin
+      .from('rent_to_buy_agreements')
+      .select('is_test, merchant_id, customer_id')
+      .eq('id', payout.rent_to_buy_agreement_id)
+      .maybeSingle()
+    if (!scopeAgreement) return null
+    const { data: scopeProfiles } = await admin
+      .from('profiles')
+      .select('id, data_classification')
+      .in('id', [scopeAgreement.merchant_id, scopeAgreement.customer_id])
+    const scopeRtbMerchant = scopeProfiles?.find((p) => p.id === scopeAgreement.merchant_id)
+    const scopeRtbCustomer = scopeProfiles?.find((p) => p.id === scopeAgreement.customer_id)
+    if (classifyEntityWithOwners({ is_test: scopeAgreement.is_test === true }, [scopeRtbMerchant ?? {}, scopeRtbCustomer ?? {}]) !== 'real') return null
+  } else {
+    // merchant_payouts_one_transaction_chk guarantees this never
+    // happens -- fail safe, never guess real.
     return null
   }
 
@@ -222,54 +248,76 @@ export interface RealPayoutOverviewCounts {
 }
 
 /**
- * D3-E: the 5 payout-derived Admin Overview metrics, scoped to
- * confirmed real payouts only -- the exact same rule getAdminPayoutDetail
- * applies (merchant real, and the COMPLETE booking rule when
- * booking_id is set, never merchant-real alone). Deliberately does NOT
- * call _admin_list_merchant_payouts (the RPC blocker noted above) --
- * this is an independent, direct scoped query against
- * merchant_payouts/profiles/bookings/listings. booking_id is nullable,
- * so this cannot be a single embedded-join filter (an inner join on
- * bookings would wrongly exclude every payout with no booking at all)
- * -- rows are fetched per status, classified in batch (never per-row),
- * then counted. Preserves every existing status/timestamp definition
- * from get_admin_overview_stats() verbatim.
+ * D3-E-F2: the 5 payout-derived Admin Overview metrics, scoped to
+ * confirmed real payouts only -- the exact same two-family rule
+ * getAdminPayoutDetail/_admin_list_merchant_payouts apply.
+ * merchant_payouts_one_transaction_chk guarantees exactly one of
+ * booking_id/rent_to_buy_agreement_id is set on every row -- a
+ * booking-linked payout requires the COMPLETE booking rule (merchant
+ * real + renter real + listing not test); an RTB-linked payout requires
+ * the COMPLETE RTB rule (agreement not test + RTB merchant real + RTB
+ * customer real, resolved via the agreement's own merchant_id/
+ * customer_id, never the payout's own merchant_id alone). Deliberately
+ * does NOT call _admin_list_merchant_payouts (the RPC blocker noted
+ * above) -- this is an independent, direct scoped query against
+ * merchant_payouts/profiles/bookings/listings/rent_to_buy_agreements.
+ * booking_id/rent_to_buy_agreement_id are nullable, so this cannot be a
+ * single embedded-join filter -- rows are fetched per status,
+ * classified in batch (never per-row), then counted. Preserves every
+ * existing status/timestamp definition from get_admin_overview_stats()
+ * verbatim.
  */
 export async function getRealPayoutOverviewCounts(admin: SupabaseClient): Promise<RealPayoutOverviewCounts> {
   const overdueThreshold = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
 
   async function countRealForStatus(status: string, overdueColumn?: 'created_at' | 'processing_started_at'): Promise<number> {
-    const query = admin.from('merchant_payouts').select('id, merchant_id, booking_id, created_at, processing_started_at').eq('status', status)
+    const query = admin.from('merchant_payouts').select('id, merchant_id, booking_id, rent_to_buy_agreement_id, created_at, processing_started_at').eq('status', status)
     const { data: rows } = await (overdueColumn ? query.lt(overdueColumn, overdueThreshold) : query)
     if (!rows || rows.length === 0) return 0
 
     const merchantIds = Array.from(new Set(rows.map((r) => r.merchant_id)))
     const bookingIds = Array.from(new Set(rows.filter((r) => r.booking_id).map((r) => r.booking_id as string)))
+    const rtbIds = Array.from(new Set(rows.filter((r) => r.rent_to_buy_agreement_id).map((r) => r.rent_to_buy_agreement_id as string)))
 
-    const [{ data: merchants }, { data: bookings }] = await Promise.all([
+    const [{ data: merchants }, { data: bookings }, { data: rtbAgreements }] = await Promise.all([
       admin.from('profiles').select('id, data_classification').in('id', merchantIds),
       bookingIds.length ? admin.from('bookings').select('id, renter_id, listing_id').in('id', bookingIds) : Promise.resolve({ data: [] }),
+      rtbIds.length ? admin.from('rent_to_buy_agreements').select('id, is_test, merchant_id, customer_id').in('id', rtbIds) : Promise.resolve({ data: [] }),
     ])
     const merchantById = new Map((merchants ?? []).map((m) => [m.id, { data_classification: m.data_classification }]))
     const bookingById = new Map((bookings ?? []).map((b) => [b.id, b]))
+    const rtbById = new Map((rtbAgreements ?? []).map((a) => [a.id, a]))
 
     const renterIds = Array.from(new Set((bookings ?? []).map((b) => b.renter_id)))
     const listingIds = Array.from(new Set((bookings ?? []).map((b) => b.listing_id)))
-    const [{ data: renters }, { data: listings }] = await Promise.all([
+    const rtbParticipantIds = Array.from(new Set((rtbAgreements ?? []).flatMap((a) => [a.merchant_id, a.customer_id])))
+    const [{ data: renters }, { data: listings }, { data: rtbParticipants }] = await Promise.all([
       renterIds.length ? admin.from('profiles').select('id, data_classification').in('id', renterIds) : Promise.resolve({ data: [] }),
       listingIds.length ? admin.from('listings').select('id, is_test').in('id', listingIds) : Promise.resolve({ data: [] }),
+      rtbParticipantIds.length ? admin.from('profiles').select('id, data_classification').in('id', rtbParticipantIds) : Promise.resolve({ data: [] }),
     ])
     const renterById = new Map((renters ?? []).map((r) => [r.id, { data_classification: r.data_classification }]))
     const listingIsTestById = new Map((listings ?? []).map((l) => [l.id, l.is_test]))
+    const rtbParticipantById = new Map((rtbParticipants ?? []).map((p) => [p.id, { data_classification: p.data_classification }]))
 
     return rows.filter((r) => {
       const merchant = merchantById.get(r.merchant_id) ?? {}
-      if (!r.booking_id) return classifyEntityWithOwners({ is_test: false }, [merchant]) === 'real'
-      const booking = bookingById.get(r.booking_id)
-      if (!booking) return false
-      const renter = renterById.get(booking.renter_id) ?? {}
-      const isTest = listingIsTestById.get(booking.listing_id) === true
-      return classifyEntityWithOwners({ is_test: isTest }, [renter, merchant]) === 'real'
+      if (r.booking_id) {
+        const booking = bookingById.get(r.booking_id)
+        if (!booking) return false
+        const renter = renterById.get(booking.renter_id) ?? {}
+        const isTest = listingIsTestById.get(booking.listing_id) === true
+        return classifyEntityWithOwners({ is_test: isTest }, [renter, merchant]) === 'real'
+      }
+      if (r.rent_to_buy_agreement_id) {
+        const agreement = rtbById.get(r.rent_to_buy_agreement_id)
+        if (!agreement) return false
+        const rtbMerchant = rtbParticipantById.get(agreement.merchant_id) ?? {}
+        const rtbCustomer = rtbParticipantById.get(agreement.customer_id) ?? {}
+        return classifyEntityWithOwners({ is_test: agreement.is_test === true }, [rtbMerchant, rtbCustomer]) === 'real'
+      }
+      // merchant_payouts_one_transaction_chk guarantees this never happens -- fail safe, never guess real.
+      return false
     }).length
   }
 

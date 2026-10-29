@@ -1,4 +1,4 @@
--- D3-E-F1: Merchant Payout admin list -- Real Data provenance.
+-- D3-E-F1/F2: Merchant Payout admin list -- Real Data provenance.
 --
 -- Independent review of D3-E (ADMIN-CONTROL-CENTRE-BATCH-D3-E-INDEPENDENT-
 -- REVIEW) confirmed _admin_list_merchant_payouts (20260904000022) has zero
@@ -9,29 +9,53 @@
 -- 20261028090000_admin_orders_real_data_scope.sql fixed for
 -- _admin_list_orders_page.
 --
+-- D3-E-F2 correction: the F1 version of this file treated
+-- `booking_id IS NULL` as "no transaction parent, merchant-real alone is
+-- sufficient". The focused independent re-review proved this false by
+-- reading schema directly: merchant_payouts was widened by
+-- 20260821183555_rtb_v2_schema.sql with its own rent_to_buy_agreement_id
+-- column, and merchant_payouts_one_transaction_chk requires EXACTLY one
+-- of booking_id/rent_to_buy_agreement_id -- there is no legitimate
+-- "neither" state. create_merchant_payout() (20260821183600_rtb_v2_rpcs.sql)
+-- is a live RPC that creates exactly these RTB-linked rows. So
+-- `booking_id IS NULL` always means RTB-linked, and this fix now proves
+-- the complete RTB provenance rule for that branch instead of merchant-
+-- real alone.
+--
 -- Fix: CREATE OR REPLACE the existing RPC, byte-identical in name,
 -- argument signature (including defaults), return shape, language,
 -- stability, security-definer behavior, and search_path. Every existing
 -- filter (status/failed-only/overdue/dispute-related/restricted-merchant/
 -- date range/search/ordering/limit) is preserved verbatim. The only
--- change is 2 new internal `base` CTE columns (merchant_classification,
--- renter_classification, listing_is_test -- used only in the outer
--- WHERE, never added to the final projected column list, so the
--- function's return shape is unchanged) and one new WHERE predicate.
+-- change is new internal `base` CTE columns (never added to the final
+-- projected column list, so the function's return shape is unchanged)
+-- and a rewritten two-branch WHERE predicate.
 --
--- Provenance rule (mirrors the booking "COMPLETE booking rule" already
--- established for payout detail in src/lib/admin/payouts-service.ts):
---   merchant_classification = 'real'
---   AND (
---     booking_id IS NULL                                -- merchant-real alone is sufficient
---     OR (renter_classification = 'real' AND listing_is_test = false)
---   )
--- The existing `pr`/`b`/`l` joins are all LEFT JOINs (never INNER), so a
--- missing/unresolved merchant, renter, or listing row fails this WHERE
--- closed via NULL-vs-'real' three-valued logic, never promoted to real --
--- the same fail-closed design already used by the Orders RPC fix. A new
--- `rp` LEFT JOIN resolves the booking's renter profile, which the
--- historical query never joined at all.
+-- Provenance rule -- exactly two parent families, no unparented fallback:
+--   (booking_id IS NOT NULL
+--     AND merchant_classification = 'real'
+--     AND renter_classification = 'real'
+--     AND listing_is_test = false)
+--   OR
+--   (rent_to_buy_agreement_id IS NOT NULL
+--     AND rtb_is_test = false
+--     AND rtb_merchant_classification = 'real'
+--     AND rtb_customer_classification = 'real')
+-- The booking branch mirrors the booking "COMPLETE booking rule" already
+-- established for payout detail in src/lib/admin/payouts-service.ts. The
+-- RTB branch mirrors the exact rule already established in
+-- src/lib/admin/rent-to-buy-service.ts -- never a payout-specific
+-- reimplementation. The RTB merchant check is resolved via its OWN
+-- LEFT JOIN on rent_to_buy_agreements.merchant_id (rtb_merchant), not by
+-- reusing the payout's own merchant_id/pr join -- payout.merchant_id and
+-- rtb.merchant_id are expected identical by the creating RPC, but this
+-- fix proves it from the actual RTB agreement row rather than relying on
+-- that invariant alone. Every join (pr/b/l/rp/rtb/rtb_merchant/
+-- rtb_customer) is a LEFT JOIN (never INNER), so a missing/unresolved
+-- merchant, renter, listing, or RTB agreement/participant row fails this
+-- WHERE closed via NULL-vs-'real'/NULL-vs-false three-valued logic,
+-- never promoted to real -- the same fail-closed design already used by
+-- the Orders RPC fix.
 --
 -- This migration is created as a reviewed SOURCE FILE only. It is NOT
 -- applied here -- per this phase's explicit instruction, no database
@@ -110,17 +134,24 @@ as $$
         (mp.status = 'pending' and mp.created_at < now() - interval '48 hours')
         or (mp.status = 'processing' and mp.processing_started_at is not null and mp.processing_started_at < now() - interval '48 hours')
       ) as is_overdue,
-      -- D3-E-F1: Real Data provenance -- positive proof only. LEFT JOINs
-      -- above (and the new `rp` one below) mean a missing/unresolved
-      -- participant yields NULL here, never 'real'.
+      -- D3-E-F1/F2: Real Data provenance -- positive proof only. LEFT
+      -- JOINs mean a missing/unresolved participant or parent row
+      -- yields NULL here, never 'real'/false.
+      mp.rent_to_buy_agreement_id,
       pr.data_classification as merchant_classification,
       rp.data_classification as renter_classification,
-      l.is_test as listing_is_test
+      l.is_test as listing_is_test,
+      rtb.is_test as rtb_is_test,
+      rtb_merchant.data_classification as rtb_merchant_classification,
+      rtb_customer.data_classification as rtb_customer_classification
     from public.merchant_payouts mp
     left join public.profiles pr on pr.id = mp.merchant_id
     left join public.bookings b on b.id = mp.booking_id
     left join public.listings l on l.id = b.listing_id
     left join public.profiles rp on rp.id = b.renter_id
+    left join public.rent_to_buy_agreements rtb on rtb.id = mp.rent_to_buy_agreement_id
+    left join public.profiles rtb_merchant on rtb_merchant.id = rtb.merchant_id
+    left join public.profiles rtb_customer on rtb_customer.id = rtb.customer_id
   )
   select
     base.id, base.payout_reference, base.merchant_id, base.merchant_name,
@@ -144,14 +175,18 @@ as $$
       or coalesce(base.booking_reference, '') ilike search_pattern.pattern escape '\'
       or coalesce(base.payout_reference, '') ilike search_pattern.pattern escape '\'
     )
-    -- D3-E-F1: Real Data provenance -- merchant must always be real; a
-    -- booking-linked payout additionally requires the COMPLETE booking
-    -- rule (renter real AND listing not test), never merchant-real
-    -- alone, mirroring getAdminPayoutDetail's existing rule exactly.
-    and base.merchant_classification = 'real'
+    -- D3-E-F2: Real Data provenance -- exactly two parent families, no
+    -- unparented fallback (merchant_payouts_one_transaction_chk
+    -- guarantees exactly one of booking_id/rent_to_buy_agreement_id is
+    -- set on every row). A booking-linked payout requires the COMPLETE
+    -- booking rule (merchant real AND renter real AND listing not
+    -- test); an RTB-linked payout requires the COMPLETE RTB rule
+    -- (agreement not test AND RTB merchant real AND RTB customer
+    -- real) -- never merchant-real alone for either branch.
     and (
-      base.booking_id is null
-      or (base.renter_classification = 'real' and base.listing_is_test = false)
+      (base.booking_id is not null and base.merchant_classification = 'real' and base.renter_classification = 'real' and base.listing_is_test = false)
+      or
+      (base.rent_to_buy_agreement_id is not null and base.rtb_is_test = false and base.rtb_merchant_classification = 'real' and base.rtb_customer_classification = 'real')
     )
   order by base.created_at desc, base.id desc
   limit p_limit;
