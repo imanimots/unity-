@@ -10,6 +10,10 @@ interface AdminFinancialRow {
   bookingReference: string | null
   orderId: string | null
   orderReference: string | null
+  barterAgreementId: string | null
+  barterAgreementReference: string | null
+  rentToBuyAgreementId: string | null
+  rentToBuyReference: string | null
   paymentType: string
   status: string
   amount: number
@@ -153,7 +157,7 @@ export default function AdminFinancialOperationsPage() {
               ) : (
                 rows.map((r) => (
                   <tr key={r.paymentId} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors last:border-0">
-                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] whitespace-nowrap">{r.bookingReference ?? r.orderReference ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] whitespace-nowrap">{r.bookingReference ?? r.orderReference ?? r.barterAgreementReference ?? r.rentToBuyReference ?? '—'}</td>
                     <td className="px-4 py-3 text-sm capitalize text-[#6B5B55] dark:text-[#9B8B85]">{r.paymentType.replace(/_/g, ' ')}</td>
                     <td className="px-4 py-3"><Pill value={r.status} styles={STATUS_STYLES} /></td>
                     <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55] dark:text-[#9B8B85]">{formatMoney(r.amount, r.currency)}</td>

@@ -4,19 +4,33 @@ import { classifyEntityWithOwners, type ProfileDataClassification } from '@/lib/
 const DEFAULT_LIMIT = 100
 
 /**
- * D3-E: escrow_transactions has no participants of its own -- its
- * real-data provenance is inherited from whichever ONE of its three
- * nullable parent-transaction columns is set (order/booking/barter --
- * confirmed from supabase/migrations/20260825000001_escrow_schema.sql:
- * no rent_to_buy_agreement_id column and no is_test column exist on
- * this table). Each parent's rule reuses the exact same positive-proof
- * logic already applied to that parent's own list/detail (orders:
- * buyer+seller+listing.is_test; bookings: renter+merchant+listing.is_test;
- * barter: party_a+party_b) -- never an escrow-specific reimplementation.
+ * D3-E-F1: escrow_transactions has no participants of its own -- its
+ * real-data provenance is inherited from whichever ONE of its FOUR
+ * nullable parent-transaction columns is set. Confirmed from source
+ * (correcting D3-E's own mistaken doc comment here, which claimed no
+ * rent_to_buy_agreement_id column exists): the column was added by
+ * supabase/migrations/20260821183555_rtb_v2_schema.sql, and
+ * escrow_transactions_one_transaction_chk was widened to its current
+ * 4-way shape (order/booking/barter/rent_to_buy) by
+ * 20260821191500_rtb_v2_escrow_constraint_fix_forward.sql --
+ * src/lib/escrow/orchestrator.ts actively creates and reads
+ * rent_to_buy_agreement_id-linked rows today, so this is live,
+ * real-production-data, not a theoretical gap. Each parent's rule
+ * reuses the exact same positive-proof logic already applied to that
+ * parent's own list/detail (orders: buyer+seller+listing.is_test;
+ * bookings: renter+merchant+listing.is_test; barter: party_a+party_b;
+ * rent_to_buy: is_test=false AND merchant+customer, the exact rule
+ * already established in src/lib/admin/rent-to-buy-service.ts) --
+ * never an escrow-specific reimplementation.
  */
 async function resolveEscrowRealClassification(
   admin: SupabaseClient,
-  escrow: { order_id: string | null; booking_id: string | null; barter_agreement_id: string | null }
+  escrow: {
+    order_id: string | null
+    booking_id: string | null
+    barter_agreement_id: string | null
+    rent_to_buy_agreement_id: string | null
+  }
 ): Promise<ProfileDataClassification> {
   if (escrow.order_id) {
     const { data: order } = await admin.from('orders').select('buyer_id, seller_id, listing_id').eq('id', escrow.order_id).maybeSingle()
@@ -48,9 +62,21 @@ async function resolveEscrowRealClassification(
     const partyB = profiles?.find((p) => p.id === agreement.party_b_id)
     return classifyEntityWithOwners({ is_test: false }, [partyA ?? {}, partyB ?? {}])
   }
-  // Exactly one of order_id/booking_id/barter_agreement_id should
-  // always be set -- reaching here should never happen. Fail safe,
-  // never guess real.
+  if (escrow.rent_to_buy_agreement_id) {
+    const { data: agreement } = await admin
+      .from('rent_to_buy_agreements')
+      .select('is_test, merchant_id, customer_id')
+      .eq('id', escrow.rent_to_buy_agreement_id)
+      .maybeSingle()
+    if (!agreement) return 'unknown'
+    const { data: profiles } = await admin.from('profiles').select('id, data_classification').in('id', [agreement.merchant_id, agreement.customer_id])
+    const merchant = profiles?.find((p) => p.id === agreement.merchant_id)
+    const customer = profiles?.find((p) => p.id === agreement.customer_id)
+    return classifyEntityWithOwners({ is_test: agreement.is_test === true }, [merchant ?? {}, customer ?? {}])
+  }
+  // Exactly one of order_id/booking_id/barter_agreement_id/
+  // rent_to_buy_agreement_id should always be set -- reaching here
+  // should never happen. Fail safe, never guess real.
   return 'unknown'
 }
 
@@ -65,6 +91,7 @@ export interface AdminEscrowRow {
   orderId: string | null
   bookingId: string | null
   barterAgreementId: string | null
+  rentToBuyAgreementId: string | null
   transactionReference: string | null
   createdAt: string
   fundedAt: string | null
@@ -83,17 +110,17 @@ export interface AdminEscrowFilters {
  * Mirrors listAdminPayouts' exact shape -- one base query + Promise.all
  * of related-table lookups + in-memory joins.
  *
- * D3-E: real-data provenance is inherited from whichever parent
- * transaction is linked (see resolveEscrowRealClassification's own
- * comment), which PostgREST cannot express as a single embedded-join
- * filter on `escrow_transactions` itself (exactly one of three
- * different parent tables). Like Disputes/Reviews (D3-D), the
+ * D3-E/D3-E-F1: real-data provenance is inherited from whichever
+ * parent transaction is linked (see resolveEscrowRealClassification's
+ * own comment), which PostgREST cannot express as a single
+ * embedded-join filter on `escrow_transactions` itself (exactly one of
+ * four different parent tables). Like Disputes/Reviews (D3-D), the
  * row-count bound moves to AFTER classification, never before it.
  */
 export async function listAdminEscrowTransactions(admin: SupabaseClient, filters: AdminEscrowFilters): Promise<AdminEscrowRow[]> {
   let query = admin
     .from('escrow_transactions')
-    .select('id, transaction_type, status, provider, principal_amount, secure_transaction_fee_amount, currency, order_id, booking_id, barter_agreement_id, created_at, funded_at, released_at, refunded_at')
+    .select('id, transaction_type, status, provider, principal_amount, secure_transaction_fee_amount, currency, order_id, booking_id, barter_agreement_id, rent_to_buy_agreement_id, created_at, funded_at, released_at, refunded_at')
     .order('created_at', { ascending: false })
 
   if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status)
@@ -105,21 +132,28 @@ export async function listAdminEscrowTransactions(admin: SupabaseClient, filters
   const orderIds = initialRows.map((r) => r.order_id).filter((id): id is string => !!id)
   const bookingIds = initialRows.map((r) => r.booking_id).filter((id): id is string => !!id)
   const barterIds = initialRows.map((r) => r.barter_agreement_id).filter((id): id is string => !!id)
+  const rtbIds = initialRows.map((r) => r.rent_to_buy_agreement_id).filter((id): id is string => !!id)
 
-  const [{ data: orders }, { data: bookings }, { data: barterAgreements }] = await Promise.all([
+  const [{ data: orders }, { data: bookings }, { data: barterAgreements }, { data: rtbAgreements }] = await Promise.all([
     orderIds.length ? admin.from('orders').select('id, order_reference, buyer_id, seller_id, listing_id').in('id', orderIds) : Promise.resolve({ data: [] }),
     bookingIds.length
       ? admin.from('bookings').select('id, booking_reference, renter_id, merchant_id, listing_id').in('id', bookingIds)
       : Promise.resolve({ data: [] }),
     barterIds.length ? admin.from('barter_agreements').select('id, agreement_reference, party_a_id, party_b_id').in('id', barterIds) : Promise.resolve({ data: [] }),
+    rtbIds.length ? admin.from('rent_to_buy_agreements').select('id, is_test, merchant_id, customer_id').in('id', rtbIds) : Promise.resolve({ data: [] }),
   ])
 
   const orderRefById = new Map((orders ?? []).map((o) => [o.id, o.order_reference]))
   const bookingRefById = new Map((bookings ?? []).map((b) => [b.id, b.booking_reference]))
   const barterRefById = new Map((barterAgreements ?? []).map((b) => [b.id, b.agreement_reference]))
+  // rent_to_buy_agreements has no human-readable reference column --
+  // mirrors the exact synthetic-reference convention already used by
+  // src/lib/escrow/orchestrator.ts for the same gap.
+  const rtbRefById = new Map((rtbAgreements ?? []).map((a) => [a.id, `RTB-${a.id.slice(0, 8).toUpperCase()}`]))
   const orderById = new Map((orders ?? []).map((o) => [o.id, o]))
   const bookingById = new Map((bookings ?? []).map((b) => [b.id, b]))
   const barterById = new Map((barterAgreements ?? []).map((b) => [b.id, b]))
+  const rtbById = new Map((rtbAgreements ?? []).map((a) => [a.id, a]))
 
   const participantIds = new Set<string>()
   const listingIdsToCheck = new Set<string>()
@@ -136,6 +170,10 @@ export async function listAdminEscrowTransactions(admin: SupabaseClient, filters
   for (const b of barterAgreements ?? []) {
     participantIds.add(b.party_a_id)
     participantIds.add(b.party_b_id)
+  }
+  for (const a of rtbAgreements ?? []) {
+    participantIds.add(a.merchant_id)
+    participantIds.add(a.customer_id)
   }
 
   const [{ data: scopeProfiles }, { data: scopeListings }] = await Promise.all([
@@ -170,19 +208,28 @@ export async function listAdminEscrowTransactions(admin: SupabaseClient, filters
         const partyB = scopeProfileById.get(agreement.party_b_id) ?? {}
         return classifyEntityWithOwners({ is_test: false }, [partyA, partyB]) === 'real'
       }
+      if (r.rent_to_buy_agreement_id) {
+        const agreement = rtbById.get(r.rent_to_buy_agreement_id)
+        if (!agreement) return false
+        const merchant = scopeProfileById.get(agreement.merchant_id) ?? {}
+        const customer = scopeProfileById.get(agreement.customer_id) ?? {}
+        return classifyEntityWithOwners({ is_test: agreement.is_test === true }, [merchant, customer]) === 'real'
+      }
       return false
     })
     .slice(0, filters.limit ?? DEFAULT_LIMIT)
   if (rows.length === 0) return []
 
-  const [{ data: orderDisputes }, { data: bookingDisputes }, { data: barterDisputes }] = await Promise.all([
+  const [{ data: orderDisputes }, { data: bookingDisputes }, { data: barterDisputes }, { data: rtbDisputes }] = await Promise.all([
     orderIds.length ? admin.from('disputes').select('order_id').in('order_id', orderIds).not('status', 'in', '(resolved,closed,cancelled)') : Promise.resolve({ data: [] }),
     bookingIds.length ? admin.from('disputes').select('booking_id').in('booking_id', bookingIds).not('status', 'in', '(resolved,closed,cancelled)') : Promise.resolve({ data: [] }),
     barterIds.length ? admin.from('disputes').select('barter_agreement_id').in('barter_agreement_id', barterIds).not('status', 'in', '(resolved,closed,cancelled)') : Promise.resolve({ data: [] }),
+    rtbIds.length ? admin.from('disputes').select('rent_to_buy_agreement_id').in('rent_to_buy_agreement_id', rtbIds).not('status', 'in', '(resolved,closed,cancelled)') : Promise.resolve({ data: [] }),
   ])
   const disputedOrderIds = new Set((orderDisputes ?? []).map((d) => d.order_id))
   const disputedBookingIds = new Set((bookingDisputes ?? []).map((d) => d.booking_id))
   const disputedBarterIds = new Set((barterDisputes ?? []).map((d) => d.barter_agreement_id))
+  const disputedRtbIds = new Set((rtbDisputes ?? []).map((d) => d.rent_to_buy_agreement_id))
 
   let results: AdminEscrowRow[] = rows.map((r) => ({
     id: r.id,
@@ -195,13 +242,16 @@ export async function listAdminEscrowTransactions(admin: SupabaseClient, filters
     orderId: r.order_id,
     bookingId: r.booking_id,
     barterAgreementId: r.barter_agreement_id,
+    rentToBuyAgreementId: r.rent_to_buy_agreement_id,
     transactionReference: r.order_id
       ? (orderRefById.get(r.order_id) ?? null)
       : r.booking_id
         ? (bookingRefById.get(r.booking_id) ?? null)
         : r.barter_agreement_id
           ? (barterRefById.get(r.barter_agreement_id) ?? null)
-          : null,
+          : r.rent_to_buy_agreement_id
+            ? (rtbRefById.get(r.rent_to_buy_agreement_id) ?? null)
+            : null,
     createdAt: r.created_at,
     fundedAt: r.funded_at,
     releasedAt: r.released_at,
@@ -212,7 +262,9 @@ export async function listAdminEscrowTransactions(admin: SupabaseClient, filters
         ? disputedBookingIds.has(r.booking_id)
         : r.barter_agreement_id
           ? disputedBarterIds.has(r.barter_agreement_id)
-          : false,
+          : r.rent_to_buy_agreement_id
+            ? disputedRtbIds.has(r.rent_to_buy_agreement_id)
+            : false,
   }))
 
   if (filters.search && filters.search.trim()) {
@@ -263,6 +315,17 @@ export async function getAdminEscrowDetail(admin: SupabaseClient, escrowId: stri
     ])
     transactionReference = agreement?.agreement_reference ?? null
     disputes = disputeRows ?? []
+  } else if (escrow.rent_to_buy_agreement_id) {
+    const { data: disputeRows } = await admin
+      .from('disputes')
+      .select('*')
+      .eq('rent_to_buy_agreement_id', escrow.rent_to_buy_agreement_id)
+      .order('created_at', { ascending: false })
+    // rent_to_buy_agreements has no human-readable reference column --
+    // mirrors the exact synthetic-reference convention already used by
+    // src/lib/escrow/orchestrator.ts and listAdminEscrowTransactions above.
+    transactionReference = `RTB-${escrow.rent_to_buy_agreement_id.slice(0, 8).toUpperCase()}`
+    disputes = disputeRows ?? []
   }
 
   const { data: history } = await admin.from('escrow_transaction_history').select('*').eq('escrow_transaction_id', escrowId).order('created_at', { ascending: false })
@@ -301,16 +364,17 @@ export interface RealEscrowOverviewCounts {
  * resolveEscrowRealClassification already applies. Preserves every
  * existing status grouping from get_admin_overview_stats() verbatim.
  *
- * P3 scalability note (same disposition as D3-D's Disputes/Reviews):
- * classification is resolved per matching row rather than via a single
- * DB-level count, since PostgREST cannot express "whichever of
- * order_id/booking_id/barter_agreement_id is set" as one embedded-join
- * filter. Acceptable at current escrow volume; revisit if volume grows
- * substantially.
+ * P3 scalability note (same disposition as D3-D's Disputes/Reviews,
+ * unchanged by D3-E-F1's RTB branch addition): classification is
+ * resolved per matching row rather than via a single DB-level count,
+ * since PostgREST cannot express "whichever of order_id/booking_id/
+ * barter_agreement_id/rent_to_buy_agreement_id is set" as one
+ * embedded-join filter. Acceptable at current escrow volume; revisit
+ * if volume grows substantially.
  */
 export async function getRealEscrowOverviewCounts(admin: SupabaseClient): Promise<RealEscrowOverviewCounts> {
   async function countRealForStatuses(statuses: string[]): Promise<number> {
-    const { data: rows } = await admin.from('escrow_transactions').select('order_id, booking_id, barter_agreement_id').in('status', statuses)
+    const { data: rows } = await admin.from('escrow_transactions').select('order_id, booking_id, barter_agreement_id, rent_to_buy_agreement_id').in('status', statuses)
     if (!rows || rows.length === 0) return 0
     const classifications = await Promise.all(rows.map((r) => resolveEscrowRealClassification(admin, r)))
     return classifications.filter((c) => c === 'real').length

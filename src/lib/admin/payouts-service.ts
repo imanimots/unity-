@@ -4,15 +4,22 @@ import { classifyEntityWithOwners } from '@/lib/admin/data-scope'
 const DEFAULT_LIMIT = 100
 
 /**
- * D3-E: listAdminPayouts() below is backed entirely by
- * _admin_list_merchant_payouts (migration
- * 20260904000022_admin_payout_search_relational.sql), the same
- * kind of CREATE OR REPLACE RPC blocker _admin_list_orders_page was in
- * D3-D -- editing it to add Real Data provenance is itself a database
- * migration, and this phase's expected migration count is zero. This
- * is reported as a blocker in the final report, not worked around
- * here. getAdminPayoutDetail below is a plain table query with no such
- * constraint, so it is scoped directly.
+ * D3-E-F1: listAdminPayouts() below is backed entirely by
+ * _admin_list_merchant_payouts. D3-E's independent review confirmed the
+ * RPC (as it stood after 20260904000022_admin_payout_search_relational.sql)
+ * had zero Real Data provenance filtering -- the same class of gap
+ * _admin_list_orders_page had in D3-D, fixed there via a new
+ * CREATE OR REPLACE migration. The identical fix now exists at
+ * supabase/migrations/20261029090000_admin_payouts_real_data_scope.sql
+ * (merchant real always required; booking-linked payouts additionally
+ * require the COMPLETE booking rule -- renter real AND listing
+ * non-test, the exact rule getAdminPayoutDetail below already applies).
+ * That migration is a reviewed SOURCE FILE only -- this phase does not
+ * apply it (no database migration/mutation occurs here); until it is
+ * applied, this RPC's live behavior in any already-deployed environment
+ * remains unscoped. getAdminPayoutDetail below is a plain table query
+ * with no such constraint, so it is already scoped directly and
+ * requires no migration.
  */
 
 export interface AdminPayoutRow {

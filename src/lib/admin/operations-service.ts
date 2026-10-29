@@ -233,6 +233,10 @@ export interface AdminFinancialRow {
   bookingReference: string | null
   orderId: string | null
   orderReference: string | null
+  barterAgreementId: string | null
+  barterAgreementReference: string | null
+  rentToBuyAgreementId: string | null
+  rentToBuyReference: string | null
   paymentType: string
   status: string
   amount: number
@@ -250,21 +254,37 @@ export interface AdminFinancialRow {
  * provider payloads/webhook bodies — payment_webhook_events is not
  * queried here at all.
  *
- * Step 11 Phase 6: extended (not forked) to also label order-linked rows
- * correctly. Before this, an order-linked payment row rendered with a
- * silent null booking reference and null failure category -- the exact,
- * confirmed-real bug this fix targets. `booking_id`/`order_id` are
- * nullable side-by-side (exactly one populated per row, same
- * exactly-one-of shape `payments` itself enforces). An order row never
- * has a `financial_workflows` entry (orders use a single-step charge
- * flow, see chargeOrderPayment()'s own header comment) -- its
- * failureCategory is derived directly from `payment.status === 'failed'`
- * instead, a deliberately simpler category than bookings' retryable/
- * terminal split, because that split isn't durably stored for orders
- * (see docs/ORDER_ADMINISTRATION.md). `merchant_payouts` has no
- * order_id/payment_id column at all -- an order row's payoutStatus is
- * never queried for, always `'not_applicable'`, not left to fall
- * through to a lookup that can never match.
+ * D3-E-F1: independent review of D3-E confirmed this page is an
+ * ordinary BUSINESS Finance ledger, not an operational queue, and that
+ * it had zero Real Data provenance filtering while also only handling
+ * 2 of `payments`' 4 polymorphic parent families (booking/order) for
+ * display -- barter/rent_to_buy rows silently rendered with blank
+ * reference fields. Both gaps are fixed together via
+ * _admin_list_financial_operations (migration
+ * 20261029090100_admin_financial_operations_real_data_scope.sql): a
+ * narrowly-scoped new RPC that applies each parent family's own
+ * already-established D3 provenance rule INSIDE the query, before the
+ * keyset LIMIT -- never a bounded-fetch-then-classify-then-drop
+ * pattern, which would reintroduce the exact short-page/false-
+ * exhaustion defect this page's pagination was already hardened
+ * against once. `booking_id`/`order_id`/`barter_agreement_id`/
+ * `rent_to_buy_agreement_id` are nullable side-by-side (exactly one
+ * populated per row, per `payments_one_transaction_chk`). An order row
+ * never has a `financial_workflows` entry (orders use a single-step
+ * charge flow, see chargeOrderPayment()'s own header comment), and
+ * neither do barter/rent_to_buy rows (that table is booking-only) --
+ * all three share the same simpler `payment.status === 'failed'`
+ * failureCategory derivation, a deliberately simpler category than
+ * bookings' retryable/terminal split, because that split isn't durably
+ * stored for them (see docs/ORDER_ADMINISTRATION.md). `merchant_payouts`
+ * has no order_id/barter_agreement_id/rent_to_buy_agreement_id/payment_id
+ * column at all -- a non-booking row's payoutStatus is never queried
+ * for, always `'not_applicable'`, not left to fall through to a lookup
+ * that can never match. rent_to_buy_agreements has no human-readable
+ * reference column -- rentToBuyReference is a synthetic `RTB-XXXXXXXX`
+ * string, mirroring the exact convention already used by
+ * src/lib/escrow/orchestrator.ts and src/lib/admin/escrow-service.ts
+ * for the same gap.
  */
 export interface AdminFinancialOperationsFilters {
   status?: string
@@ -279,40 +299,45 @@ export interface AdminFinancialOperationsPage {
   nextCursor: string | null
 }
 
-/**
- * Bounded keyset pagination on top of the SAME `payments` query and the
- * SAME `bookings(booking_reference)`/`orders(order_reference)` embedded
- * joins as before (confirmed correct by the diagnosis phase -- the
- * financial-operations defect was pure boundedness, never a join/
- * hydration bug, so the relation itself is deliberately unchanged here).
- */
+interface AdminListFinancialOperationsRpcRow {
+  id: string
+  booking_id: string | null
+  booking_reference: string | null
+  order_id: string | null
+  order_reference: string | null
+  barter_agreement_id: string | null
+  barter_agreement_reference: string | null
+  rent_to_buy_agreement_id: string | null
+  payment_type: string
+  status: string
+  amount: number
+  currency: string
+  failure_reason: string | null
+  requested_at: string
+}
+
 export async function listFinancialOperations(admin: SupabaseClient, filters: AdminFinancialOperationsFilters): Promise<AdminFinancialOperationsPage> {
   const contextParams = { status: filters.status ?? null }
   const cursor = filters.cursor ? decodeAndValidateCursor(filters.cursor, FIN_OPS_CURSOR_ENTITY, contextParams) : null
 
   const requestedLimit = filters.limit ?? DEFAULT_LIMIT
-  let query = admin
-    .from('payments')
-    .select('id, booking_id, order_id, payment_type, status, amount, currency, failure_reason, requested_at, bookings(booking_reference), orders(order_reference)')
-    .order('requested_at', { ascending: false })
-    .order('id', { ascending: false })
-    // Fetch one extra row to detect "more pages exist" without relying on
-    // "returned length === limit" (ambiguous when exactly that many rows remain).
-    .limit(requestedLimit + 1)
-
-  if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status)
-  if (cursor) {
-    query = query.or(`requested_at.lt.${cursor.ts},and(requested_at.eq.${cursor.ts},id.lt.${cursor.id})`)
-  }
-
-  const { data: pagePayments, error } = await query
+  // Fetch one extra row to detect "more pages exist" without relying on
+  // "returned length === limit" (ambiguous when exactly that many rows
+  // remain) -- same convention as before, now a p_limit RPC argument.
+  const { data: pagePayments, error } = await admin.rpc('_admin_list_financial_operations', {
+    p_status: filters.status && filters.status !== 'all' ? filters.status : null,
+    p_cursor_ts: cursor?.ts ?? null,
+    p_cursor_id: cursor?.id ?? null,
+    p_limit: requestedLimit + 1,
+  })
   if (error) throw error
 
-  const hasMore = (pagePayments?.length ?? 0) > requestedLimit
-  const payments = (pagePayments ?? []).slice(0, requestedLimit)
+  const allRows = (pagePayments ?? []) as AdminListFinancialOperationsRpcRow[]
+  const hasMore = allRows.length > requestedLimit
+  const payments = allRows.slice(0, requestedLimit)
   const nextCursor = hasMore && payments.length > 0
     ? encodeKeysetCursor({
-        ts: (payments[payments.length - 1] as { requested_at: string }).requested_at,
+        ts: payments[payments.length - 1].requested_at,
         id: payments[payments.length - 1].id,
         contextHash: computeCursorContextHash(FIN_OPS_CURSOR_ENTITY, contextParams),
       })
@@ -337,14 +362,18 @@ export async function listFinancialOperations(admin: SupabaseClient, filters: Ad
   }
 
   const operations: AdminFinancialRow[] = payments.map((p) => {
-    if (p.order_id) {
+    if (!p.booking_id) {
       const failureCategory: AdminFinancialRow['failureCategory'] = p.status === 'failed' ? 'failed' : null
       return {
         paymentId: p.id,
         bookingId: null,
         bookingReference: null,
         orderId: p.order_id,
-        orderReference: (p.orders as unknown as { order_reference: string } | null)?.order_reference ?? null,
+        orderReference: p.order_reference,
+        barterAgreementId: p.barter_agreement_id,
+        barterAgreementReference: p.barter_agreement_reference,
+        rentToBuyAgreementId: p.rent_to_buy_agreement_id,
+        rentToBuyReference: p.rent_to_buy_agreement_id ? `RTB-${p.rent_to_buy_agreement_id.slice(0, 8).toUpperCase()}` : null,
         paymentType: p.payment_type,
         status: p.status,
         amount: p.amount,
@@ -357,15 +386,19 @@ export async function listFinancialOperations(admin: SupabaseClient, filters: Ad
       }
     }
 
-    const workflowStatus = p.booking_id ? (workflowByBooking.get(p.booking_id) ?? null) : null
+    const workflowStatus = workflowByBooking.get(p.booking_id) ?? null
     const failureCategory: AdminFinancialRow['failureCategory'] =
       workflowStatus === 'failed_retryable' ? 'retryable' : workflowStatus === 'failed_terminal' ? 'terminal' : null
     return {
       paymentId: p.id,
       bookingId: p.booking_id,
-      bookingReference: (p.bookings as unknown as { booking_reference: string } | null)?.booking_reference ?? null,
+      bookingReference: p.booking_reference,
       orderId: null,
       orderReference: null,
+      barterAgreementId: null,
+      barterAgreementReference: null,
+      rentToBuyAgreementId: null,
+      rentToBuyReference: null,
       paymentType: p.payment_type,
       status: p.status,
       amount: p.amount,
@@ -374,7 +407,7 @@ export async function listFinancialOperations(admin: SupabaseClient, filters: Ad
       failureCategory,
       failureReason: p.failure_reason,
       ledgerEntryCount: ledgerCountByPayment.get(p.id) ?? 0,
-      payoutStatus: p.booking_id ? (payoutByBooking.get(p.booking_id) ?? null) : null,
+      payoutStatus: payoutByBooking.get(p.booking_id) ?? null,
     }
   })
 

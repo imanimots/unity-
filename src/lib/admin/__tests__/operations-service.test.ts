@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
-import { listAdminBookings, getAdminBookingDetail, getRealBookingOverviewCounts } from '../operations-service'
+import { listAdminBookings, getAdminBookingDetail, getRealBookingOverviewCounts, listFinancialOperations } from '../operations-service'
+import { encodeKeysetCursor, computeCursorContextHash } from '../cursor'
 
 vi.mock('@/lib/checkout/load-financial-state', () => ({
   loadBookingFinancialState: vi.fn().mockResolvedValue({ booking: null, workflowStatus: null, rentalPaymentStatus: null, depositPaymentStatus: null }),
@@ -199,5 +200,134 @@ describe('operations-service: getRealBookingOverviewCounts (category: ADMIN-CONT
     expect(counts.requestedBookings).toBe(0)
     expect(counts.activeRentals).toBe(0)
     expect(counts.overduePaymentDeadlines).toBe(0)
+  })
+})
+
+interface RpcCall {
+  fn: string
+  args: unknown
+}
+
+function fakeFinOpsAdmin(
+  rpcRows: Record<string, unknown>[],
+  tables: Record<string, Record<string, unknown>[]> = {},
+  rpcCalls: RpcCall[] = []
+) {
+  return {
+    rpc: (fn: string, args: unknown) => {
+      rpcCalls.push({ fn, args })
+      return Promise.resolve({ data: rpcRows, error: null })
+    },
+    from: (table: string) => {
+      const rows = tables[table] ?? []
+      let filters: Record<string, unknown> = {}
+      const obj: Record<string, unknown> = {
+        select: () => obj,
+        in: (col: string, vals: unknown[]) => {
+          filters = { ...filters, [col]: vals }
+          return obj
+        },
+        then: (resolve: (v: { data: Record<string, unknown>[]; error: null }) => void) => {
+          const matched = rows.filter((r) => Object.entries(filters).every(([k, v]) => (v as unknown[]).includes(r[k])))
+          resolve({ data: matched, error: null })
+        },
+      }
+      return obj
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any
+}
+
+describe('operations-service: listFinancialOperations real-data scope (category: ADMIN-CONTROL-CENTRE-BATCH-D3-E-F1)', () => {
+  it('1. calls the Real-Data-scoped RPC with the status filter and a null cursor on the first page', async () => {
+    const rpcCalls: RpcCall[] = []
+    const admin = fakeFinOpsAdmin([], {}, rpcCalls)
+    await listFinancialOperations(admin, { status: 'captured' })
+    expect(rpcCalls[0].fn).toBe('_admin_list_financial_operations')
+    expect(rpcCalls[0].args).toMatchObject({ p_status: 'captured', p_cursor_ts: null, p_cursor_id: null })
+  })
+
+  it('2. a booking-linked row resolves booking fields, workflow/payout status, and leaves order/barter/RTB fields null', async () => {
+    const admin = fakeFinOpsAdmin(
+      [
+        {
+          id: 'p1', booking_id: 'bk1', booking_reference: 'BK-1', order_id: null, order_reference: null,
+          barter_agreement_id: null, barter_agreement_reference: null, rent_to_buy_agreement_id: null,
+          payment_type: 'rental_charge', status: 'captured', amount: 100, currency: 'ZAR', failure_reason: null, requested_at: '2026-01-01T00:00:00Z',
+        },
+      ],
+      {
+        financial_workflows: [{ booking_id: 'bk1', status: 'completed' }],
+        ledger_entries: [{ payment_id: 'p1' }, { payment_id: 'p1' }],
+        merchant_payouts: [{ booking_id: 'bk1', status: 'paid' }],
+      }
+    )
+    const { operations } = await listFinancialOperations(admin, {})
+    expect(operations).toEqual([
+      expect.objectContaining({
+        paymentId: 'p1', bookingId: 'bk1', bookingReference: 'BK-1',
+        orderId: null, orderReference: null, barterAgreementId: null, barterAgreementReference: null,
+        rentToBuyAgreementId: null, rentToBuyReference: null,
+        workflowStatus: 'completed', ledgerEntryCount: 2, payoutStatus: 'paid',
+      }),
+    ])
+  })
+
+  it('3. a barter-linked row displays its own agreement reference rather than a blank booking/order field, with payoutStatus not_applicable', async () => {
+    const admin = fakeFinOpsAdmin([
+      {
+        id: 'p2', booking_id: null, booking_reference: null, order_id: null, order_reference: null,
+        barter_agreement_id: 'ba1', barter_agreement_reference: 'BA-1', rent_to_buy_agreement_id: null,
+        payment_type: 'barter_deposit', status: 'captured', amount: 50, currency: 'ZAR', failure_reason: null, requested_at: '2026-01-01T00:00:00Z',
+      },
+    ])
+    const { operations } = await listFinancialOperations(admin, {})
+    expect(operations[0]).toMatchObject({
+      barterAgreementId: 'ba1', barterAgreementReference: 'BA-1', bookingReference: null, orderReference: null,
+      workflowStatus: null, payoutStatus: 'not_applicable',
+    })
+  })
+
+  it('4. a rent-to-buy-linked row synthesizes an RTB-XXXXXXXX reference and a failed status derives a failed failureCategory', async () => {
+    const admin = fakeFinOpsAdmin([
+      {
+        id: 'p3', booking_id: null, booking_reference: null, order_id: null, order_reference: null,
+        barter_agreement_id: null, barter_agreement_reference: null, rent_to_buy_agreement_id: 'rtb-abcdef12',
+        payment_type: 'rent_to_buy_installment', status: 'failed', amount: 200, currency: 'ZAR', failure_reason: 'card_declined', requested_at: '2026-01-01T00:00:00Z',
+      },
+    ])
+    const { operations } = await listFinancialOperations(admin, {})
+    expect(operations[0]).toMatchObject({
+      rentToBuyAgreementId: 'rtb-abcdef12', rentToBuyReference: 'RTB-RTB-ABCD', failureCategory: 'failed', payoutStatus: 'not_applicable',
+    })
+  })
+
+  it('5. zero rows returns an empty, well-formed page without querying any enrichment table', async () => {
+    const admin = fakeFinOpsAdmin([])
+    const page = await listFinancialOperations(admin, {})
+    expect(page).toEqual({ operations: [], hasMore: false, nextCursor: null })
+  })
+
+  it('6. hasMore/nextCursor are derived from the extra fetched row, same as before, and the cursor is bound to the status filter context', async () => {
+    const rows = Array.from({ length: 3 }, (_, i) => ({
+      id: `p${i}`, booking_id: null, booking_reference: null, order_id: `o${i}`, order_reference: `ORD-${i}`,
+      barter_agreement_id: null, barter_agreement_reference: null, rent_to_buy_agreement_id: null,
+      payment_type: 'order_payment', status: 'captured', amount: 10, currency: 'ZAR', failure_reason: null, requested_at: `2026-01-0${3 - i}T00:00:00Z`,
+    }))
+    const admin = fakeFinOpsAdmin(rows)
+    const page = await listFinancialOperations(admin, { limit: 2 })
+    expect(page.hasMore).toBe(true)
+    expect(page.operations).toHaveLength(2)
+    expect(page.nextCursor).toBe(
+      encodeKeysetCursor({ ts: '2026-01-02T00:00:00Z', id: 'p1', contextHash: computeCursorContextHash('admin_financial_operations', { status: null }) })
+    )
+  })
+
+  it('7. a prior cursor is decoded and forwarded to the RPC as p_cursor_ts/p_cursor_id', async () => {
+    const rpcCalls: RpcCall[] = []
+    const cursor = encodeKeysetCursor({ ts: '2026-01-01T00:00:00Z', id: 'p9', contextHash: computeCursorContextHash('admin_financial_operations', { status: null }) })
+    const admin = fakeFinOpsAdmin([], {}, rpcCalls)
+    await listFinancialOperations(admin, { cursor })
+    expect(rpcCalls[0].args).toMatchObject({ p_cursor_ts: '2026-01-01T00:00:00Z', p_cursor_id: 'p9' })
   })
 })

@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       const { operations } = await listFinancialOperations(admin, { status: filters.status })
       return csvResponse(
         'financial-operations.csv',
-        ['paymentId', 'bookingReference', 'orderReference', 'paymentType', 'status', 'amount', 'currency', 'workflowStatus', 'failureCategory', 'ledgerEntryCount', 'payoutStatus'],
+        ['paymentId', 'bookingReference', 'orderReference', 'barterAgreementReference', 'rentToBuyReference', 'paymentType', 'status', 'amount', 'currency', 'workflowStatus', 'failureCategory', 'ledgerEntryCount', 'payoutStatus'],
         operations
       )
     }
