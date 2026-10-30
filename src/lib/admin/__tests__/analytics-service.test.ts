@@ -898,7 +898,7 @@ function behaviorAnalyticsAdmin(probe: { data: unknown[] | null; error: unknown 
 }
 
 describe('getBehaviorAnalytics (category: ADMIN-CONTROL-CENTRE-BATCH-D2-F1) — first-party event analytics, server-side counts, safe zero/missing-table handling', () => {
-  it('1. counts each event by exact event_name match, excluding confirmed-test rows, as a server-side head:true count', async () => {
+  it('1. counts each event by exact event_name match, requiring positive-proof data_classification=real (D3-F: never a negative .neq(..., \'test\'), which would silently count unresolved \'unknown\' rows as real), as a server-side head:true count', async () => {
     const seenFilters: Record<string, unknown>[] = []
     const admin = behaviorAnalyticsAdmin({ data: [{ event_id: 'x' }], error: null }, (f) => {
       seenFilters.push(f)
@@ -906,7 +906,8 @@ describe('getBehaviorAnalytics (category: ADMIN-CONTROL-CENTRE-BATCH-D2-F1) — 
     })
     const result = await getBehaviorAnalytics(admin, 'all')
     expect(result.pageViews).toBe(7)
-    expect(seenFilters.some((f) => f['data_classification__neq'] === 'test')).toBe(true)
+    expect(seenFilters.some((f) => f['data_classification'] === 'real')).toBe(true)
+    expect(seenFilters.some((f) => 'data_classification__neq' in f)).toBe(false)
   })
 
   it('2. applies the occurred_at lower bound for finite periods (7d/30d/90d), not created_at or any other column', async () => {
@@ -992,11 +993,12 @@ describe('getBehaviorAnalytics (category: ADMIN-CONTROL-CENTRE-BATCH-D2-F1) — 
     await expect(getBehaviorAnalytics(admin, '30d')).rejects.toMatchObject({ code: '42501' })
   })
 
-  it('10. dataQuality.mayIncludeUnclassifiedActivity is honestly true -- never silently implies every count is confirmed-real', async () => {
+  it('10. [D3-F] dataQuality.mayIncludeUnclassifiedActivity is false -- every count is now strictly confirmed-real, with notes disclosing the resulting undercount risk for listing-independent event types instead', async () => {
     const admin = behaviorAnalyticsAdmin({ data: [], error: null }, () => 0)
     const result = await getBehaviorAnalytics(admin, '7d')
-    expect(result.dataQuality.mayIncludeUnclassifiedActivity).toBe(true)
+    expect(result.dataQuality.mayIncludeUnclassifiedActivity).toBe(false)
     expect(result.dataQuality.notes.length).toBeGreaterThan(0)
+    expect(result.dataQuality.notes.some((n) => /real/i.test(n))).toBe(true)
   })
 
   it('11. covers every one of the 16 canonical event names across pageViews/searchStarted/searchResultsViewed/zeroResultSearches/searchRefinements/listingViews/signup/listing-creation/listing-publish/rental/order/KYC -- no section is silently omitted (D2-F1: closes the search_results_viewed/search_refined gap)', async () => {
@@ -1027,5 +1029,103 @@ describe('getBehaviorAnalytics (category: ADMIN-CONTROL-CENTRE-BATCH-D2-F1) — 
     const result = await getBehaviorAnalytics(admin, 'all')
     expect(result.searchResultsViewed).toBe(5)
     expect(result.searchRefinements).toBe(3)
+  })
+})
+
+describe('D3-F: profile metrics require positive-proof data_classification=real, never a negative .neq (category: ADMIN-CONTROL-CENTRE-BATCH-D3-F)', () => {
+  it('1. getMarketplaceOverview totalUsers/nonErasedUsers/merchantUsers/renterUsers all require data_classification=real -- a mixed real+test+unknown population without the filter would read differently', async () => {
+    const admin = {
+      from: (table: string) => {
+        if (table === 'profiles') return countQueryChain((f) => (f.data_classification === 'real' ? 3 : 9))
+        return countQueryChain(() => 0)
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getMarketplaceOverview(admin, 'all')
+    expect(result.totalUsers).toBe(3)
+    expect(result.nonErasedUsers).toBe(3)
+    expect(result.merchantUsers).toBe(3)
+    expect(result.renterUsers).toBe(3)
+  })
+
+  it('2. getMarketplaceOverview newUsers (period comparison) also requires data_classification=real for both current and previous period', async () => {
+    const admin = {
+      from: (table: string) => {
+        if (table === 'profiles') return countQueryChain((f) => (f.data_classification === 'real' ? 5 : 50))
+        return countQueryChain(() => 0)
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getMarketplaceOverview(admin, '30d')
+    expect(result.newUsers.current).toBe(5)
+    expect(result.newUsers.previous).toBe(5)
+  })
+
+  it('3. getGrowthAnalytics newUsers/newMerchants both require data_classification=real', async () => {
+    const admin = {
+      from: (table: string) => {
+        if (table === 'profiles') return countQueryChain((f) => (f.data_classification === 'real' ? 4 : 40))
+        return countQueryChain(() => 0)
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getGrowthAnalytics(admin, '30d')
+    expect(result.newUsers.current).toBe(4)
+    expect(result.newMerchants.current).toBe(4)
+  })
+
+  it('4. getTrustAnalytics kycByStatus requires data_classification=real alongside the kyc_status filter -- a BUSINESS metric, distinct from the deliberately all-system Admin KYC review queue', async () => {
+    const admin = {
+      from: (table: string) => {
+        if (table === 'profiles') return countQueryChain((f) => (f.kyc_status === 'approved' && f.data_classification === 'real' ? 2 : 0))
+        return countQueryChain(() => 0)
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getTrustAnalytics(admin, 'all')
+    expect(result.kycByStatus).toEqual([{ label: 'approved', count: 2 }])
+  })
+
+  it('5. getTrustAnalytics restricted/suspended account counts require data_classification=real', async () => {
+    const admin = {
+      from: (table: string) => {
+        if (table === 'profiles') {
+          return countQueryChain((f) => (f.data_classification === 'real' && (f.account_status === 'restricted' || f.account_status === 'suspended') ? 1 : 99))
+        }
+        return countQueryChain(() => 0)
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getTrustAnalytics(admin, 'all')
+    expect(result.accountRestrictions).toEqual({ restricted: 1, suspended: 1 })
+  })
+
+  it('6. zero real profiles resolves to 0, not undefined/NaN, across Overview/Growth/Trust', async () => {
+    const admin = {
+      from: () => countQueryChain(() => 0),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const overview = await getMarketplaceOverview(admin, 'all')
+    const growth = await getGrowthAnalytics(admin, 'all')
+    const trust = await getTrustAnalytics(admin, 'all')
+    expect(overview.totalUsers).toBe(0)
+    expect(growth.newUsers.current).toBe(0)
+    expect(trust.accountRestrictions).toEqual({ restricted: 0, suspended: 0 })
+  })
+})
+
+describe('D3-F: Support Centre and Admin KYC review queue remain intentionally all-system (category: ADMIN-CONTROL-CENTRE-BATCH-D3-F)', () => {
+  it('1. getSupportAnalytics never filters support_cases by data_classification -- an operational agent work queue, not a confirmed-real-customer business list', async () => {
+    const eqCalls: unknown[][] = []
+    const admin = {
+      from: (table: string) => {
+        if (table === 'support_cases') return chainableQuery({ data: [{ status: 'open', priority: 'normal', category: 'billing', created_at: '2026-01-01' }], error: null }, { eq: (...a: unknown[]) => eqCalls.push(a) })
+        return chainableQuery({ data: [], error: null })
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    const result = await getSupportAnalytics(admin, 'all')
+    expect(result.total).toBe(1)
+    expect(eqCalls.some((c) => c[0] === 'data_classification')).toBe(false)
   })
 })

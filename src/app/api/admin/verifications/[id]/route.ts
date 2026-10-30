@@ -15,6 +15,13 @@ interface RouteParams {
  * prior decisions/resubmission history via identity_verification_history
  * (admin-only, no merchant-safe split needed -- see
  * 20260804000001's header).
+ *
+ * D3-F scope determination: deliberately all-system, same operational
+ * review-queue rationale as GET /api/admin/verifications (the queue
+ * this detail view is reached from) -- an admin reviewing a specific
+ * submission must be able to open it regardless of the account's
+ * data_classification, including a test/QA account's own verification.
+ * Intentional, not an oversight.
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { id: userId } = await params

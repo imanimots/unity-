@@ -246,6 +246,16 @@ describe('listAdminSupportCases (category: ADMIN-CONTROL-CENTRE-BATCH-A2) — li
     expect(page.total).toBe(7)
     expect(page.cases).toEqual([])
   })
+
+  it('7. [D3-F] never filters support_cases by data_classification -- deliberately all-system operational agent work queue, not a confirmed-real-customer business list', async () => {
+    const eqSpy = vi.fn()
+    const admin = {
+      from: () => chainableQuery({ data: [], error: null, count: 0 }, { eq: eqSpy }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any
+    await listAdminSupportCases(admin, { status: 'open' })
+    expect(eqSpy).not.toHaveBeenCalledWith('data_classification', expect.anything())
+  })
 })
 
 describe('getSupportCaseSummaryForUser (category: ADMIN-CONTROL-CENTRE-BATCH-A2) — Customer/Merchant 360 integration (F, G) + privacy (H)', () => {

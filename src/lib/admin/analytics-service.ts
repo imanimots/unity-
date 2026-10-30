@@ -18,12 +18,26 @@ import { getDemandInsights, type DemandInsightsResult } from '@/lib/subscription
  * a direct (or, for `barter_agreements`, two mutually-exclusive) FK to
  * a table that does -- those are relationally excluded via an inner
  * join instead (see `countRowsByStatusExcludingTestListings` and
- * `countBarterByStatusExcludingTestAnchors`). `disputes`, `profiles`,
+ * `countBarterByStatusExcludingTestAnchors`). `disputes`,
  * `merchant_payouts`, `merchant_subscriptions`, and `support_cases`
  * have no `is_test` column AND no reliable join path (too many hops,
  * or no listing/booking relation at all) -- those counts are reported
  * as-is, with explicit `mayIncludeTestData`/`notes` metadata the UI
  * must surface rather than silently imply test-free.
+ *
+ * D3-F: `profiles` is NOT in that "no reliable signal" group --
+ * `data_classification` (D3-A) gives it exactly the positive-proof
+ * signal the other tables lack. Every direct `profiles` metric here
+ * (account counts, KYC-status breakdown, restriction counts) filters
+ * `data_classification = 'real'`, never a negative `<>`/`.neq('data_
+ * classification', 'test')` comparison -- the latter would silently
+ * count every unresolved-legacy 'unknown' row as if it were confirmed
+ * real, exactly the anti-pattern 20261028083649_profiles_data_
+ * classification.sql's own header forbids. `analytics_events`
+ * (D2) similarly moved from `.neq(..., 'test')` to `.eq(..., 'real')`
+ * for the same reason -- see `countAnalyticsEvents`'s own comment for
+ * why most funnel stages structurally read 0 under this filter and why
+ * that is the correct, not broken, Real Data answer today.
  *
  * This is designed to be reused later by a future AI R&D/Intelligence
  * module (not built in this phase) -- every exported function returns a
@@ -117,7 +131,7 @@ async function countRowsByStatus(
   admin: SupabaseClient,
   table: string,
   statuses: readonly string[],
-  opts: { isTestColumn?: boolean; sinceIso?: string | null; statusColumn?: string; idColumn?: string } = {}
+  opts: { isTestColumn?: boolean; sinceIso?: string | null; statusColumn?: string; idColumn?: string; extraEq?: Record<string, string | boolean> } = {}
 ): Promise<Array<{ label: string; count: number }>> {
   const statusColumn = opts.statusColumn ?? 'status'
   // Most tables here have a real `id` primary key; listing_ownership_verification
@@ -128,6 +142,10 @@ async function countRowsByStatus(
     statuses.map(async (status) => {
       let q = admin.from(table).select(idColumn, { count: 'exact', head: true }).eq(statusColumn, status)
       if (opts.isTestColumn) q = q.eq('is_test', false)
+      // D3-F: positive-proof extra filter (e.g. data_classification = 'real'
+      // for profiles) -- separate from isTestColumn since not every table
+      // that needs this has an is_test column of its own.
+      if (opts.extraEq) for (const [col, val] of Object.entries(opts.extraEq)) q = q.eq(col, val)
       if (opts.sinceIso) q = q.gte('created_at', opts.sinceIso)
       const { count, error } = await q
       if (error) throw error
@@ -267,8 +285,9 @@ function bucketByDaySAST(timestamps: string[]): Array<{ date: string; count: num
 // ============================================================
 
 export interface MarketplaceOverview {
+  /** D3-F: data_classification = 'real' -- positive proof only, never `.neq(..., 'test')` (which would silently count unresolved-legacy 'unknown' profiles as real). */
   totalUsers: number
-  /** account_status <> 'erased'. There is no existing "active user" activity definition in this codebase (no login/session-activity table) -- this is deliberately labeled "non-erased", not "active", to avoid overclaiming. */
+  /** Real profiles with account_status <> 'erased'. There is no existing "active user" activity definition in this codebase (no login/session-activity table) -- this is deliberately labeled "non-erased", not "active", to avoid overclaiming. */
   nonErasedUsers: number
   merchantUsers: number
   renterUsers: number
@@ -290,12 +309,12 @@ export async function getMarketplaceOverview(admin: SupabaseClient, period: Anal
     newUsers,
     newRealListings,
   ] = await Promise.all([
-    admin.from('profiles').select('id', { count: 'exact', head: true }),
-    admin.from('profiles').select('id', { count: 'exact', head: true }).neq('account_status', 'erased'),
-    admin.from('profiles').select('id', { count: 'exact', head: true }).in('role', ['merchant', 'both']),
-    admin.from('profiles').select('id', { count: 'exact', head: true }).in('role', ['renter', 'both']),
+    admin.from('profiles').select('id', { count: 'exact', head: true }).eq('data_classification', 'real'),
+    admin.from('profiles').select('id', { count: 'exact', head: true }).eq('data_classification', 'real').neq('account_status', 'erased'),
+    admin.from('profiles').select('id', { count: 'exact', head: true }).eq('data_classification', 'real').in('role', ['merchant', 'both']),
+    admin.from('profiles').select('id', { count: 'exact', head: true }).eq('data_classification', 'real').in('role', ['renter', 'both']),
     admin.from('listings').select('merchant_id', { count: 'exact' }).eq('status', 'active').eq('is_test', false).eq('direction', 'available'),
-    periodComparison(admin, 'profiles', {}, period),
+    periodComparison(admin, 'profiles', { data_classification: 'real' }, period),
     periodComparison(admin, 'listings', { is_test: false }, period),
   ])
 
@@ -491,7 +510,12 @@ export async function getTrustAnalytics(admin: SupabaseClient, period: Analytics
 
   const [kycByStatus, ownershipVerificationByStatus, disputesByStatus, { count: publishedReviews }, { count: restricted }, { count: suspended }] = await Promise.all([
     // Server-side per-status counts (D1-F1 performance fix) -- never a full profiles.kyc_status row fetch.
-    countRowsByStatus(admin, 'profiles', KYC_STATUSES, { statusColumn: 'kyc_status' }),
+    // D3-F: positive-proof data_classification='real' -- this is a BUSINESS
+    // metric ("what % of our real users are KYC-approved"), distinct from
+    // the Admin KYC review queue (src/app/api/admin/verifications/route.ts),
+    // which stays deliberately all-system since admins must action every
+    // pending submission regardless of classification.
+    countRowsByStatus(admin, 'profiles', KYC_STATUSES, { statusColumn: 'kyc_status', extraEq: { data_classification: 'real' } }),
     countRowsByStatus(admin, 'listing_ownership_verification', OWNERSHIP_VERIFICATION_STATUSES, { idColumn: 'listing_id' }),
     // disputes: no reliable, verified relational exclusion path within this
     // phase's narrow scope (2-hop via booking_id/order_id/barter_agreement_id,
@@ -509,8 +533,8 @@ export async function getTrustAnalytics(admin: SupabaseClient, period: Analytics
       if (since) q = q.gte('created_at', since)
       return q
     })(),
-    admin.from('profiles').select('id', { count: 'exact', head: true }).eq('account_status', 'restricted'),
-    admin.from('profiles').select('id', { count: 'exact', head: true }).eq('account_status', 'suspended'),
+    admin.from('profiles').select('id', { count: 'exact', head: true }).eq('account_status', 'restricted').eq('data_classification', 'real'),
+    admin.from('profiles').select('id', { count: 'exact', head: true }).eq('account_status', 'suspended').eq('data_classification', 'real'),
   ])
 
   return {
@@ -613,6 +637,21 @@ export interface SupportAnalytics {
   total: number
 }
 
+/**
+ * D3-F scope determination: Support Centre is an operational agent
+ * work queue (assign/escalate/resolve/close/reopen actions in
+ * src/lib/admin/support-service.ts), not a confirmed-real-customer
+ * business record view -- agents must see and act on every case
+ * regardless of the customer/merchant's data_classification (e.g. a
+ * QA account's own support ticket, raised while testing the Support
+ * flow itself, still needs an agent to process it). This summary is
+ * deliberately left all-system for the same reason, and because
+ * `support_cases` has no reliable test-exclusion signal anyway
+ * (no is_test column; customer_id/merchant_id are both nullable, not a
+ * universal boundary -- see the module header's existing note on this
+ * table). Intentional, not an oversight -- do not add a classification
+ * filter here without re-deriving this reasoning first.
+ */
 export async function getSupportAnalytics(admin: SupabaseClient, period: AnalyticsPeriod): Promise<SupportAnalytics> {
   const since = periodSinceIso(period)
   let query = admin.from('support_cases').select('status, priority, category, created_at')
@@ -643,8 +682,8 @@ export interface GrowthAnalytics {
 
 export async function getGrowthAnalytics(admin: SupabaseClient, period: AnalyticsPeriod): Promise<GrowthAnalytics> {
   const [newUsers, newMerchants, newRealListings, newBookings, newOrders] = await Promise.all([
-    periodComparison(admin, 'profiles', {}, period),
-    periodComparisonWithIn(admin, 'profiles', 'role', ['merchant', 'both'], period),
+    periodComparison(admin, 'profiles', { data_classification: 'real' }, period),
+    periodComparisonWithIn(admin, 'profiles', 'role', ['merchant', 'both'], period, { data_classification: 'real' }),
     periodComparison(admin, 'listings', { is_test: false }, period),
     // Relationally excludes test-listing-linked bookings/orders (D1-F2) --
     // the same real-only rule Transaction Analytics already applies to
@@ -656,8 +695,17 @@ export async function getGrowthAnalytics(admin: SupabaseClient, period: Analytic
   return { newUsers, newMerchants, newRealListings, newBookings, newOrders }
 }
 
-async function countWhereIn(admin: SupabaseClient, table: string, col: string, values: string[], sinceIso: string | null, untilIso?: string): Promise<number> {
+async function countWhereIn(
+  admin: SupabaseClient,
+  table: string,
+  col: string,
+  values: string[],
+  sinceIso: string | null,
+  untilIso?: string,
+  extraEq?: Record<string, string | boolean>
+): Promise<number> {
   let q = admin.from(table).select('id', { count: 'exact', head: true }).in(col, values)
+  if (extraEq) for (const [c, v] of Object.entries(extraEq)) q = q.eq(c, v)
   if (sinceIso) q = q.gte('created_at', sinceIso)
   if (untilIso) q = q.lt('created_at', untilIso)
   const { count, error } = await q
@@ -665,11 +713,18 @@ async function countWhereIn(admin: SupabaseClient, table: string, col: string, v
   return count ?? 0
 }
 
-async function periodComparisonWithIn(admin: SupabaseClient, table: string, col: string, values: string[], period: AnalyticsPeriod): Promise<PeriodComparison> {
+async function periodComparisonWithIn(
+  admin: SupabaseClient,
+  table: string,
+  col: string,
+  values: string[],
+  period: AnalyticsPeriod,
+  extraEq?: Record<string, string | boolean>
+): Promise<PeriodComparison> {
   const since = periodSinceIso(period)
-  const current = await countWhereIn(admin, table, col, values, since)
+  const current = await countWhereIn(admin, table, col, values, since, undefined, extraEq)
   const prevRange = previousPeriodRange(period)
-  const previous = prevRange ? await countWhereIn(admin, table, col, values, prevRange.since, prevRange.until) : null
+  const previous = prevRange ? await countWhereIn(admin, table, col, values, prevRange.since, prevRange.until, extraEq) : null
   return { current, previous }
 }
 
@@ -718,7 +773,7 @@ export interface BehaviorAnalytics {
   dataQuality: {
     /** False only when analytics_events has no rows at all yet -- distinguishes "genuinely zero activity this period" from "D2 instrumentation has no historical data at all" (Section 30/31: zero data is expected and must never be mistaken for a broken response). */
     hasAnyEventData: boolean
-    /** Most D2 events have no authoritative per-row test/QA signal (no profile-level is_test marker exists in this codebase -- see analytics-service.ts's own D1 header comment for the equivalent database-side limitation). Confirmed-test rows (data_classification = 'test', derived server-side from a related listing's real is_test column) are always excluded from every count below; everything else ('real' or 'unknown') is counted, so these numbers may still include some unclassified QA/test browsing activity. */
+    /** D3-F: every count below is strictly data_classification = 'real' (positive proof), so this is always false now -- kept as a field (not removed) for response-contract stability. See `notes` for the accompanying undercount caveat this filter introduces for listing-independent event types. */
     mayIncludeUnclassifiedActivity: boolean
     notes: string[]
   }
@@ -731,7 +786,8 @@ function safeConversionRate(started: number, completed: number): number | null {
 
 function emptyBehaviorAnalytics(extraNote?: string): BehaviorAnalytics {
   const notes = [
-    'Most behavioral events have no authoritative per-row test/QA signal (no profile-level is_test marker exists) -- confirmed-test rows are excluded, but counts may still include some unclassified QA/test browsing activity.',
+    "Every count is strictly confirmed-real (data_classification = 'real') -- never 'unknown' or 'test'.",
+    'Most event types (page views, search, signup/KYC starts, checkout starts) have no listing anchor and can never be positively classified real under the current instrumentation, so their counts read 0 by design -- not a broken query. Only listing-anchored events (listing views, listing published, bookings created, orders created) can read nonzero.',
     'Behavioral event data begins from when D2 instrumentation was deployed -- no historical events were backfilled from existing database rows.',
   ]
   if (extraNote) notes.push(extraNote)
@@ -748,13 +804,36 @@ function emptyBehaviorAnalytics(extraNote?: string): BehaviorAnalytics {
     rentalFunnel: { started: 0, completed: 0, conversionRate: null },
     orderFunnel: { started: 0, completed: 0, conversionRate: null },
     kycFunnel: { started: 0, completed: 0, conversionRate: null },
-    dataQuality: { hasAnyEventData: false, mayIncludeUnclassifiedActivity: true, notes },
+    dataQuality: { hasAnyEventData: false, mayIncludeUnclassifiedActivity: false, notes },
   }
 }
 
-/** Server-side exact COUNT(*) for one event_name, over the period window, always excluding confirmed-test rows (data_classification = 'test') -- never a full-row fetch, matching every other count in this file. */
+/**
+ * Server-side exact COUNT(*) for one event_name, over the period window
+ * -- never a full-row fetch, matching every other count in this file.
+ *
+ * D3-F: positive-proof `data_classification = 'real'`, replacing the
+ * prior `.neq(..., 'test')` (which silently counted every 'unknown'
+ * row, D3's exact forbidden anti-pattern, as if it were confirmed
+ * real). Confirmed from source (20261027145645_analytics_events_
+ * foundation.sql + src/app/api/analytics/events/route.ts): only an
+ * event carrying a listing `entity_type`/`entity_id` (listing_viewed),
+ * or a server-emitted event with a resolved listing (listing_published,
+ * booking_created, order_created), can EVER become 'real' -- every
+ * other event_name in this table's CHECK constraint (page_view,
+ * signup_started/completed, search_*, listing_creation_started,
+ * rental_checkout_started, order_checkout_started, kyc_started/
+ * submitted) has no listing anchor and is permanently 'unknown' by
+ * this schema's own design (record_analytics_event()'s own default).
+ * Under this filter those counts correctly read 0 -- that is the
+ * honest Real Data answer given the current instrumentation, not a
+ * broken query, and is why several funnel "started" counts below will
+ * read 0 even when their "completed" count (booking_created/
+ * order_created/listing_published) is nonzero. No synthetic backfill
+ * or listing-independent heuristic is introduced to paper over this.
+ */
 async function countAnalyticsEvents(admin: SupabaseClient, eventName: string, sinceIso: string | null): Promise<number> {
-  let q = admin.from('analytics_events').select('id', { count: 'exact', head: true }).eq('event_name', eventName).neq('data_classification', 'test')
+  let q = admin.from('analytics_events').select('id', { count: 'exact', head: true }).eq('event_name', eventName).eq('data_classification', 'real')
   if (sinceIso) q = q.gte('occurred_at', sinceIso)
   const { count, error } = await q
   if (error) throw error
@@ -849,9 +928,10 @@ export async function getBehaviorAnalytics(admin: SupabaseClient, period: Analyt
     kycFunnel: { started: kycStarted, completed: kycSubmitted, conversionRate: safeConversionRate(kycStarted, kycSubmitted) },
     dataQuality: {
       hasAnyEventData,
-      mayIncludeUnclassifiedActivity: true,
+      mayIncludeUnclassifiedActivity: false,
       notes: [
-        'Most behavioral events have no authoritative per-row test/QA signal (no profile-level is_test marker exists) -- confirmed-test rows are excluded, but counts may still include some unclassified QA/test browsing activity.',
+        "Every count is strictly confirmed-real (data_classification = 'real') -- never 'unknown' or 'test'.",
+        'Most event types (page views, search, signup/KYC starts, checkout starts) have no listing anchor and can never be positively classified real under the current instrumentation, so their counts read 0 by design -- not a broken query. Only listing-anchored events (listing views, listing published, bookings created, orders created) can read nonzero.',
         'Behavioral event data begins from when D2 instrumentation was deployed -- no historical events were backfilled from existing database rows.',
       ],
     },

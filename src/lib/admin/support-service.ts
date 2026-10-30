@@ -67,6 +67,19 @@ export interface AdminSupportCasePage {
  * first (same two-step pattern listAdminUsers already uses for its own
  * name search), then combines with a direct case_number/title ilike --
  * all pushed to Postgres via .or(), never filtered in memory.
+ *
+ * D3-F scope determination: Support Centre is an operational agent
+ * work queue (assign/escalate/resolve/close/reopen/priority/notes --
+ * see the dedicated action routes under src/app/api/admin/support/[id]/),
+ * not a confirmed-real-customer business record list. An agent must
+ * see and action every case regardless of the customer/merchant's
+ * data_classification -- including a QA account's own ticket raised
+ * while testing the Support flow itself. Also structurally necessary:
+ * `support_cases` has no is_test column, and customer_id/merchant_id
+ * are both nullable (not a universal boundary), so no reliable
+ * relational test-exclusion path exists even if one were wanted.
+ * Deliberately all-system -- do not add a classification filter here
+ * without re-deriving this reasoning first.
  */
 export async function listAdminSupportCases(admin: SupabaseClient, filters: AdminSupportCaseFilters): Promise<AdminSupportCasePage> {
   const limit = filters.limit ?? DEFAULT_LIMIT
@@ -164,6 +177,7 @@ export interface AdminSupportCaseDetail {
   }>
 }
 
+/** D3-F: deliberately all-system, same operational-work-queue rationale as listAdminSupportCases above -- an agent opening a specific case must be able to, regardless of the customer/merchant's data_classification. */
 export async function getAdminSupportCaseDetail(admin: SupabaseClient, caseId: string): Promise<AdminSupportCaseDetail | null> {
   const { data: supportCase, error } = await admin.from('support_cases').select('*').eq('id', caseId).maybeSingle()
   if (error) throw error

@@ -9,6 +9,18 @@ import { requireAdminForRoute, getAdminServiceClient } from '@/lib/admin/route-h
  * explicitly asked for: user name, role, current status, submitted
  * date, account age, risk indicators already available (unity_score),
  * prior review attempts (review_count).
+ *
+ * D3-F scope determination: this is an operational compliance review
+ * queue, not a confirmed-real-customer business record list -- an
+ * admin must be able to see and action EVERY pending/in-review
+ * submission, including a test/QA account's own verification
+ * (reviewers need to approve/reject those too while testing the
+ * Sumsub integration and the review flow itself). Deliberately
+ * all-system; no data_classification filter is applied here, matching
+ * the already-established "pending_kyc_reviews" Admin Overview
+ * metric's own operational-work-queue rationale. Intentional, not an
+ * oversight -- do not add a classification filter here without
+ * re-deriving this reasoning first.
  */
 export async function GET(request: NextRequest) {
   const gate = await requireAdminForRoute(request, 'admin:verifications:queue')
