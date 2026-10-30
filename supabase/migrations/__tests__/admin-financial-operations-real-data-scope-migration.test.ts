@@ -9,7 +9,7 @@ import { join } from 'path'
 // Real-Data-scoped, keyset-pagination-safe RPC -- not that it has been
 // applied anywhere (it has not -- this phase does not apply it).
 const REPO_ROOT = join(__dirname, '../../..')
-const migrationPath = join(REPO_ROOT, 'supabase/migrations/20261029090100_admin_financial_operations_real_data_scope.sql')
+const migrationPath = join(REPO_ROOT, 'supabase/migrations/20261030182914_admin_financial_operations_real_data_scope.sql')
 const sql = readFileSync(migrationPath, 'utf-8')
 
 describe('D3-E-F1 admin-financial-operations-real-data-scope migration (category: ADMIN-CONTROL-CENTRE-BATCH-D3-E-F1)', () => {

@@ -9,7 +9,7 @@ import { join } from 'path'
 // Data provenance -- not that it has been applied anywhere (it has
 // not -- this phase does not apply it).
 const REPO_ROOT = join(__dirname, '../../..')
-const migrationPath = join(REPO_ROOT, 'supabase/migrations/20261029090000_admin_payouts_real_data_scope.sql')
+const migrationPath = join(REPO_ROOT, 'supabase/migrations/20261030175302_admin_payouts_real_data_scope.sql')
 const sql = readFileSync(migrationPath, 'utf-8')
 
 const PRIOR_MIGRATION_PATH = join(REPO_ROOT, 'supabase/migrations/20260904000022_admin_payout_search_relational.sql')
