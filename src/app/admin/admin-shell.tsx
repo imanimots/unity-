@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, Package, Calendar,
   AlertTriangle, Link2, BookOpen, BarChart3,
   Menu, X, Shield, LogOut, ChevronRight, UserCheck, Mail,
-  Wallet, Inbox, ScrollText, Repeat, ShoppingBag, DollarSign, Banknote, CreditCard, Percent, ShieldCheck, ClipboardList, KeyRound, Megaphone, Headset,
+  Wallet, Inbox, ScrollText, Repeat, ShoppingBag, DollarSign, Banknote, CreditCard, Percent, ShieldCheck, ClipboardList, KeyRound, Megaphone, Headset, Lightbulb,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { IS_MOCK_MODE } from '@/lib/mock/data'
@@ -40,6 +40,7 @@ const NAV_ITEMS = [
   { href: '/admin/knowledge-base',      label: 'Knowledge Base',       icon: BookOpen         },
   { href: '/admin/email-previews',      label: 'Email Previews',       icon: Mail             },
   { href: '/admin/analytics',           label: 'Analytics',            icon: BarChart3        },
+  { href: '/admin/intelligence',        label: 'AI R&D & Intelligence', icon: Lightbulb        },
 ]
 
 export function AdminShell({ children }: { children: React.ReactNode }) {

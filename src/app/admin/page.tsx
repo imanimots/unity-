@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { requireAdmin } from '@/lib/supabase/require-admin'
 import { getAdminServiceClient } from '@/lib/admin/route-helpers'
 import { getRealUserOverviewCounts } from '@/lib/admin/users-service'
@@ -11,6 +12,7 @@ import { getRealSubscriptionOverviewCounts } from '@/lib/admin/subscriptions-ser
 import { getRealUnityCommissionOverviewCounts } from '@/lib/admin/commissions-service'
 import { getRealAffiliateOverviewCounts } from '@/lib/admin/affiliate-service'
 import { getRealEscrowOverviewCounts } from '@/lib/admin/escrow-service'
+import { getIntelligenceInsights } from '@/lib/admin/intelligence-service'
 import { StatCard, AdminPageHeader, formatDateTime } from '@/components/admin/ui'
 
 interface OverviewStats {
@@ -105,6 +107,7 @@ export default async function AdminOverviewPage() {
     realUnityCommissionCounts,
     realAffiliateCounts,
     realEscrowCounts,
+    intelligence,
   ] = await Promise.all([
     admin.rpc('get_admin_overview_stats'),
     getRealUserOverviewCounts(admin),
@@ -118,6 +121,7 @@ export default async function AdminOverviewPage() {
     getRealUnityCommissionOverviewCounts(admin),
     getRealAffiliateOverviewCounts(admin),
     getRealEscrowOverviewCounts(admin),
+    getIntelligenceInsights(admin),
   ])
   if (error || !data) {
     return <div className="p-8 text-sm text-red-600">Could not load the overview.</div>
@@ -199,6 +203,31 @@ export default async function AdminOverviewPage() {
         <AdminPageHeader eyebrow="Operations" title="Overview" />
         <p className="text-xs text-[#9B8B85]">Last updated {formatDateTime(stats.generated_at)}</p>
       </div>
+
+      {/* Homepage summary card -- reuses getIntelligenceInsights(), the exact same function /admin/intelligence itself calls (src/lib/admin/intelligence-service.ts), never a parallel implementation. Deliberately does not dump full recommendations here. */}
+      <Link href="/admin/intelligence" className="block bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 hover:border-[#8B1A1A] transition-colors">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-1">AI R&amp;D</p>
+            <h2 className="text-base font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">AI R&amp;D &amp; Intelligence</h2>
+          </div>
+          <span className="text-xs font-medium uppercase tracking-[0.08em] text-[#8B1A1A] whitespace-nowrap">View Intelligence →</span>
+        </div>
+        <div className="grid grid-cols-3 gap-4 mt-4">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.1em] text-[#9B8B85]">High priority</p>
+            <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{intelligence.summary.highPriority}</p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.1em] text-[#9B8B85]">Opportunities</p>
+            <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{intelligence.summary.opportunities}</p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.1em] text-[#9B8B85]">Data limitations</p>
+            <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{intelligence.summary.dataQualityLimitations}</p>
+          </div>
+        </div>
+      </Link>
 
       <section className="space-y-3">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Users</p>
