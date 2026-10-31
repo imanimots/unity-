@@ -85,10 +85,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'This insight no longer matches a currently-generated finding and cannot be rated.' }, { status: 409 })
   }
 
+  // E4: the client's claimed fingerprintVersion is never trusted for
+  // persistence, even though it already passed the zod positivity check
+  // -- a client could otherwise submit an arbitrary positive integer
+  // alongside an otherwise-valid, currently-matching fingerprint/ruleId
+  // pair, corrupting the ledger's version metadata (the one thing
+  // FINGERPRINT_VERSION exists to keep trustworthy for future E4/E5
+  // algorithm changes). The server-verified insight's own version is the
+  // only value ever written; an unsupported/mismatched claimed version
+  // is rejected outright rather than silently overridden.
+  if (matchingInsight.fingerprintVersion !== parsed.data.fingerprintVersion) {
+    return NextResponse.json({ error: 'Unsupported fingerprint version.' }, { status: 409 })
+  }
+
   const result = await recordIntelligenceEvaluation(admin, {
     adminUserId: gate.requester.userId,
     insightFingerprint: parsed.data.fingerprint,
-    fingerprintVersion: parsed.data.fingerprintVersion,
+    fingerprintVersion: matchingInsight.fingerprintVersion,
     ruleId: parsed.data.ruleId,
     evaluation: parsed.data.evaluation,
     reasonCode: parsed.data.reasonCode ?? null,

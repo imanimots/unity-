@@ -61,7 +61,13 @@ describe('20261031090000_admin_intelligence_evaluation_ledger.sql (category: ADM
     expect(sql).toMatch(/create policy "admin_intelligence_evaluations: admin read"[\s\S]*?profiles\.role = 'admin'/)
     const policyBlocks = sql.match(/create policy "admin_intelligence_evaluations:[^"]*"/g) ?? []
     expect(policyBlocks).toHaveLength(1)
-    expect(sql).not.toMatch(/create policy "admin_intelligence_evaluations:[\s\S]*?for (insert|update|delete)/)
+    // Scoped to just THIS policy's own statement (up to its closing `;`)
+    // -- an unbounded `[\s\S]*?` here would also match unrelated SQL much
+    // later in the file (e.g. the RPC's own `for update` row lock),
+    // producing a false positive/negative unrelated to this policy.
+    const start = sql.indexOf('create policy "admin_intelligence_evaluations:')
+    const policyStatement = sql.slice(start, sql.indexOf(';', start))
+    expect(policyStatement).not.toMatch(/for (insert|update|delete)/)
   })
 
   it('7. creates the immutable admin_intelligence_evaluation_history audit table', () => {
@@ -78,7 +84,10 @@ describe('20261031090000_admin_intelligence_evaluation_ledger.sql (category: ADM
     expect(sql).toMatch(/alter table public\.admin_intelligence_evaluation_history enable row level security/)
     const policyBlocks = sql.match(/create policy "admin_intelligence_evaluation_history:[^"]*"/g) ?? []
     expect(policyBlocks).toHaveLength(1)
-    expect(sql).not.toMatch(/create policy "admin_intelligence_evaluation_history:[\s\S]*?for (insert|update|delete)/)
+    // Scoped to just THIS policy's own statement -- see test 6's comment.
+    const start = sql.indexOf('create policy "admin_intelligence_evaluation_history:')
+    const policyStatement = sql.slice(start, sql.indexOf(';', start))
+    expect(policyStatement).not.toMatch(/for (insert|update|delete)/)
   })
 
   it('10. record_intelligence_evaluation is SECURITY DEFINER with a locked-down search_path', () => {
@@ -118,5 +127,10 @@ describe('20261031090000_admin_intelligence_evaluation_ledger.sql (category: ADM
 
   it('16. does not reference any marketplace entity table (bookings/orders/listings/disputes/payments) -- this ledger is Intelligence-metadata only', () => {
     expect(sql).not.toMatch(/references public\.(bookings|orders|listings|disputes|payments|merchant_payouts)\(/)
+  })
+
+  it('17. E4: the previous-evaluation read locks the row (FOR UPDATE) before the upsert, so two genuinely concurrent calls for the same (admin_user_id, insight_fingerprint) cannot both read the same stale "previous" value and corrupt the audit transition history', () => {
+    const fnBody = sql.slice(sql.indexOf('create or replace function public.record_intelligence_evaluation('), sql.indexOf('$$;') + 3)
+    expect(fnBody).toMatch(/select evaluation into v_previous[\s\S]*?where admin_user_id = p_admin_id and insight_fingerprint = p_insight_fingerprint\s*\n\s*for update;/)
   })
 })

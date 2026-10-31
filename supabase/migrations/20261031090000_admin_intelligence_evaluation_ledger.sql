@@ -145,9 +145,22 @@ declare
   v_previous text;
   v_row public.admin_intelligence_evaluations;
 begin
+  -- E4: locks the existing row (if any) before reading it, so two
+  -- genuinely concurrent calls for the SAME (admin_user_id,
+  -- insight_fingerprint) cannot both read the same stale "previous"
+  -- value. Without this lock, under READ COMMITTED, two racing
+  -- transactions could both SELECT the same pre-change value before
+  -- either commits; the UNIQUE constraint still keeps the CURRENT-STATE
+  -- row correct, but whichever call is serialized second would write a
+  -- history row claiming the wrong "previous_evaluation", misrepresenting
+  -- the real transition sequence. With FOR UPDATE, the second call
+  -- blocks until the first commits, then re-reads the now-committed
+  -- value -- so the audit trail always reflects the actual serialized
+  -- order of changes, not just the current-state table.
   select evaluation into v_previous
   from public.admin_intelligence_evaluations
-  where admin_user_id = p_admin_id and insight_fingerprint = p_insight_fingerprint;
+  where admin_user_id = p_admin_id and insight_fingerprint = p_insight_fingerprint
+  for update;
 
   insert into public.admin_intelligence_evaluations (
     insight_fingerprint, fingerprint_version, rule_id, evaluation, reason_code, admin_user_id, updated_at

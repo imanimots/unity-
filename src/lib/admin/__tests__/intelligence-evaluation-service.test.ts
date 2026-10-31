@@ -80,6 +80,14 @@ describe('getEvaluationsForFingerprints: batched read (category: ADMIN-CONTROL-C
     expect(result.has('c'.repeat(64))).toBe(false)
   })
 
+  it('E4: a fingerprints array containing duplicates still queries exactly once and produces a correct, non-duplicated map', async () => {
+    const admin = fakeAdmin({ selectData: [{ insight_fingerprint: VALID_FP, evaluation: 'useful' }] })
+    const result = await getEvaluationsForFingerprints(admin as never, ADMIN_ID, [VALID_FP, VALID_FP, VALID_FP])
+    expect(admin.from).toHaveBeenCalledTimes(1)
+    expect(result.size).toBe(1)
+    expect(result.get(VALID_FP)).toBe('useful')
+  })
+
   it('a read failure fails closed to an empty map, never throws -- Intelligence rendering must survive an evaluation-read error', async () => {
     const admin = fakeAdmin({ selectError: new Error('db down') })
     const result = await getEvaluationsForFingerprints(admin as never, ADMIN_ID, [VALID_FP])

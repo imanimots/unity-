@@ -133,6 +133,19 @@ describe('POST /api/admin/intelligence/evaluations: tamper resistance (category:
     const json = await res.json()
     expect(JSON.stringify(json)).not.toMatch(/all sources down/)
   })
+
+  it('5. E4: an unsupported/mismatched fingerprintVersion is rejected even when the fingerprint and ruleId both match a currently-generated insight -- the client cannot corrupt the ledger\'s version metadata', async () => {
+    getIntelligenceInsights.mockResolvedValue({ insights: [{ fingerprint: VALID_FP, ruleId: 'GROWTH_NEW_USERS_UP', fingerprintVersion: 1 }] })
+    const res = await call(validBody({ fingerprintVersion: 999 }))
+    expect(res.status).toBe(409)
+    expect(recordIntelligenceEvaluation).not.toHaveBeenCalled()
+  })
+
+  it('6. E4: the SERVER-verified fingerprintVersion (from the matched live insight) is what gets persisted, never blindly the client-supplied value', async () => {
+    getIntelligenceInsights.mockResolvedValue({ insights: [{ fingerprint: VALID_FP, ruleId: 'GROWTH_NEW_USERS_UP', fingerprintVersion: 1 }] })
+    await call(validBody({ fingerprintVersion: 1 }))
+    expect(recordIntelligenceEvaluation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ fingerprintVersion: 1 }))
+  })
 })
 
 describe('POST /api/admin/intelligence/evaluations: failure containment (category: ADMIN-CONTROL-CENTRE-BATCH-E3)', () => {
