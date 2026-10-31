@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { createHash } from 'crypto'
 import {
   getMarketplaceOverview,
   getSupplyAnalytics,
@@ -159,6 +160,19 @@ export interface IntelligenceInsight {
   generatedAt: string
   /** E2-F1: honest, rule-specific freshness disclosure -- see IntelligenceFreshness. */
   freshness: IntelligenceFreshness
+  /**
+   * E3: a stable, deterministic, privacy-safe identity for THIS
+   * occurrence of the rule firing -- see `computeInsightFingerprint()`.
+   * Two insights have the same fingerprint iff they share the same
+   * ruleId, scope, trigger, and evidence; `generatedAt`/`id`/priority/
+   * confidence (all derived or volatile) never affect it. This is the
+   * key an admin's evaluation (src/lib/admin/intelligence-evaluation-service.ts)
+   * attaches to -- never the per-call `id`, which is not stable across
+   * requests.
+   */
+  fingerprint: string
+  /** E3: the fingerprint algorithm/input-shape version that produced `fingerprint` -- see FINGERPRINT_VERSION. */
+  fingerprintVersion: number
   /** Plain navigation to an existing Admin page -- never an action/mutation endpoint. */
   actionHref?: string
   actionLabel?: string
@@ -171,7 +185,10 @@ export interface IntelligenceInsight {
  * same `{generatedAt, sourceWindow}` literal through every individual
  * call site.
  */
-type DraftInsight = Omit<IntelligenceInsight, 'freshness'>
+type DraftInsight = Omit<IntelligenceInsight, 'freshness' | 'fingerprint' | 'fingerprintVersion'>
+
+/** E3: intermediate shape after freshness is attached but before the fingerprint post-processing pass. */
+type InsightWithFreshness = Omit<IntelligenceInsight, 'fingerprint' | 'fingerprintVersion'>
 
 export interface IntelligenceSummary {
   totalInsights: number
@@ -496,7 +513,7 @@ function clampBusinessPriority(insight: IntelligenceInsight): IntelligenceInsigh
  * structural finding can never carry a "Last 30 days" claim it doesn't
  * have.
  */
-function attachFreshness(insight: DraftInsight): IntelligenceInsight {
+function attachFreshness(insight: DraftInsight): InsightWithFreshness {
   const { evidenceBasis } = RULE_REGISTRY[insight.ruleId]
   return {
     ...insight,
@@ -505,6 +522,54 @@ function attachFreshness(insight: DraftInsight): IntelligenceInsight {
       evidenceBasis,
       ...(evidenceBasis === 'period' ? { sourceWindow: EVIDENCE_BASIS_LABEL.period } : {}),
     },
+  }
+}
+
+/**
+ * E3: the fingerprint algorithm/input-shape version. Bump this (and
+ * leave old evaluation rows pointing at the old version) if the input
+ * shape below ever changes -- never silently reinterpret an old
+ * fingerprint under new rules.
+ */
+export const FINGERPRINT_VERSION = 1
+
+/**
+ * E3: a stable, deterministic, privacy-safe occurrence identity for one
+ * insight firing. Input is deliberately narrow -- only `ruleId`,
+ * `scope`, `trigger`, and `evidence` (aggregate, already-public
+ * Intelligence metadata, never a raw DB row or user identifier) --
+ * excluding `generatedAt`/`id`/`priority`/`confidence`/`dataSufficiency`/
+ * `limitations` (all either volatile per-call noise or purely derived
+ * from the same evidence, not additional material facts). Two calls
+ * with the same ruleId/scope/trigger/evidence always produce the same
+ * fingerprint; a change in the underlying numbers changes it. Uses
+ * Node's built-in `crypto` (SHA-256) -- no external hashing dependency.
+ */
+function computeInsightFingerprint(input: { ruleId: RuleId; scope: IntelligenceScope; trigger?: IntelligenceTrigger; evidence: IntelligenceEvidence[] }): string {
+  const canonical = stableStringify({
+    ruleId: input.ruleId,
+    scope: input.scope,
+    trigger: input.trigger ?? null,
+    evidence: input.evidence.map((e) => ({ label: e.label, value: e.value })),
+  })
+  return createHash('sha256').update(canonical).digest('hex')
+}
+
+/** Deterministic JSON serialization -- object keys sorted recursively at every level, so key insertion order can never change the fingerprint. Array element order is preserved (every evidence/trigger array in this module is already built in a fixed, deterministic order per rule). */
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
+  if (value !== null && typeof value === 'object') {
+    const keys = Object.keys(value as Record<string, unknown>).sort()
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`).join(',')}}`
+  }
+  return JSON.stringify(value)
+}
+
+function attachFingerprint(insight: InsightWithFreshness): IntelligenceInsight {
+  return {
+    ...insight,
+    fingerprint: computeInsightFingerprint(insight),
+    fingerprintVersion: FINGERPRINT_VERSION,
   }
 }
 
@@ -697,17 +762,23 @@ export async function getIntelligenceInsights(admin: SupabaseClient): Promise<In
   // ---- F. Operations (all-system) ----
   insights.push(...buildOperationsInsights({ support, overviewStats: overviewRpcOutcome, exceptions }))
 
-  // E2: attach the honest, per-insight freshness disclosure before the
-  // E1-F1 priority clamp -- order doesn't matter between the two (they
-  // touch disjoint fields), but freshness first keeps every insight a
-  // fully-typed IntelligenceInsight (not a DraftInsight) by the time the
-  // clamp, sort, and summary logic below run.
+  // E2: attach the honest, per-insight freshness disclosure, then E3's
+  // deterministic occurrence fingerprint -- order relative to the E1-F1
+  // priority clamp below doesn't matter (all three touch disjoint
+  // fields: freshness, fingerprint, and priority respectively), but
+  // doing both here keeps every insight a fully-typed IntelligenceInsight
+  // (not a DraftInsight) by the time the clamp/sort/summary logic runs.
+  // Critically, the fingerprint is computed from ruleId/scope/trigger/
+  // evidence ONLY -- it is never read back by anything above this line,
+  // so no admin evaluation of a past occurrence can ever feed back into
+  // which insights are generated or how they're prioritized (E3 Section 20/39).
   const freshInsights = insights.map(attachFreshness)
+  const fingerprintedInsights = freshInsights.map(attachFingerprint)
 
   // E1-F1: a thin-sample business insight cannot out-rank a
   // well-supported one merely by raw percentage magnitude -- applied
   // before sorting/summarizing so both reflect the clamped priority.
-  const clampedInsights = freshInsights.map(clampBusinessPriority)
+  const clampedInsights = fingerprintedInsights.map(clampBusinessPriority)
 
   // Stable, meaningful ordering: priority desc, then type (risk before
   // opportunity before watch before informational), then category name

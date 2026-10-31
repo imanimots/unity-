@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { requireAdmin } from '@/lib/supabase/require-admin'
 import { getAdminServiceClient } from '@/lib/admin/route-helpers'
 import { getIntelligenceInsights, EVIDENCE_BASIS_LABEL, type IntelligenceInsight, type IntelligencePriority, type IntelligenceInsightType, type IntelligenceConfidence, type IntelligenceDataSufficiency, type IntelligenceScope, type IntelligenceSourceStatus } from '@/lib/admin/intelligence-service'
+import { getEvaluationsForFingerprints, getRuleQualitySummary, EVALUATION_VALUES, EVALUATION_LABEL, type IntelligenceEvaluationValue } from '@/lib/admin/intelligence-evaluation-service'
+import { IntelligenceEvaluationControls } from './IntelligenceEvaluationControls'
 import { AdminPageHeader, StatCard, Pill, formatDateTime } from '@/components/admin/ui'
 
 const PRIORITY_STYLES: Record<IntelligencePriority, string> = {
@@ -86,7 +88,7 @@ function SourceHealthSection({ sourceHealth }: { sourceHealth: IntelligenceSourc
 }
 
 
-function InsightCard({ insight }: { insight: IntelligenceInsight }) {
+function InsightCard({ insight, currentEvaluation }: { insight: IntelligenceInsight; currentEvaluation: IntelligenceEvaluationValue | null }) {
   return (
     <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -166,7 +168,79 @@ function InsightCard({ insight }: { insight: IntelligenceInsight }) {
           <p><span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Generated: </span>{formatDateTime(insight.freshness.generatedAt)} · <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Evidence: </span>{EVIDENCE_BASIS_LABEL[insight.freshness.evidenceBasis]}</p>
         </div>
       </details>
+
+      {/* E3: human evaluation of this Intelligence finding -- feedback data only, never a decision about the underlying user/merchant/transaction. See IntelligenceEvaluationControls' own doc comment. */}
+      <IntelligenceEvaluationControls
+        fingerprint={insight.fingerprint}
+        fingerprintVersion={insight.fingerprintVersion}
+        ruleId={insight.ruleId}
+        initialEvaluation={currentEvaluation}
+      />
     </div>
+  )
+}
+
+/**
+ * E3: a small, human-evaluation-labeled summary of the CURRENT admin's
+ * own ratings for the insights visible on this render -- explicitly NOT
+ * a business KPI, and deliberately never shown on the Admin Overview
+ * homepage (E3 Section 21).
+ */
+function EvaluationSummarySection({ evaluations }: { evaluations: Map<string, IntelligenceEvaluationValue> }) {
+  const counts: Record<IntelligenceEvaluationValue, number> = {
+    useful: 0, not_useful: 0, incorrect: 0, needs_more_data: 0, needs_investigation: 0,
+  }
+  for (const value of evaluations.values()) counts[value] += 1
+
+  return (
+    <section className="space-y-3">
+      <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Human evaluation summary (your ratings, not a business metric)</p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <StatCard label="Evaluated findings" value={evaluations.size} />
+        {EVALUATION_VALUES.map((value) => (
+          <StatCard key={value} label={EVALUATION_LABEL[value]} value={counts[value]} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/**
+ * E3 Section 22: a small, privacy-safe, COUNT-only summary by rule id --
+ * never a percentage, never an automatic "this rule is bad" label, and
+ * never used to disable or change a rule. Purely descriptive, for a
+ * human to use when deciding whether a rule needs future calibration.
+ */
+function RuleQualitySection({ rows }: { rows: Awaited<ReturnType<typeof getRuleQualitySummary>> }) {
+  if (rows.length === 0) return null
+  return (
+    <section className="space-y-3">
+      <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Rule quality (evaluation counts by rule -- not an automatic judgment)</p>
+      <div className="overflow-x-auto rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A]">
+        <table className="w-full text-xs">
+          <thead className="bg-[#FAF8F5] dark:bg-[#0F0808] text-[#9B8B85] uppercase tracking-[0.08em]">
+            <tr>
+              <th className="text-left px-3 py-2 font-medium">Rule</th>
+              <th className="text-right px-3 py-2 font-medium">Evaluations</th>
+              <th className="text-right px-3 py-2 font-medium">Useful</th>
+              <th className="text-right px-3 py-2 font-medium">Incorrect</th>
+              <th className="text-right px-3 py-2 font-medium">Needs more data</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.ruleId} className="border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
+                <td className="px-3 py-2 font-mono text-[#1A0A0A] dark:text-[#F5F0ED]">{row.ruleId}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{row.total}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{row.useful}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{row.incorrect}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{row.needsMoreData}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }
 
@@ -184,6 +258,19 @@ export default async function AdminIntelligencePage() {
   const result = await getIntelligenceInsights(admin)
   const dataQualityInsights = result.insights.filter((i) => i.category === 'data-quality')
   const otherInsights = result.insights.filter((i) => i.category !== 'data-quality')
+
+  // E3: ONE batched read for every fingerprint visible on this render --
+  // never one query per insight. getEvaluationsForFingerprints() itself
+  // fails closed to an empty map on any read error, so an evaluation-read
+  // failure can never prevent Intelligence from rendering (E3 Section
+  // 31) -- it would just show every insight as not-yet-evaluated.
+  // getRuleQualitySummary() is similarly non-critical and wrapped the
+  // same way; it never depends on, and never affects, result.insights.
+  const fingerprints = result.insights.map((i) => i.fingerprint)
+  const [evaluations, ruleQualityRows] = await Promise.all([
+    getEvaluationsForFingerprints(admin, requester.userId, fingerprints).catch(() => new Map<string, IntelligenceEvaluationValue>()),
+    getRuleQualitySummary(admin).catch(() => []),
+  ])
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
@@ -211,6 +298,10 @@ export default async function AdminIntelligencePage() {
 
       <SourceHealthSection sourceHealth={result.sourceHealth} />
 
+      <EvaluationSummarySection evaluations={evaluations} />
+
+      <RuleQualitySection rows={ruleQualityRows} />
+
       <section className="space-y-3">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Prioritized insights</p>
         {otherInsights.length === 0 ? (
@@ -218,7 +309,7 @@ export default async function AdminIntelligencePage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {otherInsights.map((insight) => (
-              <InsightCard key={insight.id} insight={insight} />
+              <InsightCard key={insight.id} insight={insight} currentEvaluation={evaluations.get(insight.fingerprint) ?? null} />
             ))}
           </div>
         )}
@@ -228,7 +319,7 @@ export default async function AdminIntelligencePage() {
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Data quality</p>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {dataQualityInsights.map((insight) => (
-            <InsightCard key={insight.id} insight={insight} />
+            <InsightCard key={insight.id} insight={insight} currentEvaluation={evaluations.get(insight.fingerprint) ?? null} />
           ))}
         </div>
       </section>
@@ -242,6 +333,7 @@ export default async function AdminIntelligencePage() {
           <li>&quot;Operational (all-system)&quot; insights (Support, KYC review, ownership/moderation, Exceptions) intentionally include every record regardless of classification, because staff must action all of them -- these are workload signals, never confirmed-real business metrics, and are never mixed numerically with Real Data insights.</li>
           <li>Sparse, unresolved, or unknown-classification data reduces confidence and is reported as such rather than presented as a confident conclusion.</li>
           <li>No figure here represents settled cash or completed live payment/payout/escrow settlement -- those provider integrations remain mock, manual, or stub in the relevant paths.</li>
+          <li>Human evaluation (Useful / Not useful / Incorrect / Needs more data / Needs investigation) is feedback on the Intelligence finding itself -- it is never a decision about the underlying user, merchant, transaction, or dispute, and it never changes which insights are generated, their priority, or any threshold.</li>
         </ul>
       </section>
     </div>

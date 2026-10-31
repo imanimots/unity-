@@ -118,3 +118,89 @@ describe('Admin Intelligence page E2-F1 freshness-semantics wiring (category: AD
     expect(intelligencePage).toMatch(/Status at generation time/)
   })
 })
+
+describe('Admin Intelligence page E3 human evaluation ledger wiring (category: ADMIN-CONTROL-CENTRE-BATCH-E3)', () => {
+  const homepage = readFileSync(join(REPO_ROOT, 'src/app/admin/page.tsx'), 'utf-8')
+  const intelligencePage = readFileSync(join(REPO_ROOT, 'src/app/admin/intelligence/page.tsx'), 'utf-8')
+  const evaluationControls = readFileSync(join(REPO_ROOT, 'src/app/admin/intelligence/IntelligenceEvaluationControls.tsx'), 'utf-8')
+
+  it('17. the evaluation controls component is imported and rendered only on the Intelligence page, never the Admin Overview homepage', () => {
+    expect(intelligencePage).toMatch(/import\s*\{\s*IntelligenceEvaluationControls\s*\}\s*from\s*'\.\/IntelligenceEvaluationControls'/)
+    expect(intelligencePage).toMatch(/<IntelligenceEvaluationControls/)
+    expect(homepage).not.toMatch(/IntelligenceEvaluationControls/)
+  })
+
+  it('18. each insight card passes its own fingerprint/fingerprintVersion/ruleId and the batched-read current evaluation -- never a hardcoded default', () => {
+    expect(intelligencePage).toMatch(/fingerprint=\{insight\.fingerprint\}/)
+    expect(intelligencePage).toMatch(/fingerprintVersion=\{insight\.fingerprintVersion\}/)
+    expect(intelligencePage).toMatch(/ruleId=\{insight\.ruleId\}/)
+    expect(intelligencePage).toMatch(/currentEvaluation=\{evaluations\.get\(insight\.fingerprint\) \?\? null\}/)
+  })
+
+  it('19. the evaluation read is ONE batched query (getEvaluationsForFingerprints), never one query per insight -- no per-insight evaluation fetch call exists', () => {
+    expect(intelligencePage).toMatch(/getEvaluationsForFingerprints\(admin, requester\.userId, fingerprints\)/)
+    expect(intelligencePage).not.toMatch(/otherInsights\.map[\s\S]{0,80}getEvaluationsForFingerprints/)
+  })
+
+  it('20. the evaluation read is wrapped so a failure cannot break Intelligence rendering', () => {
+    expect(intelligencePage).toMatch(/getEvaluationsForFingerprints\([^)]*\)\.catch\(/)
+  })
+
+  it('21. the control wording explicitly frames this as rating the Intelligence finding, not acting on the underlying user/transaction', () => {
+    expect(evaluationControls).toMatch(/Rate this Intelligence finding/i)
+    expect(evaluationControls).not.toMatch(/>(Approve|Reject|Suspend|Ban|Refund|Pay|Release|Resolve|Change Price|Change Plan|Contact User|Run Campaign)</)
+  })
+
+  it('22. there is no default evaluation -- the initial state comes only from the currentEvaluation prop (which the page derives from the real batched read), never a hardcoded string literal', () => {
+    expect(evaluationControls).toMatch(/useState<string \| null>\(initialEvaluation\)/)
+  })
+
+  it('23. submission happens only via an explicit click handler -- no auto-submit on mount/hover/view (no useEffect, no onMouseEnter)', () => {
+    expect(evaluationControls).toMatch(/onClick=\{\(\)\s*=>\s*submit\(/)
+    expect(evaluationControls).not.toMatch(/useEffect/)
+    expect(evaluationControls).not.toMatch(/onMouseEnter/)
+  })
+
+  it('24. "incorrect" and "not_useful" require a confirmation before the request is sent', () => {
+    expect(evaluationControls).toMatch(/value: 'not_useful'[^}]*confirm:/)
+    expect(evaluationControls).toMatch(/value: 'incorrect'[^}]*confirm:/)
+    expect(evaluationControls).toMatch(/window\.confirm\(option\.confirm\)/)
+  })
+
+  it('25. the current evaluation is visibly distinguished from the other options (a distinct "isCurrent" style/marker), not just silently selected', () => {
+    expect(evaluationControls).toMatch(/isCurrent/)
+  })
+
+  it('26. a write failure is shown as a small contained message, never thrown/unhandled -- the component stays usable', () => {
+    expect(evaluationControls).toMatch(/catch\s*\{/)
+    expect(evaluationControls).toMatch(/setError\(/)
+  })
+
+  it('27. a Human Evaluation summary section exists on the Intelligence page and is NOT present on the Admin Overview homepage', () => {
+    expect(intelligencePage).toMatch(/EvaluationSummarySection/)
+    expect(intelligencePage).toMatch(/Human evaluation summary/i)
+    expect(homepage).not.toMatch(/EvaluationSummarySection|Human evaluation summary/i)
+  })
+
+  it('28. the evaluation summary is explicitly labeled as not a business metric', () => {
+    expect(intelligencePage).toMatch(/not a business metric/i)
+  })
+
+  it('29. the rule-quality view, if present, shows counts only -- no percentage field and no automatic "bad rule" judgment language', () => {
+    expect(intelligencePage).toMatch(/RuleQualitySection/)
+    expect(intelligencePage).not.toMatch(/%/)
+    expect(intelligencePage).not.toMatch(/\bbad rule\b|\bdisable(d)? rule\b/i)
+  })
+
+  it('30. no evaluation-related control anywhere introduces a marketplace enforcement action label', () => {
+    const forbidden = />(Approve|Reject|Suspend|Ban|Refund|Pay|Release|Resolve|Change Price|Change Plan|Contact User|Run Campaign|Open Dispute|Suspend User|Flag Account)</
+    expect(intelligencePage).not.toMatch(forbidden)
+    expect(evaluationControls).not.toMatch(forbidden)
+  })
+
+  it('31. Recommendation-only safety messaging, Source Health, and the explainability detail all remain intact alongside the new evaluation section', () => {
+    expect(intelligencePage).toMatch(/badge="Recommendation only"/i)
+    expect(intelligencePage).toMatch(/SourceHealthSection/)
+    expect(intelligencePage).toMatch(/Why did this appear\?/)
+  })
+})

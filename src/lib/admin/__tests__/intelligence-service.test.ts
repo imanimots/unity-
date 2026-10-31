@@ -29,7 +29,7 @@ vi.mock('@/lib/admin/exceptions-service', () => ({
   listOperationalExceptions: (...a: unknown[]) => listOperationalExceptions(...a),
 }))
 
-const { getIntelligenceInsights, RULE_IDS, RULE_REGISTRY, THRESHOLDS } = await import('../intelligence-service')
+const { getIntelligenceInsights, RULE_IDS, RULE_REGISTRY, THRESHOLDS, FINGERPRINT_VERSION } = await import('../intelligence-service')
 const THRESHOLDS_KEYS = Object.keys(THRESHOLDS)
 
 // ---- Baseline zero/sparse-data fixtures -- the "nothing confirmed-real yet" state ----
@@ -320,7 +320,15 @@ describe('getIntelligenceInsights: privacy -- no PII is ever emitted (category: 
       exceptions: Array.from({ length: 15 }, () => ({ severity: 'low' as const, resolved: false })),
     })
     const result = await getIntelligenceInsights(admin)
-    const blob = JSON.stringify(result.insights)
+    // E3's own fingerprint is an intentional SHA-256 hex digest (see
+    // computeInsightFingerprint) -- it is expected, by construction, to
+    // contain long runs of digits and hex-shaped substrings as a pure
+    // hashing artifact, so it is excluded here, not because it might
+    // hide PII (it structurally cannot -- see the dedicated E3
+    // fingerprint-privacy test below) but because the digit-run/uuid-shape
+    // regexes below are tuned to catch real phone numbers/UUIDs in
+    // narrative text fields, not a 64-char hash.
+    const blob = JSON.stringify(result.insights.map((i) => Object.fromEntries(Object.entries(i).filter(([key]) => key !== 'fingerprint'))))
     expect(blob).not.toMatch(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i) // email shape
     expect(blob).not.toMatch(/\+?\d{9,}/) // phone-length digit run
     expect(blob).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i) // raw uuid
@@ -898,5 +906,100 @@ describe('getIntelligenceInsights: E2 homepage scope after model extension (cate
     const result = await getIntelligenceInsights(admin)
     const degradedSourceCount = result.sourceHealth.filter((s) => s.status === 'degraded').length
     expect(degradedSourceCount).toBe(2)
+  })
+})
+
+describe('getIntelligenceInsights: E3 insight fingerprint (category: ADMIN-CONTROL-CENTRE-BATCH-E3)', () => {
+  it('1. identical insight evidence produces an identical fingerprint across repeated calls', async () => {
+    const admin1 = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
+    const result1 = await getIntelligenceInsights(admin1)
+    const admin2 = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
+    const result2 = await getIntelligenceInsights(admin2)
+    const fp1 = result1.insights.find((i) => i.ruleId === RULE_IDS.GROWTH_NEW_USERS_UP)?.fingerprint
+    const fp2 = result2.insights.find((i) => i.ruleId === RULE_IDS.GROWTH_NEW_USERS_UP)?.fingerprint
+    expect(fp1).toBeDefined()
+    expect(fp1).toBe(fp2)
+  })
+
+  it('2. different material evidence (a different observed count) produces a different fingerprint', async () => {
+    const admin1 = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
+    const result1 = await getIntelligenceInsights(admin1)
+    const admin2 = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 100, previous: 50 } } })
+    const result2 = await getIntelligenceInsights(admin2)
+    const fp1 = result1.insights.find((i) => i.ruleId === RULE_IDS.GROWTH_NEW_USERS_UP)?.fingerprint
+    const fp2 = result2.insights.find((i) => i.ruleId === RULE_IDS.GROWTH_NEW_USERS_UP)?.fingerprint
+    expect(fp1).not.toBe(fp2)
+  })
+
+  it('3. a generatedAt change alone (same evidence, different moment) does NOT change the fingerprint', async () => {
+    const admin1 = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
+    const result1 = await getIntelligenceInsights(admin1)
+    await new Promise((r) => setTimeout(r, 5))
+    const admin2 = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
+    const result2 = await getIntelligenceInsights(admin2)
+    const insight1 = result1.insights.find((i) => i.ruleId === RULE_IDS.GROWTH_NEW_USERS_UP)
+    const insight2 = result2.insights.find((i) => i.ruleId === RULE_IDS.GROWTH_NEW_USERS_UP)
+    expect(insight1?.generatedAt).not.toBe(insight2?.generatedAt)
+    expect(insight1?.fingerprint).toBe(insight2?.fingerprint)
+  })
+
+  it('4. two different rule families never collide even with superficially similar evidence shapes', async () => {
+    const admin = setupBaseline({
+      growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } },
+      overviewStats: { pending_kyc_reviews: 40, pending_ownership_reviews: 0, pending_listing_moderation: 0, failed_financial_workflows: 0, retryable_email_failures: 0 },
+    })
+    const result = await getIntelligenceInsights(admin)
+    const fingerprints = result.insights.map((i) => i.fingerprint)
+    expect(new Set(fingerprints).size).toBe(fingerprints.length)
+  })
+
+  it('5. no PII-shaped content enters the fingerprint input -- the fingerprint is always a 64-char lowercase hex SHA-256 digest, never a free-text echo', async () => {
+    const admin = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
+    const result = await getIntelligenceInsights(admin)
+    for (const insight of result.insights) {
+      expect(insight.fingerprint).toMatch(/^[0-9a-f]{64}$/)
+    }
+  })
+
+  it('6. FINGERPRINT_VERSION is a stable integer and is attached to every insight as fingerprintVersion', async () => {
+    expect(Number.isInteger(FINGERPRINT_VERSION)).toBe(true)
+    const admin = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
+    const result = await getIntelligenceInsights(admin)
+    for (const insight of result.insights) {
+      expect(insight.fingerprintVersion).toBe(FINGERPRINT_VERSION)
+    }
+  })
+
+  it('7. evaluation metadata (which does not exist on the generation path at all) cannot affect the fingerprint -- getIntelligenceInsights never accepts or reads any evaluation input', async () => {
+    expect(getIntelligenceInsights.length).toBe(1) // only (admin) -- no evaluation/feedback parameter exists to pass
+  })
+})
+
+describe('getIntelligenceInsights: E3 no behavioral feedback loop -- evaluation never influences generation (category: ADMIN-CONTROL-CENTRE-BATCH-E3)', () => {
+  it('given identical analytics inputs, the full generated result (insights, priorities, confidence, sufficiency, order, source health, summary) is identical across repeated calls -- there is no hidden state an evaluation could have written to', async () => {
+    const baseline = {
+      growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } },
+      overviewStats: { pending_kyc_reviews: 40, pending_ownership_reviews: 0, pending_listing_moderation: 0, failed_financial_workflows: 0, retryable_email_failures: 0 },
+      trust: { ...ZERO_TRUST, accountRestrictions: { restricted: 3, suspended: 3 } },
+    }
+    const admin1 = setupBaseline(baseline)
+    const result1 = await getIntelligenceInsights(admin1)
+    const admin2 = setupBaseline(baseline)
+    const result2 = await getIntelligenceInsights(admin2)
+
+    const strip = (r: typeof result1) => ({
+      summary: r.summary,
+      sourceHealth: r.sourceHealth,
+      insights: r.insights.map((i) => ({
+        ruleId: i.ruleId, category: i.category, type: i.type, priority: i.priority,
+        confidence: i.confidence, dataSufficiency: i.dataSufficiency, scope: i.scope,
+        fingerprint: i.fingerprint, evidence: i.evidence, trigger: i.trigger,
+      })),
+    })
+    expect(strip(result1)).toEqual(strip(result2))
+  })
+
+  it('getIntelligenceInsights has no evaluation/feedback parameter in its signature -- structurally cannot read evaluation state even if some existed', () => {
+    expect(getIntelligenceInsights.length).toBe(1)
   })
 })
