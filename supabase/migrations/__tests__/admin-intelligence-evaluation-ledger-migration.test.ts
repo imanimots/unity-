@@ -133,4 +133,22 @@ describe('20261031090000_admin_intelligence_evaluation_ledger.sql (category: ADM
     const fnBody = sql.slice(sql.indexOf('create or replace function public.record_intelligence_evaluation('), sql.indexOf('$$;') + 3)
     expect(fnBody).toMatch(/select evaluation into v_previous[\s\S]*?where admin_user_id = p_admin_id and insight_fingerprint = p_insight_fingerprint\s*\n\s*for update;/)
   })
+
+  it('18. E5-F1: service_role has an explicit SELECT grant on admin_intelligence_evaluations -- the exact least-privilege grant the real runtime read path (getEvaluationsForFingerprints/getRuleQualitySummary, traced to the service-role client) needs, since RLS bypass alone does not grant table-level access', () => {
+    expect(sql).toMatch(/grant select on table public\.admin_intelligence_evaluations to service_role;/)
+  })
+
+  it('19. E5-F1: no INSERT/UPDATE/DELETE grant to service_role on either table -- the only write path is the SECURITY DEFINER RPC, which executes with its OWNER\'s privileges and needs no direct table grant', () => {
+    expect(sql).not.toMatch(/grant (insert|update|delete)[\s\S]{0,80}to service_role/)
+    expect(sql).not.toMatch(/grant all[\s\S]{0,80}to service_role/)
+  })
+
+  it('20. E5-F1: no grant of any kind to anon or authenticated on either table -- the admin-read RLS policy is the only access path for those roles, and even that is unused by any current code path', () => {
+    expect(sql).not.toMatch(/grant[\s\S]{0,120}to (anon|authenticated)\b/)
+  })
+
+  it('21. E5-F1: no grant was added on admin_intelligence_evaluation_history -- no application code reads it directly, so an unused grant would be speculative over-privilege', () => {
+    const historyBlock = sql.slice(sql.indexOf('create table if not exists public.admin_intelligence_evaluation_history'), sql.indexOf('create or replace function public.record_intelligence_evaluation('))
+    expect(historyBlock).not.toMatch(/^\s*grant /m)
+  })
 })

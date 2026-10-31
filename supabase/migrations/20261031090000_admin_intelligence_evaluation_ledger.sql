@@ -80,6 +80,21 @@ create policy "admin_intelligence_evaluations: admin read" on public.admin_intel
 -- No client INSERT/UPDATE/DELETE policy -- rows are written only by
 -- record_intelligence_evaluation() below, via the service-role client.
 
+-- E5-F1: Supabase's Data API treats Postgres object grants and RLS
+-- policies as two separate layers -- service_role bypasses RLS, but
+-- that bypass alone does not grant table-level SELECT. The batched
+-- evaluation read (getEvaluationsForFingerprints()/getRuleQualitySummary()
+-- in intelligence-evaluation-service.ts) queries this table directly
+-- via `.from('admin_intelligence_evaluations').select(...)` using the
+-- service-role client (traced end-to-end: both functions only ever
+-- receive the client built by getAdminServiceClient(), never an
+-- authenticated-user-scoped one) -- so service_role needs this explicit
+-- SELECT grant. No INSERT/UPDATE/DELETE grant is added: the only write
+-- path is record_intelligence_evaluation() below, a SECURITY DEFINER
+-- function that executes with its OWNER's table privileges, not the
+-- caller's -- it needs no direct table grant to service_role at all.
+grant select on table public.admin_intelligence_evaluations to service_role;
+
 create table if not exists public.admin_intelligence_evaluation_history (
   id                   uuid primary key default gen_random_uuid(),
   insight_fingerprint  text not null check (insight_fingerprint ~ '^[0-9a-f]{64}$'),
@@ -103,6 +118,13 @@ create policy "admin_intelligence_evaluation_history: admin read" on public.admi
 -- No client INSERT/UPDATE/DELETE policy here either -- only the RPC
 -- below writes rows, and the immutability trigger below additionally
 -- refuses any UPDATE/DELETE regardless of who attempts it.
+--
+-- E5-F1: deliberately NO `grant select ... to service_role` on this
+-- history table -- unlike admin_intelligence_evaluations above, no
+-- application code anywhere reads admin_intelligence_evaluation_history
+-- directly (confirmed by repo-wide search); adding an unused grant here
+-- would be exactly the speculative over-grant this phase is meant to
+-- avoid. Add one only if/when a real server-side reader is introduced.
 drop trigger if exists admin_intelligence_evaluation_history_immutable on public.admin_intelligence_evaluation_history;
 create trigger admin_intelligence_evaluation_history_immutable
   before update or delete on public.admin_intelligence_evaluation_history

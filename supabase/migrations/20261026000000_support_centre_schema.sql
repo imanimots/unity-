@@ -172,6 +172,16 @@ create trigger support_cases_touch_updated_at
 
 alter table public.support_cases enable row level security;
 
+-- E5-F1: live production evidence proved this migration is being
+-- reconciled against a database where its objects already exist (the
+-- runner failed here on a rerun -- "policy already exists" -- after
+-- the earlier CREATE TYPE/SEQUENCE/TABLE/INDEX statements above, which
+-- are all already-idempotent, silently succeeded as no-ops). CREATE
+-- POLICY has no IF NOT EXISTS form in Postgres, so every policy in this
+-- file needs an explicit DROP POLICY IF EXISTS immediately before it to
+-- converge safely to the reviewed definition on a rerun, exactly like
+-- the triggers below already do via DROP TRIGGER IF EXISTS.
+drop policy if exists "support_cases: admin read" on public.support_cases;
 create policy "support_cases: admin read"
   on public.support_cases for select
   using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
@@ -196,6 +206,8 @@ create index if not exists support_case_notes_case_idx on public.support_case_no
 
 alter table public.support_case_notes enable row level security;
 
+-- E5-F1: see the rerun-safety note above support_cases' own policy.
+drop policy if exists "support_case_notes: admin read" on public.support_case_notes;
 create policy "support_case_notes: admin read"
   on public.support_case_notes for select
   using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
@@ -229,6 +241,8 @@ create index if not exists support_case_history_case_idx on public.support_case_
 
 alter table public.support_case_history enable row level security;
 
+-- E5-F1: see the rerun-safety note above support_cases' own policy.
+drop policy if exists "support_case_history: admin read" on public.support_case_history;
 create policy "support_case_history: admin read"
   on public.support_case_history for select
   using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
