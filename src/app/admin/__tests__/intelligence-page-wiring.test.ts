@@ -97,3 +97,24 @@ describe('Admin Intelligence page E2 explainability/diagnostics wiring (category
     expect(intelligencePage).not.toMatch(forbidden)
   })
 })
+
+describe('Admin Intelligence page E2-F1 freshness-semantics wiring (category: ADMIN-CONTROL-CENTRE-BATCH-E2-F1)', () => {
+  const intelligencePage = readFileSync(join(REPO_ROOT, 'src/app/admin/intelligence/page.tsx'), 'utf-8')
+
+  it('13. the page imports EVIDENCE_BASIS_LABEL from the service module as the single source of truth for freshness wording, rather than hardcoding "Last 30 days" itself', () => {
+    expect(intelligencePage).toMatch(/import\s*\{[^}]*\bEVIDENCE_BASIS_LABEL\b[^}]*\}\s*from\s*'@\/lib\/admin\/intelligence-service'/)
+    expect(intelligencePage).not.toMatch(/'Last 30 days'/)
+  })
+
+  it('14. each insight card renders its own evidence-basis label via EVIDENCE_BASIS_LABEL[insight.freshness.evidenceBasis], never a hardcoded universal window', () => {
+    expect(intelligencePage).toMatch(/EVIDENCE_BASIS_LABEL\[insight\.freshness\.evidenceBasis\]/)
+  })
+
+  it('15. the page-level header shows only the generation timestamp, not a blanket "Evidence window: Last 30 days" claim that would misrepresent snapshot/structural insights on the same page', () => {
+    expect(intelligencePage).not.toMatch(/Evidence window:\s*\{/)
+  })
+
+  it('16. the Source Health section treats availability as current-state diagnostic metadata, not a 30-day evidence window', () => {
+    expect(intelligencePage).toMatch(/Status at generation time/)
+  })
+})

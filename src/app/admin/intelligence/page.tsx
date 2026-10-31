@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { requireAdmin } from '@/lib/supabase/require-admin'
 import { getAdminServiceClient } from '@/lib/admin/route-helpers'
-import { getIntelligenceInsights, type IntelligenceInsight, type IntelligencePriority, type IntelligenceInsightType, type IntelligenceConfidence, type IntelligenceDataSufficiency, type IntelligenceScope, type IntelligenceSourceStatus } from '@/lib/admin/intelligence-service'
+import { getIntelligenceInsights, EVIDENCE_BASIS_LABEL, type IntelligenceInsight, type IntelligencePriority, type IntelligenceInsightType, type IntelligenceConfidence, type IntelligenceDataSufficiency, type IntelligenceScope, type IntelligenceSourceStatus } from '@/lib/admin/intelligence-service'
 import { AdminPageHeader, StatCard, Pill, formatDateTime } from '@/components/admin/ui'
 
 const PRIORITY_STYLES: Record<IntelligencePriority, string> = {
@@ -54,7 +54,8 @@ function SourceHealthSection({ sourceHealth }: { sourceHealth: IntelligenceSourc
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Data sources / source health</p>
-        <p className="text-xs text-[#9B8B85]">Evidence window: {FRESHNESS_WINDOW_LABEL}</p>
+        {/* E2-F1: availability is diagnostic/current-state metadata ("could this cycle read this source"), never a 30-day evidence window -- no universal freshness claim is shown here. */}
+        <p className="text-xs text-[#9B8B85]">Status at generation time</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {sourceHealth.map((s) => {
@@ -84,8 +85,6 @@ function SourceHealthSection({ sourceHealth }: { sourceHealth: IntelligenceSourc
   )
 }
 
-/** E2: honest, known evidence window -- matches intelligence-service.ts's own SOURCE_WINDOW_LABEL; never a fabricated per-source refresh timestamp. */
-const FRESHNESS_WINDOW_LABEL = 'Last 30 days'
 
 function InsightCard({ insight }: { insight: IntelligenceInsight }) {
   return (
@@ -163,7 +162,8 @@ function InsightCard({ insight }: { insight: IntelligenceInsight }) {
               </ul>
             </div>
           )}
-          <p><span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Generated: </span>{formatDateTime(insight.freshness.generatedAt)} · <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Evidence window: </span>{insight.freshness.sourceWindow}</p>
+          {/* E2-F1: "Generated" means when this Intelligence result was computed, never when the underlying source data was refreshed. "Evidence" names this rule's own honest basis (EVIDENCE_BASIS_LABEL, from RULE_REGISTRY) -- "Last 30 days" only for genuinely period-based rules; "Current snapshot" or "Structural diagnostic" otherwise, never a fabricated window. */}
+          <p><span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Generated: </span>{formatDateTime(insight.freshness.generatedAt)} · <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Evidence: </span>{EVIDENCE_BASIS_LABEL[insight.freshness.evidenceBasis]}</p>
         </div>
       </details>
     </div>
@@ -189,7 +189,8 @@ export default async function AdminIntelligencePage() {
     <div className="p-6 lg:p-8 space-y-8">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <AdminPageHeader eyebrow="AI R&D" title="AI R&D & Intelligence" badge="Recommendation only" />
-        <p className="text-xs text-[#9B8B85]">Generated {formatDateTime(result.generatedAt)} · Evidence window: {FRESHNESS_WINDOW_LABEL}</p>
+        {/* E2-F1: only the generation timestamp is shown globally -- this page mixes period/snapshot/structural evidence, so a single universal "Evidence window" claim here would be false for whichever insights aren't period-based. Each insight's own "Why did this appear?" detail discloses its own accurate evidence basis. */}
+        <p className="text-xs text-[#9B8B85]">Generated {formatDateTime(result.generatedAt)}</p>
       </div>
 
       <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] max-w-3xl">

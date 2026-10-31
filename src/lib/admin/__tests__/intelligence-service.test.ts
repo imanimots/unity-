@@ -29,7 +29,8 @@ vi.mock('@/lib/admin/exceptions-service', () => ({
   listOperationalExceptions: (...a: unknown[]) => listOperationalExceptions(...a),
 }))
 
-const { getIntelligenceInsights, RULE_IDS, RULE_REGISTRY } = await import('../intelligence-service')
+const { getIntelligenceInsights, RULE_IDS, RULE_REGISTRY, THRESHOLDS } = await import('../intelligence-service')
+const THRESHOLDS_KEYS = Object.keys(THRESHOLDS)
 
 // ---- Baseline zero/sparse-data fixtures -- the "nothing confirmed-real yet" state ----
 const ZERO_COMPARISON: PeriodComparison = { current: 0, previous: null }
@@ -687,7 +688,7 @@ describe('getIntelligenceInsights: E2 limitations (category: ADMIN-CONTROL-CENTR
   })
 })
 
-describe('getIntelligenceInsights: E2 freshness (category: ADMIN-CONTROL-CENTRE-BATCH-E2)', () => {
+describe('getIntelligenceInsights: E2-F1 freshness semantics -- period vs snapshot vs structural (category: ADMIN-CONTROL-CENTRE-BATCH-E2-F1)', () => {
   it('E1. every insight carries a valid generatedAt timestamp', async () => {
     const admin = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
     const result = await getIntelligenceInsights(admin)
@@ -696,13 +697,161 @@ describe('getIntelligenceInsights: E2 freshness (category: ADMIN-CONTROL-CENTRE-
     }
   })
 
-  it('E2. the evidence window is the known, honest analytics period -- never a fabricated refresh timestamp', async () => {
+  it('A. a genuine period-based growth insight carries evidenceBasis=period and sourceWindow="Last 30 days"', async () => {
     const admin = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
     const result = await getIntelligenceInsights(admin)
-    for (const insight of result.insights) {
-      expect(insight.freshness.sourceWindow).toBe('Last 30 days')
-      expect(Object.keys(insight.freshness).sort()).toEqual(['generatedAt', 'sourceWindow'])
+    const insight = result.insights.find((i) => i.category === 'growth' && /New users/i.test(i.title))
+    expect(insight?.freshness.evidenceBasis).toBe('period')
+    expect(insight?.freshness.sourceWindow).toBe('Last 30 days')
+  })
+
+  it('B. an operational backlog (snapshot) insight does NOT claim a "Last 30 days" window', async () => {
+    const admin = setupBaseline({ overviewStats: { pending_kyc_reviews: 40, pending_ownership_reviews: 0, pending_listing_moderation: 0, failed_financial_workflows: 0, retryable_email_failures: 0 } })
+    const result = await getIntelligenceInsights(admin)
+    const insight = result.insights.find((i) => i.category === 'operations' && /KYC review/i.test(i.title))
+    expect(insight?.freshness.evidenceBasis).toBe('snapshot')
+    expect(insight?.freshness.sourceWindow).toBeUndefined()
+  })
+
+  it('B2. every one of the 7 Operations backlog rule families is classified snapshot, never period', async () => {
+    const admin = setupBaseline({
+      support: { total: 50, byStatus: [{ label: 'open', count: 15 }], byPriority: [], byCategory: [] },
+      overviewStats: { pending_kyc_reviews: 15, pending_ownership_reviews: 15, pending_listing_moderation: 15, failed_financial_workflows: 15, retryable_email_failures: 15 },
+      exceptions: Array.from({ length: 15 }, () => ({ severity: 'low' as const, resolved: false })),
+    })
+    const result = await getIntelligenceInsights(admin)
+    const operationsInsights = result.insights.filter((i) => i.category === 'operations')
+    expect(operationsInsights.length).toBe(7)
+    for (const insight of operationsInsights) {
+      expect(insight.freshness.evidenceBasis).toBe('snapshot')
+      expect(insight.freshness.sourceWindow).toBeUndefined()
     }
+  })
+
+  it('C. TRUST_ACCOUNT_RESTRICTIONS and TRUST_KYC_STATUS_MIX are classified snapshot, not period', async () => {
+    const admin = setupBaseline({
+      trust: { ...ZERO_TRUST, accountRestrictions: { restricted: 2, suspended: 2 }, kycByStatus: [{ label: 'approved', count: 10 }] },
+    })
+    const result = await getIntelligenceInsights(admin)
+    const restrictions = result.insights.find((i) => i.category === 'trust' && /restricted/i.test(i.title))
+    const kycMix = result.insights.find((i) => i.category === 'trust' && /KYC status mix/i.test(i.title))
+    expect(restrictions?.freshness.evidenceBasis).toBe('snapshot')
+    expect(restrictions?.freshness.sourceWindow).toBeUndefined()
+    expect(kycMix?.freshness.evidenceBasis).toBe('snapshot')
+    expect(kycMix?.freshness.sourceWindow).toBeUndefined()
+  })
+
+  it('C2. TRUST_REVIEWS_SPARSE (genuinely since()-filtered on both sides) is classified period', async () => {
+    const admin = setupBaseline({
+      trust: { ...ZERO_TRUST, publishedReviews: 0 },
+      transactions: { ...ZERO_TRANSACTIONS, bookings: { ...ZERO_TRANSACTIONS.bookings, total: 10 } },
+    })
+    const result = await getIntelligenceInsights(admin)
+    const sparse = result.insights.find((i) => i.category === 'trust' && /sparse/i.test(i.title))
+    expect(sparse?.freshness.evidenceBasis).toBe('period')
+    expect(sparse?.freshness.sourceWindow).toBe('Last 30 days')
+  })
+
+  it('D. the degraded-source finding (structural) is never labeled as a 30-day window', async () => {
+    const admin = setupBaseline()
+    getMarketplaceOverview.mockRejectedValue(new Error('x'))
+    const result = await getIntelligenceInsights(admin)
+    const degraded = result.insights.find((i) => /partially unavailable/i.test(i.title))
+    expect(degraded?.freshness.evidenceBasis).toBe('structural')
+    expect(degraded?.freshness.sourceWindow).toBeUndefined()
+  })
+
+  it('D2. the funnel structural-telemetry-limitation finding is never labeled as a 30-day window', async () => {
+    const admin = setupBaseline({
+      behavior: { ...ZERO_BEHAVIOR, dataQuality: { hasAnyEventData: true, mayIncludeUnclassifiedActivity: false, notes: ['note'] } },
+    })
+    const result = await getIntelligenceInsights(admin)
+    const conv = result.insights.find((i) => i.category === 'conversion')
+    expect(conv?.freshness.evidenceBasis).toBe('structural')
+    expect(conv?.freshness.sourceWindow).toBeUndefined()
+  })
+})
+
+describe('getIntelligenceInsights: E2-F1 trend trigger sign consistency (category: ADMIN-CONTROL-CENTRE-BATCH-E2-F1)', () => {
+  it('a rising (+60%) trend trigger shows a positive observed value and a positive signed threshold', async () => {
+    const admin = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 100, previous: 50 } } })
+    const result = await getIntelligenceInsights(admin)
+    const insight = result.insights.find((i) => i.category === 'growth' && /New users/i.test(i.title))
+    expect(insight?.trigger?.operator).toBe('>=')
+    expect(insight?.trigger?.observedValue).toBe('+100%')
+    expect(insight?.trigger?.thresholdValue).toBe('+25%')
+  })
+
+  it('a falling (-50%) trend trigger shows a negative observed value and a NEGATIVE signed threshold matching the real control-flow boundary', async () => {
+    const admin = setupBaseline({ growth: { ...ZERO_GROWTH, newOrders: { current: 25, previous: 50 } } })
+    const result = await getIntelligenceInsights(admin)
+    const insight = result.insights.find((i) => i.category === 'growth' && /New orders/i.test(i.title))
+    expect(insight?.trigger?.operator).toBe('<=')
+    expect(insight?.trigger?.observedValue).toBe('-50%')
+    expect(insight?.trigger?.thresholdValue).toBe('-25%')
+  })
+})
+
+describe('getIntelligenceInsights: E2-F1 rule registry threshold completeness (category: ADMIN-CONTROL-CENTRE-BATCH-E2-F1)', () => {
+  it('SUPPLY_CATEGORY_CONCENTRATION references the real minimum-listing floor it is actually gated by', () => {
+    expect(RULE_REGISTRY.SUPPLY_CATEGORY_CONCENTRATION.thresholdRefs).toContain('MIN_REAL_LISTINGS_FOR_SUPPLY_SIGNAL')
+    expect(RULE_REGISTRY.SUPPLY_CATEGORY_CONCENTRATION.thresholdRefs).toContain('CATEGORY_CONCENTRATION_SHARE')
+  })
+
+  it('every GROWTH_* registry entry references the sample-floor threshold it actually uses for confidence/sufficiency', () => {
+    const growthRuleIds = Object.keys(RULE_REGISTRY).filter((id) => id.startsWith('GROWTH_'))
+    expect(growthRuleIds.length).toBe(10)
+    for (const id of growthRuleIds) {
+      expect(RULE_REGISTRY[id as keyof typeof RULE_REGISTRY].thresholdRefs).toContain('MIN_REAL_PROFILES_FOR_TREND')
+      expect(RULE_REGISTRY[id as keyof typeof RULE_REGISTRY].thresholdRefs).toContain('GROWTH_SWING_PCT')
+    }
+  })
+
+  it('TRUST_KYC_STATUS_MIX references its sample-floor threshold', () => {
+    expect(RULE_REGISTRY.TRUST_KYC_STATUS_MIX.thresholdRefs).toContain('MIN_REAL_PROFILES_FOR_TREND')
+  })
+
+  it('TRUST_REVIEWS_SPARSE references the new named sparse-review-rate constant, not a bare magic number', () => {
+    expect(RULE_REGISTRY.TRUST_REVIEWS_SPARSE.thresholdRefs).toContain('MAX_REVIEW_RATE_FOR_SPARSE_SIGNAL')
+  })
+
+  it('no thresholdRefs entry anywhere in RULE_REGISTRY names a nonexistent THRESHOLDS key', () => {
+    for (const meta of Object.values(RULE_REGISTRY)) {
+      for (const ref of meta.thresholdRefs ?? []) {
+        expect(THRESHOLDS_KEYS).toContain(ref)
+      }
+    }
+  })
+
+  it('every RuleId has exactly one RULE_REGISTRY entry with a valid evidenceBasis', () => {
+    for (const meta of Object.values(RULE_REGISTRY)) {
+      expect(['period', 'snapshot', 'structural']).toContain(meta.evidenceBasis)
+    }
+  })
+})
+
+describe('getIntelligenceInsights: E2-F1 degraded-source trigger truthfulness (category: ADMIN-CONTROL-CENTRE-BATCH-E2-F1)', () => {
+  it('1 failed source: fires at medium priority, and the trigger reflects the actual firing floor (1), not the high-escalation floor', async () => {
+    const admin = setupBaseline()
+    getMarketplaceOverview.mockRejectedValue(new Error('x'))
+    const result = await getIntelligenceInsights(admin)
+    const degraded = result.insights.find((i) => /partially unavailable/i.test(i.title))
+    expect(degraded?.priority).toBe('medium')
+    expect(degraded?.trigger?.observedValue).toBe(1)
+    expect(degraded?.trigger?.thresholdValue).toBe(1)
+    expect(degraded?.limitations.some((l) => /escalates to high priority/i.test(l))).toBe(true)
+  })
+
+  it('3+ failed sources: escalates to high priority, and the escalation floor is truthfully disclosed', async () => {
+    const admin = setupBaseline()
+    getMarketplaceOverview.mockRejectedValue(new Error('x'))
+    getSupplyAnalytics.mockRejectedValue(new Error('x'))
+    getDemandAnalytics.mockRejectedValue(new Error('x'))
+    const result = await getIntelligenceInsights(admin)
+    const degraded = result.insights.find((i) => /partially unavailable/i.test(i.title))
+    expect(degraded?.priority).toBe('high')
+    expect(degraded?.trigger?.observedValue).toBe(3)
+    expect(degraded?.limitations.some((l) => /escalates to high priority once 3/i.test(l))).toBe(true)
   })
 })
 

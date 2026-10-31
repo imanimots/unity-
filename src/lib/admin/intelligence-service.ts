@@ -80,6 +80,50 @@ export interface IntelligenceTrigger {
   comparisonValue?: number | string
 }
 
+/**
+ * E2-F1: what kind of evidence a rule's numbers actually are -- the
+ * single, honest classification that drives the freshness label a rule
+ * is allowed to carry. Declared once per rule in RULE_REGISTRY (see
+ * below), never re-derived or duplicated elsewhere, so there is exactly
+ * one place that can drift.
+ *
+ * - 'period': genuinely computed from a date-windowed/period-over-period
+ *   source (e.g. Growth's periodComparison() calls, or a count whose
+ *   underlying query applies `since`/`gte('created_at', ...)`). Only
+ *   these rules may show "Last 30 days".
+ * - 'snapshot': a current-state count/distribution with NO date filter
+ *   at all (e.g. profiles.account_status counts, kyc_status mix, active
+ *   listing totals/category mix, every Admin Overview RPC/Exceptions
+ *   queue-depth field) -- "how many right now", not "how many in the
+ *   last 30 days". Confirmed per-rule by reading the actual
+ *   analytics-service.ts/exceptions-service.ts query, not assumed.
+ * - 'structural': a narrative/diagnostic finding with no single
+ *   date-bound metric at all (e.g. a source-read failure this cycle, or
+ *   an instrumentation-gap caveat) -- a period or snapshot label would
+ *   be meaningless, not just imprecise.
+ */
+export type IntelligenceEvidenceBasis = 'period' | 'snapshot' | 'structural'
+
+/**
+ * E2-F1: honest freshness disclosure. `sourceWindow` is populated ONLY
+ * when `evidenceBasis === 'period'` -- a snapshot or structural insight
+ * never claims a "Last 30 days" window it doesn't have. `generatedAt`
+ * means "this Intelligence result was computed at this time", never
+ * "the underlying data was refreshed at this time".
+ */
+export interface IntelligenceFreshness {
+  generatedAt: string
+  evidenceBasis: IntelligenceEvidenceBasis
+  sourceWindow?: string
+}
+
+/** E2-F1: single source of truth for how each evidenceBasis renders -- both Admin pages import this so the wording can never drift between them. */
+export const EVIDENCE_BASIS_LABEL: Record<IntelligenceEvidenceBasis, string> = {
+  period: 'Last 30 days',
+  snapshot: 'Current snapshot',
+  structural: 'Structural diagnostic',
+}
+
 export interface IntelligenceInsight {
   id: string
   /**
@@ -89,7 +133,7 @@ export interface IntelligenceInsight {
    * reference "this exact rule" independent of `id` (which is only a
    * React-key-style per-call counter, see `nextId`).
    */
-  ruleId: string
+  ruleId: RuleId
   category: IntelligenceCategory
   type: IntelligenceInsightType
   priority: IntelligencePriority
@@ -113,13 +157,8 @@ export interface IntelligenceInsight {
    */
   limitations: string[]
   generatedAt: string
-  /**
-   * E2: honest freshness disclosure -- `generatedAt` duplicates the field
-   * above for convenience on this object, and `sourceWindow` names the
-   * known analytics period this insight was computed over. Never a
-   * fabricated per-table "last updated N seconds ago" timestamp.
-   */
-  freshness: { generatedAt: string; sourceWindow: string }
+  /** E2-F1: honest, rule-specific freshness disclosure -- see IntelligenceFreshness. */
+  freshness: IntelligenceFreshness
   /** Plain navigation to an existing Admin page -- never an action/mutation endpoint. */
   actionHref?: string
   actionLabel?: string
@@ -189,7 +228,7 @@ export interface IntelligenceResult {
 // real volume grows.
 // ============================================================
 
-const THRESHOLDS = {
+export const THRESHOLDS = {
   /** Below this many confirmed-real profiles, percentage-based trend/growth comparisons are too noisy to be meaningful. */
   MIN_REAL_PROFILES_FOR_TREND: 20,
   /** A period-over-period comparison needs at least this many in the PREVIOUS window, or a swing from e.g. 1->2 would misleadingly read as "+100%". */
@@ -208,17 +247,19 @@ const THRESHOLDS = {
   MIN_REAL_KYC_ROWS_FOR_INFO: 5,
   /** Below this many confirmed-real completed transactions (bookings+orders) in the period, no review-collection informational insight is generated. */
   MIN_REAL_TRANSACTIONS_FOR_REVIEW_RATIO: 5,
+  /** E2-F1 (named, replacing a prior inline magic number): a published-review-per-real-transaction ratio below this is flagged as sparse review collection. */
+  MAX_REVIEW_RATE_FOR_SPARSE_SIGNAL: 0.1,
   /** An operational all-system backlog (Support/KYC/ownership/moderation/exceptions/email-retry queue depth) at or above this count is a watch item. */
   OPERATIONAL_BACKLOG_WATCH_COUNT: 10,
   /** ...and at or above this count is escalated to a risk (high priority). */
   OPERATIONAL_BACKLOG_HIGH_COUNT: 30,
-  /** E1-F1: at or above this many unavailable input sources (of 10 total), the "Intelligence inputs are partially unavailable" finding is escalated to high priority -- a systemic read problem, not a single transient hiccup. */
+  /** E1-F1: the actual floor at which the "Intelligence inputs are partially unavailable" finding fires at all -- any single unavailable source is enough; this just names that floor so the trigger's displayed threshold is truthful (see E2-F1 review). */
+  DEGRADED_SOURCES_MIN_COUNT: 1,
+  /** E1-F1: at or above this many unavailable input sources (of 10 total), the finding above is escalated to high priority -- a systemic read problem, not a single transient hiccup. */
   DEGRADED_SOURCES_HIGH_COUNT: 3,
 } as const
 
 const PERIOD = '30d' as const
-/** E2: honest, known evidence window label -- never a fabricated per-table refresh timestamp. */
-const SOURCE_WINDOW_LABEL = 'Last 30 days'
 
 // ============================================================
 // E2: stable rule IDs and a lightweight rule registry.
@@ -271,37 +312,62 @@ interface RuleMeta {
   category: IntelligenceCategory
   scope: IntelligenceScope
   description: string
+  /**
+   * E2-F1: the ONE place that declares whether this rule's numbers are a
+   * period comparison, a current-state snapshot, or a structural/
+   * diagnostic finding -- attachFreshness() reads this directly rather
+   * than re-deriving or duplicating the classification. Set only after
+   * tracing the rule's actual underlying analytics-service.ts/
+   * exceptions-service.ts query -- never assumed from PERIOD being
+   * passed into the source call (several sources ignore it for the
+   * specific field a given rule reads; see each entry's own note below).
+   */
+  evidenceBasis: IntelligenceEvidenceBasis
   thresholdRefs?: Array<keyof typeof THRESHOLDS>
 }
 
 export const RULE_REGISTRY: Record<RuleId, RuleMeta> = {
-  DATA_PARTIAL_SOURCE_FAILURE: { category: 'data-quality', scope: 'real-data', description: 'One or more Intelligence input sources could not be read this cycle.', thresholdRefs: ['DEGRADED_SOURCES_HIGH_COUNT'] },
-  DATA_INSUFFICIENT_REAL_PROFILES: { category: 'data-quality', scope: 'real-data', description: 'Confirmed-real user base is below the floor needed for meaningful trend comparisons.', thresholdRefs: ['MIN_REAL_PROFILES_FOR_TREND'] },
-  DATA_NO_EVENT_DATA: { category: 'data-quality', scope: 'real-data', description: 'No first-party behavioral event data recorded yet.' },
-  DATA_DISPUTES_UNVERIFIED: { category: 'data-quality', scope: 'real-data', description: 'Dispute counts cannot yet be reliably restricted to confirmed-real records.' },
-  DEMAND_SUPPLY_IMBALANCE: { category: 'demand', scope: 'real-data', description: 'Looking For demand volume outpaces real active listing supply.', thresholdRefs: ['MIN_REAL_LISTINGS_FOR_SUPPLY_SIGNAL', 'DEMAND_SUPPLY_RATIO_WATCH'] },
-  SUPPLY_CATEGORY_CONCENTRATION: { category: 'supply', scope: 'real-data', description: 'Real active listing supply is concentrated in a single category.', thresholdRefs: ['CATEGORY_CONCENTRATION_SHARE'] },
-  GROWTH_NEW_USERS_UP: { category: 'growth', scope: 'real-data', description: 'New confirmed-real users rose period-over-period.', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT'] },
-  GROWTH_NEW_USERS_DOWN: { category: 'growth', scope: 'real-data', description: 'New confirmed-real users fell period-over-period.', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT'] },
-  GROWTH_NEW_MERCHANTS_UP: { category: 'growth', scope: 'real-data', description: 'New confirmed-real merchants rose period-over-period.', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT'] },
-  GROWTH_NEW_MERCHANTS_DOWN: { category: 'growth', scope: 'real-data', description: 'New confirmed-real merchants fell period-over-period.', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT'] },
-  GROWTH_NEW_REAL_LISTINGS_UP: { category: 'growth', scope: 'real-data', description: 'New confirmed-real listings rose period-over-period.', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT'] },
-  GROWTH_NEW_REAL_LISTINGS_DOWN: { category: 'growth', scope: 'real-data', description: 'New confirmed-real listings fell period-over-period.', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT'] },
-  GROWTH_NEW_BOOKINGS_UP: { category: 'growth', scope: 'real-data', description: 'New confirmed-real bookings rose period-over-period.', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT'] },
-  GROWTH_NEW_BOOKINGS_DOWN: { category: 'growth', scope: 'real-data', description: 'New confirmed-real bookings fell period-over-period.', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT'] },
-  GROWTH_NEW_ORDERS_UP: { category: 'growth', scope: 'real-data', description: 'New confirmed-real orders rose period-over-period.', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT'] },
-  GROWTH_NEW_ORDERS_DOWN: { category: 'growth', scope: 'real-data', description: 'New confirmed-real orders fell period-over-period.', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT'] },
-  CONVERSION_NOT_COMPUTABLE: { category: 'conversion', scope: 'real-data', description: 'Funnel conversion rate cannot be computed from confirmed Real Data under current instrumentation.' },
-  TRUST_ACCOUNT_RESTRICTIONS: { category: 'trust', scope: 'real-data', description: 'Confirmed-real accounts are currently restricted or suspended.', thresholdRefs: ['RESTRICTION_WATCH_COUNT'] },
-  TRUST_KYC_STATUS_MIX: { category: 'trust', scope: 'real-data', description: 'Confirmed-real KYC status mix baseline.', thresholdRefs: ['MIN_REAL_KYC_ROWS_FOR_INFO'] },
-  TRUST_REVIEWS_SPARSE: { category: 'trust', scope: 'real-data', description: 'Published reviews are sparse relative to completed real transactions.', thresholdRefs: ['MIN_REAL_TRANSACTIONS_FOR_REVIEW_RATIO'] },
-  OPERATIONS_SUPPORT_BACKLOG: { category: 'operations', scope: 'operational-all-system', description: 'Open Support case backlog.', thresholdRefs: ['OPERATIONAL_BACKLOG_WATCH_COUNT', 'OPERATIONAL_BACKLOG_HIGH_COUNT'] },
-  OPERATIONS_KYC_REVIEW_BACKLOG: { category: 'operations', scope: 'operational-all-system', description: 'Pending KYC review backlog.', thresholdRefs: ['OPERATIONAL_BACKLOG_WATCH_COUNT', 'OPERATIONAL_BACKLOG_HIGH_COUNT'] },
-  OPERATIONS_OWNERSHIP_REVIEW_BACKLOG: { category: 'operations', scope: 'operational-all-system', description: 'Pending ownership verification backlog.', thresholdRefs: ['OPERATIONAL_BACKLOG_WATCH_COUNT', 'OPERATIONAL_BACKLOG_HIGH_COUNT'] },
-  OPERATIONS_LISTING_MODERATION_BACKLOG: { category: 'operations', scope: 'operational-all-system', description: 'Pending listing moderation backlog.', thresholdRefs: ['OPERATIONAL_BACKLOG_WATCH_COUNT', 'OPERATIONAL_BACKLOG_HIGH_COUNT'] },
-  OPERATIONS_FAILED_FINANCIAL_WORKFLOW_BACKLOG: { category: 'operations', scope: 'operational-all-system', description: 'Failed financial workflow backlog.', thresholdRefs: ['OPERATIONAL_BACKLOG_WATCH_COUNT', 'OPERATIONAL_BACKLOG_HIGH_COUNT'] },
-  OPERATIONS_EMAIL_FAILURE_BACKLOG: { category: 'operations', scope: 'operational-all-system', description: 'Retryable email failure backlog.', thresholdRefs: ['OPERATIONAL_BACKLOG_WATCH_COUNT', 'OPERATIONAL_BACKLOG_HIGH_COUNT'] },
-  OPERATIONS_EXCEPTIONS_BACKLOG: { category: 'operations', scope: 'operational-all-system', description: 'Unresolved Exceptions queue backlog.', thresholdRefs: ['OPERATIONAL_BACKLOG_WATCH_COUNT', 'OPERATIONAL_BACKLOG_HIGH_COUNT'] },
+  // Current-cycle read availability -- not a data window at all.
+  DATA_PARTIAL_SOURCE_FAILURE: { category: 'data-quality', scope: 'real-data', description: 'One or more Intelligence input sources could not be read this cycle.', evidenceBasis: 'structural', thresholdRefs: ['DEGRADED_SOURCES_MIN_COUNT', 'DEGRADED_SOURCES_HIGH_COUNT'] },
+  // totalUsers: unfiltered COUNT(*) WHERE data_classification='real' -- no since()/gte(created_at) at all (getMarketplaceOverview). Current total, not a 30-day count.
+  DATA_INSUFFICIENT_REAL_PROFILES: { category: 'data-quality', scope: 'real-data', description: 'Confirmed-real user base is below the floor needed for meaningful trend comparisons.', evidenceBasis: 'snapshot', thresholdRefs: ['MIN_REAL_PROFILES_FOR_TREND'] },
+  // hasAnyEventData: an unfiltered existence probe ("has analytics_events ever received a row") -- an instrumentation-state diagnostic, not a period metric.
+  DATA_NO_EVENT_DATA: { category: 'data-quality', scope: 'real-data', description: 'No first-party behavioral event data recorded yet.', evidenceBasis: 'structural' },
+  // Static structural caveat -- no runtime metric at all.
+  DATA_DISPUTES_UNVERIFIED: { category: 'data-quality', scope: 'real-data', description: 'Dispute counts cannot yet be reliably restricted to confirmed-real records.', evidenceBasis: 'structural' },
+  // lookingFor.total IS since()-filtered (getDemandAnalytics), but realActiveListings (the comparison anchor, from getMarketplaceOverview) is an unfiltered current count -- the weaker (snapshot) claim is the honest one for the comparison as a whole.
+  DEMAND_SUPPLY_IMBALANCE: { category: 'demand', scope: 'real-data', description: 'Looking For demand volume outpaces real active listing supply.', evidenceBasis: 'snapshot', thresholdRefs: ['MIN_REAL_LISTINGS_FOR_SUPPLY_SIGNAL', 'DEMAND_SUPPLY_RATIO_WATCH', 'MIN_REAL_PROFILES_FOR_TREND'] },
+  // listingsByCategory/realActiveListings: unfiltered current active-listing set (getSupplyAnalytics/getMarketplaceOverview) -- no date filter at all.
+  SUPPLY_CATEGORY_CONCENTRATION: { category: 'supply', scope: 'real-data', description: 'Real active listing supply is concentrated in a single category.', evidenceBasis: 'snapshot', thresholdRefs: ['MIN_REAL_LISTINGS_FOR_SUPPLY_SIGNAL', 'CATEGORY_CONCENTRATION_SHARE'] },
+  // getGrowthAnalytics: genuine period-over-period via periodComparison() -- a real 30-day-vs-prior-30-day comparison.
+  GROWTH_NEW_USERS_UP: { category: 'growth', scope: 'real-data', description: 'New confirmed-real users rose period-over-period.', evidenceBasis: 'period', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT', 'MIN_REAL_PROFILES_FOR_TREND'] },
+  GROWTH_NEW_USERS_DOWN: { category: 'growth', scope: 'real-data', description: 'New confirmed-real users fell period-over-period.', evidenceBasis: 'period', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT', 'MIN_REAL_PROFILES_FOR_TREND'] },
+  GROWTH_NEW_MERCHANTS_UP: { category: 'growth', scope: 'real-data', description: 'New confirmed-real merchants rose period-over-period.', evidenceBasis: 'period', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT', 'MIN_REAL_PROFILES_FOR_TREND'] },
+  GROWTH_NEW_MERCHANTS_DOWN: { category: 'growth', scope: 'real-data', description: 'New confirmed-real merchants fell period-over-period.', evidenceBasis: 'period', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT', 'MIN_REAL_PROFILES_FOR_TREND'] },
+  GROWTH_NEW_REAL_LISTINGS_UP: { category: 'growth', scope: 'real-data', description: 'New confirmed-real listings rose period-over-period.', evidenceBasis: 'period', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT', 'MIN_REAL_PROFILES_FOR_TREND'] },
+  GROWTH_NEW_REAL_LISTINGS_DOWN: { category: 'growth', scope: 'real-data', description: 'New confirmed-real listings fell period-over-period.', evidenceBasis: 'period', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT', 'MIN_REAL_PROFILES_FOR_TREND'] },
+  GROWTH_NEW_BOOKINGS_UP: { category: 'growth', scope: 'real-data', description: 'New confirmed-real bookings rose period-over-period.', evidenceBasis: 'period', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT', 'MIN_REAL_PROFILES_FOR_TREND'] },
+  GROWTH_NEW_BOOKINGS_DOWN: { category: 'growth', scope: 'real-data', description: 'New confirmed-real bookings fell period-over-period.', evidenceBasis: 'period', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT', 'MIN_REAL_PROFILES_FOR_TREND'] },
+  GROWTH_NEW_ORDERS_UP: { category: 'growth', scope: 'real-data', description: 'New confirmed-real orders rose period-over-period.', evidenceBasis: 'period', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT', 'MIN_REAL_PROFILES_FOR_TREND'] },
+  GROWTH_NEW_ORDERS_DOWN: { category: 'growth', scope: 'real-data', description: 'New confirmed-real orders fell period-over-period.', evidenceBasis: 'period', thresholdRefs: ['MIN_PREVIOUS_FOR_TREND', 'GROWTH_SWING_PCT', 'MIN_REAL_PROFILES_FOR_TREND'] },
+  // Structural telemetry-gap finding, explicitly timeless by its own rationale text -- never a period/snapshot claim.
+  CONVERSION_NOT_COMPUTABLE: { category: 'conversion', scope: 'real-data', description: 'Funnel conversion rate cannot be computed from confirmed Real Data under current instrumentation.', evidenceBasis: 'structural' },
+  // accountRestrictions (restricted/suspended counts): unfiltered COUNT(*) on profiles.account_status (getTrustAnalytics) -- current state, and the insight's own title says "currently".
+  TRUST_ACCOUNT_RESTRICTIONS: { category: 'trust', scope: 'real-data', description: 'Confirmed-real accounts are currently restricted or suspended.', evidenceBasis: 'snapshot', thresholdRefs: ['RESTRICTION_WATCH_COUNT'] },
+  // kycByStatus: countRowsByStatus() called with NO sinceIso (getTrustAnalytics) -- current KYC status distribution, not a 30-day count.
+  TRUST_KYC_STATUS_MIX: { category: 'trust', scope: 'real-data', description: 'Confirmed-real KYC status mix baseline.', evidenceBasis: 'snapshot', thresholdRefs: ['MIN_REAL_KYC_ROWS_FOR_INFO', 'MIN_REAL_PROFILES_FOR_TREND'] },
+  // publishedReviews AND bookings/orders totals are both since()-filtered (getTrustAnalytics/getTransactionAnalytics) -- genuinely period-bound.
+  TRUST_REVIEWS_SPARSE: { category: 'trust', scope: 'real-data', description: 'Published reviews are sparse relative to completed real transactions.', evidenceBasis: 'period', thresholdRefs: ['MIN_REAL_TRANSACTIONS_FOR_REVIEW_RATIO', 'MAX_REVIEW_RATE_FOR_SPARSE_SIGNAL'] },
+  // Support open-case backlog: a current-queue-depth concept (an admin work queue, not a 30-day activity metric) -- kept snapshot even though its own underlying query happens to apply a 30-day case-creation filter (a pre-existing D1 analytics-service.ts characteristic this phase does not touch/change).
+  OPERATIONS_SUPPORT_BACKLOG: { category: 'operations', scope: 'operational-all-system', description: 'Open Support case backlog.', evidenceBasis: 'snapshot', thresholdRefs: ['OPERATIONAL_BACKLOG_WATCH_COUNT', 'OPERATIONAL_BACKLOG_HIGH_COUNT'] },
+  // get_admin_overview_stats(): all 5 fields below are current pending/failed/retryable counts by definition -- an admin work queue must show every pending item regardless of age, not just the last 30 days'.
+  OPERATIONS_KYC_REVIEW_BACKLOG: { category: 'operations', scope: 'operational-all-system', description: 'Pending KYC review backlog.', evidenceBasis: 'snapshot', thresholdRefs: ['OPERATIONAL_BACKLOG_WATCH_COUNT', 'OPERATIONAL_BACKLOG_HIGH_COUNT'] },
+  OPERATIONS_OWNERSHIP_REVIEW_BACKLOG: { category: 'operations', scope: 'operational-all-system', description: 'Pending ownership verification backlog.', evidenceBasis: 'snapshot', thresholdRefs: ['OPERATIONAL_BACKLOG_WATCH_COUNT', 'OPERATIONAL_BACKLOG_HIGH_COUNT'] },
+  OPERATIONS_LISTING_MODERATION_BACKLOG: { category: 'operations', scope: 'operational-all-system', description: 'Pending listing moderation backlog.', evidenceBasis: 'snapshot', thresholdRefs: ['OPERATIONAL_BACKLOG_WATCH_COUNT', 'OPERATIONAL_BACKLOG_HIGH_COUNT'] },
+  OPERATIONS_FAILED_FINANCIAL_WORKFLOW_BACKLOG: { category: 'operations', scope: 'operational-all-system', description: 'Failed financial workflow backlog.', evidenceBasis: 'snapshot', thresholdRefs: ['OPERATIONAL_BACKLOG_WATCH_COUNT', 'OPERATIONAL_BACKLOG_HIGH_COUNT'] },
+  OPERATIONS_EMAIL_FAILURE_BACKLOG: { category: 'operations', scope: 'operational-all-system', description: 'Retryable email failure backlog.', evidenceBasis: 'snapshot', thresholdRefs: ['OPERATIONAL_BACKLOG_WATCH_COUNT', 'OPERATIONAL_BACKLOG_HIGH_COUNT'] },
+  // listOperationalExceptions() takes no period argument at all -- it uses an age-THRESHOLD (items stuck longer than X), the opposite time semantic from a trailing 30-day window.
+  OPERATIONS_EXCEPTIONS_BACKLOG: { category: 'operations', scope: 'operational-all-system', description: 'Unresolved Exceptions queue backlog.', evidenceBasis: 'snapshot', thresholdRefs: ['OPERATIONAL_BACKLOG_WATCH_COUNT', 'OPERATIONAL_BACKLOG_HIGH_COUNT'] },
 }
 
 // ============================================================
@@ -421,15 +487,25 @@ function clampBusinessPriority(insight: IntelligenceInsight): IntelligenceInsigh
 }
 
 /**
- * E2 freshness: a single, honest post-processing pass rather than
- * threading the same `{generatedAt, sourceWindow}` literal through every
- * one of the ~15 insight-construction call sites below. `sourceWindow`
- * names the known analytics period (THRESHOLDS/PERIOD-driven); never a
- * fabricated "refreshed Ns ago" style timestamp this module doesn't
- * actually have.
+ * E2-F1 freshness: a single, honest post-processing pass rather than
+ * threading a freshness literal through every one of the ~15 insight-
+ * construction call sites below. The rule's own `RULE_REGISTRY` entry
+ * (set once, per rule, after tracing its actual query -- see RuleMeta's
+ * own doc comment) is the single source of truth for `evidenceBasis`;
+ * `sourceWindow` is populated ONLY for 'period' rules, so a snapshot or
+ * structural finding can never carry a "Last 30 days" claim it doesn't
+ * have.
  */
 function attachFreshness(insight: DraftInsight): IntelligenceInsight {
-  return { ...insight, freshness: { generatedAt: insight.generatedAt, sourceWindow: SOURCE_WINDOW_LABEL } }
+  const { evidenceBasis } = RULE_REGISTRY[insight.ruleId]
+  return {
+    ...insight,
+    freshness: {
+      generatedAt: insight.generatedAt,
+      evidenceBasis,
+      ...(evidenceBasis === 'period' ? { sourceWindow: EVIDENCE_BASIS_LABEL.period } : {}),
+    },
+  }
 }
 
 function pct(from: number, to: number): number {
@@ -479,7 +555,12 @@ function buildTrendInsight(opts: {
       metric: opts.metricLabel,
       operator: rising ? '>=' : '<=',
       observedValue: `${change > 0 ? '+' : ''}${Math.round(change)}%`,
-      thresholdValue: `${THRESHOLDS.GROWTH_SWING_PCT}%`,
+      // E2-F1: signed to match the actual direction-specific boundary
+      // evaluated above (rising: change >= +GROWTH_SWING_PCT; falling:
+      // change <= -GROWTH_SWING_PCT) -- previously always positive,
+      // which misrepresented the real (negative) boundary for "down"
+      // insights.
+      thresholdValue: `${rising ? '+' : '-'}${THRESHOLDS.GROWTH_SWING_PCT}%`,
       comparisonValue: previous,
     },
     recommendation: rising
@@ -703,17 +784,26 @@ function buildDegradedSourcesInsight(failedLabels: string[]): DraftInsight {
     summary: `${failedLabels.length} of 10 analytics source(s) could not be read this cycle, so current recommendations may be incomplete.`,
     rationale: 'Deterministic, per-source failure isolation (E1-F1) -- a source that could not be read is excluded from every rule it feeds and is never treated as a genuine zero/no-activity observation. Successful sources below still contribute their own insights normally.',
     evidence: failedLabels.map((label) => ({ label: `${label} unavailable`, value: 'unavailable' })),
+    // E2-F1: the trigger describes the rule's ACTUAL firing floor
+    // (DEGRADED_SOURCES_MIN_COUNT=1 -- any single unavailable source is
+    // enough) rather than always showing the high-escalation floor,
+    // which previously misrepresented the condition for a medium-
+    // priority instance (e.g. "observed 1 >= 3" reads as false). The
+    // escalation floor is disclosed separately, in `limitations`, below.
     trigger: {
       metric: 'Unavailable analytics sources',
       operator: '>=',
       observedValue: failedLabels.length,
-      thresholdValue: THRESHOLDS.DEGRADED_SOURCES_HIGH_COUNT,
+      thresholdValue: THRESHOLDS.DEGRADED_SOURCES_MIN_COUNT,
     },
     recommendation: 'Retry shortly; if this persists, check Admin service connectivity. Draw no business conclusion from the absence of these sources specifically.',
     confidence: 'high',
     dataSufficiency: 'insufficient',
     scope: 'real-data',
-    limitations: ['Built from a reduced set of analytics sources this cycle -- see Source Health for which ones.'],
+    limitations: [
+      'Built from a reduced set of analytics sources this cycle -- see Source Health for which ones.',
+      `Escalates to high priority once ${THRESHOLDS.DEGRADED_SOURCES_HIGH_COUNT} or more sources are unavailable.`,
+    ],
     generatedAt: new Date().toISOString(),
   }
 }
@@ -1051,7 +1141,7 @@ function buildTrustInsights(ctx: {
   const realTransactions = transactions.bookings.total + transactions.orders.total
   if (realTransactions >= THRESHOLDS.MIN_REAL_TRANSACTIONS_FOR_REVIEW_RATIO) {
     const reviewsPerTransaction = trust.publishedReviews / realTransactions
-    if (reviewsPerTransaction < 0.1) {
+    if (reviewsPerTransaction < THRESHOLDS.MAX_REVIEW_RATE_FOR_SPARSE_SIGNAL) {
       out.push({
         id: nextId('trust'),
         ruleId: RULE_IDS.TRUST_REVIEWS_SPARSE,
@@ -1069,7 +1159,7 @@ function buildTrustInsights(ctx: {
           metric: 'Published reviews per real transaction',
           operator: '<',
           observedValue: Math.round(reviewsPerTransaction * 100) / 100,
-          thresholdValue: 0.1,
+          thresholdValue: THRESHOLDS.MAX_REVIEW_RATE_FOR_SPARSE_SIGNAL,
         },
         recommendation: 'Consider a post-transaction review prompt if review collection is a priority; this is descriptive, not proof of a quality problem.',
         confidence: 'low',
