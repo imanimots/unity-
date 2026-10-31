@@ -104,15 +104,31 @@ describe('20261031120000_harden_support_centre_rpc_execution.sql (category: ADMI
     }
   })
 
-  it('7. no stale/duplicate function definition exists anywhere else in the repository migration history for any of these 9 names -- no unexpected overload to separately revoke', () => {
+  it('7. no stale/unexpected duplicate function definition exists anywhere else in the repository migration history for any of these 9 names -- only the schema migration, and (for the 8 names E7 later re-validates for admin-actor integrity) the dedicated E7 forward migration, ever redefine them', () => {
     const migrationsDir = join(REPO_ROOT, 'supabase/migrations')
     const files = readdirSync(migrationsDir).filter((f: string) => f.endsWith('.sql'))
+    // E7 (20261031150000_harden_support_centre_admin_actor_integrity.sql)
+    // intentionally redefines 8 of these 9 functions via CREATE OR REPLACE
+    // FUNCTION to add admin-actor validation -- create_support_case already
+    // had that check at this migration's own time and is left untouched by
+    // E7, so it alone is still expected to have exactly one definition.
+    const EXPECTED_DEFINITION_COUNT: Record<string, number> = {
+      create_support_case: 1,
+      assign_support_case: 2,
+      change_support_case_priority: 2,
+      update_support_case_status: 2,
+      escalate_support_case: 2,
+      resolve_support_case: 2,
+      close_support_case: 2,
+      reopen_support_case: 2,
+      add_support_case_note: 2,
+    }
     for (const name of PRIVILEGED_RPC_NAMES) {
       // Narrowly matches a DEFINITION (CREATE [OR REPLACE] FUNCTION), not
       // this migration's own REVOKE/GRANT lines, which also legitimately
       // reference "function public.<name>(" without redefining it.
       const definingFiles = files.filter((f: string) => readFileSync(join(migrationsDir, f), 'utf-8').match(new RegExp(`create (or replace )?function public\\.${name}\\(`)))
-      expect(definingFiles, `${name} defined in more than one migration file`).toHaveLength(1)
+      expect(definingFiles, `${name} defined in an unexpected number of migration files: ${definingFiles.join(', ')}`).toHaveLength(EXPECTED_DEFINITION_COUNT[name])
     }
   })
 
