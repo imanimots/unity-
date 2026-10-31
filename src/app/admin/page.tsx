@@ -96,6 +96,7 @@ async function loadIntelligenceSafely(admin: SupabaseClient): Promise<Intelligen
       period: '30d',
       summary: { totalInsights: 0, highPriority: 0, opportunities: 0, risksAndWatch: 0, dataQualityLimitations: 0, realData: { highPriority: 0, opportunities: 0 }, operational: { highPriority: 0 } },
       insights: [],
+      sourceHealth: [],
     }
   }
 }
@@ -220,6 +221,8 @@ export default async function AdminOverviewPage() {
     escrow_transactions_failed: realEscrowCounts.escrowTransactionsFailed,
   }
 
+  const degradedSourceCount = intelligence.sourceHealth.filter((s) => s.status === 'degraded').length
+
   return (
     <div className="p-6 lg:p-8 space-y-8">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -262,6 +265,10 @@ export default async function AdminOverviewPage() {
           <p className="text-[11px] uppercase tracking-[0.1em] text-[#9B8B85]">Data limitations</p>
           <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{intelligence.summary.dataQualityLimitations}</p>
         </div>
+        {/* E2: a concise, non-alarming degraded-source indicator -- only rendered when something is actually degraded; full Source Health detail lives on /admin/intelligence, not duplicated here. */}
+        {degradedSourceCount > 0 && (
+          <p className="mt-3 text-xs text-amber-700 dark:text-amber-400">Data sources degraded: {degradedSourceCount}</p>
+        )}
       </Link>
 
       <section className="space-y-3">

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { requireAdmin } from '@/lib/supabase/require-admin'
 import { getAdminServiceClient } from '@/lib/admin/route-helpers'
-import { getIntelligenceInsights, type IntelligenceInsight, type IntelligencePriority, type IntelligenceInsightType, type IntelligenceConfidence, type IntelligenceDataSufficiency, type IntelligenceScope } from '@/lib/admin/intelligence-service'
+import { getIntelligenceInsights, type IntelligenceInsight, type IntelligencePriority, type IntelligenceInsightType, type IntelligenceConfidence, type IntelligenceDataSufficiency, type IntelligenceScope, type IntelligenceSourceStatus } from '@/lib/admin/intelligence-service'
 import { AdminPageHeader, StatCard, Pill, formatDateTime } from '@/components/admin/ui'
 
 const PRIORITY_STYLES: Record<IntelligencePriority, string> = {
@@ -38,6 +38,54 @@ const SCOPE_LABEL: Record<IntelligenceScope, string> = {
   'real-data': 'Real Data',
   'operational-all-system': 'Operational (all-system)',
 }
+
+/**
+ * E2: Source Health -- one row per Intelligence input source, independent
+ * of whether it produced an insight this cycle. Only the already-safe
+ * `IntelligenceSourceStatus` fields (human-readable label/status/scope/
+ * rule ids) are rendered -- never a raw error, Postgres message, or
+ * stack trace (the service layer never exposes those to begin with).
+ * Healthy sources render in neutral styling; a degraded source is the
+ * only state that gets an attention color, so a fully healthy cycle
+ * never looks alarming.
+ */
+function SourceHealthSection({ sourceHealth }: { sourceHealth: IntelligenceSourceStatus[] }) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Data sources / source health</p>
+        <p className="text-xs text-[#9B8B85]">Evidence window: {FRESHNESS_WINDOW_LABEL}</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {sourceHealth.map((s) => {
+          const degraded = s.status === 'degraded'
+          return (
+            <div
+              key={s.source}
+              className={`rounded-lg border p-3 ${degraded ? 'border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-[#2A1A05]' : 'border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010]'}`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{s.label}</p>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-[0.08em] whitespace-nowrap ${degraded ? 'bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200' : 'bg-green-100 text-green-700'}`}>
+                  {degraded ? 'Degraded' : 'Available'}
+                </span>
+              </div>
+              <p className="text-[11px] uppercase tracking-[0.08em] text-[#9B8B85] mt-1">{SCOPE_LABEL[s.scope]}</p>
+              {degraded && s.usedBy.length > 0 && (
+                <p className="text-xs text-amber-800 dark:text-amber-300 mt-2">
+                  May be incomplete: <span className="font-mono">{s.usedBy.join(', ')}</span>
+                </p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+/** E2: honest, known evidence window -- matches intelligence-service.ts's own SOURCE_WINDOW_LABEL; never a fabricated per-source refresh timestamp. */
+const FRESHNESS_WINDOW_LABEL = 'Last 30 days'
 
 function InsightCard({ insight }: { insight: IntelligenceInsight }) {
   return (
@@ -86,6 +134,38 @@ function InsightCard({ insight }: { insight: IntelligenceInsight }) {
           </Link>
         )}
       </div>
+
+      {/* E2: expandable explainability -- rule id, trigger/threshold detail, limitations, and freshness. Purely informational, read-only; no mutation control anywhere in this element. */}
+      <details className="pt-1 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
+        <summary className="cursor-pointer text-xs font-medium uppercase tracking-[0.08em] text-[#6B5B55] dark:text-[#9B8B85] pt-2">
+          Why did this appear?
+        </summary>
+        <div className="mt-2 space-y-2 text-xs text-[#6B5B55] dark:text-[#9B8B85]">
+          <p><span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Rule ID: </span><span className="font-mono">{insight.ruleId}</span></p>
+          {insight.trigger && (
+            <p>
+              <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Trigger: </span>
+              {insight.trigger.metric}
+              {insight.trigger.operator && insight.trigger.observedValue !== undefined && (
+                <span className="font-mono">
+                  {' '}({insight.trigger.operator} {String(insight.trigger.observedValue)}
+                  {insight.trigger.thresholdValue !== undefined ? `, threshold ${insight.trigger.thresholdValue}` : ''}
+                  {insight.trigger.comparisonValue !== undefined ? `, prior ${insight.trigger.comparisonValue}` : ''})
+                </span>
+              )}
+            </p>
+          )}
+          {insight.limitations.length > 0 && (
+            <div>
+              <p className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Limitations:</p>
+              <ul className="list-disc pl-4 space-y-0.5">
+                {insight.limitations.map((l) => <li key={l}>{l}</li>)}
+              </ul>
+            </div>
+          )}
+          <p><span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Generated: </span>{formatDateTime(insight.freshness.generatedAt)} · <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Evidence window: </span>{insight.freshness.sourceWindow}</p>
+        </div>
+      </details>
     </div>
   )
 }
@@ -109,7 +189,7 @@ export default async function AdminIntelligencePage() {
     <div className="p-6 lg:p-8 space-y-8">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <AdminPageHeader eyebrow="AI R&D" title="AI R&D & Intelligence" badge="Recommendation only" />
-        <p className="text-xs text-[#9B8B85]">Generated {formatDateTime(result.generatedAt)}</p>
+        <p className="text-xs text-[#9B8B85]">Generated {formatDateTime(result.generatedAt)} · Evidence window: {FRESHNESS_WINDOW_LABEL}</p>
       </div>
 
       <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] max-w-3xl">
@@ -127,6 +207,8 @@ export default async function AdminIntelligencePage() {
           <StatCard label="Data limitations" value={result.summary.dataQualityLimitations} />
         </div>
       </section>
+
+      <SourceHealthSection sourceHealth={result.sourceHealth} />
 
       <section className="space-y-3">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Prioritized insights</p>

@@ -29,7 +29,7 @@ vi.mock('@/lib/admin/exceptions-service', () => ({
   listOperationalExceptions: (...a: unknown[]) => listOperationalExceptions(...a),
 }))
 
-const { getIntelligenceInsights } = await import('../intelligence-service')
+const { getIntelligenceInsights, RULE_IDS, RULE_REGISTRY } = await import('../intelligence-service')
 
 // ---- Baseline zero/sparse-data fixtures -- the "nothing confirmed-real yet" state ----
 const ZERO_COMPARISON: PeriodComparison = { current: 0, previous: null }
@@ -547,5 +547,207 @@ describe('getIntelligenceInsights: homepage scope-aware summary (category: ADMIN
     expect(demandInsight?.scope).toBe('real-data')
     expect(demandInsight?.type).toBe('opportunity')
     expect(result.summary.realData.opportunities).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('getIntelligenceInsights: E2 stable rule IDs (category: ADMIN-CONTROL-CENTRE-BATCH-E2)', () => {
+  it('A1. identical inputs generate identical rule IDs across repeated calls', async () => {
+    const admin1 = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
+    const result1 = await getIntelligenceInsights(admin1)
+    const admin2 = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
+    const result2 = await getIntelligenceInsights(admin2)
+    expect(result1.insights.map((i) => i.ruleId).sort()).toEqual(result2.insights.map((i) => i.ruleId).sort())
+  })
+
+  it('A2. no two distinct rule families share the same rule ID -- RULE_IDS values are all unique', () => {
+    const values = Object.values(RULE_IDS)
+    expect(new Set(values).size).toBe(values.length)
+  })
+
+  it('A3. every rule ID has exactly one RULE_REGISTRY entry, and every registry entry is a real rule ID', () => {
+    const ruleIdValues = new Set(Object.values(RULE_IDS) as string[])
+    expect(new Set(Object.keys(RULE_REGISTRY))).toEqual(ruleIdValues)
+  })
+
+  it('A4. rule IDs are stable human-readable strings, never UUIDs or numeric database IDs', async () => {
+    const admin = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
+    const result = await getIntelligenceInsights(admin)
+    for (const insight of result.insights) {
+      expect(insight.ruleId).toMatch(/^[A-Z][A-Z0-9_]+$/)
+      expect(insight.ruleId).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
+    }
+  })
+
+  it('A5. distinct growth directions (up vs down) for the same metric produce distinct rule IDs', async () => {
+    const adminUp = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
+    const resultUp = await getIntelligenceInsights(adminUp)
+    const adminDown = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 5, previous: 10 } } })
+    const resultDown = await getIntelligenceInsights(adminDown)
+    const upRuleId = resultUp.insights.find((i) => i.category === 'growth' && /New users/i.test(i.title))?.ruleId
+    const downRuleId = resultDown.insights.find((i) => i.category === 'growth' && /New users/i.test(i.title))?.ruleId
+    expect(upRuleId).toBe(RULE_IDS.GROWTH_NEW_USERS_UP)
+    expect(downRuleId).toBe(RULE_IDS.GROWTH_NEW_USERS_DOWN)
+    expect(upRuleId).not.toBe(downRuleId)
+  })
+})
+
+describe('getIntelligenceInsights: E2 trigger explainability (category: ADMIN-CONTROL-CENTRE-BATCH-E2)', () => {
+  it('B1. a business insight includes its triggering metric and observed/threshold values', async () => {
+    const admin = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
+    const result = await getIntelligenceInsights(admin)
+    const insight = result.insights.find((i) => i.category === 'growth' && /New users/i.test(i.title))
+    expect(insight?.trigger).toBeDefined()
+    expect(insight?.trigger?.metric).toMatch(/New users/i)
+    expect(insight?.trigger?.observedValue).toBeDefined()
+    expect(insight?.trigger?.thresholdValue).toBeDefined()
+  })
+
+  it('B2. an operational backlog insight surfaces its threshold', async () => {
+    const admin = setupBaseline({ overviewStats: { pending_kyc_reviews: 15, pending_ownership_reviews: 0, pending_listing_moderation: 0, failed_financial_workflows: 0, retryable_email_failures: 0 } })
+    const result = await getIntelligenceInsights(admin)
+    const insight = result.insights.find((i) => i.category === 'operations' && /KYC review/i.test(i.title))
+    expect(insight?.trigger?.observedValue).toBe(15)
+    expect(insight?.trigger?.thresholdValue).toBeDefined()
+  })
+
+  it('B3. no insight contains a hidden undefined/NaN value anywhere in its serialized form', async () => {
+    const admin = setupBaseline({
+      growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } },
+      overviewStats: { pending_kyc_reviews: 40, pending_ownership_reviews: 0, pending_listing_moderation: 0, failed_financial_workflows: 0, retryable_email_failures: 0 },
+    })
+    const result = await getIntelligenceInsights(admin)
+    const blob = JSON.stringify(result)
+    expect(blob).not.toMatch(/\bNaN\b|\bundefined\b/)
+  })
+})
+
+describe('getIntelligenceInsights: E2 source health diagnostics (category: ADMIN-CONTROL-CENTRE-BATCH-E2)', () => {
+  it('C1. a healthy source appears available in sourceHealth', async () => {
+    const admin = setupBaseline()
+    const result = await getIntelligenceInsights(admin)
+    const marketplaceRow = result.sourceHealth.find((s) => s.source === 'marketplace')
+    expect(marketplaceRow?.status).toBe('available')
+  })
+
+  it('C2. a failed source appears degraded in sourceHealth, with no raw exception text', async () => {
+    const admin = setupBaseline()
+    getGrowthAnalytics.mockRejectedValue(new Error('pg_catalog.unity_growth_tbl_9c2 ECONNRESET'))
+    const result = await getIntelligenceInsights(admin)
+    const growthRow = result.sourceHealth.find((s) => s.source === 'growth')
+    expect(growthRow?.status).toBe('degraded')
+    const blob = JSON.stringify(result.sourceHealth)
+    expect(blob).not.toMatch(/pg_catalog|unity_growth_tbl|ECONNRESET/)
+  })
+
+  it('C3. a degraded source correctly reports the rule families it affects', async () => {
+    const admin = setupBaseline()
+    getGrowthAnalytics.mockRejectedValue(new Error('x'))
+    const result = await getIntelligenceInsights(admin)
+    const growthRow = result.sourceHealth.find((s) => s.source === 'growth')
+    expect(growthRow?.usedBy).toContain(RULE_IDS.GROWTH_NEW_USERS_UP)
+    expect(growthRow?.usedBy).toContain(RULE_IDS.GROWTH_NEW_ORDERS_DOWN)
+  })
+
+  it('C4. sourceHealth always lists all 10 sources regardless of which insights fired this cycle', async () => {
+    const admin = setupBaseline()
+    const result = await getIntelligenceInsights(admin)
+    expect(result.sourceHealth).toHaveLength(10)
+    expect(result.sourceHealth.every((s) => s.status === 'available')).toBe(true)
+  })
+})
+
+describe('getIntelligenceInsights: E2 limitations (category: ADMIN-CONTROL-CENTRE-BATCH-E2)', () => {
+  it('D1. a sparse-sample growth insight exposes a limitation about sample sufficiency', async () => {
+    const admin = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 8, previous: 5 } } })
+    const result = await getIntelligenceInsights(admin)
+    const insight = result.insights.find((i) => i.category === 'growth' && /New users/i.test(i.title))
+    expect(insight?.limitations.length).toBeGreaterThan(0)
+  })
+
+  it('D2. a sufficiently sampled growth insight carries no sufficiency limitation', async () => {
+    const admin = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 100, previous: 50 } } })
+    const result = await getIntelligenceInsights(admin)
+    const insight = result.insights.find((i) => i.category === 'growth' && /New users/i.test(i.title))
+    expect(insight?.limitations).toEqual([])
+  })
+
+  it('D3. the degraded-source insight exposes a limitation about reduced source coverage', async () => {
+    const admin = setupBaseline()
+    getMarketplaceOverview.mockRejectedValue(new Error('x'))
+    const result = await getIntelligenceInsights(admin)
+    const degraded = result.insights.find((i) => /partially unavailable/i.test(i.title))
+    expect(degraded?.limitations.length).toBeGreaterThan(0)
+  })
+
+  it('D4. an operational-all-system backlog insight clearly represents the operational-scope limitation', async () => {
+    const admin = setupBaseline({ overviewStats: { pending_kyc_reviews: 40, pending_ownership_reviews: 0, pending_listing_moderation: 0, failed_financial_workflows: 0, retryable_email_failures: 0 } })
+    const result = await getIntelligenceInsights(admin)
+    const insight = result.insights.find((i) => i.category === 'operations' && /KYC review/i.test(i.title))
+    expect(insight?.limitations.some((l) => /operational/i.test(l))).toBe(true)
+  })
+})
+
+describe('getIntelligenceInsights: E2 freshness (category: ADMIN-CONTROL-CENTRE-BATCH-E2)', () => {
+  it('E1. every insight carries a valid generatedAt timestamp', async () => {
+    const admin = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
+    const result = await getIntelligenceInsights(admin)
+    for (const insight of result.insights) {
+      expect(Number.isNaN(new Date(insight.freshness.generatedAt).getTime())).toBe(false)
+    }
+  })
+
+  it('E2. the evidence window is the known, honest analytics period -- never a fabricated refresh timestamp', async () => {
+    const admin = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
+    const result = await getIntelligenceInsights(admin)
+    for (const insight of result.insights) {
+      expect(insight.freshness.sourceWindow).toBe('Last 30 days')
+      expect(Object.keys(insight.freshness).sort()).toEqual(['generatedAt', 'sourceWindow'])
+    }
+  })
+})
+
+describe('getIntelligenceInsights: E2 privacy -- trigger/limitations carry no PII (category: ADMIN-CONTROL-CENTRE-BATCH-E2)', () => {
+  it('F1. trigger and limitations fields contain no email, phone, or raw UUID shape', async () => {
+    const admin = setupBaseline({
+      growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } },
+      trust: { ...ZERO_TRUST, accountRestrictions: { restricted: 3, suspended: 3 } },
+      overviewStats: { pending_kyc_reviews: 40, pending_ownership_reviews: 0, pending_listing_moderation: 0, failed_financial_workflows: 0, retryable_email_failures: 0 },
+    })
+    const result = await getIntelligenceInsights(admin)
+    const blob = JSON.stringify(result.insights.map((i) => ({ trigger: i.trigger, limitations: i.limitations })))
+    expect(blob).not.toMatch(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i)
+    expect(blob).not.toMatch(/\+?\d{9,}/)
+    expect(blob).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
+  })
+})
+
+describe('getIntelligenceInsights: E2 failure isolation regression (category: ADMIN-CONTROL-CENTRE-BATCH-E2)', () => {
+  it('G1. a source rejection still resolves a valid IntelligenceResult including sourceHealth', async () => {
+    const admin = setupBaseline()
+    getSupportAnalytics.mockRejectedValue(new Error('x'))
+    const result = await getIntelligenceInsights(admin)
+    expect(result.summary).toBeDefined()
+    expect(result.sourceHealth.find((s) => s.source === 'support')?.status).toBe('degraded')
+  })
+})
+
+describe('getIntelligenceInsights: E2 homepage scope after model extension (category: ADMIN-CONTROL-CENTRE-BATCH-E2)', () => {
+  it('H1. Real Data and Operational high-priority counts remain separated after the E2 model extension', async () => {
+    const admin = setupBaseline({
+      growth: { ...ZERO_GROWTH, newUsers: { current: 100, previous: 50 } },
+      overviewStats: { pending_kyc_reviews: 0, pending_ownership_reviews: 0, pending_listing_moderation: 40, failed_financial_workflows: 0, retryable_email_failures: 0 },
+    })
+    const result = await getIntelligenceInsights(admin)
+    expect(result.summary.realData.highPriority).toBe(1)
+    expect(result.summary.operational.highPriority).toBe(1)
+  })
+
+  it('H2. a degraded-source count derived from sourceHealth matches the number of degraded rows', async () => {
+    const admin = setupBaseline()
+    getSupplyAnalytics.mockRejectedValue(new Error('x'))
+    getDemandAnalytics.mockRejectedValue(new Error('x'))
+    const result = await getIntelligenceInsights(admin)
+    const degradedSourceCount = result.sourceHealth.filter((s) => s.status === 'degraded').length
+    expect(degradedSourceCount).toBe(2)
   })
 })
