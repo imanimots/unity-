@@ -66,4 +66,11 @@ describe('POST /api/admin/support/[id]/status (category: ADMIN-CONTROL-CENTRE-BA
     const res = await postReq({ target_status: 'open' })
     expect(res.status).toBe(409)
   })
+
+  it('7. E6: a spoofed admin identity field in the body is ignored -- attribution always comes from the authenticated session', async () => {
+    const ATTACKER_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    const res = await postReq({ target_status: 'in_progress', admin_id: ATTACKER_ID, adminId: ATTACKER_ID, p_admin_id: ATTACKER_ID })
+    expect(res.status).toBe(200)
+    expect(rpcMock).toHaveBeenCalledWith('update_support_case_status', expect.objectContaining({ p_admin_id: ADMIN_ID }))
+  })
 })

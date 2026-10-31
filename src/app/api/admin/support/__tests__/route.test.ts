@@ -114,4 +114,11 @@ describe('POST /api/admin/support (category: ADMIN-CONTROL-CENTRE-BATCH-A2) — 
     const body = await res.json()
     expect(body.error).not.toContain('p_customer_id')
   })
+
+  it('12. E6: a spoofed admin identity field anywhere in the request body is ignored -- attribution always comes from the authenticated session, never the client', async () => {
+    const ATTACKER_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    const res = await postReq({ title: 'Help', category: 'general_other', customer_id: CUSTOMER_ID, admin_id: ATTACKER_ID, adminId: ATTACKER_ID, p_admin_id: ATTACKER_ID })
+    expect(res.status).toBe(200)
+    expect(rpcMock).toHaveBeenCalledWith('create_support_case', expect.objectContaining({ p_admin_id: ADMIN_ID }))
+  })
 })

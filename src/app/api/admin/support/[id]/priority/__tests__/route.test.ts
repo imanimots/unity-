@@ -48,4 +48,11 @@ describe('POST /api/admin/support/[id]/priority (category: ADMIN-CONTROL-CENTRE-
     expect(res.status).toBe(200)
     expect(rpcMock).toHaveBeenCalledWith('change_support_case_priority', expect.objectContaining({ p_admin_id: ADMIN_ID, p_case_id: CASE_ID, p_priority: 'urgent' }))
   })
+
+  it('4. E6: a spoofed admin identity field in the body is ignored -- attribution always comes from the authenticated session', async () => {
+    const ATTACKER_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    const res = await postReq({ priority: 'urgent', admin_id: ATTACKER_ID, adminId: ATTACKER_ID, p_admin_id: ATTACKER_ID })
+    expect(res.status).toBe(200)
+    expect(rpcMock).toHaveBeenCalledWith('change_support_case_priority', expect.objectContaining({ p_admin_id: ADMIN_ID }))
+  })
 })

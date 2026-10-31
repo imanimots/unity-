@@ -54,4 +54,11 @@ describe('POST /api/admin/support/[id]/resolve (category: ADMIN-CONTROL-CENTRE-B
     const res = await postReq({ resolution_summary: 'x' })
     expect(res.status).toBe(409)
   })
+
+  it('5. E6: a spoofed admin identity field in the body is ignored -- attribution always comes from the authenticated session', async () => {
+    const ATTACKER_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    const res = await postReq({ resolution_summary: 'Refunded', admin_id: ATTACKER_ID, adminId: ATTACKER_ID, p_admin_id: ATTACKER_ID })
+    expect(res.status).toBe(200)
+    expect(rpcMock).toHaveBeenCalledWith('resolve_support_case', expect.objectContaining({ p_admin_id: ADMIN_ID }))
+  })
 })
