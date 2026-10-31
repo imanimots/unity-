@@ -361,3 +361,191 @@ describe('getIntelligenceInsights: structural safety (category: ADMIN-CONTROL-CE
     }
   })
 })
+
+describe('getIntelligenceInsights: failure isolation (category: ADMIN-CONTROL-CENTRE-BATCH-E1-F1)', () => {
+  it('A1. a single rejecting source does not reject the overall result, and other sources still contribute their own insights normally', async () => {
+    const admin = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 20, previous: 10 } } })
+    getMarketplaceOverview.mockRejectedValue(new Error('connection reset'))
+    const result = await getIntelligenceInsights(admin)
+    expect(result).toBeDefined()
+    expect(result.insights.some((i) => i.category === 'growth' && /New users/i.test(i.title))).toBe(true)
+  })
+
+  it('A2. a failed source produces a dedicated degraded-source finding naming it by human-readable label, never a raw error message, stack trace, or table name', async () => {
+    const admin = setupBaseline()
+    getMarketplaceOverview.mockRejectedValue(new Error('pg_catalog.unity_profiles_tbl_7f3a ECONNRESET at host 10.0.0.5:5432'))
+    const result = await getIntelligenceInsights(admin)
+    const degraded = result.insights.find((i) => /partially unavailable/i.test(i.title))
+    expect(degraded).toBeDefined()
+    expect(degraded?.category).toBe('data-quality')
+    expect(degraded?.evidence.some((e) => /Marketplace analytics/i.test(String(e.label)))).toBe(true)
+    const blob = JSON.stringify(result.insights)
+    expect(blob).not.toMatch(/pg_catalog|unity_profiles_tbl|ECONNRESET|10\.0\.0\.5/)
+  })
+
+  it('A3. a failed source is never silently substituted with a genuine-zero value -- the "small real user base" insight (keyed off an observed totalUsers=0) does not fire when marketplace actually failed to load', async () => {
+    const admin = setupBaseline()
+    getMarketplaceOverview.mockRejectedValue(new Error('timeout'))
+    const result = await getIntelligenceInsights(admin)
+    expect(result.insights.some((i) => /confirmed Real Data user base is still small/i.test(i.title))).toBe(false)
+  })
+
+  it('A4. a failed source does not suppress an unrelated successful source\'s operational insight', async () => {
+    const admin = setupBaseline({ overviewStats: { pending_kyc_reviews: 40, pending_ownership_reviews: 0, pending_listing_moderation: 0, failed_financial_workflows: 0, retryable_email_failures: 0 } })
+    getBehaviorAnalytics.mockRejectedValue(new Error('boom'))
+    const result = await getIntelligenceInsights(admin)
+    expect(result.insights.some((i) => i.category === 'operations' && /KYC review/i.test(i.title))).toBe(true)
+  })
+})
+
+describe('getIntelligenceInsights: Admin Overview protection -- Intelligence failure cannot break Overview rendering (category: ADMIN-CONTROL-CENTRE-BATCH-E1-F1)', () => {
+  it('B1. getIntelligenceInsights never rejects even when every single input source rejects', async () => {
+    const admin = setupBaseline()
+    getMarketplaceOverview.mockRejectedValue(new Error('x'))
+    getSupplyAnalytics.mockRejectedValue(new Error('x'))
+    getDemandAnalytics.mockRejectedValue(new Error('x'))
+    getTransactionAnalytics.mockRejectedValue(new Error('x'))
+    getTrustAnalytics.mockRejectedValue(new Error('x'))
+    getGrowthAnalytics.mockRejectedValue(new Error('x'))
+    getBehaviorAnalytics.mockRejectedValue(new Error('x'))
+    getSupportAnalytics.mockRejectedValue(new Error('x'))
+    listOperationalExceptions.mockRejectedValue(new Error('x'))
+    admin.rpc = vi.fn().mockRejectedValue(new Error('x'))
+    await expect(getIntelligenceInsights(admin)).resolves.toBeDefined()
+  })
+
+  it('B2. a total source outage still returns a well-formed result with a high-priority degraded-source finding, so a caller awaiting this promise (e.g. the Admin Overview page\'s own Promise.all) is never the cause of a rejected page render', async () => {
+    const admin = setupBaseline()
+    getMarketplaceOverview.mockRejectedValue(new Error('x'))
+    getSupplyAnalytics.mockRejectedValue(new Error('x'))
+    getDemandAnalytics.mockRejectedValue(new Error('x'))
+    getTransactionAnalytics.mockRejectedValue(new Error('x'))
+    getTrustAnalytics.mockRejectedValue(new Error('x'))
+    getGrowthAnalytics.mockRejectedValue(new Error('x'))
+    getBehaviorAnalytics.mockRejectedValue(new Error('x'))
+    getSupportAnalytics.mockRejectedValue(new Error('x'))
+    listOperationalExceptions.mockRejectedValue(new Error('x'))
+    admin.rpc = vi.fn().mockRejectedValue(new Error('x'))
+    const result = await getIntelligenceInsights(admin)
+    expect(result.summary).toBeDefined()
+    expect(Array.isArray(result.insights)).toBe(true)
+    const degraded = result.insights.find((i) => /partially unavailable/i.test(i.title))
+    expect(degraded?.priority).toBe('high')
+  })
+})
+
+describe('getIntelligenceInsights: multiple simultaneous source failures (category: ADMIN-CONTROL-CENTRE-BATCH-E1-F1)', () => {
+  it('C1. several sources failing at once still produces a valid result with no NaN/undefined/Infinity anywhere in the output', async () => {
+    const admin = setupBaseline()
+    getSupplyAnalytics.mockRejectedValue(new Error('x'))
+    getDemandAnalytics.mockRejectedValue(new Error('x'))
+    getTrustAnalytics.mockRejectedValue(new Error('x'))
+    const result = await getIntelligenceInsights(admin)
+    expect(Number.isNaN(result.summary.totalInsights)).toBe(false)
+    expect(Number.isNaN(result.summary.highPriority)).toBe(false)
+    expect(Number.isFinite(result.summary.totalInsights)).toBe(true)
+    const blob = JSON.stringify(result)
+    expect(blob).not.toMatch(/\bNaN\b|\bundefined\b|\bInfinity\b/)
+  })
+
+  it('C2. the single degraded-source finding names every one of several simultaneously failed sources', async () => {
+    const admin = setupBaseline()
+    getSupplyAnalytics.mockRejectedValue(new Error('x'))
+    getDemandAnalytics.mockRejectedValue(new Error('x'))
+    getTrustAnalytics.mockRejectedValue(new Error('x'))
+    const result = await getIntelligenceInsights(admin)
+    const degraded = result.insights.find((i) => /partially unavailable/i.test(i.title))
+    expect(degraded).toBeDefined()
+    expect(degraded?.evidence.length).toBe(3)
+    expect(degraded?.evidence.some((e) => /Supply analytics/i.test(String(e.label)))).toBe(true)
+    expect(degraded?.evidence.some((e) => /Demand analytics/i.test(String(e.label)))).toBe(true)
+    expect(degraded?.evidence.some((e) => /Trust analytics/i.test(String(e.label)))).toBe(true)
+  })
+
+  it('C3. exactly reaching the degraded-source high-priority count escalates the finding to high priority; below it stays medium', async () => {
+    const admin1 = setupBaseline()
+    getSupplyAnalytics.mockRejectedValue(new Error('x'))
+    const result1 = await getIntelligenceInsights(admin1)
+    expect(result1.insights.find((i) => /partially unavailable/i.test(i.title))?.priority).toBe('medium')
+
+    const admin2 = setupBaseline()
+    getSupplyAnalytics.mockRejectedValue(new Error('x'))
+    getDemandAnalytics.mockRejectedValue(new Error('x'))
+    getTrustAnalytics.mockRejectedValue(new Error('x'))
+    const result2 = await getIntelligenceInsights(admin2)
+    expect(result2.insights.find((i) => /partially unavailable/i.test(i.title))?.priority).toBe('high')
+  })
+})
+
+describe('getIntelligenceInsights: priority/confidence coherence clamp (category: ADMIN-CONTROL-CENTRE-BATCH-E1-F1)', () => {
+  it('D1. previous=5/current=8 (+60%, a thin-sample swing) must NOT reach high priority -- it is both below the sufficiency floor and low-confidence', async () => {
+    const admin = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 8, previous: 5 } } })
+    const result = await getIntelligenceInsights(admin)
+    const insight = result.insights.find((i) => i.category === 'growth' && /New users/i.test(i.title))
+    expect(insight).toBeDefined()
+    expect(insight?.dataSufficiency).not.toBe('sufficient')
+    expect(insight?.confidence).toBe('low')
+    expect(insight?.priority).not.toBe('high')
+  })
+
+  it('D2. a sufficiently sampled, high-confidence swing can still reach high priority -- the clamp does not globally block it', async () => {
+    const admin = setupBaseline({ growth: { ...ZERO_GROWTH, newUsers: { current: 100, previous: 50 } } }) // +100%, previous >= MIN_REAL_PROFILES_FOR_TREND
+    const result = await getIntelligenceInsights(admin)
+    const insight = result.insights.find((i) => i.category === 'growth' && /New users/i.test(i.title))
+    expect(insight).toBeDefined()
+    expect(insight?.dataSufficiency).toBe('sufficient')
+    expect(insight?.priority).toBe('high')
+  })
+
+  it('D3. the clamp never downgrades an operational-all-system backlog finding, even from a small/low-confidence sample', async () => {
+    const admin = setupBaseline({ overviewStats: { pending_kyc_reviews: 0, pending_ownership_reviews: 0, pending_listing_moderation: 40, failed_financial_workflows: 0, retryable_email_failures: 0 } })
+    const result = await getIntelligenceInsights(admin)
+    const insight = result.insights.find((i) => i.category === 'operations' && /moderation/i.test(i.title))
+    expect(insight?.priority).toBe('high')
+  })
+
+  it('D4. the clamp never downgrades a data-quality finding (it can legitimately be high priority precisely because business data is thin)', async () => {
+    const admin = setupBaseline()
+    getMarketplaceOverview.mockRejectedValue(new Error('x'))
+    getSupplyAnalytics.mockRejectedValue(new Error('x'))
+    getDemandAnalytics.mockRejectedValue(new Error('x'))
+    const result = await getIntelligenceInsights(admin)
+    const degraded = result.insights.find((i) => /partially unavailable/i.test(i.title))
+    expect(degraded?.category).toBe('data-quality')
+    expect(degraded?.priority).toBe('high')
+  })
+})
+
+describe('getIntelligenceInsights: homepage scope-aware summary (category: ADMIN-CONTROL-CENTRE-BATCH-E1-F1)', () => {
+  it('E1. realData and operational summary counts are reported separately, not blended into one scope-blind total', async () => {
+    const admin = setupBaseline({
+      growth: { ...ZERO_GROWTH, newUsers: { current: 100, previous: 50 } }, // real-data, high priority
+      overviewStats: { pending_kyc_reviews: 0, pending_ownership_reviews: 0, pending_listing_moderation: 40, failed_financial_workflows: 0, retryable_email_failures: 0 }, // operational, high priority
+    })
+    const result = await getIntelligenceInsights(admin)
+    expect(result.summary.realData.highPriority).toBe(1)
+    expect(result.summary.operational.highPriority).toBe(1)
+    expect(result.summary.highPriority).toBe(2)
+  })
+
+  it('E2. an operational-only high-priority insight does not increment the realData.highPriority count', async () => {
+    const admin = setupBaseline({
+      overviewStats: { pending_kyc_reviews: 0, pending_ownership_reviews: 0, pending_listing_moderation: 40, failed_financial_workflows: 0, retryable_email_failures: 0 },
+    })
+    const result = await getIntelligenceInsights(admin)
+    expect(result.summary.operational.highPriority).toBeGreaterThan(0)
+    expect(result.summary.realData.highPriority).toBe(0)
+  })
+
+  it('E3. realData.opportunities only counts real-data-scoped opportunity insights', async () => {
+    const admin = setupBaseline({
+      marketplace: { ...ZERO_MARKETPLACE, realActiveListings: 20 },
+      demand: { ...ZERO_DEMAND, lookingFor: { byCategory: [], byStatus: [], total: 50 } },
+    })
+    const result = await getIntelligenceInsights(admin)
+    const demandInsight = result.insights.find((i) => i.category === 'demand')
+    expect(demandInsight?.scope).toBe('real-data')
+    expect(demandInsight?.type).toBe('opportunity')
+    expect(result.summary.realData.opportunities).toBeGreaterThanOrEqual(1)
+  })
+})

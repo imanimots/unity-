@@ -91,6 +91,16 @@ export interface IntelligenceSummary {
   opportunities: number
   risksAndWatch: number
   dataQualityLimitations: number
+  /**
+   * E1-F1: scope-aware breakdown so a consumer (the homepage card, in
+   * particular) can show Real Data and Operational-all-system counts
+   * separately rather than one scope-blind total that could read as a
+   * pure Real Data business KPI. These do not replace the top-level
+   * fields above (kept for backward compatibility) -- they partition
+   * the same underlying insight list by `scope`.
+   */
+  realData: { highPriority: number; opportunities: number }
+  operational: { highPriority: number }
 }
 
 export interface IntelligenceResult {
@@ -133,6 +143,8 @@ const THRESHOLDS = {
   OPERATIONAL_BACKLOG_WATCH_COUNT: 10,
   /** ...and at or above this count is escalated to a risk (high priority). */
   OPERATIONAL_BACKLOG_HIGH_COUNT: 30,
+  /** E1-F1: at or above this many unavailable input sources (of 10 total), the "Intelligence inputs are partially unavailable" finding is escalated to high priority -- a systemic read problem, not a single transient hiccup. */
+  DEGRADED_SOURCES_HIGH_COUNT: 3,
 } as const
 
 const PERIOD = '30d' as const
@@ -145,6 +157,67 @@ let insightCounter = 0
 function nextId(prefix: string): string {
   insightCounter += 1
   return `${prefix}-${insightCounter}`
+}
+
+/**
+ * E1-F1 failure isolation: wraps one source read so a rejection can
+ * never propagate into (or reject) the combined Promise.all in
+ * getIntelligenceInsights(). `ok: false` is tracked explicitly and
+ * carries NO data -- callers must never substitute a zero/empty value
+ * and treat it as a genuine observation (that would silently turn
+ * "source unavailable" into "observed zero", which is analytically
+ * dishonest). Every `buildXInsights` function below checks `.ok`
+ * itself and skips (or partially skips) whatever specifically depends
+ * on a failed source, rather than receiving a fabricated fallback.
+ */
+interface SourceOutcome<T> {
+  ok: boolean
+  data: T | null
+}
+
+async function loadSource<T>(promise: Promise<T>): Promise<SourceOutcome<T>> {
+  try {
+    const data = await promise
+    return { ok: true, data }
+  } catch {
+    return { ok: false, data: null }
+  }
+}
+
+/** Human-readable, implementation-detail-free labels for the degraded-source disclosure -- never a raw table name or error message. */
+const SOURCE_LABELS = {
+  marketplace: 'Marketplace analytics',
+  supply: 'Supply analytics',
+  demand: 'Demand analytics',
+  transactions: 'Transaction analytics',
+  trust: 'Trust analytics',
+  growth: 'Growth analytics',
+  behavior: 'Behavior analytics',
+  support: 'Support analytics',
+  overviewStats: 'Operational overview stats',
+  exceptions: 'Exceptions queue',
+} as const
+
+/**
+ * E1-F1 priority/confidence coherence: a non-data-quality Real Data
+ * business insight (opportunity/risk/watch) must not carry
+ * priority='high' unless its own evidence is both confidently and
+ * sufficiently assessed -- otherwise a thin sample's raw percentage
+ * swing could out-rank a well-supported finding (the independently
+ * confirmed previous=5/current=8/+60% case). Applied as one universal
+ * post-processing pass rather than a per-rule special case, so it
+ * covers every current and future business rule automatically.
+ * Deliberately exempt: 'data-quality' insights (a system-availability
+ * finding can legitimately be high priority precisely because business
+ * data is thin) and 'operational-all-system' insights (an operational
+ * queue's own count is exact regardless of Real Data sample size).
+ */
+function clampBusinessPriority(insight: IntelligenceInsight): IntelligenceInsight {
+  const isBusinessRealDataInsight = insight.scope === 'real-data' && insight.category !== 'data-quality' && insight.type !== 'informational'
+  if (isBusinessRealDataInsight && insight.priority === 'high' && (insight.dataSufficiency !== 'sufficient' || insight.confidence === 'low')) {
+    return { ...insight, priority: 'medium' }
+  }
+  return insight
 }
 
 function pct(from: number, to: number): number {
@@ -233,31 +306,69 @@ function operationalBacklogInsight(opts: { label: string; count: number; actionH
  * `listOperationalExceptions` (the canonical Exceptions queue).
  * Deterministic: given the same underlying data, always returns the
  * same insights in the same order.
+ *
+ * E1-F1 failure isolation: every one of the 10 input sources is
+ * wrapped in `loadSource()` individually -- a rejection from any single
+ * source can never reject this function as a whole (confirmed by this
+ * phase's own adversarial test: previously, a single
+ * getMarketplaceOverview() rejection rejected the entire result, which
+ * -- because src/app/admin/page.tsx calls this function inside its own
+ * unguarded Promise.all -- could take down the Admin Overview
+ * homepage). A failed source is never silently substituted with a
+ * zero/empty value and fed through its normal rules (that would turn
+ * "unavailable" into "observed zero"); instead every `buildXInsights`
+ * function below checks each of its own sources' `.ok` and skips
+ * whatever specifically depends on a failed one, while a single
+ * consolidated data-quality insight discloses which sources were
+ * unavailable this cycle.
  */
 export async function getIntelligenceInsights(admin: SupabaseClient): Promise<IntelligenceResult> {
   const generatedAt = new Date().toISOString()
 
-  const [marketplace, supply, demand, transactions, trust, growth, behavior, support, overviewRpc, exceptions] = await Promise.all([
-    getMarketplaceOverview(admin, PERIOD),
-    getSupplyAnalytics(admin, PERIOD),
-    getDemandAnalytics(admin, PERIOD),
-    getTransactionAnalytics(admin, PERIOD),
-    getTrustAnalytics(admin, PERIOD),
-    getGrowthAnalytics(admin, PERIOD),
-    getBehaviorAnalytics(admin, PERIOD),
-    getSupportAnalytics(admin, PERIOD),
-    admin.rpc('get_admin_overview_stats'),
-    listOperationalExceptions(admin).catch(() => []),
+  const [marketplace, supply, demand, transactions, trust, growth, behavior, support, overviewRpcOutcome, exceptions] = await Promise.all([
+    loadSource(getMarketplaceOverview(admin, PERIOD)),
+    loadSource(getSupplyAnalytics(admin, PERIOD)),
+    loadSource(getDemandAnalytics(admin, PERIOD)),
+    loadSource(getTransactionAnalytics(admin, PERIOD)),
+    loadSource(getTrustAnalytics(admin, PERIOD)),
+    loadSource(getGrowthAnalytics(admin, PERIOD)),
+    loadSource(getBehaviorAnalytics(admin, PERIOD)),
+    loadSource(getSupportAnalytics(admin, PERIOD)),
+    loadSource((async () => {
+      const { data, error } = await admin.rpc('get_admin_overview_stats')
+      if (error) throw error
+      return data as Record<string, number> | null
+    })()),
+    loadSource(listOperationalExceptions(admin)),
   ])
+
+  const failedLabels = (
+    [
+      [marketplace, SOURCE_LABELS.marketplace],
+      [supply, SOURCE_LABELS.supply],
+      [demand, SOURCE_LABELS.demand],
+      [transactions, SOURCE_LABELS.transactions],
+      [trust, SOURCE_LABELS.trust],
+      [growth, SOURCE_LABELS.growth],
+      [behavior, SOURCE_LABELS.behavior],
+      [support, SOURCE_LABELS.support],
+      [overviewRpcOutcome, SOURCE_LABELS.overviewStats],
+      [exceptions, SOURCE_LABELS.exceptions],
+    ] as const
+  )
+    .filter(([outcome]) => !outcome.ok)
+    .map(([, label]) => label)
 
   const insights: IntelligenceInsight[] = []
 
-  // ---- A. Data quality (evaluated first -- these often take precedence) ----
+  // ---- Degraded-source disclosure (first -- this takes precedence over any business insight) ----
+  if (failedLabels.length > 0) insights.push(buildDegradedSourcesInsight(failedLabels))
+
+  // ---- A. Data quality (these also often take precedence) ----
   insights.push(...buildDataQualityInsights({ marketplace, behavior }))
 
   // ---- B. Supply / demand ----
-  const supplyDemand = buildSupplyDemandInsights({ marketplace, supply, demand })
-  insights.push(...supplyDemand)
+  insights.push(...buildSupplyDemandInsights({ marketplace, supply, demand }))
 
   // ---- C. Growth ----
   insights.push(...buildGrowthInsights(growth))
@@ -270,7 +381,12 @@ export async function getIntelligenceInsights(admin: SupabaseClient): Promise<In
   insights.push(...buildTrustInsights({ trust, transactions }))
 
   // ---- F. Operations (all-system) ----
-  insights.push(...buildOperationsInsights({ support, overviewStats: (overviewRpc.data ?? null) as Record<string, number> | null, exceptions }))
+  insights.push(...buildOperationsInsights({ support, overviewStats: overviewRpcOutcome, exceptions }))
+
+  // E1-F1: a thin-sample business insight cannot out-rank a
+  // well-supported one merely by raw percentage magnitude -- applied
+  // before sorting/summarizing so both reflect the clamped priority.
+  const clampedInsights = insights.map(clampBusinessPriority)
 
   // Stable, meaningful ordering: priority desc, then type (risk before
   // opportunity before watch before informational), then category name
@@ -278,21 +394,63 @@ export async function getIntelligenceInsights(admin: SupabaseClient): Promise<In
   // regardless of which Promise resolved first.
   const PRIORITY_RANK: Record<IntelligencePriority, number> = { high: 0, medium: 1, low: 2 }
   const TYPE_RANK: Record<IntelligenceInsightType, number> = { risk: 0, opportunity: 1, watch: 2, informational: 3 }
-  insights.sort((a, b) => {
+  clampedInsights.sort((a, b) => {
     if (PRIORITY_RANK[a.priority] !== PRIORITY_RANK[b.priority]) return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]
     if (TYPE_RANK[a.type] !== TYPE_RANK[b.type]) return TYPE_RANK[a.type] - TYPE_RANK[b.type]
     return a.category.localeCompare(b.category)
   })
 
+  const realDataInsights = clampedInsights.filter((i) => i.scope === 'real-data')
+  const operationalInsights = clampedInsights.filter((i) => i.scope === 'operational-all-system')
+
   const summary: IntelligenceSummary = {
-    totalInsights: insights.length,
-    highPriority: insights.filter((i) => i.priority === 'high').length,
-    opportunities: insights.filter((i) => i.type === 'opportunity').length,
-    risksAndWatch: insights.filter((i) => i.type === 'risk' || i.type === 'watch').length,
-    dataQualityLimitations: insights.filter((i) => i.dataSufficiency !== 'sufficient').length,
+    totalInsights: clampedInsights.length,
+    highPriority: clampedInsights.filter((i) => i.priority === 'high').length,
+    opportunities: clampedInsights.filter((i) => i.type === 'opportunity').length,
+    risksAndWatch: clampedInsights.filter((i) => i.type === 'risk' || i.type === 'watch').length,
+    dataQualityLimitations: clampedInsights.filter((i) => i.dataSufficiency !== 'sufficient').length,
+    realData: {
+      highPriority: realDataInsights.filter((i) => i.priority === 'high').length,
+      opportunities: realDataInsights.filter((i) => i.type === 'opportunity').length,
+    },
+    operational: {
+      highPriority: operationalInsights.filter((i) => i.priority === 'high').length,
+    },
   }
 
-  return { generatedAt, period: PERIOD, summary, insights }
+  return { generatedAt, period: PERIOD, summary, insights: clampedInsights }
+}
+
+// ============================================================
+// Degraded-source disclosure
+// ============================================================
+
+/**
+ * E1-F1: the single, consolidated finding emitted when one or more
+ * input sources could not be read this cycle. Never includes a raw
+ * exception message, stack trace, or table/column name -- only the
+ * human-readable source label. `confidence: 'high'` here means "we are
+ * confident these specific sources failed to return data", never
+ * "we are confident about marketplace behavior" -- dataSufficiency is
+ * always 'insufficient' for the same reason.
+ */
+function buildDegradedSourcesInsight(failedLabels: string[]): IntelligenceInsight {
+  const high = failedLabels.length >= THRESHOLDS.DEGRADED_SOURCES_HIGH_COUNT
+  return {
+    id: nextId('dq'),
+    category: 'data-quality',
+    type: 'informational',
+    priority: high ? 'high' : 'medium',
+    title: 'Intelligence inputs are partially unavailable',
+    summary: `${failedLabels.length} of 10 analytics source(s) could not be read this cycle, so current recommendations may be incomplete.`,
+    rationale: 'Deterministic, per-source failure isolation (E1-F1) -- a source that could not be read is excluded from every rule it feeds and is never treated as a genuine zero/no-activity observation. Successful sources below still contribute their own insights normally.',
+    evidence: failedLabels.map((label) => ({ label: `${label} unavailable`, value: 'unavailable' })),
+    recommendation: 'Retry shortly; if this persists, check Admin service connectivity. Draw no business conclusion from the absence of these sources specifically.',
+    confidence: 'high',
+    dataSufficiency: 'insufficient',
+    scope: 'real-data',
+    generatedAt: new Date().toISOString(),
+  }
 }
 
 // ============================================================
@@ -300,22 +458,23 @@ export async function getIntelligenceInsights(admin: SupabaseClient): Promise<In
 // ============================================================
 
 function buildDataQualityInsights(ctx: {
-  marketplace: Awaited<ReturnType<typeof getMarketplaceOverview>>
-  behavior: Awaited<ReturnType<typeof getBehaviorAnalytics>>
+  marketplace: SourceOutcome<Awaited<ReturnType<typeof getMarketplaceOverview>>>
+  behavior: SourceOutcome<Awaited<ReturnType<typeof getBehaviorAnalytics>>>
 }): IntelligenceInsight[] {
   const out: IntelligenceInsight[] = []
   const generatedAt = new Date().toISOString()
 
-  if (ctx.marketplace.totalUsers < THRESHOLDS.MIN_REAL_PROFILES_FOR_TREND) {
+  if (ctx.marketplace.ok && ctx.marketplace.data && ctx.marketplace.data.totalUsers < THRESHOLDS.MIN_REAL_PROFILES_FOR_TREND) {
+    const totalUsers = ctx.marketplace.data.totalUsers
     out.push({
       id: nextId('dq'),
       category: 'data-quality',
       type: 'informational',
       priority: 'medium',
       title: 'Confirmed Real Data user base is still small',
-      summary: `Only ${ctx.marketplace.totalUsers} confirmed-real user profile(s) exist -- most percentage-based trend and growth comparisons below are not yet statistically meaningful.`,
+      summary: `Only ${totalUsers} confirmed-real user profile(s) exist -- most percentage-based trend and growth comparisons below are not yet statistically meaningful.`,
       rationale: `data_classification = 'real' is positive-proof only (D3 policy) -- unresolved-legacy and unclassified accounts are correctly excluded, not guessed at, so this number is intentionally conservative rather than inflated.`,
-      evidence: [{ label: 'Confirmed-real users', value: ctx.marketplace.totalUsers }],
+      evidence: [{ label: 'Confirmed-real users', value: totalUsers }],
       recommendation: 'Treat business insights below as directional until confirmed-real volume grows; prioritize resolving account provenance where legitimate.',
       confidence: 'high',
       dataSufficiency: 'insufficient',
@@ -324,7 +483,7 @@ function buildDataQualityInsights(ctx: {
     })
   }
 
-  if (!ctx.behavior.dataQuality.hasAnyEventData) {
+  if (ctx.behavior.ok && ctx.behavior.data && !ctx.behavior.data.dataQuality.hasAnyEventData) {
     out.push({
       id: nextId('dq'),
       category: 'data-quality',
@@ -368,17 +527,24 @@ function buildDataQualityInsights(ctx: {
 // ============================================================
 
 function buildSupplyDemandInsights(ctx: {
-  marketplace: Awaited<ReturnType<typeof getMarketplaceOverview>>
-  supply: Awaited<ReturnType<typeof getSupplyAnalytics>>
-  demand: Awaited<ReturnType<typeof getDemandAnalytics>>
+  marketplace: SourceOutcome<Awaited<ReturnType<typeof getMarketplaceOverview>>>
+  supply: SourceOutcome<Awaited<ReturnType<typeof getSupplyAnalytics>>>
+  demand: SourceOutcome<Awaited<ReturnType<typeof getDemandAnalytics>>>
 }): IntelligenceInsight[] {
   const out: IntelligenceInsight[] = []
   const generatedAt = new Date().toISOString()
-  const realActiveListings = ctx.marketplace.realActiveListings
+
+  // This rule cross-references all three sources at once (real active
+  // listings vs. demand vs. category mix) -- a partial read would
+  // produce a misleading comparison, so it stays silent unless every
+  // one of the three is available this cycle (E1-F1 failure isolation).
+  if (!ctx.marketplace.ok || !ctx.marketplace.data || !ctx.supply.ok || !ctx.supply.data || !ctx.demand.ok || !ctx.demand.data) return out
+
+  const realActiveListings = ctx.marketplace.data.realActiveListings
 
   if (realActiveListings < THRESHOLDS.MIN_REAL_LISTINGS_FOR_SUPPLY_SIGNAL) return out
 
-  const lookingForTotal = ctx.demand.lookingFor.total
+  const lookingForTotal = ctx.demand.data.lookingFor.total
   if (lookingForTotal >= realActiveListings * THRESHOLDS.DEMAND_SUPPLY_RATIO_WATCH) {
     out.push({
       id: nextId('demand'),
@@ -402,7 +568,7 @@ function buildSupplyDemandInsights(ctx: {
     })
   }
 
-  const topCategory = ctx.supply.listingsByCategory[0]
+  const topCategory = ctx.supply.data.listingsByCategory[0]
   if (topCategory && topCategory.count / realActiveListings >= THRESHOLDS.CATEGORY_CONCENTRATION_SHARE) {
     const share = Math.round((topCategory.count / realActiveListings) * 100)
     out.push({
@@ -435,14 +601,16 @@ function buildSupplyDemandInsights(ctx: {
 // C. Growth
 // ============================================================
 
-function buildGrowthInsights(growth: Awaited<ReturnType<typeof getGrowthAnalytics>>): IntelligenceInsight[] {
+function buildGrowthInsights(growth: SourceOutcome<Awaited<ReturnType<typeof getGrowthAnalytics>>>): IntelligenceInsight[] {
   const out: IntelligenceInsight[] = []
+  if (!growth.ok || !growth.data) return out
+  const g = growth.data
   const candidates: Array<{ metricLabel: string; comparison: PeriodComparison; actionHref?: string; actionLabel?: string }> = [
-    { metricLabel: 'New users', comparison: growth.newUsers, actionHref: '/admin/users', actionLabel: 'Review users' },
-    { metricLabel: 'New merchants', comparison: growth.newMerchants, actionHref: '/admin/merchants', actionLabel: 'Review merchants' },
-    { metricLabel: 'New real listings', comparison: growth.newRealListings, actionHref: '/admin/listings', actionLabel: 'Review listings' },
-    { metricLabel: 'New bookings', comparison: growth.newBookings, actionHref: '/admin/bookings', actionLabel: 'Review bookings' },
-    { metricLabel: 'New orders', comparison: growth.newOrders, actionHref: '/admin/orders', actionLabel: 'Review orders' },
+    { metricLabel: 'New users', comparison: g.newUsers, actionHref: '/admin/users', actionLabel: 'Review users' },
+    { metricLabel: 'New merchants', comparison: g.newMerchants, actionHref: '/admin/merchants', actionLabel: 'Review merchants' },
+    { metricLabel: 'New real listings', comparison: g.newRealListings, actionHref: '/admin/listings', actionLabel: 'Review listings' },
+    { metricLabel: 'New bookings', comparison: g.newBookings, actionHref: '/admin/bookings', actionLabel: 'Review bookings' },
+    { metricLabel: 'New orders', comparison: g.newOrders, actionHref: '/admin/orders', actionLabel: 'Review orders' },
   ]
   for (const c of candidates) {
     const insight = buildTrendInsight({ category: 'growth', metricLabel: c.metricLabel, comparison: c.comparison, actionHref: c.actionHref, actionLabel: c.actionLabel })
@@ -469,10 +637,12 @@ function buildGrowthInsights(growth: Awaited<ReturnType<typeof getGrowthAnalytic
  * structural limitation honestly, once, as a single Conversion-category
  * data-sufficiency finding.
  */
-function buildConversionInsight(behavior: Awaited<ReturnType<typeof getBehaviorAnalytics>>): IntelligenceInsight | null {
-  if (!behavior.dataQuality.hasAnyEventData) return null // the general "no event data yet" data-quality insight already covers this case
+function buildConversionInsight(behavior: SourceOutcome<Awaited<ReturnType<typeof getBehaviorAnalytics>>>): IntelligenceInsight | null {
+  if (!behavior.ok || !behavior.data) return null // source unavailable this cycle -- the degraded-source disclosure already covers this; no fabricated conversion insight is produced
+  if (!behavior.data.dataQuality.hasAnyEventData) return null // the general "no event data yet" data-quality insight already covers this case
 
-  const anyCompleted = behavior.listingCreationFunnel.completed > 0 || behavior.rentalFunnel.completed > 0 || behavior.orderFunnel.completed > 0
+  const b = behavior.data
+  const anyCompleted = b.listingCreationFunnel.completed > 0 || b.rentalFunnel.completed > 0 || b.orderFunnel.completed > 0
 
   return {
     id: nextId('conv'),
@@ -483,9 +653,9 @@ function buildConversionInsight(behavior: Awaited<ReturnType<typeof getBehaviorA
     summary: 'Every funnel\'s "started" event type lacks a listing anchor under the current instrumentation, so it is always classified \'unknown\', never \'real\' -- conversion rate is therefore null for every funnel today, not evidence of a conversion problem.',
     rationale: 'Confirmed from source: only listing-anchored events (listing_viewed with an entity, listing_published, booking_created, order_created) can ever receive a real/test classification; signup_started, listing_creation_started, rental_checkout_started, order_checkout_started, and kyc_started have no such anchor and default to \'unknown\' at the point of creation.',
     evidence: [
-      { label: 'Real listings published', value: behavior.listingCreationFunnel.completed },
-      { label: 'Real bookings created', value: behavior.rentalFunnel.completed },
-      { label: 'Real orders created', value: behavior.orderFunnel.completed },
+      { label: 'Real listings published', value: b.listingCreationFunnel.completed },
+      { label: 'Real bookings created', value: b.rentalFunnel.completed },
+      { label: 'Real orders created', value: b.orderFunnel.completed },
     ],
     recommendation: anyCompleted
       ? 'Completion-side counts above are confirmed-real and usable on their own as activity volume; do not combine them with the unmeasurable "started" side into a rate.'
@@ -502,13 +672,16 @@ function buildConversionInsight(behavior: Awaited<ReturnType<typeof getBehaviorA
 // ============================================================
 
 function buildTrustInsights(ctx: {
-  trust: Awaited<ReturnType<typeof getTrustAnalytics>>
-  transactions: Awaited<ReturnType<typeof getTransactionAnalytics>>
+  trust: SourceOutcome<Awaited<ReturnType<typeof getTrustAnalytics>>>
+  transactions: SourceOutcome<Awaited<ReturnType<typeof getTransactionAnalytics>>>
 }): IntelligenceInsight[] {
   const out: IntelligenceInsight[] = []
   const generatedAt = new Date().toISOString()
 
-  const { restricted, suspended } = ctx.trust.accountRestrictions
+  if (!ctx.trust.ok || !ctx.trust.data) return out
+  const trust = ctx.trust.data
+
+  const { restricted, suspended } = trust.accountRestrictions
   const restrictionTotal = restricted + suspended
   if (restrictionTotal >= THRESHOLDS.RESTRICTION_WATCH_COUNT) {
     out.push({
@@ -533,9 +706,9 @@ function buildTrustInsights(ctx: {
     })
   }
 
-  const kycTotal = ctx.trust.kycByStatus.reduce((s, r) => s + r.count, 0)
+  const kycTotal = trust.kycByStatus.reduce((s, r) => s + r.count, 0)
   if (kycTotal >= THRESHOLDS.MIN_REAL_KYC_ROWS_FOR_INFO) {
-    const approved = ctx.trust.kycByStatus.find((r) => r.label === 'approved')?.count ?? 0
+    const approved = trust.kycByStatus.find((r) => r.label === 'approved')?.count ?? 0
     const approvedShare = Math.round((approved / kycTotal) * 100)
     out.push({
       id: nextId('trust'),
@@ -545,7 +718,7 @@ function buildTrustInsights(ctx: {
       title: 'Confirmed-real KYC status mix',
       summary: `${approvedShare}% of confirmed-real users with a recorded KYC status (${kycTotal} total) are approved.`,
       rationale: 'kyc_status breakdown here is filtered to data_classification = \'real\' only (D3-F) -- distinct from the all-system KYC review queue reported under Operations below.',
-      evidence: ctx.trust.kycByStatus.map((r) => ({ label: r.label, value: r.count })),
+      evidence: trust.kycByStatus.map((r) => ({ label: r.label, value: r.count })),
       recommendation: 'No action implied -- informational baseline for tracking KYC approval mix as real volume grows.',
       confidence: kycTotal >= THRESHOLDS.MIN_REAL_PROFILES_FOR_TREND ? 'medium' : 'low',
       dataSufficiency: kycTotal >= THRESHOLDS.MIN_REAL_PROFILES_FOR_TREND ? 'sufficient' : 'limited',
@@ -554,9 +727,12 @@ function buildTrustInsights(ctx: {
     })
   }
 
-  const realTransactions = ctx.transactions.bookings.total + ctx.transactions.orders.total
+  if (!ctx.transactions.ok || !ctx.transactions.data) return out
+  const transactions = ctx.transactions.data
+
+  const realTransactions = transactions.bookings.total + transactions.orders.total
   if (realTransactions >= THRESHOLDS.MIN_REAL_TRANSACTIONS_FOR_REVIEW_RATIO) {
-    const reviewsPerTransaction = ctx.trust.publishedReviews / realTransactions
+    const reviewsPerTransaction = trust.publishedReviews / realTransactions
     if (reviewsPerTransaction < 0.1) {
       out.push({
         id: nextId('trust'),
@@ -564,10 +740,10 @@ function buildTrustInsights(ctx: {
         type: 'watch',
         priority: 'low',
         title: 'Published reviews are sparse relative to completed transactions',
-        summary: `${ctx.trust.publishedReviews} published review(s) against ${realTransactions} real booking(s)/order(s) this period.`,
+        summary: `${trust.publishedReviews} published review(s) against ${realTransactions} real booking(s)/order(s) this period.`,
         rationale: 'Both figures are already-reported, independently real-filtered counts (published reviews: is_test=false; bookings/orders: relationally excluded from test listings) -- this is a direct ratio of two existing metrics, not a new data source.',
         evidence: [
-          { label: 'Published reviews', value: ctx.trust.publishedReviews },
+          { label: 'Published reviews', value: trust.publishedReviews },
           { label: 'Real bookings + orders', value: realTransactions },
         ],
         recommendation: 'Consider a post-transaction review prompt if review collection is a priority; this is descriptive, not proof of a quality problem.',
@@ -589,23 +765,25 @@ function buildTrustInsights(ctx: {
 // ============================================================
 
 function buildOperationsInsights(ctx: {
-  support: Awaited<ReturnType<typeof getSupportAnalytics>>
-  overviewStats: Record<string, number> | null
-  exceptions: Awaited<ReturnType<typeof listOperationalExceptions>>
+  support: SourceOutcome<Awaited<ReturnType<typeof getSupportAnalytics>>>
+  overviewStats: SourceOutcome<Record<string, number> | null>
+  exceptions: SourceOutcome<Awaited<ReturnType<typeof listOperationalExceptions>>>
 }): IntelligenceInsight[] {
   const out: IntelligenceInsight[] = []
 
-  const openSupportCases = ctx.support.byStatus.filter((r) => r.label !== 'resolved' && r.label !== 'closed').reduce((s, r) => s + r.count, 0)
-  const supportInsight = operationalBacklogInsight({
-    label: 'Support',
-    count: openSupportCases,
-    actionHref: '/admin/support',
-    actionLabel: 'Review support queue',
-    note: 'Counted as every case not yet resolved/closed in the current period.',
-  })
-  if (supportInsight) out.push(supportInsight)
+  if (ctx.support.ok && ctx.support.data) {
+    const openSupportCases = ctx.support.data.byStatus.filter((r) => r.label !== 'resolved' && r.label !== 'closed').reduce((s, r) => s + r.count, 0)
+    const supportInsight = operationalBacklogInsight({
+      label: 'Support',
+      count: openSupportCases,
+      actionHref: '/admin/support',
+      actionLabel: 'Review support queue',
+      note: 'Counted as every case not yet resolved/closed in the current period.',
+    })
+    if (supportInsight) out.push(supportInsight)
+  }
 
-  if (ctx.overviewStats) {
+  if (ctx.overviewStats.ok && ctx.overviewStats.data) {
     const fields: Array<{ key: string; label: string; actionHref: string; actionLabel: string }> = [
       { key: 'pending_kyc_reviews', label: 'KYC review', actionHref: '/admin/verifications', actionLabel: 'Review KYC queue' },
       { key: 'pending_ownership_reviews', label: 'Ownership verification', actionHref: '/admin/listings', actionLabel: 'Review ownership queue' },
@@ -614,23 +792,25 @@ function buildOperationsInsights(ctx: {
       { key: 'retryable_email_failures', label: 'Retryable email failure', actionHref: '/admin/email-deliveries', actionLabel: 'Review email deliveries' },
     ]
     for (const f of fields) {
-      const count = ctx.overviewStats[f.key]
+      const count = ctx.overviewStats.data[f.key]
       if (typeof count !== 'number') continue
       const insight = operationalBacklogInsight({ label: f.label, count, actionHref: f.actionHref, actionLabel: f.actionLabel })
       if (insight) out.push(insight)
     }
   }
 
-  const unresolvedExceptions = ctx.exceptions.filter((e) => !e.resolved)
-  const highSeverityExceptions = unresolvedExceptions.filter((e) => e.severity === 'high').length
-  const exceptionsInsight = operationalBacklogInsight({
-    label: 'Exceptions',
-    count: unresolvedExceptions.length,
-    actionHref: '/admin/exceptions',
-    actionLabel: 'Review exceptions',
-    note: highSeverityExceptions > 0 ? `${highSeverityExceptions} marked high severity.` : undefined,
-  })
-  if (exceptionsInsight) out.push(exceptionsInsight)
+  if (ctx.exceptions.ok && ctx.exceptions.data) {
+    const unresolvedExceptions = ctx.exceptions.data.filter((e) => !e.resolved)
+    const highSeverityExceptions = unresolvedExceptions.filter((e) => e.severity === 'high').length
+    const exceptionsInsight = operationalBacklogInsight({
+      label: 'Exceptions',
+      count: unresolvedExceptions.length,
+      actionHref: '/admin/exceptions',
+      actionLabel: 'Review exceptions',
+      note: highSeverityExceptions > 0 ? `${highSeverityExceptions} marked high severity.` : undefined,
+    })
+    if (exceptionsInsight) out.push(exceptionsInsight)
+  }
 
   return out
 }

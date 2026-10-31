@@ -17,16 +17,22 @@ describe('Admin homepage Intelligence card wiring (category: ADMIN-CONTROL-CENTR
   const intelligencePage = readFileSync(join(REPO_ROOT, 'src/app/admin/intelligence/page.tsx'), 'utf-8')
 
   it('1. both the homepage and /admin/intelligence import getIntelligenceInsights from the same service module -- no duplicated recommendation logic', () => {
-    expect(homepage).toMatch(/import\s*\{\s*getIntelligenceInsights\s*\}\s*from\s*'@\/lib\/admin\/intelligence-service'/)
+    expect(homepage).toMatch(/import\s*\{[^}]*\bgetIntelligenceInsights\b[^}]*\}\s*from\s*'@\/lib\/admin\/intelligence-service'/)
     expect(intelligencePage).toMatch(/getIntelligenceInsights[^}]*\}\s*from\s*'@\/lib\/admin\/intelligence-service'/)
   })
 
-  it('2. the homepage card reads only from the shared summary object (highPriority/opportunities/dataQualityLimitations), never recomputing or filtering the insight list itself', () => {
-    expect(homepage).toMatch(/intelligence\.summary\.highPriority/)
-    expect(homepage).toMatch(/intelligence\.summary\.opportunities/)
+  it('2. the homepage card reads only from the shared summary object (realData/operational/dataQualityLimitations), never recomputing or filtering the insight list itself', () => {
+    expect(homepage).toMatch(/intelligence\.summary\.realData\.highPriority/)
+    expect(homepage).toMatch(/intelligence\.summary\.realData\.opportunities/)
+    expect(homepage).toMatch(/intelligence\.summary\.operational\.highPriority/)
     expect(homepage).toMatch(/intelligence\.summary\.dataQualityLimitations/)
     // The homepage never maps/filters the raw insights array -- it must not duplicate the page's own rendering of individual insight cards.
     expect(homepage).not.toMatch(/intelligence\.insights\.(map|filter)/)
+  })
+
+  it('2b. the homepage card visibly distinguishes Real Data from Operational (all-system) counts, rather than one scope-blind total', () => {
+    expect(homepage).toMatch(/Real Data/)
+    expect(homepage).toMatch(/Operational \(all-system\)/)
   })
 
   it('3. the homepage card links to /admin/intelligence rather than rendering full insight cards inline', () => {

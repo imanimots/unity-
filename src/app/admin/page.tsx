@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireAdmin } from '@/lib/supabase/require-admin'
 import { getAdminServiceClient } from '@/lib/admin/route-helpers'
 import { getRealUserOverviewCounts } from '@/lib/admin/users-service'
@@ -12,7 +13,7 @@ import { getRealSubscriptionOverviewCounts } from '@/lib/admin/subscriptions-ser
 import { getRealUnityCommissionOverviewCounts } from '@/lib/admin/commissions-service'
 import { getRealAffiliateOverviewCounts } from '@/lib/admin/affiliate-service'
 import { getRealEscrowOverviewCounts } from '@/lib/admin/escrow-service'
-import { getIntelligenceInsights } from '@/lib/admin/intelligence-service'
+import { getIntelligenceInsights, type IntelligenceResult } from '@/lib/admin/intelligence-service'
 import { StatCard, AdminPageHeader, formatDateTime } from '@/components/admin/ui'
 
 interface OverviewStats {
@@ -78,6 +79,28 @@ interface OverviewStats {
 }
 
 /**
+ * E1-F1 defense-in-depth: getIntelligenceInsights() already isolates
+ * every one of its own ~10 input sources internally (see
+ * SourceOutcome/loadSource in intelligence-service.ts) and should never
+ * reject. This is a second, Intelligence-only safety net so that even
+ * an unforeseen failure inside it can never take down the rest of this
+ * already-real Admin Overview page -- it never wraps or touches any of
+ * the other Promise.all entries below.
+ */
+async function loadIntelligenceSafely(admin: SupabaseClient): Promise<IntelligenceResult> {
+  try {
+    return await getIntelligenceInsights(admin)
+  } catch {
+    return {
+      generatedAt: new Date().toISOString(),
+      period: '30d',
+      summary: { totalInsights: 0, highPriority: 0, opportunities: 0, risksAndWatch: 0, dataQualityLimitations: 0, realData: { highPriority: 0, opportunities: 0 }, operational: { highPriority: 0 } },
+      insights: [],
+    }
+  }
+}
+
+/**
  * Real admin overview — replaces the Step 1 hardcoded ADMIN_MOCK_STATS
  * page. Server component: calls the aggregate RPC directly (no internal
  * fetch round trip through /api/admin/overview, which exists for the
@@ -121,7 +144,7 @@ export default async function AdminOverviewPage() {
     getRealUnityCommissionOverviewCounts(admin),
     getRealAffiliateOverviewCounts(admin),
     getRealEscrowOverviewCounts(admin),
-    getIntelligenceInsights(admin),
+    loadIntelligenceSafely(admin),
   ])
   if (error || !data) {
     return <div className="p-8 text-sm text-red-600">Could not load the overview.</div>
@@ -204,7 +227,7 @@ export default async function AdminOverviewPage() {
         <p className="text-xs text-[#9B8B85]">Last updated {formatDateTime(stats.generated_at)}</p>
       </div>
 
-      {/* Homepage summary card -- reuses getIntelligenceInsights(), the exact same function /admin/intelligence itself calls (src/lib/admin/intelligence-service.ts), never a parallel implementation. Deliberately does not dump full recommendations here. */}
+      {/* Homepage summary card -- reuses getIntelligenceInsights(), the exact same function /admin/intelligence itself calls (src/lib/admin/intelligence-service.ts), never a parallel implementation, and reads only the service's own pre-computed summary fields (never re-filtering/recomputing insight categorization here). E1-F1: Real Data and Operational (all-system) counts are shown as two visibly separate groups rather than one scope-blind total, so this card can never read as a single confirmed-real business KPI when part of it is actually an all-system workload count. */}
       <Link href="/admin/intelligence" className="block bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 hover:border-[#8B1A1A] transition-colors">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -213,19 +236,31 @@ export default async function AdminOverviewPage() {
           </div>
           <span className="text-xs font-medium uppercase tracking-[0.08em] text-[#8B1A1A] whitespace-nowrap">View Intelligence →</span>
         </div>
-        <div className="grid grid-cols-3 gap-4 mt-4">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.1em] text-[#9B8B85]">High priority</p>
-            <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{intelligence.summary.highPriority}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+          <div className="border border-[#8B1A1A]/20 rounded-lg p-3">
+            <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-[#8B1A1A] mb-2">Real Data</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.1em] text-[#9B8B85]">High priority</p>
+                <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{intelligence.summary.realData.highPriority}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.1em] text-[#9B8B85]">Opportunities</p>
+                <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{intelligence.summary.realData.opportunities}</p>
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.1em] text-[#9B8B85]">Opportunities</p>
-            <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{intelligence.summary.opportunities}</p>
+          <div className="border border-[#6B5B55]/20 rounded-lg p-3">
+            <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-[#6B5B55] dark:text-[#9B8B85] mb-2">Operational (all-system)</p>
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.1em] text-[#9B8B85]">High priority</p>
+              <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{intelligence.summary.operational.highPriority}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.1em] text-[#9B8B85]">Data limitations</p>
-            <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{intelligence.summary.dataQualityLimitations}</p>
-          </div>
+        </div>
+        <div className="mt-3">
+          <p className="text-[11px] uppercase tracking-[0.1em] text-[#9B8B85]">Data limitations</p>
+          <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{intelligence.summary.dataQualityLimitations}</p>
         </div>
       </Link>
 
