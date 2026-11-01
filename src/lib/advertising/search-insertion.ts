@@ -1,7 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { randomUUID } from 'crypto'
+import { headers } from 'next/headers'
 import { isAdvertisingEnabled } from './config'
 import { isRentToBuyEnabled } from '@/lib/rent-to-buy/config'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 /**
  * Search-result ad insertion (Advertising MVP §6/§16-18 of the
@@ -66,11 +68,34 @@ export async function getSponsoredListingSlot(
   const candidate = data.find((row: { target_type: string; listing_id: string | null }) => row.target_type === 'listing' && row.listing_id)
   if (!candidate) return null
 
-  const { data: impressionResult } = await supabase.rpc('record_ad_impression', {
+  // E9-F1: recording an impression is a privileged, commercial-state-
+  // mutating write (it consumes an advertiser's purchased quota and can
+  // force a campaign to complete) -- direct anon/authenticated EXECUTE
+  // on record_ad_impression was revoked precisely because any Data API
+  // caller could otherwise manufacture unlimited impressions at zero
+  // cost. This is now the ONLY trusted path that may call it: rate
+  // limited per client IP (defense in depth, mirroring record_ad_click's
+  // own established pattern) and invoked via a service-role client with
+  // a fresh, server-generated idempotency key (never client-influenced)
+  // so a genuine accidental double-invocation of this exact call is
+  // deduped at the database level rather than double-charged.
+  const forwardedFor = (await headers()).get('x-forwarded-for')
+  const clientKey = forwardedFor?.split(',')[0]?.trim() ?? 'unknown'
+  const rate = await checkRateLimit(`advertising:impression:${clientKey}`, 60, 60_000)
+  if (!rate.allowed) return null
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !serviceKey) return null
+  const { createClient: createServiceClient } = await import('@supabase/supabase-js')
+  const admin = createServiceClient(url, serviceKey)
+
+  const { data: impressionResult } = await admin.rpc('record_ad_impression', {
     p_campaign_id: candidate.campaign_id,
     p_placement_type: 'search_result',
     p_viewer_id: viewerId,
     p_reach_key: reachKey,
+    p_idempotency_key: randomUUID(),
   })
 
   const impressionId = impressionResult?.recorded ? (impressionResult.impression_id as string) : null
