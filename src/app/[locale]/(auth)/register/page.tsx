@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Eye, EyeOff, Check } from 'lucide-react'
 import type { UserRole } from '@/types'
 import { trackEvent } from '@/lib/analytics/client'
+import { classifyPasswordError } from '@/lib/auth/password-error'
 
 export default function RegisterPage() {
   const t = useTranslations('auth.register')
@@ -46,7 +47,14 @@ export default function RegisterPage() {
     })
 
     if (authError) {
-      setError(authError.message)
+      const reason = classifyPasswordError(authError)
+      setError(
+        reason === 'leaked'
+          ? t('errors.leakedPassword')
+          : reason === 'weak'
+            ? t('errors.weakPassword')
+            : t('errors.generic')
+      )
       setLoading(false)
       return
     }

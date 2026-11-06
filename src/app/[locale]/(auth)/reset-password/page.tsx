@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/client'
 import { Eye, EyeOff, AlertTriangle } from 'lucide-react'
+import { classifyPasswordError } from '@/lib/auth/password-error'
 
 type Status = 'exchanging' | 'ready' | 'invalid' | 'success'
 
@@ -87,7 +88,14 @@ function ResetPasswordForm() {
 
     const { error: updateError } = await supabase.auth.updateUser({ password: data.password })
     if (updateError) {
-      setError(t('errors.generic'))
+      const reason = classifyPasswordError(updateError)
+      setError(
+        reason === 'leaked'
+          ? t('errors.leakedPassword')
+          : reason === 'weak'
+            ? t('errors.weakPassword')
+            : t('errors.generic')
+      )
       setSubmitting(false)
       return
     }
