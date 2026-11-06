@@ -1,0 +1,110 @@
+-- ============================================================
+-- E18 -- Financial ledger immutability hardening
+-- ============================================================
+-- public.ledger_entries has been documented as "append-only, immutable
+-- -- never updated in place" since its own creation migration
+-- (20260801000002_payment_schema.sql), but -- unlike every one of its
+-- siblings (listing_declarations, listing_history, dispute_history,
+-- escrow_transaction_history, merchant_payout_history,
+-- review_moderation_history) -- it never actually received the
+-- public.prevent_row_mutation() trigger that makes that guarantee a
+-- database-enforced invariant rather than an application convention.
+-- This was flagged as an unresolved risk at the end of the prior
+-- phase and is the sole target of this migration.
+--
+-- A fresh, independent repo-wide trace (every migration mentioning
+-- ledger_entries re-read directly; every CREATE OR REPLACE of its 5
+-- known writer functions resolved to its CURRENT, latest-redefined
+-- form, not an earlier/superseded one; every src/, scripts/, and
+-- tests/ reference grepped) confirms this is safe:
+--
+--   - Zero UPDATE or DELETE statement against ledger_entries exists
+--     anywhere in 248 migrations or anywhere in src/scripts/tests.
+--     Every one of the ~20 ledger_entries mentions in migration
+--     history is either the CREATE TABLE itself, an index, the RLS
+--     enable statement, the later ADD COLUMN (rent_to_buy_agreement_id,
+--     no cascade), the prior phase's table-privilege-removal
+--     statement, a one-line account-erasure comment confirming it is
+--     deliberately never touched, or an
+--     INSERT inside one of 5 writer functions. The current,
+--     authoritative (latest-redefined) forms of those 5 writers --
+--     transition_payment_status (20260823000004),
+--     create_merchant_payout (20260821183600), capture_deposit_amount
+--     (20260802000003, never redefined), and
+--     qualify_rental_payment_unity_commission (20260823000007) -- are
+--     all confirmed INSERT-only against this table. (Note:
+--     qualify_sale_unity_commission, in both its original and current
+--     definitions, was independently confirmed to never write
+--     ledger_entries at all, despite an earlier, stale assumption to
+--     the contrary -- it only ever writes unity_commissions/
+--     unity_commission_history. Not a regression and not changed by
+--     this migration, which touches no function body.)
+--   - Every application-code read of this table
+--     (src/lib/payments/orchestrator/create-merchant-payout.ts,
+--     src/lib/admin/operations-service.ts,
+--     src/lib/admin/orders-service.ts, and the two verify-*.mjs
+--     scripts) is SELECT-only, already confirmed by an existing live
+--     test (src/lib/payments/orchestrator/__tests__/architecture.test.ts:
+--     "no orchestrator file inserts into ledger_entries -- only the
+--     existing payment RPCs do") and a second
+--     (src/lib/checkout/__tests__/architecture.test.ts: "...never
+--     writes to payments or ledger_entries"). A third,
+--     pre-existing static guard
+--     (src/lib/privacy/__tests__/account-erasure-migration.test.ts
+--     and its sibling) already asserts no migration ever contains
+--     `update public.ledger_entries` as one of a list of protected
+--     audit tables -- this migration stays consistent with that
+--     assertion, since installing a trigger changes no row.
+--   - All 8 foreign keys on ledger_entries (booking_id, payment_id,
+--     refund_id, payout_id, merchant_id, renter_id, reversal_of,
+--     rent_to_buy_agreement_id) use Postgres's default ON DELETE NO
+--     ACTION -- none cascades. A parent row cannot be deleted while a
+--     ledger_entries row still references it; the ledger row is never
+--     silently removed as a side effect of a parent delete.
+--   - Account erasure (20261022000000_account_erasure.sql) never hard-
+--     deletes profiles -- it anonymizes the profile row in place
+--     (UPDATE, not DELETE), explicitly and by its own header comment
+--     never touching ledger_entries or any other immutable
+--     history/audit table. merchant_id/renter_id FKs are therefore
+--     never at risk of a delete-driven violation.
+--   - The reversal/correction model this table documents (an
+--     incorrect entry is corrected by a new, independent reversal row
+--     via the nullable self-referential reversal_of column, never by
+--     editing the original) is not currently exercised by any writer
+--     (reversal_of is always null today -- no INSERT ever populates
+--     it), but refunds are already modeled as their own new row via
+--     entry_type = 'refund', consistent with "corrections are new
+--     rows," so there is no existing contradiction to resolve.
+--   - public.prevent_row_mutation() (20260729000003_
+--     listing_declarations_and_history.sql) is confirmed present,
+--     unconditional (raises for every role, including service_role,
+--     regardless of who is calling), never redefined since creation,
+--     and already hardened to search_path = '' by E11 via ALTER
+--     FUNCTION (not a redefinition) -- reused here as-is, per this
+--     phase's own instruction not to touch it absent a concrete
+--     defect, which none was found.
+--   - No trigger of any kind currently exists on ledger_entries, and
+--     no equivalently-named or equivalent-behavior trigger exists
+--     anywhere else in migration history -- this is not a duplicate.
+--   - No TRUNCATE statement exists anywhere in this codebase, and no
+--     role was ever given TRUNCATE on this table (only Supabase's
+--     default SELECT/INSERT/UPDATE/DELETE table privileges, which the
+--     prior phase's own migration already removed for anon,
+--     authenticated, and the PUBLIC pseudo-role). TRUNCATE protection
+--     is therefore not a live gap and is out of scope for a row-level
+--     trigger regardless -- noted, not acted on.
+--
+-- This migration is a pure, forward-only, metadata-only DDL change:
+-- one DROP TRIGGER IF EXISTS + one CREATE TRIGGER, no data rewrite,
+-- no column change, no new function, no RLS or privilege change, no other
+-- table touched. It takes a brief ACCESS EXCLUSIVE lock on
+-- ledger_entries for the duration of the trigger-catalog update only
+-- (metadata-only; no table rewrite), the same lock class every sibling
+-- table's own immutability trigger already took when it was installed.
+-- ============================================================
+
+drop trigger if exists ledger_entries_immutable on public.ledger_entries;
+
+create trigger ledger_entries_immutable
+  before update or delete on public.ledger_entries
+  for each row execute function public.prevent_row_mutation();
