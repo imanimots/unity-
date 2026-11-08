@@ -43,9 +43,24 @@ export const requestDisputeEvidenceSchema = z.object({
   idempotency_key: idempotencyKeySchema.optional(),
 })
 
+// E28: financial_disposition_* fields are optional at this schema level
+// because whether they are REQUIRED depends on whether this dispute is a
+// booking dispute -- a fact only the route can know after fetching the
+// dispute row (order/barter/RTB dispute resolution is unaffected and must
+// keep working exactly as before, with none of these fields). The route
+// enforces "required for a booking dispute" explicitly; Zod only enforces
+// the shape of whichever fields are actually present.
 export const resolveDisputeSchema = z.object({
   outcome: z.enum(['favor_raiser', 'favor_respondent', 'mutual_agreement', 'manual_settlement']),
   resolution_notes: z.string().trim().max(5000).optional(),
+  financial_disposition_type: z.enum(['no_financial_adjustment', 'refund_required', 'manual_financial_settlement']).optional(),
+  financial_disposition_amount: z.number().positive().optional(),
+  financial_disposition_reason: z.string().trim().min(1).max(2000).optional(),
+  idempotency_key: idempotencyKeySchema.optional(),
+})
+
+export const completeDisputeFinancialDispositionSchema = z.object({
+  completion_notes: z.string().trim().max(2000).optional(),
   idempotency_key: idempotencyKeySchema.optional(),
 })
 
@@ -62,3 +77,37 @@ export const disputeActionSchema = z.object({
 export type OpenDisputeRequest = z.infer<typeof openDisputeSchema>
 export type ResolveDisputeRequest = z.infer<typeof resolveDisputeSchema>
 export type CancelDisputeRequest = z.infer<typeof cancelDisputeSchema>
+
+/**
+ * E28: pure, DB-free validation of a resolve-dispute request's
+ * financial-disposition fields -- extracted from the route for direct
+ * unit testing (this file's own established convention). Returns a
+ * user-facing error string, or null if the request is valid for the
+ * given domain. Order/barter/RTB disputes (isBookingDispute=false)
+ * never require these fields regardless of what was submitted -- the
+ * route never even reaches this check for them, but this function
+ * documents and enforces the contract either way: it should be
+ * impossible for a booking dispute to resolve without an explicit
+ * financial disposition, exactly as explicit for favor_respondent
+ * (no_financial_adjustment, with a reason) as for any other outcome.
+ */
+export function validateBookingFinancialDisposition(
+  isBookingDispute: boolean,
+  fields: Pick<ResolveDisputeRequest, 'financial_disposition_type' | 'financial_disposition_amount' | 'financial_disposition_reason'>
+): string | null {
+  if (!isBookingDispute) return null
+  const { financial_disposition_type, financial_disposition_amount, financial_disposition_reason } = fields
+  if (!financial_disposition_type) {
+    return 'A financial disposition is required to resolve a booking dispute.'
+  }
+  if (!financial_disposition_reason) {
+    return 'A reason is required for the financial disposition.'
+  }
+  if (financial_disposition_type === 'no_financial_adjustment' && financial_disposition_amount !== undefined) {
+    return 'No financial adjustment must not include an amount.'
+  }
+  if (financial_disposition_type !== 'no_financial_adjustment' && financial_disposition_amount === undefined) {
+    return 'An amount is required for this disposition type.'
+  }
+  return null
+}

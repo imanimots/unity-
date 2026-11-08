@@ -286,6 +286,13 @@ export interface AdminDisputeDetail {
    * rental bookings.
    */
   bookingConditionEvidence: Record<string, unknown>[]
+  /**
+   * E28: the booking dispute's 1:1 financial disposition, if one has
+   * been recorded (null for order/barter/RTB disputes, and for a
+   * booking dispute not yet resolved through the new flow -- e.g. any
+   * of the 78 historical disputes that predate this contract).
+   */
+  financialDisposition: Record<string, unknown> | null
 }
 
 export async function getAdminDisputeDetail(admin: SupabaseClient, disputeId: string): Promise<AdminDisputeDetail | null> {
@@ -305,15 +312,20 @@ export async function getAdminDisputeDetail(admin: SupabaseClient, disputeId: st
   ])
 
   let bookingConditionEvidence: Record<string, unknown>[] = []
+  let financialDisposition: Record<string, unknown> | null = null
   if (dispute.booking_id) {
-    const { data } = await admin
-      .from('booking_condition_evidence')
-      .select('*')
-      .eq('booking_id', dispute.booking_id)
-      .order('evidence_stage', { ascending: true })
-      .order('created_at', { ascending: true })
-    bookingConditionEvidence = data ?? []
+    const [{ data: conditionEvidence }, { data: disposition }] = await Promise.all([
+      admin
+        .from('booking_condition_evidence')
+        .select('*')
+        .eq('booking_id', dispute.booking_id)
+        .order('evidence_stage', { ascending: true })
+        .order('created_at', { ascending: true }),
+      admin.from('dispute_financial_dispositions').select('*').eq('dispute_id', disputeId).maybeSingle(),
+    ])
+    bookingConditionEvidence = conditionEvidence ?? []
+    financialDisposition = disposition ?? null
   }
 
-  return { dispute, history: history ?? [], evidence: evidence ?? [], bookingConditionEvidence }
+  return { dispute, history: history ?? [], evidence: evidence ?? [], bookingConditionEvidence, financialDisposition }
 }

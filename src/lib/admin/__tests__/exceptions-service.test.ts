@@ -811,3 +811,71 @@ describe('listOperationalExceptions -- RTB payout exception wiring (category: AD
     expect(exceptions.filter((e) => rtbTypes.includes(e.type))).toEqual([])
   })
 })
+
+/**
+ * E28: wiring tests for the booking payout gate's new
+ * has_pending_financial_disposition context field (supabase/
+ * migrations/20261108180657) -- this field only EXPLAINS an already-
+ * canonical blocking decision; it is never independently computed
+ * here. The booking exception RPC (_merchant_payout_exception_
+ * candidates) is a different RPC from the RTB one above, reusing the
+ * same extended fake-admin rpcResults support.
+ */
+function bookingPayoutCandidate(overrides: Partial<Row> = {}): Row {
+  return {
+    payout_id: 'payout-booking-1',
+    booking_id: 'booking-1',
+    merchant_id: 'merchant-1',
+    status: 'pending',
+    updated_at: hoursAgoIso(0),
+    provider_reference: null,
+    rental_payment_status: 'captured',
+    has_blocking_dispute: false,
+    merchant_account_status: 'active',
+    has_pending_financial_disposition: false,
+    ...overrides,
+  }
+}
+
+describe('listOperationalExceptions -- booking payout financial-disposition-pending visibility (category: ADMIN-CONTROL-CENTRE-BATCH-E28)', () => {
+  it('65. an unpaid booking payout with a pending financial disposition surfaces merchant_payout_financial_disposition_pending', async () => {
+    const { admin } = createFakeExceptionsAdmin({
+      rpcResults: { _merchant_payout_exception_candidates: [bookingPayoutCandidate({ has_pending_financial_disposition: true })] },
+    })
+    const exceptions = await listOperationalExceptions(admin)
+    const found = exceptions.find((e) => e.type === 'merchant_payout_financial_disposition_pending')
+    expect(found).toBeDefined()
+    expect(found?.entityType).toBe('merchant_payout')
+    expect(found?.entityId).toBe('payout-booking-1')
+    expect(found?.severity).toBe('high')
+  })
+
+  it('66. a healthy unpaid booking payout (no pending disposition) never surfaces the category', async () => {
+    const { admin } = createFakeExceptionsAdmin({
+      rpcResults: { _merchant_payout_exception_candidates: [bookingPayoutCandidate({ has_pending_financial_disposition: false })] },
+    })
+    const exceptions = await listOperationalExceptions(admin)
+    expect(exceptions.find((e) => e.type === 'merchant_payout_financial_disposition_pending')).toBeUndefined()
+  })
+
+  it('67. a PAID booking payout with a pending financial disposition surfaces the distinct paid-variant category, never the unpaid one', async () => {
+    const { admin } = createFakeExceptionsAdmin({
+      rpcResults: {
+        _merchant_payout_exception_candidates: [
+          bookingPayoutCandidate({ payout_id: 'payout-booking-2', status: 'paid', provider_reference: 'ref-1', has_pending_financial_disposition: true }),
+        ],
+      },
+    })
+    const exceptions = await listOperationalExceptions(admin)
+    expect(exceptions.find((e) => e.type === 'merchant_payout_paid_with_pending_disposition' && e.entityId === 'payout-booking-2')).toBeDefined()
+    expect(exceptions.find((e) => e.type === 'merchant_payout_financial_disposition_pending' && e.entityId === 'payout-booking-2')).toBeUndefined()
+  })
+
+  it('68. detection never mutates anything -- no update/insert/delete/rpc mutation call happens while surfacing a pending-disposition exception', async () => {
+    const { admin, mutationCalls } = createFakeExceptionsAdmin({
+      rpcResults: { _merchant_payout_exception_candidates: [bookingPayoutCandidate({ has_pending_financial_disposition: true })] },
+    })
+    await listOperationalExceptions(admin)
+    expect(mutationCalls).toEqual([])
+  })
+})

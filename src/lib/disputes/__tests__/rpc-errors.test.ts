@@ -23,6 +23,18 @@ describe('mapDisputeRpcError', () => {
     ['a dispute can only be resolved while under review', 409],
     ['a dispute can only be closed after it has been resolved', 409],
     ['this listing is no longer available for the requested dates', 409],
+    ['invalid disposition type', 400],
+    ['a reason is required', 400],
+    ['no_financial_adjustment must not carry an amount', 400],
+    ['a positive amount is required for this disposition type', 400],
+    ['financial disposition is only supported for booking disputes', 400],
+    ['a dispute must be resolved before a financial disposition can be recorded', 409],
+    ['a financial disposition has already been recorded for this dispute', 409],
+    ['no rental charge payment exists for this booking to refund', 409],
+    ['the booking payment is not in a refundable status', 409],
+    ['refund amount exceeds the amount available to refund', 400],
+    ['no financial disposition exists for this dispute', 404],
+    ['this financial disposition is not pending completion', 409],
     ['not authorized', 500],
   ])('maps %j to status %i', (message, status) => {
     expect(mapDisputeRpcError(message).status).toBe(status)

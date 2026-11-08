@@ -200,6 +200,13 @@ interface PayoutExceptionCandidateRow {
   rental_payment_status: string | null
   has_blocking_dispute: boolean
   merchant_account_status: string | null
+  // E28: true when a resolved/closed dispute on this booking has a
+  // financial disposition still 'pending' -- see
+  // _merchant_payout_full_eligibility_block/_merchant_payout_still_
+  // safe_to_pay_block's own identical check (supabase/migrations/
+  // 20261108180657). This field only explains an already-canonical
+  // blocking decision; it never independently decides one.
+  has_pending_financial_disposition: boolean
 }
 
 /**
@@ -1244,6 +1251,19 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
           resolved: isResolved('merchant_payout_restricted_merchant', 'merchant_payout', payout.payout_id),
         })
       }
+      if (payout.has_pending_financial_disposition) {
+        exceptions.push({
+          id: exceptionId('merchant_payout_financial_disposition_pending', payout.payout_id),
+          type: 'merchant_payout_financial_disposition_pending',
+          severity: 'high',
+          entityType: 'merchant_payout',
+          entityId: payout.payout_id,
+          summary: 'A resolved dispute on this booking has a financial disposition (refund or settlement) that has not yet been completed -- payout must wait',
+          detectedAt: now,
+          suggestedAction: `Complete the financial disposition from the dispute detail page, then review at /admin/payouts/${payout.payout_id}`,
+          resolved: isResolved('merchant_payout_financial_disposition_pending', 'merchant_payout', payout.payout_id),
+        })
+      }
     }
   }
 
@@ -1328,6 +1348,19 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
         detectedAt: payout.updated_at,
         suggestedAction: `Investigate at /admin/payouts/${payout.payout_id}`,
         resolved: isResolved('merchant_payout_paid_without_reference', 'merchant_payout', payout.payout_id),
+      })
+    }
+    if (payout.has_pending_financial_disposition) {
+      exceptions.push({
+        id: exceptionId('merchant_payout_paid_with_pending_disposition', payout.payout_id),
+        type: 'merchant_payout_paid_with_pending_disposition',
+        severity: 'high',
+        entityType: 'merchant_payout',
+        entityId: payout.payout_id,
+        summary: 'This payout was already paid, but a financial disposition on its source dispute is still pending completion -- requires admin review, do not rewrite the paid record',
+        detectedAt: now,
+        suggestedAction: `Review the linked dispute and complete its financial disposition -- /admin/payouts/${payout.payout_id}`,
+        resolved: isResolved('merchant_payout_paid_with_pending_disposition', 'merchant_payout', payout.payout_id),
       })
     }
   }

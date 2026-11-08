@@ -57,6 +57,8 @@ export default async function AdminDisputeDetailPage({ params }: PageProps) {
               status={dispute.status}
               currentAdminId={requester.userId}
               assignedAdminId={dispute.assigned_admin_id}
+              bookingId={dispute.booking_id}
+              financialDisposition={detail.financialDisposition as { disposition_type: string; status: string; amount: string | number | null } | null}
             />
           }
         />

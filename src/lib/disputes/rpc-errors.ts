@@ -69,6 +69,40 @@ export function mapDisputeRpcError(message: string | undefined): { status: numbe
   if (m.includes('this listing is no longer available for the requested dates')) {
     return { status: 409, error: 'The requested dates are no longer available for this listing.' }
   }
+  // E28: record_dispute_financial_disposition / complete_dispute_financial_disposition.
+  if (m.includes('invalid disposition type')) {
+    return { status: 400, error: 'Invalid financial disposition type.' }
+  }
+  if (m.includes('a reason is required')) {
+    return { status: 400, error: 'A reason is required.' }
+  }
+  if (m.includes('must not carry an amount') || m.includes('a positive amount is required for this disposition type')) {
+    return { status: 400, error: 'Please provide the correct amount for this disposition type.' }
+  }
+  if (m.includes('financial disposition is only supported for booking disputes')) {
+    return { status: 400, error: 'A financial disposition can only be recorded for a booking dispute.' }
+  }
+  if (m.includes('a dispute must be resolved before a financial disposition can be recorded')) {
+    return { status: 409, error: 'This dispute must be resolved before a financial disposition can be recorded.' }
+  }
+  if (m.includes('a financial disposition has already been recorded for this dispute')) {
+    return { status: 409, error: 'A financial disposition has already been recorded for this dispute.' }
+  }
+  if (m.includes('no rental charge payment exists for this booking to refund')) {
+    return { status: 409, error: 'No refundable payment exists for this booking.' }
+  }
+  if (m.includes('the booking payment is not in a refundable status')) {
+    return { status: 409, error: 'This booking payment is not in a refundable status.' }
+  }
+  if (m.includes('refund amount exceeds the amount available to refund')) {
+    return { status: 400, error: 'The refund amount exceeds the amount available to refund.' }
+  }
+  if (m.includes('no financial disposition exists for this dispute')) {
+    return { status: 404, error: 'No financial disposition exists for this dispute.' }
+  }
+  if (m.includes('this financial disposition is not pending completion')) {
+    return { status: 409, error: 'This financial disposition is not pending completion.' }
+  }
   if (m.includes('not authorized')) {
     return { status: 500, error: 'Could not process your request — please try again' }
   }
