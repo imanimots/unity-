@@ -8,6 +8,7 @@ interface Props {
   escrowId: string
   status: string
   defaultReleaseTo: string | null
+  principalAmount: number
 }
 
 type ActionKind = 'release' | 'refund' | 'cancel'
@@ -32,7 +33,7 @@ function availableActions(status: string): ActionKind[] {
   return []
 }
 
-export function EscrowActions({ escrowId, status, defaultReleaseTo }: Props) {
+export function EscrowActions({ escrowId, status, defaultReleaseTo, principalAmount }: Props) {
   const router = useRouter()
   const [pending, setPending] = useState<ActionKind | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -53,15 +54,16 @@ export function EscrowActions({ escrowId, status, defaultReleaseTo }: Props) {
     }
 
     if (action === 'refund') {
-      const amountStr = window.prompt('Refund amount (required, ZAR):')
-      const amount = Number(amountStr)
-      if (!amountStr || !Number.isFinite(amount) || amount <= 0) {
-        setError('A valid positive refund amount is required')
-        return
-      }
+      // Partial refunds are not currently supported (see
+      // docs/ESCROW_ARCHITECTURE.md) -- no transition anywhere
+      // accepts the resulting 'partially_refunded' status as a
+      // source, so a lesser amount would strand the residual
+      // permanently. The only valid amount is the full held
+      // principal; no amount input is offered.
+      if (!window.confirm(`Refund the full held principal of R${principalAmount.toFixed(2)} back to the payer?`)) return
       const reason = window.prompt('Reason for this refund (required):')
       if (!reason || !reason.trim()) return
-      body.amount = amount
+      body.amount = principalAmount
       body.reason = reason
     }
 

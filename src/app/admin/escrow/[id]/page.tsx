@@ -120,7 +120,7 @@ export default async function AdminEscrowDetailPage({ params }: PageProps) {
 
         <section>
           <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-3">Admin actions</h2>
-          <EscrowActions escrowId={e.id} status={e.status} defaultReleaseTo={e.released_to} />
+          <EscrowActions escrowId={e.id} status={e.status} defaultReleaseTo={e.released_to} principalAmount={e.principal_amount} />
         </section>
 
         <section>

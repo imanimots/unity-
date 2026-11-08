@@ -20,7 +20,7 @@ import { sendTemplate } from '@/lib/email'
  * client is required) -- same trust boundary as the payments orchestrator.
  */
 
-export type EscrowOrchestrationErrorCode = 'provider_declined' | 'provider_unavailable' | 'provider_timeout' | 'retryable_provider_error' | 'terminal_provider_error' | 'internal_consistency_error' | 'not_eligible'
+export type EscrowOrchestrationErrorCode = 'provider_declined' | 'provider_unavailable' | 'provider_timeout' | 'retryable_provider_error' | 'terminal_provider_error' | 'internal_consistency_error' | 'not_eligible' | 'partial_refund_not_supported'
 
 export class EscrowOrchestrationError extends Error {
   readonly code: EscrowOrchestrationErrorCode
@@ -243,6 +243,16 @@ async function notifyEscrowReleased(admin: SupabaseClient, escrowTransactionId: 
 /**
  * Admin-only refund (no automatic refund trigger exists yet -- see
  * docs/ESCROW_ARCHITECTURE.md). Never blocked by a dispute.
+ *
+ * Partial refunds are not currently supported -- see
+ * docs/ESCROW_ARCHITECTURE.md's "Known limitations" section. No
+ * transition anywhere accepts the resulting 'partially_refunded'
+ * status as a source, so any amount less than the full held
+ * principal would strand the residual permanently. Rejected here,
+ * before the provider is ever called, so a predictable rejection
+ * never costs a real provider round-trip; public.refund_escrow_
+ * transaction independently enforces the same rule as the
+ * authoritative database-side check.
  */
 export async function refundEscrowTransaction(
   admin: SupabaseClient,
@@ -254,10 +264,17 @@ export async function refundEscrowTransaction(
 ): Promise<EscrowTransactionResult> {
   const { data: escrow } = await admin
     .from('escrow_transactions')
-    .select('id, status, provider_reference, currency')
+    .select('id, status, provider_reference, currency, principal_amount')
     .eq('id', escrowTransactionId)
     .maybeSingle()
   if (!escrow) throw new EscrowOrchestrationError('internal_consistency_error', 'escrow transaction not found')
+
+  if (amount !== Number(escrow.principal_amount)) {
+    throw new EscrowOrchestrationError(
+      'partial_refund_not_supported',
+      'Partial escrow refunds are not currently supported -- the refund amount must equal the full held principal amount.'
+    )
+  }
 
   const provider = getEscrowProvider()
   let result
