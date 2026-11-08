@@ -202,6 +202,145 @@ interface PayoutExceptionCandidateRow {
   merchant_account_status: string | null
 }
 
+/**
+ * E27: public._merchant_payout_exception_candidates() (above) can never
+ * see RTB payout context -- its only joins key on booking_id, which is
+ * always NULL for an RTB payout (merchant_payouts_one_transaction_chk
+ * requires exactly one of booking_id/rent_to_buy_agreement_id), so a
+ * separate, narrow RPC exists for RTB
+ * (_rtb_merchant_payout_exception_candidates, migration
+ * 20261108163517). Its eligibility_block column is the SAME canonical
+ * verdict public._merchant_payout_full_eligibility_block (pending/
+ * processing) or public._merchant_payout_still_safe_to_pay_block
+ * (paid) would return for this exact row -- computed once, server
+ * side, never re-implemented here. The remaining fields are raw
+ * context facts (escrow participation/backing, dispute existence,
+ * merchant status) needed only to pick which of several independent,
+ * possibly-simultaneous labels to attach to an already-canonically-
+ * confirmed problem -- never to independently decide whether one
+ * exists.
+ */
+export type RtbPayoutExceptionType =
+  | 'merchant_payout_rtb_escrow_backing_invalid'
+  | 'merchant_payout_rtb_source_state_invalid'
+  | 'merchant_payout_rtb_paid_underbacked'
+  | 'merchant_payout_unresolved_dispute'
+  | 'merchant_payout_restricted_merchant'
+  | 'merchant_payout_paid_then_disputed'
+  | 'merchant_payout_paid_without_reference'
+
+export interface RtbPayoutExceptionCandidateRow {
+  payout_id: string
+  rent_to_buy_agreement_id: string
+  merchant_id: string
+  status: 'pending' | 'processing' | 'paid'
+  amount: string | number
+  updated_at: string
+  provider_reference: string | null
+  eligibility_block: 'source_payment_issue' | 'compliance_review' | 'account_restricted' | null
+  agreement_status: string | null
+  agreement_settled_at: string | null
+  has_any_escrow: boolean
+  released_escrow_total: string | number
+  has_blocking_dispute: boolean
+  merchant_account_status: string | null
+}
+
+export interface RtbPayoutExceptionClassification {
+  type: RtbPayoutExceptionType
+  severity: ExceptionSeverity
+  summary: string
+}
+
+/**
+ * Pure, DB-free classification of one RTB payout exception candidate
+ * row -- extracted for direct unit testing, same convention as
+ * classifyCapturedRtbInstallmentPayment above. A row only reaches this
+ * function at all because the RPC's own WHERE clause already confirmed
+ * it is operationally relevant (eligibility_block is not null, or it's
+ * paid without a provider reference) -- this function never decides
+ * IF a row is a problem, only WHICH label(s) describe an
+ * already-confirmed one. Can return more than one classification for
+ * a single row (e.g. an under-backed payout whose merchant is also
+ * restricted) -- these are independent remediation paths, never
+ * collapsed into one vague exception.
+ *
+ * The escrow-backing check (has_any_escrow && amount > released) is
+ * the exact formula public._merchant_payout_full_eligibility_block and
+ * public._merchant_payout_still_safe_to_pay_block both use -- computed
+ * here from the same pre-joined context fields the canonical gate
+ * itself used, never a second independent definition of "under-
+ * backed". Given the gate's own check order (agreement state, then
+ * backing, then dispute, then restriction for pending/processing),
+ * this condition being true always implies the gate's own verdict is
+ * 'source_payment_issue' for that row today -- so
+ * merchant_payout_rtb_source_state_invalid (the catch-all residual
+ * label) is deliberately gated on "source_payment_issue AND NOT
+ * under-backed", never invented independently of the canonical
+ * verdict, since no raw context field here can safely stand in for
+ * the agreement-lifecycle-validity rule itself.
+ */
+export function classifyRtbPayoutExceptionCandidate(row: RtbPayoutExceptionCandidateRow): RtbPayoutExceptionClassification[] {
+  const results: RtbPayoutExceptionClassification[] = []
+  const amount = Number(row.amount)
+  const released = Number(row.released_escrow_total)
+  const underBacked = row.has_any_escrow && amount > released
+
+  if (row.status === 'pending' || row.status === 'processing') {
+    if (row.has_blocking_dispute) {
+      results.push({
+        type: 'merchant_payout_unresolved_dispute',
+        severity: 'high',
+        summary: 'This payout is blocked by an unresolved dispute on its source rent-to-buy agreement',
+      })
+    }
+    if (row.merchant_account_status === 'suspended' || row.merchant_account_status === 'restricted') {
+      results.push({
+        type: 'merchant_payout_restricted_merchant',
+        severity: 'high',
+        summary: 'This payout belongs to a suspended or restricted merchant',
+      })
+    }
+    if (underBacked) {
+      results.push({
+        type: 'merchant_payout_rtb_escrow_backing_invalid',
+        severity: 'high',
+        summary: `This rent-to-buy merchant payout of R${amount.toFixed(2)} exceeds its agreement's released escrow backing of R${released.toFixed(2)}`,
+      })
+    } else if (row.eligibility_block === 'source_payment_issue') {
+      results.push({
+        type: 'merchant_payout_rtb_source_state_invalid',
+        severity: 'high',
+        summary: `This rent-to-buy merchant payout's source agreement is not in a valid state for payout (agreement status: "${row.agreement_status ?? 'unknown'}")`,
+      })
+    }
+  } else if (row.status === 'paid') {
+    if (row.has_blocking_dispute) {
+      results.push({
+        type: 'merchant_payout_paid_then_disputed',
+        severity: 'high',
+        summary: 'This payout was already paid, but a dispute has since opened on its source rent-to-buy agreement',
+      })
+    }
+    if (underBacked) {
+      results.push({
+        type: 'merchant_payout_rtb_paid_underbacked',
+        severity: 'high',
+        summary: `This rent-to-buy merchant payout was already paid R${amount.toFixed(2)}, but released escrow backing is only R${released.toFixed(2)} -- requires admin review before any recovery`,
+      })
+    }
+    if (!row.provider_reference) {
+      results.push({
+        type: 'merchant_payout_paid_without_reference',
+        severity: 'medium',
+        summary: 'Payout is marked paid but has no recorded payout reference',
+      })
+    }
+  }
+
+  return results
+}
+
 export async function listOperationalExceptions(admin: SupabaseClient): Promise<AdminException[]> {
   const threshold = hoursAgo(REVIEW_OVERDUE_HOURS)
   const now = new Date().toISOString()
@@ -308,6 +447,12 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
   // here.
   const payoutExceptionCandidatesP = admin.rpc('_merchant_payout_exception_candidates') as unknown as Promise<{ data: PayoutExceptionCandidateRow[] | null }>
   const missingPayoutCandidatesP = admin.rpc('_payout_reconcile_missing_candidates', { p_limit: 50 }) as unknown as Promise<{ data: { booking_id: string }[] | null }>
+  // E27: the RTB-specific sibling of payoutExceptionCandidatesP above --
+  // see _rtb_merchant_payout_exception_candidates (migration
+  // 20261108163517) and classifyRtbPayoutExceptionCandidate's own doc
+  // comment for why this exists as a separate RPC/query rather than
+  // widening the booking one.
+  const rtbPayoutExceptionCandidatesP = admin.rpc('_rtb_merchant_payout_exception_candidates') as unknown as Promise<{ data: RtbPayoutExceptionCandidateRow[] | null }>
 
   const wave7P = Promise.all([
     admin
@@ -1055,6 +1200,7 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
   // bounded to "payouts currently exhibiting an exception", which does
   // not grow with total historical payout volume.
   const { data: payoutExceptionCandidates } = await payoutExceptionCandidatesP
+  const { data: rtbPayoutExceptionCandidates } = await rtbPayoutExceptionCandidatesP
 
   for (const payout of payoutExceptionCandidates ?? []) {
     if (!payout.booking_id) continue
@@ -1182,6 +1328,48 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
         detectedAt: payout.updated_at,
         suggestedAction: `Investigate at /admin/payouts/${payout.payout_id}`,
         resolved: isResolved('merchant_payout_paid_without_reference', 'merchant_payout', payout.payout_id),
+      })
+    }
+  }
+
+  // ------------------------------------------------------------
+  // E27: RTB merchant payout safety blockers. Reuses the exact
+  // generic categories above where the condition genuinely matches
+  // (unresolved_dispute, restricted_merchant, paid_then_disputed,
+  // paid_without_reference) and adds exactly 3 RTB-specific financial
+  // categories (escrow_backing_invalid / source_state_invalid /
+  // paid_underbacked) that the generic booking categories cannot
+  // describe accurately -- see classifyRtbPayoutExceptionCandidate's
+  // own doc comment for the full classification contract. No RTB
+  // duplicate-payout category exists: merchant_payouts_rtb_agreement_
+  // unique (20260821183555_rtb_v2_schema.sql) already makes more than
+  // one payout per agreement a database impossibility. RTB payouts are
+  // already automatically covered by the generic, payout-ID-scoped
+  // categories above (pending_overdue, processing_overdue, failed,
+  // missing_history, processing_without_actor) and by
+  // merchant_payout_missing_for_completed_booking's deliberate
+  // booking-only scope is left untouched -- RTB reconciliation gaps
+  // are a distinct, unverified concern this phase does not expand into.
+  // ------------------------------------------------------------
+  for (const row of rtbPayoutExceptionCandidates ?? []) {
+    for (const classification of classifyRtbPayoutExceptionCandidate(row)) {
+      exceptions.push({
+        id: exceptionId(classification.type, row.payout_id),
+        type: classification.type,
+        severity: classification.severity,
+        entityType: 'merchant_payout',
+        entityId: row.payout_id,
+        summary: classification.summary,
+        detectedAt: row.updated_at,
+        suggestedAction:
+          classification.type === 'merchant_payout_restricted_merchant'
+            ? `Review the merchant account at /admin/users, then /admin/payouts/${row.payout_id}`
+            : classification.type === 'merchant_payout_unresolved_dispute' || classification.type === 'merchant_payout_paid_then_disputed'
+              ? `Review the linked dispute at /admin/payouts/${row.payout_id}${classification.type === 'merchant_payout_paid_then_disputed' ? ' -- do not rewrite the paid record' : ''}`
+              : classification.type === 'merchant_payout_rtb_paid_underbacked'
+                ? `Manually reconcile at /admin/payouts/${row.payout_id} -- do not rewrite the paid record`
+                : `Review at /admin/payouts/${row.payout_id}`,
+        resolved: isResolved(classification.type, 'merchant_payout', row.payout_id),
       })
     }
   }

@@ -2,10 +2,12 @@ import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   classifyCapturedRtbInstallmentPayment,
+  classifyRtbPayoutExceptionCandidate,
   isCapturedRtbDepositUnfunded,
   listOperationalExceptions,
   type RtbInstallmentExceptionCandidate,
   type RtbInstallmentRow,
+  type RtbPayoutExceptionCandidateRow,
 } from '../exceptions-service'
 
 /**
@@ -197,13 +199,22 @@ describe('durability -- classification depends only on persisted payment/install
  * the same function resolves to an empty array unconditionally, which is
  * exactly the inert state we want for all of them in this test.
  */
-function createFakeExceptionsAdmin(fixtures: { affiliate_commissions?: Row[]; email_deliveries?: Row[]; exception_resolutions?: Row[]; account_erasure_cleanup?: Row[] } = {}) {
+function createFakeExceptionsAdmin(
+  fixtures: {
+    affiliate_commissions?: Row[]
+    email_deliveries?: Row[]
+    exception_resolutions?: Row[]
+    account_erasure_cleanup?: Row[]
+    rpcResults?: Record<string, Row[]>
+  } = {}
+) {
   const tables: Record<string, Row[]> = {
     affiliate_commissions: fixtures.affiliate_commissions ?? [],
     email_deliveries: fixtures.email_deliveries ?? [],
     exception_resolutions: fixtures.exception_resolutions ?? [],
     account_erasure_cleanup: fixtures.account_erasure_cleanup ?? [],
   }
+  const rpcResults = fixtures.rpcResults ?? {}
   const mutationCalls: Array<{ method: string; table: string }> = []
 
   type Filter = ['eq' | 'neq' | 'lt' | 'gt' | 'gte' | 'in' | 'not_is_null', string, unknown]
@@ -299,19 +310,21 @@ function createFakeExceptionsAdmin(fixtures: { affiliate_commissions?: Row[]; em
     }
   }
 
-  // listOperationalExceptions legitimately calls two READ-ONLY (SQL
+  // listOperationalExceptions legitimately calls three READ-ONLY (SQL
   // `stable`) RPCs for the unrelated merchant-payout exception
   // categories (_merchant_payout_exception_candidates,
-  // _payout_reconcile_missing_candidates) -- those are not mutations and
-  // must not trip the "detection never mutates" assertion. Any OTHER rpc
-  // name would be a real affiliate-commission state-transition call
-  // (mark_affiliate_commission_processing, record_affiliate_payout_result,
-  // retry_affiliate_payout, mark_affiliate_commission_paid_manually, etc.)
-  // and is tracked as a genuine mutation.
-  const READ_ONLY_RPCS = new Set(['_merchant_payout_exception_candidates', '_payout_reconcile_missing_candidates'])
+  // _payout_reconcile_missing_candidates,
+  // _rtb_merchant_payout_exception_candidates -- E27) -- those are not
+  // mutations and must not trip the "detection never mutates" assertion.
+  // Any OTHER rpc name would be a real affiliate-commission state-
+  // transition call (mark_affiliate_commission_processing,
+  // record_affiliate_payout_result, retry_affiliate_payout,
+  // mark_affiliate_commission_paid_manually, etc.) and is tracked as a
+  // genuine mutation.
+  const READ_ONLY_RPCS = new Set(['_merchant_payout_exception_candidates', '_payout_reconcile_missing_candidates', '_rtb_merchant_payout_exception_candidates'])
   const rpc = vi.fn((fnName: string) => {
     if (!READ_ONLY_RPCS.has(fnName)) mutationCalls.push({ method: 'rpc', table: fnName })
-    return Promise.resolve({ data: [], error: null })
+    return Promise.resolve({ data: rpcResults[fnName] ?? [], error: null })
   })
 
   return { admin: { from, rpc } as unknown as SupabaseClient, mutationCalls }
@@ -588,5 +601,213 @@ describe('listOperationalExceptions -- account erasure cleanup pending (category
     const { admin } = createFakeExceptionsAdmin({})
     const exceptions = await listOperationalExceptions(admin)
     expect(exceptions.find((e) => e.type === 'privacy_cleanup_pending')).toBeUndefined()
+  })
+})
+
+/**
+ * E27: DB-free tests for classifyRtbPayoutExceptionCandidate, covering
+ * the phase's own required test matrix in full -- the healthy no-
+ * escrow/escrow-backed boundary (the most important E26/E27 regression
+ * boundary), under-backed detection in every escrow-row status, the
+ * generic categories reused from the booking flow, the new RTB-
+ * specific categories, deterministic precedence (never double-labeling
+ * one financial cause), and legitimately independent multi-condition
+ * rows.
+ */
+function rtbPayoutCandidate(overrides: Partial<RtbPayoutExceptionCandidateRow> = {}): RtbPayoutExceptionCandidateRow {
+  return {
+    payout_id: 'payout-1',
+    rent_to_buy_agreement_id: 'agr-1',
+    merchant_id: 'merchant-1',
+    status: 'pending',
+    amount: '900.00',
+    updated_at: hoursAgoIso(0),
+    provider_reference: null,
+    eligibility_block: null,
+    agreement_status: 'active',
+    agreement_settled_at: null,
+    has_any_escrow: false,
+    released_escrow_total: '0',
+    has_blocking_dispute: false,
+    merchant_account_status: 'active',
+    ...overrides,
+  }
+}
+
+describe('classifyRtbPayoutExceptionCandidate -- the E26/E27 no-escrow false-positive boundary (category: ADMIN-CONTROL-CENTRE-BATCH-E27)', () => {
+  it('44. a healthy, no-escrow, pending RTB payout produces zero exceptions', () => {
+    const row = rtbPayoutCandidate({ status: 'pending', has_any_escrow: false, eligibility_block: null })
+    expect(classifyRtbPayoutExceptionCandidate(row)).toEqual([])
+  })
+
+  it('45. a healthy, no-escrow, processing RTB payout produces zero exceptions', () => {
+    const row = rtbPayoutCandidate({ status: 'processing', has_any_escrow: false, eligibility_block: null })
+    expect(classifyRtbPayoutExceptionCandidate(row)).toEqual([])
+  })
+
+  it('46. a healthy escrow-participating payout (amount <= released, no dispute, merchant active) produces zero exceptions', () => {
+    const row = rtbPayoutCandidate({ has_any_escrow: true, amount: '399.80', released_escrow_total: '400.00', eligibility_block: null })
+    expect(classifyRtbPayoutExceptionCandidate(row)).toEqual([])
+  })
+
+  it('47. zero escrow rows never produces merchant_payout_rtb_escrow_backing_invalid even when released_escrow_total happens to be reported as 0 -- has_any_escrow gates it, not the total alone', () => {
+    const row = rtbPayoutCandidate({ has_any_escrow: false, released_escrow_total: '0', amount: '900.00', eligibility_block: null })
+    const results = classifyRtbPayoutExceptionCandidate(row)
+    expect(results.find((r) => r.type === 'merchant_payout_rtb_escrow_backing_invalid')).toBeUndefined()
+  })
+})
+
+describe('classifyRtbPayoutExceptionCandidate -- under-backed escrow (pending/processing/paid, every participating escrow status)', () => {
+  it('48. escrow participation exists with amount (R900) exceeding released backing (R600) -> high-severity escrow backing exception', () => {
+    const row = rtbPayoutCandidate({ has_any_escrow: true, amount: '900.00', released_escrow_total: '600.00', eligibility_block: 'source_payment_issue' })
+    const results = classifyRtbPayoutExceptionCandidate(row)
+    expect(results).toHaveLength(1)
+    expect(results[0].type).toBe('merchant_payout_rtb_escrow_backing_invalid')
+    expect(results[0].severity).toBe('high')
+    expect(results[0].summary).toMatch(/R900\.00/)
+    expect(results[0].summary).toMatch(/R600\.00/)
+    expect(results[0].summary).not.toMatch(/source rental payment invalid|rental charge/i)
+  })
+
+  it('49. a single failed-only escrow row (released = 0) with a positive payout is still surfaced as a backing exception -- no silent no-escrow fallback', () => {
+    const row = rtbPayoutCandidate({ has_any_escrow: true, amount: '250.00', released_escrow_total: '0', eligibility_block: 'source_payment_issue' })
+    const results = classifyRtbPayoutExceptionCandidate(row)
+    expect(results.map((r) => r.type)).toContain('merchant_payout_rtb_escrow_backing_invalid')
+  })
+
+  it('50. a single refunded-only escrow row (released = 0) with a positive payout is likewise surfaced -- same conservative mode as a failed row', () => {
+    const row = rtbPayoutCandidate({ has_any_escrow: true, amount: '250.00', released_escrow_total: '0', eligibility_block: 'source_payment_issue' })
+    const results = classifyRtbPayoutExceptionCandidate(row)
+    expect(results.map((r) => r.type)).toContain('merchant_payout_rtb_escrow_backing_invalid')
+  })
+
+  it('51. a processing RTB payout under-backed is classified identically to a pending one', () => {
+    const row = rtbPayoutCandidate({ status: 'processing', has_any_escrow: true, amount: '900.00', released_escrow_total: '600.00', eligibility_block: 'source_payment_issue' })
+    const results = classifyRtbPayoutExceptionCandidate(row)
+    expect(results.map((r) => r.type)).toEqual(['merchant_payout_rtb_escrow_backing_invalid'])
+  })
+
+  it('52. a PAID RTB payout under-backed is classified as the distinct paid-underbacked category, never the unpaid backing category', () => {
+    const row = rtbPayoutCandidate({ status: 'paid', has_any_escrow: true, amount: '900.00', released_escrow_total: '600.00', provider_reference: 'ref-123' })
+    const results = classifyRtbPayoutExceptionCandidate(row)
+    expect(results).toHaveLength(1)
+    expect(results[0].type).toBe('merchant_payout_rtb_paid_underbacked')
+    expect(results[0].severity).toBe('high')
+  })
+})
+
+describe('classifyRtbPayoutExceptionCandidate -- dispute, restricted merchant, and invalid source state (reused + new categories)', () => {
+  it('53. an unpaid RTB payout with an active dispute surfaces the generic, reused merchant_payout_unresolved_dispute category', () => {
+    const row = rtbPayoutCandidate({ has_blocking_dispute: true, eligibility_block: 'compliance_review' })
+    const results = classifyRtbPayoutExceptionCandidate(row)
+    expect(results.map((r) => r.type)).toEqual(['merchant_payout_unresolved_dispute'])
+  })
+
+  it('54. an unpaid RTB payout for a restricted merchant surfaces the generic, reused merchant_payout_restricted_merchant category', () => {
+    const row = rtbPayoutCandidate({ merchant_account_status: 'restricted', eligibility_block: 'account_restricted' })
+    const results = classifyRtbPayoutExceptionCandidate(row)
+    expect(results.map((r) => r.type)).toEqual(['merchant_payout_restricted_merchant'])
+  })
+
+  it('55. eligibility_block is source_payment_issue but no escrow backing deficit explains it -> the RTB source-state category, never mislabeled as a backing problem', () => {
+    const row = rtbPayoutCandidate({ has_any_escrow: false, eligibility_block: 'source_payment_issue', agreement_status: 'defaulted' })
+    const results = classifyRtbPayoutExceptionCandidate(row)
+    expect(results).toHaveLength(1)
+    expect(results[0].type).toBe('merchant_payout_rtb_source_state_invalid')
+    expect(results[0].summary).toMatch(/defaulted/)
+  })
+
+  it('56. a paid RTB payout with a dispute opened afterward surfaces merchant_payout_paid_then_disputed, with no automatic remediation implied', () => {
+    const row = rtbPayoutCandidate({ status: 'paid', has_blocking_dispute: true, provider_reference: 'ref-456' })
+    const results = classifyRtbPayoutExceptionCandidate(row)
+    expect(results.map((r) => r.type)).toEqual(['merchant_payout_paid_then_disputed'])
+    expect(results[0].summary).not.toMatch(/refund|rollback|clawback/i)
+  })
+
+  it('57. a paid RTB payout with no provider reference surfaces the generic, reused merchant_payout_paid_without_reference category', () => {
+    const row = rtbPayoutCandidate({ status: 'paid', provider_reference: null })
+    const results = classifyRtbPayoutExceptionCandidate(row)
+    expect(results.map((r) => r.type)).toEqual(['merchant_payout_paid_without_reference'])
+  })
+})
+
+describe('classifyRtbPayoutExceptionCandidate -- deterministic precedence and legitimate multi-condition rows', () => {
+  it('58. an under-backed escrow payout never ALSO receives the source-state label for the same source_payment_issue cause -- deterministic precedence, no double-classification', () => {
+    const row = rtbPayoutCandidate({ has_any_escrow: true, amount: '900.00', released_escrow_total: '600.00', eligibility_block: 'source_payment_issue' })
+    const results = classifyRtbPayoutExceptionCandidate(row)
+    expect(results.map((r) => r.type)).toEqual(['merchant_payout_rtb_escrow_backing_invalid'])
+    expect(results.map((r) => r.type)).not.toContain('merchant_payout_rtb_source_state_invalid')
+  })
+
+  it('59. an under-backed payout for a restricted merchant legitimately yields two independent exceptions, never collapsed into one', () => {
+    const row = rtbPayoutCandidate({
+      has_any_escrow: true,
+      amount: '900.00',
+      released_escrow_total: '600.00',
+      merchant_account_status: 'restricted',
+      eligibility_block: 'source_payment_issue',
+    })
+    const results = classifyRtbPayoutExceptionCandidate(row)
+    expect(results.map((r) => r.type).sort()).toEqual(['merchant_payout_restricted_merchant', 'merchant_payout_rtb_escrow_backing_invalid'])
+  })
+
+  it('60. an under-backed, disputed, paid payout legitimately yields two independent paid exceptions', () => {
+    const row = rtbPayoutCandidate({
+      status: 'paid',
+      has_any_escrow: true,
+      amount: '900.00',
+      released_escrow_total: '600.00',
+      has_blocking_dispute: true,
+      provider_reference: 'ref-789',
+    })
+    const results = classifyRtbPayoutExceptionCandidate(row)
+    expect(results.map((r) => r.type).sort()).toEqual(['merchant_payout_paid_then_disputed', 'merchant_payout_rtb_paid_underbacked'])
+  })
+})
+
+describe('listOperationalExceptions -- RTB payout exception wiring (category: ADMIN-CONTROL-CENTRE-BATCH-E27)', () => {
+  it('61. a candidate row returned by _rtb_merchant_payout_exception_candidates is surfaced as a real exception with the correct entity type/id', async () => {
+    const { admin } = createFakeExceptionsAdmin({
+      rpcResults: {
+        _rtb_merchant_payout_exception_candidates: [
+          rtbPayoutCandidate({ payout_id: 'payout-rtb-1', has_any_escrow: true, amount: '900.00', released_escrow_total: '600.00', eligibility_block: 'source_payment_issue' }) as unknown as Row,
+        ],
+      },
+    })
+    const exceptions = await listOperationalExceptions(admin)
+    const found = exceptions.find((e) => e.type === 'merchant_payout_rtb_escrow_backing_invalid')
+    expect(found).toBeDefined()
+    expect(found?.entityType).toBe('merchant_payout')
+    expect(found?.entityId).toBe('payout-rtb-1')
+    expect(found?.severity).toBe('high')
+  })
+
+  it('62. calling the RTB candidate RPC and classifying its result never mutates anything', async () => {
+    const { admin, mutationCalls } = createFakeExceptionsAdmin({
+      rpcResults: {
+        _rtb_merchant_payout_exception_candidates: [rtbPayoutCandidate({ has_blocking_dispute: true, eligibility_block: 'compliance_review' }) as unknown as Row],
+      },
+    })
+    await listOperationalExceptions(admin)
+    expect(mutationCalls).toEqual([])
+  })
+
+  it('63. an admin-acknowledged RTB payout exception is reported as resolved without the underlying payout being touched', async () => {
+    const { admin } = createFakeExceptionsAdmin({
+      rpcResults: {
+        _rtb_merchant_payout_exception_candidates: [rtbPayoutCandidate({ payout_id: 'payout-rtb-2', status: 'paid', provider_reference: null }) as unknown as Row],
+      },
+      exception_resolutions: [{ exception_type: 'merchant_payout_paid_without_reference', entity_type: 'merchant_payout', entity_id: 'payout-rtb-2' }],
+    })
+    const exceptions = await listOperationalExceptions(admin)
+    const found = exceptions.find((e) => e.type === 'merchant_payout_paid_without_reference' && e.entityId === 'payout-rtb-2')
+    expect(found?.resolved).toBe(true)
+  })
+
+  it('64. an empty RTB candidate set (the live no-escrow healthy case, post-E26) produces zero RTB-specific exceptions', async () => {
+    const { admin } = createFakeExceptionsAdmin({ rpcResults: { _rtb_merchant_payout_exception_candidates: [] } })
+    const exceptions = await listOperationalExceptions(admin)
+    const rtbTypes = ['merchant_payout_rtb_escrow_backing_invalid', 'merchant_payout_rtb_source_state_invalid', 'merchant_payout_rtb_paid_underbacked']
+    expect(exceptions.filter((e) => rtbTypes.includes(e.type))).toEqual([])
   })
 })
