@@ -21,6 +21,89 @@ schema needed to change.
 
 ---
 
+## 0. E31 update — refund contract investigation, generation mismatch, and corrected payout facts
+
+Everything below this section describes the Phase 2D generation of this integration:
+**classic** Payments API v2 (`userId`/`password`/`entityId`), Checkout V2 session creation,
+the card/backoffice API, and a static Payouts bearer token. **That is no longer what
+`PeachPaymentsProvider` actually does.** A later phase (P5C.1, per that class's own doc
+comment) rewired `chargeRental()`/`authorizeDeposit()`/`captureDeposit()`/`releaseDeposit()`
+onto a *different* generation — "Peach Orchestration," authenticated with a single `api-key`
+header against `PEACH_ORCHESTRATION_API_BASE_URL` — without this document being updated to
+match. The classic scaffolding under `./peach/` (config, signature, request-builders,
+response-parsers, error-mapper — everything §15 lists as "real") still exists and is still
+unit-tested, but as of P5C.1 it is **unreferenced by any money-moving method** and is used
+today only by `verifyWebhook()`/`healthCheck()`. Treat every claim below about `refund()`,
+`createMerchantPayout()`, or `createAffiliatePayout()`'s *intended* request/response shape as
+describing the classic generation specifically, not necessarily the Orchestration generation
+the live methods actually use.
+
+**E31's refund-contract audit, performed against current official
+`developer.peachpayments.com` documentation (live web search + fetch, this phase):**
+
+- Peach's current documentation **has no standalone "Orchestration" product category at
+  all** — confirmed directly against the live top-level docs index. The only concrete
+  reference to "Peach Orchestration's Server-to-Server" links to
+  `https://playground.peachpayments.com/integrate/api-only`, an interactive, JavaScript-
+  rendered playground that returns only a loading placeholder to a static fetch — not a
+  crawlable reference page. **This is the exact same wall `orchestration/config.ts`'s own
+  comment already discloses** ("the real Orchestration REST API's own base URL was never
+  directly confirmed by any fetch... only the interactive-docs/playground host was") — still
+  unresolved today, not newly discovered by this phase.
+- Two *different*, fully-documented refund endpoints exist, and **neither is confirmed to be
+  the one Unity's actual `api-key`-header `OrchestrationClient` would use**:
+  1. Classic Payments API: `POST /payments/{uniqueId}`, `userId`/`password`/`entityId` body
+     auth — officially deprecated for new integrations ("use Peach Orchestration's
+     Server-to-Server and not the classic Payments API").
+  2. Checkout API: `POST /v1/checkout/refund`, **HMAC-SHA256 signature** auth — a plausible
+     candidate for what Peach calls "Orchestration" (the "use Orchestration" sentence lives
+     on the Checkout API's own overview page), but no page directly confirms this identity,
+     and its auth model doesn't match the plain `api-key` header Unity's session-creation
+     calls already use successfully.
+- Given this, **no real `refund()` implementation was written this phase.** Building one
+  against either unverified candidate would risk a real-money refund operation on a wrong
+  auth model, wrong endpoint, or wrong finality assumption. `PeachPaymentsProvider.refund()`
+  remains a `NotImplementedError` stub; `supportsCapability('refund')` remains `false`.
+
+**Corrected payout facts** (the specific stale claims named by this phase's own brief,
+re-verified against current official docs):
+
+- **§7 "Payouts webhooks," §16:** "No documented signature or encryption mechanism was found
+  for this webhook" is **no longer accurate.** Current Peach Payouts documentation now
+  explicitly supports webhook signature verification — Svix-compatible (or manual)
+  verification using a signing secret plus `webhook-id`/`webhook-timestamp` headers. A real
+  Payouts webhook integration must use this, never treat the payload as unsigned/trusted.
+- **§14 "Configuration," §6:** the static `PEACH_PAYOUTS_API_BEARER_TOKEN` model is
+  **confirmed stale.** Current official Peach Payouts authentication is OAuth-style:
+  `clientId` + `clientSecret` + `merchantId` → a Peach Authentication API token endpoint →
+  a short-lived `access_token`, used as `Authorization: Bearer <token>` and refreshed on
+  expiry. This repo's existing `PEACH_PAYOUTS_API_BEARER_TOKEN` variable and the
+  `payoutsBearerToken` block in `peach/config.ts` are **not production-ready** and are
+  unreferenced by any real call site today (`createMerchantPayout`/`createAffiliatePayout`
+  are still stubs) — a real implementation needs client-credentials config
+  (`PEACH_PAYOUTS_CLIENT_ID`/`_CLIENT_SECRET`/`_MERCHANT_ID` or equivalent), not this
+  variable.
+- **§6 "Payout status lifecycle":** re-confirmed accurate — `processing`/`successful`/
+  `failed` (this phase's fetch also surfaced `cancelled`/`reversed` as additional terminal
+  states already recorded here) remain the current documented states. Re-confirmed: querying
+  by payout ID is a real, documented reconciliation mechanism; a merchant-supplied `payoutId`
+  is not yet mandatory but **Peach has stated it will become mandatory and reject duplicate
+  `payoutId`s** once it does — any future implementation should treat uniqueness as mandatory
+  now rather than retrofit it later.
+- **Bank account verification:** confirmed to run on a schedule (03:00–23:00) for first
+  payouts to a new account — a real operational constraint, not just a recommendation, worth
+  carrying into any future payout-activation runbook.
+
+**The hard blocker for either real payout capability remains unrelated to any of the above:**
+no `bankName`/`accountNumber`/`branchCode`/`accountHolder` (or equivalent) column exists
+anywhere in this schema for a merchant or an affiliate — confirmed again this phase, schema
+unchanged. `PeachPaymentsProvider.supportsCapability('merchant_payout' | 'affiliate_payout')`
+remain `false`. A dedicated follow-up phase (recipient banking authority, storage, RLS,
+verification, change lifecycle, payout-time snapshot) must land before either capability can
+honestly become `true` — see the engagement's own E32 scope note.
+
+---
+
 ## 1. Architecture review — PaymentProvider interface, method by method
 
 | Method | Verdict | Notes |
@@ -271,12 +354,11 @@ Source: [oppwa-guides-webhooks](https://developer.peachpayments.com/docs/oppwa-g
 Source: [reference/post_payoutstatusupdated.md](https://developer.peachpayments.com/reference/post_payoutstatusupdated.md)
 
 - **Payload:** `{ status, payoutId, lastUpdated, resultCode }`.
-- **No documented signature or encryption mechanism was found for this webhook.** This
-  phase deliberately does **not** assume it is safe to trust unsigned — `verifyWebhook()`
-  treats a Payouts-shaped payload the same as an unverifiable one (`valid: false`), until
-  a real verification mechanism is confirmed with Peach (support ticket or a sandbox trace
-  showing what headers actually arrive) before Phase 2E processes one for real. See "Known
-  limitations."
+- **STALE, corrected by E31 (see §0):** signature verification for this webhook *is* now
+  documented (Svix-compatible, signing secret + `webhook-id`/`webhook-timestamp` headers).
+  `verifyWebhook()` still treats a Payouts-shaped payload as unverifiable today (`valid:
+  false`) — that remains correct behavior until the signature scheme above is actually
+  implemented, just not because no mechanism exists any more.
 
 ### Mapping table (Peach event → Unity effect)
 
@@ -452,7 +534,7 @@ card API) or payouts are ready.
 | `PEACH_CHECKOUT_WEBHOOK_URL` | verifying Checkout webhooks (part of the signed string — must exactly match what's registered in the Dashboard) | value differs per environment |
 | `PEACH_CARD_API_BACKOFFICE_BEARER_TOKEN` | capturing/reversing a deposit (`CP`/`RV`) | value differs per environment |
 | `PEACH_CARD_API_WEBHOOK_DECRYPTION_KEY` | decrypting OPPWA webhooks | value differs per environment |
-| `PEACH_PAYOUTS_API_BEARER_TOKEN` | merchant payouts | value differs per environment |
+| `PEACH_PAYOUTS_API_BEARER_TOKEN` | merchant payouts — **stale, see §0**: current official Peach Payouts auth is OAuth client-credentials, not a static bearer token | value differs per environment |
 | `PAYMENT_PROVIDER=peach` | selecting this provider at all (existing var from Phase 2C) | same both environments |
 
 ---
@@ -502,9 +584,9 @@ but nothing calls `fetch()` anywhere in this codebase for Peach.
   the production value in `config.ts` (`card.peachpayments.com`) follows the same
   "sandbox-" prefix pattern every other confirmed Peach host uses, but is flagged as an
   assumption, not a fact, in the code comment itself.
-- **Payouts webhook signature/verification mechanism is not documented anywhere found this
-  phase.** Treated as unverifiable (see §7) — must be confirmed before Phase 2E trusts a
-  payout webhook.
+- **STALE, corrected by E31 (see §0):** a Payouts webhook signature/verification mechanism
+  *is* now documented (Svix-compatible). Still treated as unverifiable in code (see §7) until
+  that scheme is actually implemented — the gap now is "not yet built," not "not documented."
 - **Deposits are realistically card-only** in Peach's model — Unity needs a product
   decision (Phase 2E or later) about whether that's acceptable or whether a non-card
   deposit fallback (immediate charge + conditional refund) is needed.
