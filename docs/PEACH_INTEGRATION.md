@@ -590,9 +590,13 @@ but nothing calls `fetch()` anywhere in this codebase for Peach.
 - **Deposits are realistically card-only** in Peach's model — Unity needs a product
   decision (Phase 2E or later) about whether that's acceptable or whether a non-card
   deposit fallback (immediate charge + conditional refund) is needed.
-- **Merchant banking details are not collected anywhere in Unity today** — a real payout
-  needs `bankName`/`accountNumber`/`branchCode`/`accountHolder` per merchant, which has no
-  home in the schema yet. Not built this phase (would be Phase 2E+ schema work).
+- **STALE, superseded by E32 (see §18):** merchant/affiliate bank destinations now have a
+  real, Vault-backed, versioned home (`payout_destinations` + BANV), established
+  specifically so a future payout-execution phase has somewhere real to read from. What
+  remains unbuilt is payout *execution* itself (`createMerchantPayout`/
+  `createAffiliatePayout` are still stubs, Peach's `merchant_payout`/`affiliate_payout`
+  capabilities still `false`) — not banking-details collection, which this sentence
+  previously (incorrectly, as of E32) described as entirely missing.
 - **No client-side request timeout guidance found** in any fetched Peach page — Phase 2E
   will need to choose its own values.
 - **`700.400.200`'s mapping to `invalid_payment_transition`** is the closest existing code,
@@ -627,3 +631,89 @@ but nothing calls `fetch()` anywhere in this codebase for Peach.
 9. Re-run this document's request-builder/response-parser/error-mapper tests against real
    sandbox responses as each step lands, to catch any drift between what the docs say and
    what the sandbox actually returns.
+
+## 18. E32 update — payout recipient banking authority, verification & secure storage
+
+Closes step 4 of §17's migration plan above (merchant/affiliate banking-details
+collection) — but only that step. Payout *execution* (steps 7+) remains untouched:
+`createMerchantPayout()`/`createAffiliatePayout()` are still `NotImplementedError` stubs,
+and `PeachPaymentsProvider.supportsCapability('merchant_payout'|'affiliate_payout')` are
+still `false`.
+
+**Recipient model.** Unity has exactly one canonical identity, `profiles(id)` — no separate
+merchants/affiliates table exists (confirmed by audit: "merchant" is a `profiles.role` enum
+value, "affiliate" an independent `profiles.is_affiliate` boolean, so one profile can be
+both). A bank destination is therefore owned by `profiles(id)` directly, purpose-agnostic —
+one destination serves both merchant and affiliate payouts for that person, never a
+polymorphic `(recipient_type, recipient_id)` pair.
+
+**Storage.** Supabase Vault (`vault.create_secret`/`vault.decrypted_secrets`), not a new
+`pgsodium` integration — current official guidance is to prefer Vault for new secret
+storage; Vault's own API is stable even as `pgsodium` itself is pending deprecation for
+direct use. The vault schema is structurally un-exposable via the Data API
+(`supabase/config.toml` `[api] schemas = ["public", "graphql_public"]`), and its default
+grants are service-role-only. The one function that ever reads `vault.decrypted_secrets`
+(`get_payout_destination_account_number`) is itself grant-gated to `service_role` only,
+exactly like every other sensitive RPC already in this codebase — it is **not** in the
+pre-existing `private` schema (that schema is reserved for RLS-policy-internal predicates
+that are never called via PostgREST `.rpc()`; a function the application *does* call via
+`.rpc()` must stay in a Data-API-exposed schema to be reachable at all).
+
+**Versioning.** Every `payout_destinations` row is an immutable version — bank/account-type/
+last4/branch-code fields are never `UPDATE`d after insert; replacing a destination always
+inserts a new version and flips the previous one's `is_current` to `false` in the same
+transaction. A partial unique index (`(owner_id) where is_current and disabled_at is null`)
+is the actual concurrency backstop, not just RPC discipline.
+
+**KYC reuse — no duplicated identity data.** Peach's BANV `idNumber`/`lastName` are sourced
+*live*, at submission time, from the already-structured `identity_verifications` table
+(`id_reference_number`/`legal_surname`) — confirmed by audit to already capture structured
+fields, not just uploaded documents. Nothing is copied into the new payout-destination
+tables; a destination cannot be submitted for verification until
+`identity_verifications.status = 'approved'` for its owner, failing closed with a clear
+error otherwise.
+
+**BANV contract (confirmed live against current official docs, 2026-11-11):**
+- Create: `POST /merchants/{merchantId}/banv` — `accountNumber` (`^[0-9]{1,13}$`),
+  `accountType` (enum: `current_cheque_account|savings_account|transmission_account|
+  bond_account|subscription_share|unknown`), `branchCode` (`^[0-9]{6}$`), `idNumber`
+  (1–13 chars), `initials`/`lastName` optional — returns `bankVerificationId`, `status`
+  (`pending|processing|successful|failed`), `resultCode`.
+- Query: `GET /merchants/{merchantId}/banv/{bankVerificationId}/status` — returns the same
+  `status`/`resultCode` plus nine per-attribute `positive|negative|unverified` attestation
+  outcomes (`accountNumber`, `idNumber`, `initials`, `lastName`, `accountOpen`,
+  `accountAcceptsCredits`, `accountAcceptsDebits`, `accountOpenGtThreeMonths`,
+  `accountType`) — stored verbatim (safe: attestation outcomes, never raw banking values).
+- Auth: OAuth client-credentials (`clientId`/`clientSecret`/`merchantId` →
+  short-lived `access_token`), reusing the existing `PEACH_ENVIRONMENT` selector for host
+  choice rather than adding a second toggle.
+- Webhook: Svix/Standard Webhooks (`webhook-id`/`webhook-timestamp`/`webhook-signature`
+  headers, `whsec_`-prefixed secret) — a **different** scheme from Checkout's own
+  `x-webhook-signature` family (§7), implemented separately
+  (`providers/peach/payouts-webhook-signature.ts`). The webhook payload shape itself was
+  never confirmed by a dedicated reference page — assumed, conservatively, to match the
+  query-result shape (Peach's own wording: "sends a webhook with the bank account
+  verification result"); an unrecognized shape fails closed (never marks anything
+  verified) rather than guessing.
+
+**Bank catalog.** Seeded from Peach's current official "Supported banks" table (29 banks,
+fetched live) — payout and BANV support are tracked independently because they are
+genuinely asymmetric for several banks (e.g. Bidvest Bank Alliances: payout yes/BANV no;
+Finbond Net1: payout no/BANV yes).
+
+**Verification finality & freshness.** Only Peach's own top-level `status = 'successful'`
+on a signed webhook or an authenticated query-reconciliation call can ever set
+`verification_status = 'verified'` — never HTTP 200 on creation, never an admin action.
+Freshness is a 90-day window (matching Peach's own "approximately every three months"
+guidance), computed live at eligibility-check time rather than stored as a separate enum
+value, so no cron sweep is needed to fail closed on staleness.
+
+**Webhook infrastructure reuse.** BANV results reuse the existing, already provider-neutral
+`payment_webhook_events` table and its claim/complete/error lease RPCs completely
+unchanged, under a new `provider` value `'peach_banv'` — no new webhook ledger.
+
+**Scope boundary.** No payout-execution code was touched. `createMerchantPayout()`/
+`createAffiliatePayout()` remain stubs; both payout capabilities remain `false`. The one
+authoritative check a future payout-execution phase must call is
+`_payout_destination_eligibility(owner_id)` — eligible only for exactly one current,
+enabled, verified, non-stale destination.
