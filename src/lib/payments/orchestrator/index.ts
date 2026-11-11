@@ -18,6 +18,7 @@ export { chargeOrderPayment, type ChargeOrderPaymentResult } from './charge-orde
 export { authorizeBarterDeposit, type AuthorizeBarterDepositResult } from './authorize-barter-deposit'
 export { releaseBarterDeposit, type ReleaseBarterDepositResult } from './release-barter-deposit'
 export { chargeBarterCashAdjustment, type ChargeBarterCashAdjustmentResult } from './charge-barter-cash-adjustment'
+export { completeDisputeRefundWithProvider, type CompleteDisputeRefundResult } from './complete-dispute-refund'
 export { reconcileProviderEvent, type NormalizedPaymentEvent, type ReconcileResult } from './reconcile-provider-event'
 export {
   reconcileOrchestrationPayment,

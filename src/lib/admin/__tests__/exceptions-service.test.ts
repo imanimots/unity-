@@ -205,6 +205,7 @@ function createFakeExceptionsAdmin(
     email_deliveries?: Row[]
     exception_resolutions?: Row[]
     account_erasure_cleanup?: Row[]
+    refunds?: Row[]
     rpcResults?: Record<string, Row[]>
   } = {}
 ) {
@@ -213,6 +214,7 @@ function createFakeExceptionsAdmin(
     email_deliveries: fixtures.email_deliveries ?? [],
     exception_resolutions: fixtures.exception_resolutions ?? [],
     account_erasure_cleanup: fixtures.account_erasure_cleanup ?? [],
+    refunds: fixtures.refunds ?? [],
   }
   const rpcResults = fixtures.rpcResults ?? {}
   const mutationCalls: Array<{ method: string; table: string }> = []
@@ -877,5 +879,75 @@ describe('listOperationalExceptions -- booking payout financial-disposition-pend
     })
     await listOperationalExceptions(admin)
     expect(mutationCalls).toEqual([])
+  })
+})
+
+/**
+ * E29: refund-provider-completion visibility -- a refund is created
+ * only by create_refund() (status 'pending') and only ever leaves
+ * 'pending' via start_refund_provider_attempt()/record_refund_
+ * provider_result() (migration 20261111112418). These 3 categories
+ * cover the whole lifecycle: never attempted, stuck mid-attempt, or
+ * the provider said no.
+ */
+describe('listOperationalExceptions -- refund provider-completion visibility (category: ADMIN-CONTROL-CENTRE-BATCH-E29)', () => {
+  it('69. a refund pending for over 48h with no provider attempt started surfaces refund_pending_overdue', async () => {
+    const { admin } = createFakeExceptionsAdmin({ refunds: [{ id: 'refund-1', status: 'pending', created_at: hoursAgoIso(49) }] })
+    const exceptions = await listOperationalExceptions(admin)
+    const found = exceptions.find((e) => e.type === 'refund_pending_overdue')
+    expect(found).toBeDefined()
+    expect(found?.entityType).toBe('refund')
+    expect(found?.entityId).toBe('refund-1')
+    expect(found?.severity).toBe('medium')
+  })
+
+  it('70. a fresh pending refund (within the threshold) is NOT surfaced as overdue', async () => {
+    const { admin } = createFakeExceptionsAdmin({ refunds: [{ id: 'refund-1', status: 'pending', created_at: hoursAgoIso(1) }] })
+    const exceptions = await listOperationalExceptions(admin)
+    expect(exceptions.find((e) => e.type === 'refund_pending_overdue')).toBeUndefined()
+  })
+
+  it('71. a refund stuck "processing" for over 48h surfaces the high-severity refund_provider_state_unknown category -- the provider call may have crashed before its result was recorded', async () => {
+    const { admin } = createFakeExceptionsAdmin({ refunds: [{ id: 'refund-2', status: 'processing', updated_at: hoursAgoIso(49) }] })
+    const exceptions = await listOperationalExceptions(admin)
+    const found = exceptions.find((e) => e.type === 'refund_provider_state_unknown')
+    expect(found).toBeDefined()
+    expect(found?.entityId).toBe('refund-2')
+    expect(found?.severity).toBe('high')
+  })
+
+  it('72. a refund only just started processing (within the threshold) is NOT surfaced as unknown-state', async () => {
+    const { admin } = createFakeExceptionsAdmin({ refunds: [{ id: 'refund-2', status: 'processing', updated_at: hoursAgoIso(1) }] })
+    const exceptions = await listOperationalExceptions(admin)
+    expect(exceptions.find((e) => e.type === 'refund_provider_state_unknown')).toBeUndefined()
+  })
+
+  it('73. a failed refund surfaces refund_failed regardless of age -- detection only, never automatically retried', async () => {
+    const { admin, mutationCalls } = createFakeExceptionsAdmin({ refunds: [{ id: 'refund-3', status: 'failed', updated_at: hoursAgoIso(1) }] })
+    const exceptions = await listOperationalExceptions(admin)
+    const found = exceptions.find((e) => e.type === 'refund_failed')
+    expect(found).toBeDefined()
+    expect(found?.entityId).toBe('refund-3')
+    expect(found?.severity).toBe('high')
+    expect(mutationCalls).toEqual([])
+  })
+
+  it('74. a completed refund never surfaces any of the 3 new categories', async () => {
+    const { admin } = createFakeExceptionsAdmin({ refunds: [{ id: 'refund-4', status: 'completed', created_at: hoursAgoIso(500), updated_at: hoursAgoIso(500) }] })
+    const exceptions = await listOperationalExceptions(admin)
+    const refundTypes = ['refund_pending_overdue', 'refund_provider_state_unknown', 'refund_failed']
+    expect(exceptions.filter((e) => refundTypes.includes(e.type))).toEqual([])
+  })
+
+  it('75. an admin-acknowledged stuck refund is reported as resolved without the underlying row being touched', async () => {
+    const fixture = { id: 'refund-5', status: 'processing', updated_at: hoursAgoIso(49) }
+    const { admin } = createFakeExceptionsAdmin({
+      refunds: [fixture],
+      exception_resolutions: [{ exception_type: 'refund_provider_state_unknown', entity_type: 'refund', entity_id: 'refund-5' }],
+    })
+    const exceptions = await listOperationalExceptions(admin)
+    const found = exceptions.find((e) => e.type === 'refund_provider_state_unknown')
+    expect(found?.resolved).toBe(true)
+    expect(fixture.status).toBe('processing')
   })
 })

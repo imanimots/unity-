@@ -113,6 +113,26 @@ export function mapDisputeRpcError(message: string | undefined): { status: numbe
   if (m.includes('this booking has escrow activity and cannot be refunded through this path')) {
     return { status: 409, error: 'This booking has escrow activity that must be reconciled separately before a refund can be recorded.' }
   }
+  // E29: complete_dispute_financial_disposition's type-aware hardening,
+  // and the two new refund-provider-result RPCs.
+  if (m.includes('the linked refund has not been authoritatively completed by the payment provider yet')) {
+    return { status: 409, error: 'This refund has not been completed by the payment provider yet.' }
+  }
+  if (m.includes('completion notes are required for a manual financial settlement')) {
+    return { status: 400, error: 'Completion notes are required for a manual settlement.' }
+  }
+  if (m.includes('refund not found')) {
+    return { status: 404, error: 'Refund not found.' }
+  }
+  if (m.includes('refund is not pending a provider attempt')) {
+    return { status: 409, error: 'This refund is not pending a provider attempt.' }
+  }
+  if (m.includes('refund is not awaiting a provider result')) {
+    return { status: 409, error: 'This refund is not awaiting a provider result.' }
+  }
+  if (m.includes('invalid provider status')) {
+    return { status: 400, error: 'Invalid refund provider status.' }
+  }
   if (m.includes('not authorized')) {
     return { status: 500, error: 'Could not process your request — please try again' }
   }

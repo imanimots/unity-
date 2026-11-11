@@ -16,6 +16,7 @@ export type ExceptionEntityType =
   | 'merchant_subscription'
   | 'unity_commission'
   | 'payment'
+  | 'refund'
 
 export interface AdminException {
   id: string
@@ -446,6 +447,19 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
     admin.from('merchant_payouts').select('id, booking_id, created_at'),
     admin.from('merchant_payouts').select('id, status, processing_started_by').neq('status', 'pending'),
     admin.from('merchant_payout_history').select('payout_id'),
+  ])
+
+  // E29: refund-provider-completion visibility. A refund is created only
+  // by create_refund() (status 'pending') and only ever leaves 'pending'
+  // via start_refund_provider_attempt()/record_refund_provider_result()
+  // (migration 20261111112418) -- so these 3 categories cover the whole
+  // lifecycle: never attempted, stuck mid-attempt, or the provider said
+  // no. None of this is specific to dispute-linked refunds -- a stuck or
+  // failed refund is worth surfacing regardless of why it was created.
+  const wave6RefundsP = Promise.all([
+    admin.from('refunds').select('id, created_at').eq('status', 'pending').lt('created_at', threshold),
+    admin.from('refunds').select('id, updated_at').eq('status', 'processing').lt('updated_at', threshold),
+    admin.from('refunds').select('id, updated_at').eq('status', 'failed'),
   ])
 
   // P1 (unchanged): the SAME canonical eligibility authority as payout
@@ -1190,6 +1204,50 @@ export async function listOperationalExceptions(admin: SupabaseClient): Promise<
     { data: nonPendingPayoutIds },
     { data: historyRows },
   ] = await wave6P
+
+  const [{ data: stalePendingRefunds }, { data: staleProcessingRefunds }, { data: failedRefunds }] = await wave6RefundsP
+
+  for (const row of stalePendingRefunds ?? []) {
+    exceptions.push({
+      id: exceptionId('refund_pending_overdue', row.id),
+      type: 'refund_pending_overdue',
+      severity: 'medium',
+      entityType: 'refund',
+      entityId: row.id,
+      summary: `Refund has been pending for over ${REVIEW_OVERDUE_HOURS}h without a provider attempt being started`,
+      detectedAt: row.created_at,
+      suggestedAction: `Start the refund provider attempt from the linked dispute, or investigate directly`,
+      resolved: isResolved('refund_pending_overdue', 'refund', row.id),
+    })
+  }
+
+  for (const row of staleProcessingRefunds ?? []) {
+    exceptions.push({
+      id: exceptionId('refund_provider_state_unknown', row.id),
+      type: 'refund_provider_state_unknown',
+      severity: 'high',
+      entityType: 'refund',
+      entityId: row.id,
+      summary: `Refund has been "processing" for over ${REVIEW_OVERDUE_HOURS}h -- the provider call may have crashed before its result was recorded; verify with the payment provider before retrying, do not assume it failed`,
+      detectedAt: row.updated_at,
+      suggestedAction: `Manually verify this refund's true state with the payment provider, then record the result`,
+      resolved: isResolved('refund_provider_state_unknown', 'refund', row.id),
+    })
+  }
+
+  for (const row of failedRefunds ?? []) {
+    exceptions.push({
+      id: exceptionId('refund_failed', row.id),
+      type: 'refund_failed',
+      severity: 'high',
+      entityType: 'refund',
+      entityId: row.id,
+      summary: `A payment provider refund attempt failed -- the linked financial disposition remains pending and payout remains blocked`,
+      detectedAt: row.updated_at,
+      suggestedAction: `Review and retry the refund, or reassess the dispute's financial disposition`,
+      resolved: isResolved('refund_failed', 'refund', row.id),
+    })
+  }
 
   // Wave 2C -- payout query scalability, final correction. The prior fix
   // (_merchant_payout_relevant_context(uuid[])) removed the PostgREST

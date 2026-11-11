@@ -220,21 +220,39 @@ export function DisputeAdminActions({ disputeId, status, currentAdminId, assigne
         <div className="space-y-3 border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-4">
           <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
             Financial disposition pending: {financialDisposition.disposition_type.replace(/_/g, ' ')}
-            {financialDisposition.amount != null ? ` (R${financialDisposition.amount})` : ''} -- payout is blocked until this is marked complete.
+            {financialDisposition.amount != null ? ` (R${financialDisposition.amount})` : ''} -- payout is blocked until this is resolved.
           </p>
-          <div>
-            <label htmlFor="admin-completion-notes" className="block text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1">
-              Completion notes (confirm the money has actually moved, e.g. via the payment provider dashboard)
-            </label>
-            <textarea id="admin-completion-notes" rows={2} value={completionNotes} onChange={(e) => setCompletionNotes(e.target.value)} className={`w-full ${inputClass}`} />
-          </div>
-          <button
-            disabled={busy}
-            onClick={() => call(`/api/admin/disputes/${disputeId}/complete-financial-disposition`, { completion_notes: completionNotes })}
-            className={primaryButtonClass}
-          >
-            Mark financial disposition complete
-          </button>
+
+          {financialDisposition.disposition_type === 'refund_required' ? (
+            // E29: provider-grounded completion only -- no admin
+            // attestation path for a refund. This calls the payment
+            // provider's own refund() and, on a completed result, the
+            // disposition is completed automatically in the same DB
+            // call that records it.
+            <button
+              disabled={busy}
+              onClick={() => call(`/api/admin/disputes/${disputeId}/execute-refund`, {})}
+              className={primaryButtonClass}
+            >
+              Execute refund via payment provider
+            </button>
+          ) : (
+            <>
+              <div>
+                <label htmlFor="admin-completion-notes" className="block text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1">
+                  Completion notes (required -- confirm how this settlement was actually carried out)
+                </label>
+                <textarea id="admin-completion-notes" rows={2} value={completionNotes} onChange={(e) => setCompletionNotes(e.target.value)} className={`w-full ${inputClass}`} />
+              </div>
+              <button
+                disabled={busy || completionNotes.trim().length === 0}
+                onClick={() => call(`/api/admin/disputes/${disputeId}/complete-financial-disposition`, { completion_notes: completionNotes })}
+                className={primaryButtonClass}
+              >
+                Mark financial disposition complete
+              </button>
+            </>
+          )}
         </div>
       )}
 

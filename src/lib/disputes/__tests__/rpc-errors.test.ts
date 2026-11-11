@@ -38,6 +38,12 @@ describe('mapDisputeRpcError', () => {
     ['booking disputes must be resolved via resolve_booking_dispute', 400],
     ['resolve_booking_dispute is only for booking disputes', 400],
     ['this booking has escrow activity and cannot be refunded through this path -- reconcile escrow custody separately first', 409],
+    ['the linked refund has not been authoritatively completed by the payment provider yet', 409],
+    ['completion notes are required for a manual financial settlement', 400],
+    ['refund not found', 404],
+    ['refund is not pending a provider attempt', 409],
+    ['refund is not awaiting a provider result', 409],
+    ['invalid provider status', 400],
     ['not authorized', 500],
   ])('maps %j to status %i', (message, status) => {
     expect(mapDisputeRpcError(message).status).toBe(status)
