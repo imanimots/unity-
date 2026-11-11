@@ -72,7 +72,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   try {
     const result = await completeDisputeRefundWithProvider(
-      { admin, providerName: process.env.PAYMENT_PROVIDER },
+      { admin },
       disposition.refund_id,
       gate.requester.userId,
       parsed.data.idempotency_key
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'A temporary issue stopped this refund. Please try again.' }, { status: 503 })
       }
       if (err.code === 'provider_configuration_error') {
-        return NextResponse.json({ error: 'The payment provider does not support refund execution yet.' }, { status: 503 })
+        return NextResponse.json({ error: 'Refund execution is not available in this environment -- the active payment provider does not support it, or is not permitted here.' }, { status: 503 })
       }
       if (err.code === 'duplicate_workflow_conflict') {
         return NextResponse.json({ error: err.message }, { status: 409 })

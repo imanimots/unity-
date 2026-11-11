@@ -158,6 +158,29 @@ export interface HealthCheckResult {
   detail?: string
 }
 
+/**
+ * E30: an explicit, self-reported capability model -- each provider's own
+ * class states what it actually supports, right next to the methods
+ * themselves, rather than a separate table that could drift from the
+ * real implementation. Introduced specifically because two of these
+ * (`refund`, `affiliate_payout`) have real orchestrator call sites that
+ * mark a DB row 'processing' BEFORE calling the provider -- an unknown-
+ * in-advance capability gap must reject before that mutation, never
+ * after. `merchant_payout` is included for completeness (PeachPayments
+ * Provider reports it unsupported too) even though no real application
+ * code calls `createMerchantPayout()` today (merchant payouts are
+ * admin-attested, never provider-executed, in this codebase).
+ */
+export type PaymentCapability =
+  | 'charge_rental'
+  | 'authorize_deposit'
+  | 'capture_deposit'
+  | 'release_deposit'
+  | 'refund'
+  | 'merchant_payout'
+  | 'affiliate_payout'
+  | 'webhook_verification'
+
 export interface PaymentProvider {
   readonly name: string
 
@@ -171,11 +194,27 @@ export interface PaymentProvider {
   createAffiliatePayout(input: AffiliatePayoutInput): Promise<AffiliatePayoutResult>
   verifyWebhook(input: WebhookVerificationInput): Promise<WebhookVerificationResult>
   healthCheck(): Promise<HealthCheckResult>
+  supportsCapability(capability: PaymentCapability): boolean
 }
 
 export class NotImplementedError extends Error {
   constructor(provider: string, method: string) {
     super(`${provider} does not implement ${method}() yet -- Phase 2C builds the abstraction only, no real provider integration.`)
     this.name = 'NotImplementedError'
+  }
+}
+
+/**
+ * E30: thrown by assertProviderSupportsCapability() (registry.ts) --
+ * distinct from NotImplementedError, which a provider throws from
+ * *inside* a method it was actually called into. This is thrown
+ * *before* that call, by the caller's own pre-flight check, so an
+ * orchestrator can reject a known-unsupported operation before any DB
+ * row is marked 'processing' -- never after.
+ */
+export class ProviderCapabilityUnsupportedError extends Error {
+  constructor(provider: string, capability: PaymentCapability) {
+    super(`Payment provider "${provider}" does not support the "${capability}" capability.`)
+    this.name = 'ProviderCapabilityUnsupportedError'
   }
 }

@@ -1,7 +1,7 @@
 import type { OrchestratorContext } from './types'
 import { OrchestrationError } from './errors'
 import { checkIdempotentReplay, computeReleaseBarterDepositHash } from './idempotency'
-import { getPaymentProvider } from '../registry'
+import { getActivePaymentProvider } from '../registry'
 
 export interface ReleaseBarterDepositResult {
   paymentId: string
@@ -23,7 +23,7 @@ export async function releaseBarterDeposit(
   idempotencyKey?: string
 ): Promise<ReleaseBarterDepositResult> {
   const { admin, providerName = 'mock' } = ctx
-  const provider = getPaymentProvider(providerName)
+  const provider = getActivePaymentProvider(providerName)
 
   const { data: deposit } = await admin
     .from('payments')

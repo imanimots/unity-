@@ -17,6 +17,7 @@ import type {
   WebhookVerificationResult,
   HealthCheckResult,
   MockScenario,
+  PaymentCapability,
 } from '../provider'
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../provider-errors'
 
@@ -118,6 +119,12 @@ export class MockProvider implements PaymentProvider {
 
   async healthCheck(): Promise<HealthCheckResult> {
     return { healthy: true, provider: this.name }
+  }
+
+  /** Fully functional -- every capability is simulated. */
+  supportsCapability(_capability: PaymentCapability): boolean {
+    void _capability
+    return true
   }
 
   /** Throws for the scenarios that represent a provider-level failure rather than a result value. */

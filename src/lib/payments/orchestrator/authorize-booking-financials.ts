@@ -2,7 +2,7 @@ import type { OrchestratorContext, AuthorizeBookingFinancialsResult } from './ty
 import { OrchestrationError, type OrchestrationErrorCode } from './errors'
 import { prepareBookingFinancials } from './prepare-booking-financials'
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../provider-errors'
-import { getPaymentProvider } from '../registry'
+import { getActivePaymentProvider } from '../registry'
 import type { MockScenario } from '../provider'
 import { qualifyRentalPaymentAffiliateCommission } from '@/lib/affiliate/qualify'
 import { qualifyRentalPaymentUnityCommission } from '@/lib/commissions/qualify'
@@ -42,7 +42,7 @@ export async function authorizeBookingFinancials(
 ): Promise<AuthorizeBookingFinancialsResult> {
   const { admin } = ctx
   const providerName = ctx.providerName || process.env.PAYMENT_PROVIDER || 'mock'
-  const provider = getPaymentProvider(providerName)
+  const provider = getActivePaymentProvider(providerName)
 
   const { data: started, error: startError } = await admin.rpc('start_or_resume_financial_workflow', {
     p_booking_id: bookingId,
@@ -135,7 +135,7 @@ export async function authorizeBookingFinancials(
 
 async function ensureRentalCharged(
   admin: OrchestratorContext['admin'],
-  provider: ReturnType<typeof getPaymentProvider>,
+  provider: ReturnType<typeof getActivePaymentProvider>,
   workflowId: string,
   bookingId: string,
   paymentId: string,
@@ -242,7 +242,7 @@ async function ensureRentalCharged(
 
 async function ensureDepositAuthorised(
   admin: OrchestratorContext['admin'],
-  provider: ReturnType<typeof getPaymentProvider>,
+  provider: ReturnType<typeof getActivePaymentProvider>,
   workflowId: string,
   paymentId: string,
   testScenario?: MockScenario

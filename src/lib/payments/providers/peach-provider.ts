@@ -15,6 +15,7 @@ import type {
   WebhookVerificationInput,
   WebhookVerificationResult,
   HealthCheckResult,
+  PaymentCapability,
 } from '../provider'
 import { NotImplementedError } from '../provider'
 import { loadPeachConfig, describePeachConfigStatus, PeachConfigurationError } from './peach/config'
@@ -60,6 +61,27 @@ import { orchestrationReturnUrl } from '@/app/api/payments/checkout-return/route
  */
 export class PeachPaymentsProvider implements PaymentProvider {
   readonly name = 'peach'
+
+  /**
+   * E30: self-reported, matching this class's own method bodies exactly
+   * -- chargeRental/authorizeDeposit/captureDeposit/releaseDeposit are
+   * wired to real Orchestration calls above; refund/createMerchantPayout/
+   * createAffiliatePayout are still NotImplementedError stubs;
+   * verifyWebhook is fully implemented. Update this set in the same
+   * change that wires up (or removes) any of those methods -- never
+   * separately.
+   */
+  private static readonly SUPPORTED_CAPABILITIES: ReadonlySet<PaymentCapability> = new Set<PaymentCapability>([
+    'charge_rental',
+    'authorize_deposit',
+    'capture_deposit',
+    'release_deposit',
+    'webhook_verification',
+  ])
+
+  supportsCapability(capability: PaymentCapability): boolean {
+    return PeachPaymentsProvider.SUPPORTED_CAPABILITIES.has(capability)
+  }
 
   private requireOrchestrationConfig(): OrchestrationConfig {
     const config = loadOrchestrationConfig()

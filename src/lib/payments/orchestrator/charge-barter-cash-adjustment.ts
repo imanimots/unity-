@@ -2,7 +2,7 @@ import type { OrchestratorContext } from './types'
 import { OrchestrationError, type OrchestrationErrorCode } from './errors'
 import { checkIdempotentReplay, computeChargeBarterCashAdjustmentHash } from './idempotency'
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../provider-errors'
-import { getPaymentProvider } from '../registry'
+import { getActivePaymentProvider } from '../registry'
 import { createEscrowForPayment, fundEscrowForPayment } from '@/lib/escrow/orchestrator'
 import { assertNoPendingProviderAttempt } from './pending-provider-attempt-guard'
 
@@ -36,7 +36,7 @@ export async function chargeBarterCashAdjustment(
   idempotencyKey?: string
 ): Promise<ChargeBarterCashAdjustmentResult> {
   const { admin, providerName = 'mock' } = ctx
-  const provider = getPaymentProvider(providerName)
+  const provider = getActivePaymentProvider(providerName)
 
   const { data: payment } = await admin
     .from('payments')

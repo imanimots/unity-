@@ -1,8 +1,8 @@
 import type { OrchestratorContext } from './types'
 import { OrchestrationError, type OrchestrationErrorCode } from './errors'
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../provider-errors'
-import { getPaymentProvider } from '../registry'
-import { NotImplementedError } from '../provider'
+import { getActivePaymentProvider, assertProviderSupportsCapability, ProviderNotPermittedError } from '../registry'
+import { NotImplementedError, ProviderCapabilityUnsupportedError } from '../provider'
 
 export interface CompleteDisputeRefundResult {
   refundId: string
@@ -42,7 +42,6 @@ export async function completeDisputeRefundWithProvider(
   idempotencyKey?: string
 ): Promise<CompleteDisputeRefundResult> {
   const { admin, providerName } = ctx
-  const provider = getPaymentProvider(providerName)
 
   const { data: refund } = await admin.from('refunds').select('id, payment_id, amount, reason, status').eq('id', refundId).maybeSingle()
   if (!refund) throw new OrchestrationError('missing_payment', 'Refund not found')
@@ -55,6 +54,23 @@ export async function completeDisputeRefundWithProvider(
       'duplicate_workflow_conflict',
       'A refund attempt is already in progress for this refund -- verify its outcome with the payment provider before retrying'
     )
+  }
+
+  // E30: both checks happen here, before the refund is ever marked
+  // 'processing' -- an environment-disallowed or capability-unsupported
+  // provider must never advance past 'pending'.
+  let provider
+  try {
+    provider = getActivePaymentProvider(providerName)
+  } catch (err) {
+    if (err instanceof ProviderNotPermittedError) throw new OrchestrationError('provider_configuration_error', err.message)
+    throw err
+  }
+  try {
+    assertProviderSupportsCapability(provider, 'refund')
+  } catch (err) {
+    if (err instanceof ProviderCapabilityUnsupportedError) throw new OrchestrationError('provider_configuration_error', err.message)
+    throw err
   }
 
   const { data: payment } = await admin.from('payments').select('id, provider_reference, currency').eq('id', refund.payment_id).maybeSingle()

@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { chargeRentToBuyInstallment } from '../charge-rent-to-buy-installment'
 import { OrchestrationError } from '../errors'
 
-vi.mock('../../registry', () => ({ getPaymentProvider: vi.fn() }))
-import { getPaymentProvider } from '../../registry'
+vi.mock('../../registry', () => ({ getActivePaymentProvider: vi.fn() }))
+import { getActivePaymentProvider } from '../../registry'
 
 /**
  * P5D-B.2: proves (1) the exact server-selected installment.sequence is
@@ -65,7 +65,7 @@ function fakeAdmin(options: {
 describe('chargeRentToBuyInstallment -- P5D-B.2 durable sequence correlation', () => {
   it('1. p_installment_sequence is passed from the authoritative, server-selected installment row', async () => {
     const provider = { name: 'mock', chargeRental: vi.fn().mockResolvedValue({ status: 'captured', providerReference: 'ref-1' }) }
-    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    vi.mocked(getActivePaymentProvider).mockReturnValue(provider as never)
     const admin = fakeAdmin({})
 
     await chargeRentToBuyInstallment({ admin } as never, 'agr-1', 3, 'idem-1')
@@ -77,7 +77,7 @@ describe('chargeRentToBuyInstallment -- P5D-B.2 durable sequence correlation', (
 
   it('2. requires_action does not mark the installment paid and does not call record_rent_to_buy_installment_payment', async () => {
     const provider = { name: 'mock', chargeRental: vi.fn().mockResolvedValue({ status: 'requires_action', providerReference: 'ref-1', redirectUrl: 'https://pay.example/session' }) }
-    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    vi.mocked(getActivePaymentProvider).mockReturnValue(provider as never)
     const admin = fakeAdmin({})
 
     const result = await chargeRentToBuyInstallment({ admin } as never, 'agr-1', 3, 'idem-1')
@@ -89,7 +89,7 @@ describe('chargeRentToBuyInstallment -- P5D-B.2 durable sequence correlation', (
 
   it('3. a genuine captured result transitions the payment and progresses the exact persisted sequence', async () => {
     const provider = { name: 'mock', chargeRental: vi.fn().mockResolvedValue({ status: 'captured', providerReference: 'ref-1' }) }
-    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    vi.mocked(getActivePaymentProvider).mockReturnValue(provider as never)
     const admin = fakeAdmin({})
 
     const result = await chargeRentToBuyInstallment({ admin } as never, 'agr-1', 3, 'idem-1')
@@ -103,7 +103,7 @@ describe('chargeRentToBuyInstallment -- P5D-B.2 durable sequence correlation', (
 
   it('4. a provider decline transitions to failed and never calls record_rent_to_buy_installment_payment', async () => {
     const provider = { name: 'mock', chargeRental: vi.fn().mockResolvedValue({ status: 'failed', providerReference: 'ref-1', failureReason: 'card declined' }) }
-    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    vi.mocked(getActivePaymentProvider).mockReturnValue(provider as never)
     const admin = fakeAdmin({})
 
     await expect(chargeRentToBuyInstallment({ admin } as never, 'agr-1', 3, 'idem-1')).rejects.toThrow(OrchestrationError)
@@ -114,7 +114,7 @@ describe('chargeRentToBuyInstallment -- P5D-B.2 durable sequence correlation', (
 
   it('5. an already-paid installment short-circuits before any provider call', async () => {
     const provider = { name: 'mock', chargeRental: vi.fn() }
-    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    vi.mocked(getActivePaymentProvider).mockReturnValue(provider as never)
     const admin = fakeAdmin({ installmentRow: { id: 'inst-1', sequence: 3, principal_amount: '150.00', status: 'paid', payment_id: 'pay-existing' } })
 
     const result = await chargeRentToBuyInstallment({ admin } as never, 'agr-1', 3, 'idem-1')

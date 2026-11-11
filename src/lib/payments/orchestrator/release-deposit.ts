@@ -1,7 +1,7 @@
 import type { OrchestratorContext, ReleaseDepositResult } from './types'
 import { OrchestrationError } from './errors'
 import { checkIdempotentReplay, computeReleaseDepositHash } from './idempotency'
-import { getPaymentProvider } from '../registry'
+import { getActivePaymentProvider } from '../registry'
 
 const ELIGIBLE_BOOKING_STATUSES = ['returned', 'completed']
 
@@ -22,7 +22,7 @@ const ELIGIBLE_BOOKING_STATUSES = ['returned', 'completed']
  */
 export async function releaseDeposit(ctx: OrchestratorContext, bookingId: string, idempotencyKey?: string): Promise<ReleaseDepositResult> {
   const { admin, providerName = 'mock' } = ctx
-  const provider = getPaymentProvider(providerName)
+  const provider = getActivePaymentProvider(providerName)
 
   const { data: booking } = await admin.from('bookings').select('id, status').eq('id', bookingId).maybeSingle()
   if (!booking) throw new OrchestrationError('missing_payment', 'Booking not found')

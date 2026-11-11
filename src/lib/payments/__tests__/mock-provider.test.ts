@@ -47,6 +47,12 @@ describe('MockProvider', () => {
     expect((await provider.healthCheck()).healthy).toBe(true)
   })
 
+  it('E30: supportsCapability is true for every capability -- fully functional, nothing to gate', () => {
+    for (const capability of ['charge_rental', 'authorize_deposit', 'capture_deposit', 'release_deposit', 'refund', 'merchant_payout', 'affiliate_payout', 'webhook_verification'] as const) {
+      expect(provider.supportsCapability(capability)).toBe(true)
+    }
+  })
+
   describe('verifyWebhook — signature validation and duplicate/event-id extraction', () => {
     it('accepts a correctly signed webhook and extracts its event id', async () => {
       const result = await provider.verifyWebhook({
@@ -107,6 +113,15 @@ describe('PeachPaymentsProvider (stub)', () => {
   it('authorizeDeposit/chargeRental are wired to Orchestration (P5C.1) -- with no config, they fail closed with OrchestrationConfigurationError, not NotImplementedError, and make no network call', async () => {
     await expect(provider.authorizeDeposit({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })).rejects.toThrow(OrchestrationConfigurationError)
     await expect(provider.chargeRental({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })).rejects.toThrow(OrchestrationConfigurationError)
+  })
+
+  it('E30: supportsCapability matches the class\'s own method bodies exactly -- supported for the 4 Orchestration-backed methods and webhook verification, unsupported for the 3 remaining NotImplementedError stubs', () => {
+    for (const capability of ['charge_rental', 'authorize_deposit', 'capture_deposit', 'release_deposit', 'webhook_verification'] as const) {
+      expect(provider.supportsCapability(capability)).toBe(true)
+    }
+    for (const capability of ['refund', 'merchant_payout', 'affiliate_payout'] as const) {
+      expect(provider.supportsCapability(capability)).toBe(false)
+    }
   })
 
   // verifyWebhook() and healthCheck() are real, not stubbed -- neither moves

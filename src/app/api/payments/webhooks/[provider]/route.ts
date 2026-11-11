@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getPaymentProvider, listRegisteredProviders } from '@/lib/payments/registry'
+import { getPaymentProvider, listRegisteredProviders, isMockPaymentAuthorityAllowed } from '@/lib/payments/registry'
 import { reconcileProviderEvent, reconcileOrchestrationPayment, completeAsyncPaymentBusinessProgression, type NormalizedPaymentEvent } from '@/lib/payments/orchestrator'
 import { readBoundedRequestBody, ORCHESTRATION_WEBHOOK_BODY_LIMIT_BYTES } from '@/lib/payments/webhook-body-reader'
 import {
@@ -54,7 +54,14 @@ const ORCHESTRATION_WEBHOOK_STALE_LEASE_SECONDS = 30
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { provider: providerName } = await params
 
-  if (!listRegisteredProviders().includes(providerName)) {
+  // E30: MockProvider.verifyWebhook()'s "signature" is the hardcoded
+  // literal string 'mock-signature' -- in any environment where mock is
+  // not permitted as real financial authority, this endpoint must not
+  // exist at all, exactly as if 'mock' were never a registered provider.
+  // Without this, an unauthenticated caller could POST to
+  // /api/payments/webhooks/mock in production with that literal header
+  // and have an arbitrary payload accepted as a "verified" event.
+  if (!listRegisteredProviders().includes(providerName) || (providerName === 'mock' && !isMockPaymentAuthorityAllowed())) {
     return NextResponse.json({ error: 'Unknown payment provider' }, { status: 404 })
   }
 

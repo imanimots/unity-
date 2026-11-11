@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getRequestProfile } from '@/lib/supabase/require-admin'
 import { checkRateLimit, getClientKey } from '@/lib/rate-limit'
 import { mapRentToBuyRpcError } from '@/lib/rent-to-buy/rpc-errors'
-import { getPaymentProvider } from '@/lib/payments/registry'
+import { getActivePaymentProvider, ProviderNotPermittedError } from '@/lib/payments/registry'
 import { assertNoPendingProviderAttempt } from '@/lib/payments/orchestrator/pending-provider-attempt-guard'
 import { z } from 'zod'
 
@@ -81,8 +81,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const remaining = (remainingRows ?? []).reduce((sum, r) => sum + Number(r.principal_amount), 0)
   if (payoffSequences.length === 0 || remaining <= 0) return NextResponse.json({ error: 'There is no remaining balance to pay off' }, { status: 409 })
 
-  const providerName = process.env.PAYMENT_PROVIDER || 'mock'
-  const provider = getPaymentProvider(providerName)
+  // E30: resolved before create_rent_to_buy_payment_intent so an
+  // environment-disallowed 'mock' (e.g. production with no
+  // PAYMENT_PROVIDER configured) rejects before that RPC's own
+  // payment-row creation, not after.
+  let provider
+  try {
+    provider = getActivePaymentProvider()
+  } catch (err) {
+    if (err instanceof ProviderNotPermittedError) {
+      return NextResponse.json({ error: 'Payment processing is not available in this environment' }, { status: 503 })
+    }
+    throw err
+  }
+  const providerName = provider.name
 
   const { data: intent, error: intentError } = await admin.rpc('create_rent_to_buy_payment_intent', {
     p_rent_to_buy_agreement_id: id,

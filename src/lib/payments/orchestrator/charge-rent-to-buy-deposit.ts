@@ -1,7 +1,7 @@
 import type { OrchestratorContext } from './types'
 import { OrchestrationError, type OrchestrationErrorCode } from './errors'
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../provider-errors'
-import { getPaymentProvider } from '../registry'
+import { getActivePaymentProvider } from '../registry'
 import { assertNoPendingProviderAttempt } from './pending-provider-attempt-guard'
 
 export interface ChargeRentToBuyDepositResult {
@@ -53,7 +53,7 @@ export async function chargeRentToBuyDeposit(
 ): Promise<ChargeRentToBuyDepositResult> {
   const { admin } = ctx
   const providerName = ctx.providerName || process.env.PAYMENT_PROVIDER || 'mock'
-  const provider = getPaymentProvider(providerName)
+  const provider = getActivePaymentProvider(providerName)
 
   const { data: agreement, error: agreementError } = await admin
     .from('rent_to_buy_agreements')

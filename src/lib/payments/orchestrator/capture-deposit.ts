@@ -1,6 +1,6 @@
 import type { OrchestratorContext, CaptureDepositResult } from './types'
 import { OrchestrationError } from './errors'
-import { getPaymentProvider } from '../registry'
+import { getActivePaymentProvider } from '../registry'
 
 const ELIGIBLE_BOOKING_STATUSES = ['active', 'return_pending', 'returned', 'completed']
 
@@ -31,7 +31,7 @@ export async function captureDeposit(
   idempotencyKey?: string
 ): Promise<CaptureDepositResult> {
   const { admin, providerName = 'mock' } = ctx
-  const provider = getPaymentProvider(providerName)
+  const provider = getActivePaymentProvider(providerName)
 
   if (!(amount > 0)) {
     throw new OrchestrationError('insufficient_deposit_authorization', 'Capture amount must be positive')

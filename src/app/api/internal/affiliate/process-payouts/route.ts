@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { AFFILIATE_SWEEP_BATCH_LIMIT } from '@/lib/affiliate/constants'
 import { isMockScenarioSelectionAllowed } from '@/lib/checkout/test-scenario'
-import { getPaymentProvider } from '@/lib/payments/registry'
+import { getActivePaymentProvider, assertProviderSupportsCapability, ProviderNotPermittedError } from '@/lib/payments/registry'
 import { notifyAffiliateOfCommission } from '@/lib/affiliate/notify'
 import type { MockScenario } from '@/lib/payments/provider'
+import { ProviderCapabilityUnsupportedError } from '@/lib/payments/provider'
 import { hasCronAuthConfigured, isAuthorizedCronRequest, isAuthorizedGcpSchedulerRequest } from '@/lib/internal-cron/auth'
 
 /**
@@ -11,12 +12,17 @@ import { hasCronAuthConfigured, isAuthorizedCronRequest, isAuthorizedGcpSchedule
  * affiliate automation chain (review-and-approve -> queue-payouts ->
  * process-payouts), scheduled via vercel.json (P4). payout_queued ->
  * processing -> paid/failed, calling the configured payout provider
- * once per commission. `PAYMENT_PROVIDER` is unchanged by this phase --
- * still defaults to `'mock'` unless a real provider is explicitly
- * configured (P5's exclusive authority), so scheduling this route now
- * cannot activate real-money behavior. If no provider is configured,
- * the sweep stops each row at `processing` rather than falsely marking
- * anything paid -- an exception surfaces it.
+ * once per commission.
+ *
+ * E30: before this phase, an unset PAYMENT_PROVIDER in production meant
+ * this sweep silently called MockProvider -- marking real affiliate
+ * commissions "paid" with zero money ever moving. Both checks below now
+ * run ONCE, before the candidate query, so a disallowed/unsupported
+ * provider stops the entire sweep before any row is ever marked
+ * 'processing': getActivePaymentProvider() rejects 'mock' outright
+ * outside a permitted environment (see src/lib/payments/registry.ts),
+ * and assertProviderSupportsCapability() rejects a real provider that
+ * doesn't implement affiliate payouts yet (Peach does not, today).
  *
  * `mock_scenario` is only ever honoured when isMockScenarioSelectionAllowed()
  * -- the same dev/test-only gate checkout itself uses -- letting the
@@ -50,11 +56,21 @@ async function handleCronRequest(request: NextRequest) {
     // No body / not JSON -- fine, this route takes no required fields.
   }
 
+  let provider
+  try {
+    provider = getActivePaymentProvider()
+    assertProviderSupportsCapability(provider, 'affiliate_payout')
+  } catch (err) {
+    if (err instanceof ProviderNotPermittedError || err instanceof ProviderCapabilityUnsupportedError) {
+      console.error('[internal.affiliate.process-payouts] provider not available for this sweep', { message: err.message })
+      return NextResponse.json({ error: 'Affiliate payout processing is not available in this environment', considered: 0, paid: 0, failed: 0 }, { status: 503 })
+    }
+    throw err
+  }
+
   try {
     const { createClient: createServiceClient } = await import('@supabase/supabase-js')
     const admin = createServiceClient(url, serviceKey)
-    const providerName = process.env.PAYMENT_PROVIDER || 'mock'
-    const provider = getPaymentProvider(providerName)
 
     const { data: candidates, error: selectError } = await admin
       .from('affiliate_commissions')

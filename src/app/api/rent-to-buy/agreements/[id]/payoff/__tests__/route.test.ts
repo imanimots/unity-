@@ -15,7 +15,13 @@ vi.mock('@/lib/rate-limit', () => ({
 }))
 
 const chargeRental = vi.fn()
-vi.mock('@/lib/payments/registry', () => ({ getPaymentProvider: () => ({ name: 'mock', chargeRental: (...args: unknown[]) => chargeRental(...args) }) }))
+vi.mock('@/lib/payments/registry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/payments/registry')>()
+  return {
+    ...actual,
+    getActivePaymentProvider: () => ({ name: 'mock', supportsCapability: () => true, chargeRental: (...args: unknown[]) => chargeRental(...args) }),
+  }
+})
 
 let nextAdmin: ReturnType<typeof fakeServiceRoleClient>
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => nextAdmin }))

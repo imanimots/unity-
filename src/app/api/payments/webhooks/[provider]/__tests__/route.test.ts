@@ -200,6 +200,58 @@ describe('POST /api/payments/webhooks/[provider] -- MockProvider regression (unc
   })
 })
 
+describe('POST /api/payments/webhooks/[provider] -- E30: mock containment in production', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs()
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('rejects /webhooks/mock with the same 404 as a genuinely unknown provider when VERCEL_ENV=production -- never reaches MockProvider.verifyWebhook()\'s trivially-forgeable "signature"', async () => {
+    // NODE_ENV is also overridden here: vitest itself always sets
+    // NODE_ENV=test, which isMockPaymentAuthorityAllowed() treats as an
+    // unconditional "mock is allowed" signal (the entire orchestrator
+    // test suite depends on that) -- a real Vercel production runtime
+    // never sets NODE_ENV=test, so simulating it accurately requires
+    // overriding both here, exactly as registry.test.ts already does.
+    vi.stubEnv('VERCEL_ENV', 'production')
+    vi.stubEnv('NODE_ENV', 'production')
+    const request = new NextRequest('https://unity.test/api/payments/webhooks/mock', {
+      method: 'POST',
+      body: JSON.stringify({ event_id: 'evt_attack', type: 'payment.captured' }),
+      headers: { 'content-type': 'application/json', 'x-mock-signature': 'mock-signature' },
+    })
+    const response = await POST(request, mockRouteParams)
+    expect(response.status).toBe(404)
+    const json = await response.json()
+    expect(json.error).toBe('Unknown payment provider')
+  })
+
+  it('still allows /webhooks/mock when VERCEL_ENV=preview, even though NODE_ENV=production during a Preview build', async () => {
+    vi.stubEnv('VERCEL_ENV', 'preview')
+    vi.stubEnv('NODE_ENV', 'production')
+    const request = new NextRequest('https://unity.test/api/payments/webhooks/mock', {
+      method: 'POST',
+      body: JSON.stringify({ event_id: 'evt_preview', type: 'payment.captured' }),
+      headers: { 'content-type': 'application/json', 'x-mock-signature': 'mock-signature' },
+    })
+    const response = await POST(request, mockRouteParams)
+    expect(response.status).not.toBe(404)
+  })
+
+  it('a genuinely unregistered provider name still 404s regardless of environment', async () => {
+    vi.stubEnv('VERCEL_ENV', 'preview')
+    const request = new NextRequest('https://unity.test/api/payments/webhooks/stripe', {
+      method: 'POST',
+      body: '{}',
+      headers: { 'content-type': 'application/json' },
+    })
+    const response = await POST(request, { params: Promise.resolve({ provider: 'stripe' }) })
+    expect(response.status).toBe(404)
+  })
+})
+
 describe('POST /api/payments/webhooks/[provider] -- Orchestration authentication', () => {
   beforeEach(() => {
     resetEnv()

@@ -2,7 +2,7 @@ import type { OrchestratorContext } from './types'
 import { OrchestrationError, type OrchestrationErrorCode } from './errors'
 import { checkIdempotentReplay, computeAuthorizeBarterDepositHash } from './idempotency'
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../provider-errors'
-import { getPaymentProvider } from '../registry'
+import { getActivePaymentProvider } from '../registry'
 import { assertNoPendingProviderAttempt } from './pending-provider-attempt-guard'
 
 const ELIGIBLE_AGREEMENT_STATUSES = ['accepted']
@@ -32,7 +32,7 @@ export async function authorizeBarterDeposit(
   idempotencyKey?: string
 ): Promise<AuthorizeBarterDepositResult> {
   const { admin, providerName = 'mock' } = ctx
-  const provider = getPaymentProvider(providerName)
+  const provider = getActivePaymentProvider(providerName)
 
   const { data: deposit } = await admin
     .from('payments')

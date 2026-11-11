@@ -49,7 +49,7 @@ describe('architecture fitness: provider adapters contain no booking-state mutat
 })
 
 describe('architecture fitness: orchestrator uses the provider registry, not a hardcoded provider', () => {
-  it('every orchestrator workflow file that talks to a provider imports getPaymentProvider from the registry', () => {
+  it('every orchestrator workflow file that talks to a provider imports getActivePaymentProvider from the registry (E30: the environment-gated authority -- getPaymentProvider itself is now reserved for the webhook route\'s own named lookup)', () => {
     // create-merchant-payout.ts deliberately does NOT talk to a provider
     // (Step 11 Phase 8, review correction 1) -- it creates the pending
     // payout obligation only; provider invocation belongs to a future,
@@ -59,13 +59,13 @@ describe('architecture fitness: orchestrator uses the provider registry, not a h
     for (const name of filesExpectedToUseAProvider) {
       const content = readFileSync(join(ORCHESTRATOR_DIR, name), 'utf-8')
       expect(content).toMatch(/from ['"]\.\.\/registry['"]/)
-      expect(content).toMatch(/getPaymentProvider/)
+      expect(content).toMatch(/getActivePaymentProvider/)
     }
   })
 
   it('create-merchant-payout.ts never calls a payout provider at creation time (Step 11 Phase 8 correction 1)', () => {
     const content = readFileSync(join(ORCHESTRATOR_DIR, 'create-merchant-payout.ts'), 'utf-8')
-    expect(content).not.toMatch(/getPaymentProvider/)
+    expect(content).not.toMatch(/getPaymentProvider|getActivePaymentProvider/)
     expect(content).not.toMatch(/provider\.createMerchantPayout/)
   })
 

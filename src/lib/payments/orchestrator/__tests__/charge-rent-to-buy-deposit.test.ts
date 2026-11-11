@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { chargeRentToBuyDeposit } from '../charge-rent-to-buy-deposit'
 import { OrchestrationError } from '../errors'
 
-vi.mock('../../registry', () => ({ getPaymentProvider: vi.fn() }))
-import { getPaymentProvider } from '../../registry'
+vi.mock('../../registry', () => ({ getActivePaymentProvider: vi.fn() }))
+import { getActivePaymentProvider } from '../../registry'
 
 /**
  * P5D-B.2: proves the RTB deposit charge no longer uses
@@ -64,7 +64,7 @@ function fakeAdmin(options: {
 describe('chargeRentToBuyDeposit -- P5D-B.2 automatic-capture correction', () => {
   it('1/2. uses provider.chargeRental(), never authorizeDeposit()', async () => {
     const provider = { name: 'mock', chargeRental: vi.fn().mockResolvedValue({ status: 'captured', providerReference: 'ref-1' }), authorizeDeposit: vi.fn() }
-    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    vi.mocked(getActivePaymentProvider).mockReturnValue(provider as never)
     const admin = fakeAdmin({})
 
     await chargeRentToBuyDeposit({ admin } as never, 'agr-1', 'idem-1')
@@ -75,7 +75,7 @@ describe('chargeRentToBuyDeposit -- P5D-B.2 automatic-capture correction', () =>
 
   it('3/4. requires_action stays pending and returns redirect info, without recording the deposit', async () => {
     const provider = { name: 'mock', chargeRental: vi.fn().mockResolvedValue({ status: 'requires_action', providerReference: 'ref-1', redirectUrl: 'https://pay.example/session' }) }
-    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    vi.mocked(getActivePaymentProvider).mockReturnValue(provider as never)
     const admin = fakeAdmin({})
 
     const result = await chargeRentToBuyDeposit({ admin } as never, 'agr-1', 'idem-1')
@@ -87,7 +87,7 @@ describe('chargeRentToBuyDeposit -- P5D-B.2 automatic-capture correction', () =>
 
   it('6. a genuine captured result transitions the payment and calls record_rent_to_buy_deposit_payment exactly once', async () => {
     const provider = { name: 'mock', chargeRental: vi.fn().mockResolvedValue({ status: 'captured', providerReference: 'ref-1' }) }
-    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    vi.mocked(getActivePaymentProvider).mockReturnValue(provider as never)
     const admin = fakeAdmin({})
 
     const result = await chargeRentToBuyDeposit({ admin } as never, 'agr-1', 'idem-1')
@@ -100,7 +100,7 @@ describe('chargeRentToBuyDeposit -- P5D-B.2 automatic-capture correction', () =>
 
   it('a provider decline transitions to failed and never records the deposit', async () => {
     const provider = { name: 'mock', chargeRental: vi.fn().mockResolvedValue({ status: 'failed', providerReference: 'ref-1', failureReason: 'card declined' }) }
-    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    vi.mocked(getActivePaymentProvider).mockReturnValue(provider as never)
     const admin = fakeAdmin({})
 
     await expect(chargeRentToBuyDeposit({ admin } as never, 'agr-1', 'idem-1')).rejects.toThrow(OrchestrationError)
@@ -109,7 +109,7 @@ describe('chargeRentToBuyDeposit -- P5D-B.2 automatic-capture correction', () =>
 
   it('9/10/11/12. an already-captured deposit completes domain progression (crash recovery) before returning, and never calls the provider again', async () => {
     const provider = { name: 'mock', chargeRental: vi.fn() }
-    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    vi.mocked(getActivePaymentProvider).mockReturnValue(provider as never)
     const admin = fakeAdmin({ existingPaymentRow: { id: 'pay-existing', status: 'captured' } })
 
     const result = await chargeRentToBuyDeposit({ admin } as never, 'agr-1', 'idem-1')
@@ -123,7 +123,7 @@ describe('chargeRentToBuyDeposit -- P5D-B.2 automatic-capture correction', () =>
 
   it('13. an already-captured deposit whose recovery RPC fails technically propagates the error, never silently reports ordinary success', async () => {
     const provider = { name: 'mock', chargeRental: vi.fn() }
-    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    vi.mocked(getActivePaymentProvider).mockReturnValue(provider as never)
     const admin = fakeAdmin({ existingPaymentRow: { id: 'pay-existing', status: 'captured' }, recordResult: { data: null, error: new Error('deposit rpc infra failure') } })
 
     await expect(chargeRentToBuyDeposit({ admin } as never, 'agr-1', 'idem-1')).rejects.toThrow(OrchestrationError)
@@ -132,7 +132,7 @@ describe('chargeRentToBuyDeposit -- P5D-B.2 automatic-capture correction', () =>
 
   it('an already-captured deposit\'s recovery accepts an already_paid: true RPC result as success, not a failure', async () => {
     const provider = { name: 'mock', chargeRental: vi.fn() }
-    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    vi.mocked(getActivePaymentProvider).mockReturnValue(provider as never)
     const admin = fakeAdmin({
       existingPaymentRow: { id: 'pay-existing', status: 'captured' },
       recordResult: { data: { agreement_id: 'agr-1', deposit_paid: true, already_paid: true }, error: null },
@@ -145,7 +145,7 @@ describe('chargeRentToBuyDeposit -- P5D-B.2 automatic-capture correction', () =>
 
   it('14/15. requires_action still stays pending and returns redirect info -- unregressed by the recovery fix', async () => {
     const provider = { name: 'mock', chargeRental: vi.fn().mockResolvedValue({ status: 'requires_action', providerReference: 'ref-1', redirectUrl: 'https://pay.example/session' }) }
-    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    vi.mocked(getActivePaymentProvider).mockReturnValue(provider as never)
     const admin = fakeAdmin({})
 
     const result = await chargeRentToBuyDeposit({ admin } as never, 'agr-1', 'idem-1')
@@ -156,7 +156,7 @@ describe('chargeRentToBuyDeposit -- P5D-B.2 automatic-capture correction', () =>
 
   it('16. a fresh synchronous captured path still completes deposit domain progression exactly once -- unregressed by the recovery fix', async () => {
     const provider = { name: 'mock', chargeRental: vi.fn().mockResolvedValue({ status: 'captured', providerReference: 'ref-1' }) }
-    vi.mocked(getPaymentProvider).mockReturnValue(provider as never)
+    vi.mocked(getActivePaymentProvider).mockReturnValue(provider as never)
     const admin = fakeAdmin({})
 
     const result = await chargeRentToBuyDeposit({ admin } as never, 'agr-1', 'idem-1')

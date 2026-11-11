@@ -2,7 +2,7 @@ import type { OrchestratorContext } from './types'
 import { OrchestrationError, type OrchestrationErrorCode } from './errors'
 import { prepareOrderFinancials } from './prepare-order-financials'
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../provider-errors'
-import { getPaymentProvider } from '../registry'
+import { getActivePaymentProvider } from '../registry'
 import { qualifySaleAffiliateCommission } from '@/lib/affiliate/qualify'
 import { qualifySaleUnityCommission } from '@/lib/commissions/qualify'
 import { createEscrowForPayment, fundEscrowForPayment } from '@/lib/escrow/orchestrator'
@@ -40,7 +40,7 @@ export async function chargeOrderPayment(
 ): Promise<ChargeOrderPaymentResult> {
   const { admin } = ctx
   const providerName = ctx.providerName || process.env.PAYMENT_PROVIDER || 'mock'
-  const provider = getPaymentProvider(providerName)
+  const provider = getActivePaymentProvider(providerName)
 
   const { paymentId } = await prepareOrderFinancials(ctx, orderId, idempotencyKey)
 
