@@ -103,6 +103,16 @@ export function mapDisputeRpcError(message: string | undefined): { status: numbe
   if (m.includes('this financial disposition is not pending completion')) {
     return { status: 409, error: 'This financial disposition is not pending completion.' }
   }
+  // E28-R1: resolve_booking_dispute / resolve_dispute's new domain guard.
+  if (m.includes('booking disputes must be resolved via resolve_booking_dispute')) {
+    return { status: 400, error: 'Booking disputes must be resolved with a financial disposition.' }
+  }
+  if (m.includes('resolve_booking_dispute is only for booking disputes')) {
+    return { status: 400, error: 'This action is only available for booking disputes.' }
+  }
+  if (m.includes('this booking has escrow activity and cannot be refunded through this path')) {
+    return { status: 409, error: 'This booking has escrow activity that must be reconciled separately before a refund can be recorded.' }
+  }
   if (m.includes('not authorized')) {
     return { status: 500, error: 'Could not process your request — please try again' }
   }

@@ -35,6 +35,9 @@ describe('mapDisputeRpcError', () => {
     ['refund amount exceeds the amount available to refund', 400],
     ['no financial disposition exists for this dispute', 404],
     ['this financial disposition is not pending completion', 409],
+    ['booking disputes must be resolved via resolve_booking_dispute', 400],
+    ['resolve_booking_dispute is only for booking disputes', 400],
+    ['this booking has escrow activity and cannot be refunded through this path -- reconcile escrow custody separately first', 409],
     ['not authorized', 500],
   ])('maps %j to status %i', (message, status) => {
     expect(mapDisputeRpcError(message).status).toBe(status)

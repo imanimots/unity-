@@ -137,8 +137,9 @@ describe('resolve_dispute is deliberately NOT touched: fresh investigation dispr
   const LATEST_FILE = join(MIGRATIONS_DIR, '20260904000003_dispute_resolve_restore_booking_all_outcomes.sql')
   const latestContent = readFileSync(LATEST_FILE, 'utf-8')
 
-  it('12. the current authoritative resolve_dispute (20260904000003, the chronologically latest of its 5 defining migrations) is the one this migration deliberately leaves unchanged', () => {
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql') && /function public\.resolve_dispute\(/.test(readFileSync(join(MIGRATIONS_DIR, f), 'utf-8')))
+  it("12. as of this migration (E22), the authoritative resolve_dispute was 20260904000003, the chronologically latest of its then-5 defining migrations -- the one this migration deliberately leaves unchanged. Scoped to files at or before E22's own position: a later phase (E28-R1) legitimately redefines resolve_dispute again, which must not retroactively make this historical claim false.", () => {
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql') && f <= MIGRATION_FILE && /function public\.resolve_dispute\(/.test(readFileSync(join(MIGRATIONS_DIR, f), 'utf-8')))
     const latestByName = files.sort().at(-1)
     expect(latestByName).toBe('20260904000003_dispute_resolve_restore_booking_all_outcomes.sql')
   })

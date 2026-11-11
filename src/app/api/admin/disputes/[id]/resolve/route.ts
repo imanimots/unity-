@@ -14,16 +14,23 @@ interface RouteParams {
  * records the outcome. No financial EXECUTION happens here -- see
  * docs/DISPUTE_SYSTEM.md.
  *
- * E28: for a BOOKING dispute specifically, a financial disposition is
- * now a required part of resolving it -- it must be impossible for a
- * financially ambiguous booking outcome to silently mean "normal
- * payout flow resumes" (see supabase/migrations/20261108180657). This
- * is enforced here, not inside the shared resolve_dispute() RPC
- * itself, so order/order/barter/RTB dispute resolution is completely
- * unaffected -- their booking_id is null, so this requirement never
- * applies to them. The dispute's domain is checked BEFORE calling any
- * RPC, so a missing/invalid disposition on a booking dispute fails
- * with a clean 400 and mutates nothing.
+ * E28/E28-R1: for a BOOKING dispute specifically, a financial
+ * disposition is a required part of resolving it -- it must be
+ * impossible for a financially ambiguous booking outcome to silently
+ * mean "normal payout flow resumes" (see supabase/migrations/
+ * 20261108180657). This route makes exactly ONE RPC call for a
+ * booking dispute (resolve_booking_dispute, migration
+ * 20261111105618) -- dispute resolution, the disposition insert, and
+ * the booking restoration all happen inside that one call's own
+ * PL/pgSQL transaction, so there is no network-boundary window where
+ * the dispute is resolved but the disposition is missing (the exact
+ * race the earlier two-RPC version of this route had). order/barter/
+ * RTB dispute resolution is unaffected -- their booking_id is null,
+ * so they continue through the unchanged, generic resolve_dispute()
+ * RPC, which itself now rejects a booking dispute outright, making
+ * the atomic path the only way to resolve one. The dispute's domain
+ * is checked BEFORE calling any RPC, so a missing/invalid disposition
+ * on a booking dispute fails with a clean 400 and mutates nothing.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { id: disputeId } = await params
@@ -65,40 +72,29 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: dispositionValidationError }, { status: 400 })
   }
 
-  const { data, error } = await admin.rpc('resolve_dispute', {
-    p_admin_id: gate.requester.userId,
-    p_dispute_id: disputeId,
-    p_outcome: parsed.data.outcome,
-    p_resolution_notes: parsed.data.resolution_notes ?? null,
-    p_idempotency_key: parsed.data.idempotency_key ?? null,
-  })
+  const { data, error } = isBookingDispute
+    ? await admin.rpc('resolve_booking_dispute', {
+        p_admin_id: gate.requester.userId,
+        p_dispute_id: disputeId,
+        p_outcome: parsed.data.outcome,
+        p_resolution_notes: parsed.data.resolution_notes ?? null,
+        p_disposition_type: parsed.data.financial_disposition_type,
+        p_disposition_amount: parsed.data.financial_disposition_amount ?? null,
+        p_disposition_reason: parsed.data.financial_disposition_reason,
+        p_idempotency_key: parsed.data.idempotency_key ?? null,
+      })
+    : await admin.rpc('resolve_dispute', {
+        p_admin_id: gate.requester.userId,
+        p_dispute_id: disputeId,
+        p_outcome: parsed.data.outcome,
+        p_resolution_notes: parsed.data.resolution_notes ?? null,
+        p_idempotency_key: parsed.data.idempotency_key ?? null,
+      })
 
   if (error) {
     console.error('[admin.disputes.resolve] RPC error', { disputeId, error })
     const mapped = mapDisputeRpcError(error.message)
     return NextResponse.json({ error: mapped.error }, { status: mapped.status })
-  }
-
-  let disposition: unknown = null
-  if (isBookingDispute) {
-    const { data: dispositionData, error: dispositionError } = await admin.rpc('record_dispute_financial_disposition', {
-      p_admin_id: gate.requester.userId,
-      p_dispute_id: disputeId,
-      p_disposition_type: parsed.data.financial_disposition_type,
-      p_amount: parsed.data.financial_disposition_amount ?? null,
-      p_reason: parsed.data.financial_disposition_reason,
-      p_idempotency_key: parsed.data.idempotency_key ? `${parsed.data.idempotency_key}-disposition` : null,
-    })
-    if (dispositionError) {
-      console.error('[admin.disputes.resolve] financial disposition RPC error', { disputeId, dispositionError })
-      const mapped = mapDisputeRpcError(dispositionError.message)
-      // The dispute itself is already resolved at this point (resolve_dispute
-      // succeeded above and is idempotent) -- retrying this exact request
-      // with the same idempotency_key will safely no-op the resolve step
-      // and retry only the disposition step.
-      return NextResponse.json({ error: `Dispute resolved, but the financial disposition failed: ${mapped.error} Retry this request to record it.` }, { status: mapped.status })
-    }
-    disposition = dispositionData
   }
 
   try {
@@ -109,5 +105,5 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.error('[admin.disputes.resolve] email dispatch failed', { disputeId, emailErr })
   }
 
-  return NextResponse.json({ ...(data as Record<string, unknown>), financial_disposition: disposition })
+  return NextResponse.json(data)
 }
