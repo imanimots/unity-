@@ -964,3 +964,158 @@ sandbox run from production), and any non-production app deployment pointed at P
 production (no exception). Peach hosts themselves remain enum-derived from `PEACH_ENVIRONMENT`
 (`'sandbox'|'production'`) only — never a raw base-URL env var — so there is no way to point
 at an arbitrary/custom host at all, satisfying §52 directly.
+
+## 21. E35 update — production payout activation audit, rollback & canary procedure
+
+**Fresh verification, 2026-11-12:** sandbox credentials remain completely absent from this
+environment (presence-only check of `.env.local` and `.env` — zero `PEACH_*` variables of
+any kind). Production environment likewise has zero Peach presence: `PAYMENT_PROVIDER`,
+every `PEACH_PAYOUTS_*` credential, every `PEACH_ORCHESTRATION_*` variable, and
+`PEACH_PAYOUTS_EXECUTION_ENABLED` are all absent. Remote `main` is still at the E32-R1 commit
+— E33/E34 are not published. This phase's own instruction (§10/§11) is explicit: do not
+bypass E34's sandbox blocker, and stop before production activation while it stands. Nothing
+this phase found changes that conclusion.
+
+**Peach docs re-confirmed live this phase** (`/docs/peach-payouts`): sandbox and live remain
+distinct hosts; Payouts maintains a separately-funded, per-country float balance ("Funds
+that you deposit for one country are not available for payouts in another country");
+sandbox is confirmed a test environment only ("may fail intermittently outside of South
+African office hours" — a test-environment characteristic, not a live-money one). No change
+from E34's own findings on activation (4 Dashboard-only steps), source-of-funds (required,
+no API), or webhook configuration (Dashboard-only, two separate URLs).
+
+### Security & financial safety tests added this phase
+
+E32/E32-R1/E33/E34 already proved nearly every item on this phase's own required test lists
+(§71/§72) — gate-off blocks the provider call, sandbox-from-production and
+production-from-preview are both rejected, duplicate webhooks are idempotent, no provider
+call happens without an eligible/non-stale destination, timeouts never trigger a second
+payout, non-terminal provider states never mark anything paid, and the affiliate sweep is
+bounded (never unbounded). Three specific gaps this phase's own list named but nothing
+before it had a dedicated test for were closed
+(`src/lib/payments/payout-execution/__tests__/production-safety.test.ts`, 11 tests):
+
+- **Unknown/custom provider host rejection** — proved that no env var of any name can ever
+  change the resolved Payouts/auth host away from the two hardcoded pairs, and that
+  `PEACH_ENVIRONMENT` outside `'sandbox'|'production'` throws rather than silently resolving
+  to an unrecognized value.
+- **Credentials never reach the client** — proved by scanning every `'use client'` file in
+  the new payout-destination UI for any Peach credential name, access-token reference, or
+  Vault/raw-secret RPC name.
+- **No mass/backlog activation path** — proved the merchant provider-execution route only
+  ever operates on one `[id]` at a time (no `.in()`/list-based bulk call), the affiliate
+  cron sweep stays bounded by `AFFILIATE_SWEEP_BATCH_LIMIT`, and no admin UI source contains
+  a "pay all"/"process backlog" action.
+
+### Kill switch — audited, not reinvented (phase brief §27/§31/§33)
+
+Confirmed exactly one execution gate exists: `PEACH_PAYOUTS_EXECUTION_ENABLED`
+(`src/lib/payments/payout-execution/gate.ts`, `isPayoutExecutionEnabled()`), checked first,
+before any DB mutation, in both `executeMerchantPayoutProviderAttempt()` and
+`executeAffiliatePayoutProviderAttempt()`. No second gate was added. Already proven by test
+(`execute-payout-provider-attempt.test.ts` #1/#11, `gate.test.ts` #1/#2) that the gate being
+off/absent/any-value-other-than-the-exact-string-`"true"` prevents the provider method from
+ever being called — this is a config-only control, never a database row, satisfying §33
+("emergency payout stop must not require Git revert, database rollback, schema rollback").
+
+### Rollback / emergency-stop procedure (phase brief §32/§34)
+
+1. Set `PEACH_PAYOUTS_EXECUTION_ENABLED` to anything other than the exact string `"true"`
+   (or remove it) in the Vercel production environment.
+2. Redeploy, or wait for the platform's own config-propagation (Vercel env var changes take
+   effect on the next deployment/cold start — confirm via the platform's own documented
+   propagation behavior before assuming it is instant).
+3. Confirm the execution routes now fail closed: `POST /api/admin/payouts/[id]/execute-provider`
+   and the affiliate cron (`GET/POST /api/internal/affiliate/process-payouts`) both return
+   503 with zero RPC calls made (proved statically by this phase's and E33's own tests; verify
+   the same behavior live against the actual deployed environment before relying on it).
+4. Any provider attempt already `pending`/`processing` at the moment the switch is flipped is
+   left exactly as-is — Peach's own documentation states a submitted payout cannot be
+   recalled, so there is nothing to "cancel" — reconciliation (signed webhook delivery and/or
+   admin-triggered query-by-payoutId, `POST /api/admin/payout-provider-attempts/[id]/reconcile`)
+   continues to resolve it to its authoritative final state.
+5. Do NOT resubmit any attempt whose outcome is uncertain at the time of the stop — the exact
+   same lost-response safety E33 already enforces (same `provider_payout_id`, never a new
+   one, only after the query endpoint's own 404-means-not-visible-yet guidance is satisfied).
+6. Monitor webhook delivery and/or run query reconciliation until every attempt open at stop
+   time reaches a terminal state (`successful`/`failed`/`cancelled`/`reversed`).
+
+### Canary selection criteria (not a selected candidate — phase brief §35-39)
+
+A future canary candidate, if and when sandbox certification completes and explicit approval
+is sought, must satisfy ALL of:
+
+- An existing, legitimate `merchant_payouts` or `affiliate_commissions` row — never a
+  fabricated obligation created merely to exercise Peach.
+- `_merchant_payout_full_eligibility_block` (merchant) or the destination-eligibility +
+  `payout_queued` status (affiliate) currently passes with zero blockers.
+- `_payout_destination_eligibility` reports `eligible: true` for the recipient — current,
+  enabled, verified, and not past the 90-day freshness window.
+- No open dispute, no pending financial disposition, no `account_restricted` state, no
+  active (`pending`/`processing`) provider attempt already on that row.
+- Currency is `ZAR` (the only currency this integration supports).
+- A small, real amount — never invented; whatever the existing obligation's own amount is.
+- The recipient is a real, known identity with currently-approved KYC — never a synthetic or
+  anonymized test subject.
+
+No candidate is selected by this phase. Selecting one is a future, separately-approved step,
+and even then only after sandbox certification is complete (phase brief §10/§11 — this phase
+does not have standing to waive that).
+
+### Production payout readiness matrix (phase brief §68)
+
+```text
+UNITY E35 — PRODUCTION PAYOUT READINESS MATRIX
+
+CODE STACK:
+  E33 present:            YES (local, commit 04c0d12e1ceda8aa9e3646047dc062bb959a5586)
+  E34 present:             YES (local, commit 661218a62cd62b4b4ad79809b4eb16de9e1ec2e9)
+  E35 present:             YES (this commit)
+
+REMOTE:
+  main contains E33:       NO
+  main contains E34:       NO
+  main contains E35:       NO
+
+SUPABASE:
+  migrations current:      unchanged (20261111184936_add_payout_destination_authority is still the latest LIVE migration; E33/E34/E35 migrations, where they exist, are not yet deployed)
+  health:                   not independently re-queried (no live project access in this environment)
+  security baseline:        unchanged (no new migration this phase)
+
+VERCEL:
+  deployment SHA:           faea09ffe9b56e58633a5b2aceaa733ce0e7f284 (E32-R1) -- unchanged
+  READY:                    YES (at that commit; E33/E34/E35 not yet deployed)
+
+SANDBOX:
+  credentials:              ABSENT
+  BANV certified:           BLOCKED
+  payout certified:         BLOCKED
+  webhook certified:        BLOCKED
+  lost-response certified:  BLOCKED
+
+PEACH LIVE:
+  Payouts product active:  UNKNOWN
+  source-of-funds:         UNKNOWN
+  live credentials:        ABSENT
+  webhooks configured:     UNKNOWN
+  signing enabled:         ABSENT (no secret present)
+  available float:         UNKNOWN (no authenticated access)
+
+UNITY:
+  PAYMENT_PROVIDER:                ABSENT
+  payout execution gate:            ABSENT (defaults false)
+  kill switch tested:                YES (statically, via test -- not yet tested against a live deployment, since nothing is deployed)
+  historical auto-sweep disabled:   YES (confirmed: no bulk/backlog code path exists anywhere, proved by test this phase)
+
+CANARY:
+  candidate selected:       NONE
+  explicit approval:        NO
+
+PRODUCTION READY FOR CANARY: NO
+
+BLOCKERS:
+  1. Sandbox credentials absent -- sandbox certification cannot proceed at all (external blocker, unchanged from E34).
+  2. E33/E34/E35 are not published to origin/main -- Supabase/Vercel are still on the E32-R1 commit.
+  3. Live Peach credentials, Payouts product activation, source-of-funds approval, and live webhook configuration are all unknown/absent -- none can be verified or set by code.
+  4. No canary candidate has been selected, and none may be without a completed sandbox certification first.
+```
