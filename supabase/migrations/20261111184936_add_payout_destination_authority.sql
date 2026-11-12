@@ -75,8 +75,21 @@
 -- search_path = '' with fully-qualified public./private. references on
 -- every new function, matching the current post-20261101130000 /
 -- post-20261111112418 idiom. Every write-capable function: revoke all
--- from public/anon/authenticated, grant execute to service_role only,
--- plus an explicit auth.role() <> 'service_role' guard in the body.
+-- from public/anon/authenticated, grant execute to service_role only --
+-- the function ACL (a role without EXECUTE cannot invoke the function
+-- at all; Postgres itself raises "permission denied for function ...")
+-- IS the privilege boundary. E32-R1 removed the auth.role() <>
+-- 'service_role' in-body check every one of these functions originally
+-- also carried: it was fully redundant with the grant/revoke above (the
+-- grant alone already makes the function uncallable by anon/
+-- authenticated), and duplicating the same boundary in two places risks
+-- the two silently drifting apart later rather than adding real
+-- defense in depth. Table-level privileges on every E32 table are
+-- likewise explicit below (see "EXPLICIT GRANTS" near the end of this
+-- file) rather than left to inherited/default privileges, and
+-- private.payout_destination_secrets carries an explicit deny-all RLS
+-- policy so Supabase's rls_enabled_no_policy advisor does not flag it
+-- as RLS-enabled-but-unintentionally-bare.
 -- ============================================================
 
 create extension if not exists supabase_vault with schema vault;
@@ -325,9 +338,58 @@ create table if not exists private.payout_destination_secrets (
 );
 
 alter table private.payout_destination_secrets enable row level security;
--- No policy at all -- private is not Data-API-exposed, and this table
--- carries no SELECT/INSERT/UPDATE/DELETE grant to anon/authenticated
--- below, so RLS here is belt-and-suspenders, not the primary control.
+
+-- E32-R1: an explicit deny-all policy, not zero policies -- RLS enabled
+-- with no policy at all is exactly what Supabase's own
+-- rls_enabled_no_policy advisor flags (it cannot distinguish
+-- "deliberately bare because this table is unreachable another way"
+-- from "RLS turned on by habit and never finished"). This policy
+-- changes nothing behaviorally (every role was already denied; `false`
+-- denies everyone including service_role under RLS, but service_role
+-- bypasses RLS entirely by its own Postgres role attribute, same as
+-- every other service-role-only table in this codebase) -- it only
+-- makes the already-intended "no client access, ever" posture explicit
+-- to the advisor and to a future reader. `private` not being
+-- Data-API-exposed and the explicit revokes below are still the real,
+-- primary controls; this policy is defense in depth on top of both.
+create policy "private.payout_destination_secrets: deny all client access"
+  on private.payout_destination_secrets for all
+  to public
+  using (false)
+  with check (false);
+
+-- ============================================================
+-- EXPLICIT GRANTS -- E32-R1
+-- ============================================================
+-- Every E32 table's client-facing privilege is stated explicitly here,
+-- rather than relying on this project's inherited/default privileges
+-- (which otherwise grant anon/authenticated broad table-level access
+-- automatically on table creation -- RLS alone, not the table grant,
+-- was what blocked INSERT/UPDATE/DELETE before this phase). None of
+-- anon/authenticated/PUBLIC can write to any of the four public E32
+-- tables under any circumstance now, regardless of RLS policy changes
+-- someone makes later -- the grant itself is the first gate. All
+-- reads remain additionally narrowed by each table's own RLS SELECT
+-- policy above (owner/admin, or the authenticated-only catalog read on
+-- payout_banks) -- revoking then re-granting SELECT does not widen
+-- anything beyond what those policies already allow.
+revoke all on public.payout_banks from public, anon, authenticated;
+grant select on public.payout_banks to authenticated;
+
+revoke all on public.payout_destinations from public, anon, authenticated;
+grant select on public.payout_destinations to authenticated;
+
+revoke all on public.payout_destination_verification_attempts from public, anon, authenticated;
+grant select on public.payout_destination_verification_attempts to authenticated;
+
+revoke all on public.payout_destination_history from public, anon, authenticated;
+grant select on public.payout_destination_history to authenticated;
+
+-- private.payout_destination_secrets: zero privileges for every
+-- client-reachable role, full stop -- not even SELECT. Defense in
+-- depth on top of the schema's own non-exposure and the deny-all RLS
+-- policy above; none of the three is relied on alone.
+revoke all on private.payout_destination_secrets from public, anon, authenticated;
 
 -- ============================================================
 -- RPCs
@@ -367,9 +429,6 @@ declare
   v_last4 text;
   v_version int;
 begin
-  if auth.role() <> 'service_role' then
-    raise exception 'not authorized';
-  end if;
   if p_account_number !~ '^[0-9]{1,13}$' then
     raise exception 'account number must be 1-13 numeric characters';
   end if;
@@ -456,9 +515,6 @@ as $$
 declare
   v_account_number text;
 begin
-  if auth.role() <> 'service_role' then
-    raise exception 'not authorized';
-  end if;
 
   select vault.decrypted_secrets.decrypted_secret into v_account_number
   from private.payout_destination_secrets
@@ -499,9 +555,6 @@ declare
   v_bank public.payout_banks;
   v_attempt_id uuid;
 begin
-  if auth.role() <> 'service_role' then
-    raise exception 'not authorized';
-  end if;
   if p_trigger not in ('initial', 'replacement', 'reverification', 'admin_manual', 'reconciliation') then
     raise exception 'invalid trigger %', p_trigger;
   end if;
@@ -560,9 +613,6 @@ as $$
 declare
   v_attempt public.payout_destination_verification_attempts;
 begin
-  if auth.role() <> 'service_role' then
-    raise exception 'not authorized';
-  end if;
   if p_initial_status not in ('pending', 'processing', 'successful', 'failed') then
     raise exception 'invalid initial status %', p_initial_status;
   end if;
@@ -623,9 +673,6 @@ declare
   v_attempt public.payout_destination_verification_attempts;
   v_dest public.payout_destinations;
 begin
-  if auth.role() <> 'service_role' then
-    raise exception 'not authorized';
-  end if;
   if p_status not in ('pending', 'processing', 'successful', 'failed') then
     raise exception 'invalid status %', p_status;
   end if;
@@ -719,9 +766,6 @@ as $$
 declare
   v_dest public.payout_destinations;
 begin
-  if auth.role() <> 'service_role' then
-    raise exception 'not authorized';
-  end if;
 
   select * into v_dest from public.payout_destinations where id = p_destination_id;
   if v_dest.id is null then
@@ -760,9 +804,6 @@ as $$
 declare
   v_dest public.payout_destinations;
 begin
-  if auth.role() <> 'service_role' then
-    raise exception 'not authorized';
-  end if;
 
   select * into v_dest from public.payout_destinations
   where owner_id = p_owner_id and is_current and disabled_at is null;

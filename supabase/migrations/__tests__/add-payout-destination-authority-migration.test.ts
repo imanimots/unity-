@@ -101,11 +101,13 @@ describe('20261111184936_add_payout_destination_authority.sql (category: ADMIN-C
     }
   })
 
-  it('9. private.payout_destination_secrets has zero policies -- it relies on schema non-exposure + grants, not RLS, as its primary control', () => {
+  it('9. private.payout_destination_secrets has exactly one explicit deny-all policy (E32-R1) -- not zero policies, which Supabase\'s rls_enabled_no_policy advisor would flag', () => {
     const start = normalized.indexOf('alter table private.payout_destination_secrets enable row level security;')
     const nextSection = normalized.indexOf('-- ====', start)
     const body = normalized.slice(start, nextSection === -1 ? undefined : nextSection)
-    expect(body).not.toMatch(/create policy/)
+    const policyMatches = body.match(/create policy/g) ?? []
+    expect(policyMatches.length).toBe(1)
+    expect(body).toMatch(/create policy "private\.payout_destination_secrets: deny all client access"\s+on private\.payout_destination_secrets for all\s+to public\s+using \(false\)\s+with check \(false\);/)
   })
 
   it('10. payout_destinations RLS grants read to owner and admin only, no insert/update/delete policy exists for any role', () => {
@@ -182,8 +184,9 @@ describe('20261111184936_add_payout_destination_authority.sql (category: ADMIN-C
     }
   })
 
-  it('18. every write-capable new function guards auth.role() <> service_role inside its own body, not just via grants', () => {
+  it('18. (E32-R1) no E32 function contains an auth.role() caller guard -- the function ACL (revoke all + grant service_role only) is the sole privilege boundary, never duplicated in the body', () => {
     const bodies = [
+      extractBody(sql, 'create or replace function private.is_payout_destination_owner('),
       extractBody(sql, 'create or replace function public.create_payout_destination('),
       extractBody(sql, 'create or replace function public.get_payout_destination_account_number('),
       extractBody(sql, 'create or replace function public.start_bank_verification_attempt('),
@@ -193,8 +196,39 @@ describe('20261111184936_add_payout_destination_authority.sql (category: ADMIN-C
       extractBody(sql, 'create or replace function public._payout_destination_eligibility('),
     ]
     for (const body of bodies) {
-      expect(body).toMatch(/auth\.role\(\) <> 'service_role'/)
+      expect(body).not.toMatch(/auth\.role\(\)/)
     }
+  })
+
+  it("18b. (E32-R1) the E32-R1 header comment is the only remaining auth.role() reference in the whole migration -- it documents the removal, it is not a caller guard", () => {
+    const occurrences = (sql.match(/auth\.role\(\)/g) ?? []).length
+    expect(occurrences).toBe(1)
+  })
+
+  it('18c. (E32-R1) every E32 table has explicit revokes for anon/authenticated/PUBLIC, never relying solely on inherited default privileges', () => {
+    const tables = [
+      'public.payout_banks',
+      'public.payout_destinations',
+      'public.payout_destination_verification_attempts',
+      'public.payout_destination_history',
+      'private.payout_destination_secrets',
+    ]
+    for (const t of tables) {
+      const escaped = t.replace('.', '\\.')
+      expect(normalized, `missing explicit revoke on ${t}`).toMatch(new RegExp(`revoke all on ${escaped} from public, anon, authenticated;`))
+    }
+  })
+
+  it('18d. (E32-R1) the 4 public E32 tables grant SELECT (only) to authenticated -- no INSERT/UPDATE/DELETE grant to anon or authenticated anywhere', () => {
+    const publicTables = ['public.payout_banks', 'public.payout_destinations', 'public.payout_destination_verification_attempts', 'public.payout_destination_history']
+    for (const t of publicTables) {
+      const escaped = t.replace('.', '\\.')
+      expect(normalized, `missing authenticated SELECT grant on ${t}`).toMatch(new RegExp(`grant select on ${escaped} to authenticated;`))
+    }
+    expect(normalized).not.toMatch(/grant insert on public\.payout_/)
+    expect(normalized).not.toMatch(/grant update on public\.payout_/)
+    expect(normalized).not.toMatch(/grant delete on public\.payout_/)
+    expect(normalized).not.toMatch(/grant (select|insert|update|delete) on private\.payout_destination_secrets/)
   })
 
   it('19. create_payout_destination validates account number and account type before touching Vault or any table', () => {
