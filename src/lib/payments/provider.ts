@@ -94,16 +94,46 @@ export interface RefundResult {
   failureReason?: string
 }
 
+/**
+ * E33: Peach's own real payout lifecycle has 6 states, not the 2-3 an
+ * earlier, provider-execution-less version of this interface assumed
+ * -- widened once, here, for both merchant and affiliate payouts
+ * rather than inventing two slightly different vocabularies.
+ * 'pending'/'processing' are both genuinely non-final; only
+ * 'successful' may ever mark a domain row paid, and 'reversed' can
+ * arrive after 'successful' (see docs/PEACH_INTEGRATION.md §18 and
+ * the E33 migration's own header comment for the full domain mapping).
+ */
+export type ProviderPayoutStatus = 'pending' | 'processing' | 'successful' | 'failed' | 'cancelled' | 'reversed'
+
+/**
+ * E33: amount/accountNumber/bankName/etc are already server-resolved
+ * by the orchestrator (via the E32 destination authority + E33's
+ * start_*_provider_attempt RPC) BEFORE this is ever called -- a
+ * provider implementation never fetches banking/identity data itself
+ * (phase brief §33). payoutId is Unity's own provider_payout_id, a
+ * genuine v4 UUID persisted before this call is ever made.
+ */
 export interface MerchantPayoutInput {
   merchantId: string
+  payoutId: string
+  reference: string
   amount: number
+  amountMinorUnits: number
   currency: string
+  bankName: string
+  branchCode: string
+  accountNumber: string
+  accountHolder: string
   mockScenario?: MockScenario
 }
 
 export interface MerchantPayoutResult {
-  providerReference: string
-  status: 'pending' | 'paid' | 'failed'
+  providerPayoutId: string
+  providerRequestId?: string
+  status: ProviderPayoutStatus
+  resultCode?: string
+  failureReason?: string
 }
 
 /**
@@ -116,14 +146,23 @@ export interface MerchantPayoutResult {
 export interface AffiliatePayoutInput {
   affiliateId: string
   commissionId: string
+  payoutId: string
+  reference: string
   amount: number
+  amountMinorUnits: number
   currency: string
+  bankName: string
+  branchCode: string
+  accountNumber: string
+  accountHolder: string
   mockScenario?: MockScenario
 }
 
 export interface AffiliatePayoutResult {
-  providerReference: string
-  status: 'paid' | 'failed'
+  providerPayoutId: string
+  providerRequestId?: string
+  status: ProviderPayoutStatus
+  resultCode?: string
   failureReason?: string
 }
 
@@ -166,10 +205,12 @@ export interface HealthCheckResult {
  * (`refund`, `affiliate_payout`) have real orchestrator call sites that
  * mark a DB row 'processing' BEFORE calling the provider -- an unknown-
  * in-advance capability gap must reject before that mutation, never
- * after. `merchant_payout` is included for completeness (PeachPayments
- * Provider reports it unsupported too) even though no real application
- * code calls `createMerchantPayout()` today (merchant payouts are
- * admin-attested, never provider-executed, in this codebase).
+ * after. As of E33, `merchant_payout` also has a real orchestrator
+ * call site -- merchant payouts are no longer exclusively admin-
+ * attested; a real provider-execution path now coexists alongside the
+ * pre-existing manual one (see the E33 migration's own "manual-flow
+ * conflict guard" for how the two stay mutually exclusive at any given
+ * moment).
  */
 export type PaymentCapability =
   | 'charge_rental'

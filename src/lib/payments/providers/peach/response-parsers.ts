@@ -49,9 +49,13 @@ interface PeachPayoutResponse {
   status: 'pending' | 'processing' | 'failed' | 'successful' | 'cancelled' | 'reversed'
 }
 
-/** docs/reference/querypayoutrequest -- PayoutState enum: pending/processing/failed/successful/cancelled/reversed. */
+/**
+ * docs/reference/querypayoutrequest -- PayoutState enum: pending/
+ * processing/failed/successful/cancelled/reversed. E33 widened
+ * MerchantPayoutResult.status to this exact same 6-value union (see
+ * provider.ts), so this is now a direct pass-through rather than a
+ * lossy collapse to 3 states.
+ */
 export function parsePayoutResponse(raw: PeachPayoutResponse): MerchantPayoutResult {
-  if (raw.status === 'successful') return { providerReference: raw.payoutId, status: 'paid' }
-  if (raw.status === 'pending' || raw.status === 'processing') return { providerReference: raw.payoutId, status: 'pending' }
-  return { providerReference: raw.payoutId, status: 'failed' }
+  return { providerPayoutId: raw.payoutId, status: raw.status }
 }

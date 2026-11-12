@@ -717,3 +717,99 @@ unchanged, under a new `provider` value `'peach_banv'` — no new webhook ledger
 authoritative check a future payout-execution phase must call is
 `_payout_destination_eligibility(owner_id)` — eligible only for exactly one current,
 enabled, verified, non-stale destination.
+
+**STALE, superseded by E33 (see §19):** real Peach payout execution now exists for both
+merchant and affiliate payouts — `createMerchantPayout()`/`createAffiliatePayout()` are
+implemented, not stubs, and `supportsCapability('merchant_payout'|'affiliate_payout')` is
+`true`. Production remains disabled via a separate, independently-gated
+`PEACH_PAYOUTS_EXECUTION_ENABLED` control (default false) — the capability flag means "a
+real implementation exists," never "production execution is enabled."
+
+## 19. E33 update — Peach payout execution, async reconciliation & destination snapshot binding
+
+Closes steps 7+ of §17's migration plan (payout execution itself), consuming the E32
+destination authority rather than inventing recipient banking data during this phase.
+Production stays fail-closed: `PAYMENT_PROVIDER` remains absent, and the new
+`PEACH_PAYOUTS_EXECUTION_ENABLED` gate independently defaults `false` — `PAYMENT_PROVIDER=
+peach` alone was deliberately never allowed to auto-enable payouts, since Peach already
+serves charges/deposits under that same env var and payout activation may need separate
+operational sign-off (funded float, source-of-funds compliance, Dashboard webhook
+configuration — see E34, planned next).
+
+**Two critical corrections found by re-verifying current official docs this phase** (never
+assumed correct from E32's own research):
+1. **Auth host.** The OAuth token endpoint lives on `dashboard.peachpayments.com` /
+   `sandbox-dashboard.peachpayments.com` — a genuinely different host from the Payouts API
+   itself (`payouts.peachpayments.com`). E32's client posted the token request to the
+   Payouts host, which would have failed against the real API. Fixed in
+   `providers/peach/banv-client.ts`/`payouts-config.ts` (new `authBaseUrl` field).
+2. **bankName enum mismatch.** Peach's real-time-EFT `bankName` field only accepts 25
+   literal values (confirmed via the live `createpayoutrequest` reference), which do **not**
+   match E32's `payout_banks.display_name` strings, and exclude 3 banks E32 had marked
+   `payout_supported = true` (Mukuru, Mercantile Bank, Rand Merchant Bank) — those banks were
+   sourced from a different, less authoritative docs page. Fixed additively: a new nullable
+   `payout_banks.peach_payout_bank_name` column, populated only for the 22 confirmed
+   matches; the submission path requires it non-null, layered on top of (not replacing)
+   `payout_supported`.
+
+**Create-payout contract (confirmed live):** `POST /merchants/{merchantId}/payouts`, one
+payout per request (no batching) — `payoutId` (a genuine v4 UUID, generated and persisted
+server-side *before* any HTTP call), `reference` (≤20 chars, alnum+space, built
+deterministically from the attempt id, never PII), `currency: "ZAR"`, `amount` (integer
+minor units, exact decimal→cents conversion, no floating-point multiplication), `bankName`,
+`branchCode`, `accountNumber`, `accountHolder` (2-50 chars, strict pattern, built fresh from
+the destination owner's currently-approved `identity_verifications.legal_first_name`/
+`legal_surname` — re-checked at execution time, never trusted stale from BANV-submission
+time), `payoutMethod: "realtime-eft"`. The create response already carries a real status
+(the same 6-value enum the webhook uses) — never treated as mere acknowledgement.
+
+**Lost-create-response handling (confirmed live, introduced 2026-10-01 specifically for
+this case):** `GET /merchants/{merchantId}/payouts/status?payoutId={payoutId}` — "a 404
+means it is not visible yet; wait and call this again; send create again only if this call
+stays 404." A thrown `ProviderTimeoutError`/`RetryableProviderError`/unrecognized error from
+the create call is classified **ambiguous**, never automatically resolved: the attempt and
+the domain row are left in `processing`, relying on this query (by the identical
+`provider_payout_id`, never a new one) for reconciliation. Only an authoritative
+`TerminalProviderError` (a genuine 4xx rejection, proof the payout was never accepted) is
+safe to mark `failed` immediately.
+
+**Provider-attempt model:** one new table, `payout_provider_attempts`, with a domain-FK
+`CHECK` (exactly one of `merchant_payout_id`/`affiliate_commission_id`) rather than a
+polymorphic pair, and a real partial unique index enforcing at most one nonterminal attempt
+per domain row — the same idiom `payout_destinations_one_current_per_owner_idx` already
+established. Each attempt immutably binds the exact `payout_destinations.id` snapshot used
+at creation time; a later bank-detail change can never redirect an in-flight payout, and a
+retry after confirmed failure re-runs E32 eligibility fresh (so a corrected destination can
+be used) rather than reusing the old binding.
+
+**State application:** one shared RPC per domain
+(`complete_merchant_payout_provider_attempt` / `complete_affiliate_payout_provider_attempt`)
+is called identically from three places — the create-response handler, the payout webhook,
+and query reconciliation — so there is exactly one authority for what a Peach status means.
+Idempotent on a duplicate terminal result; monotonic on `provider_last_updated_at` (an older
+update can never regress a newer one). `payout_status` gained a `reversed` value (merchant
+side; `affiliate_commission_status` already had one, Phase 7) — a provider reversal after
+`successful` moves the domain row to `reversed` without rewriting its prior `paid` history.
+
+**Manual-flow conflict guard:** `mark_payout_paid`/`mark_payout_failed`/`retry_payout` each
+gained one additional check — refuse outright while a live (pending/processing) provider
+attempt exists for the payout — so manual admin action can never race live provider
+authority. The one deliberate exception to "don't touch unrelated historical functions":
+this phase's own brief explicitly required it.
+
+**Webhook & security:** a new dedicated signed route
+(`/api/payments/webhooks/peach-payouts`) reuses the same Svix/Standard Webhooks helper E32
+built for BANV, and the same provider-neutral `payment_webhook_events` lease RPCs
+(`record_webhook_event`/`claim_webhook_event_processing`/`mark_webhook_event_processed`/
+`mark_webhook_event_error`) unchanged, under provider value `'peach_payouts'`. Every new
+SQL function continues the E32-R1 lesson — `search_path = ''`, `REVOKE ALL FROM public,
+anon, authenticated`, `GRANT EXECUTE TO service_role`, no `auth.role()` caller guard. The
+new attempt table has RLS enabled with an explicit deny-all policy plus explicit client
+revokes (no owner-read policy at all — this is operational financial-execution authority,
+server/admin-only).
+
+**Scope boundary:** no production activation. `PAYMENT_PROVIDER` stays absent,
+`PEACH_PAYOUTS_EXECUTION_ENABLED` defaults false, no credentials were added anywhere, and no
+historical `merchant_payouts`/`affiliate_commissions` row was touched or auto-submitted to
+Peach. `refund` capability remains `false` (E31 still binding). Planned next: E34 (payout
+destination UX, Peach sandbox certification, and controlled production activation).

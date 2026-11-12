@@ -27,6 +27,8 @@ import { buildOrdinaryPaymentRequest, buildDepositAuthorisationRequest } from '.
 import { parseCreateHostedCheckoutPaymentResponse, parseCapturePaymentResponse, parseCancelPaymentResponse, parseGetPaymentResponse, extractRedirectUrl } from './orchestration/response-parsers'
 import type { GetPaymentResponse } from './orchestration/types'
 import { orchestrationReturnUrl } from '@/app/api/payments/checkout-return/route'
+import { loadPeachPayoutsConfig, type PeachPayoutsConfig } from './peach/payouts-config'
+import { PeachPayoutsClient } from './peach/banv-client'
 
 /**
  * Money-moving methods are wired to Peach Orchestration as of P5C.1 (see
@@ -55,27 +57,41 @@ import { orchestrationReturnUrl } from '@/app/api/payments/checkout-return/route
  * possible at this point, unchanged from P5C.
  *
  * `createPaymentIntent()` remains a stub: zero real call sites in the
- * orchestrator. `refund()`/`createMerchantPayout()`/
- * `createAffiliatePayout()` remain stubs -- explicitly P5E/deferred.
- * `verifyWebhook()` is untouched -- explicitly P5D scope.
+ * orchestrator. `refund()` remains a stub -- E31 found the refund
+ * contract cannot be confirmed against current official docs, still
+ * binding. `createMerchantPayout()`/`createAffiliatePayout()` are real
+ * as of E33, wired to Peach Payouts' create-payout call -- see that
+ * method's own comment. `verifyWebhook()` is untouched for
+ * Checkout/OPPWA -- Payouts webhooks go through their own dedicated,
+ * signed route instead (E33).
  */
 export class PeachPaymentsProvider implements PaymentProvider {
   readonly name = 'peach'
 
   /**
-   * E30: self-reported, matching this class's own method bodies exactly
-   * -- chargeRental/authorizeDeposit/captureDeposit/releaseDeposit are
-   * wired to real Orchestration calls above; refund/createMerchantPayout/
-   * createAffiliatePayout are still NotImplementedError stubs;
-   * verifyWebhook is fully implemented. Update this set in the same
-   * change that wires up (or removes) any of those methods -- never
-   * separately.
+   * E30/E33: self-reported, matching this class's own method bodies
+   * exactly -- chargeRental/authorizeDeposit/captureDeposit/
+   * releaseDeposit are wired to real Orchestration calls above;
+   * createMerchantPayout/createAffiliatePayout are wired to the real
+   * Peach Payouts create-payout call (E33); refund remains a
+   * NotImplementedError stub (E31 remains binding -- the refund
+   * contract was never confirmed against current official docs);
+   * verifyWebhook is fully implemented for Checkout/OPPWA. Update this
+   * set in the same change that wires up (or removes) any of those
+   * methods -- never separately. Reporting `merchant_payout`/
+   * `affiliate_payout` here means "a real implementation exists", NOT
+   * "production execution is enabled" -- that is the separate,
+   * independently-gated PEACH_PAYOUTS_EXECUTION_ENABLED check in
+   * src/lib/payments/payout-execution/gate.ts, enforced by every
+   * orchestrator call site, never by this capability flag alone.
    */
   private static readonly SUPPORTED_CAPABILITIES: ReadonlySet<PaymentCapability> = new Set<PaymentCapability>([
     'charge_rental',
     'authorize_deposit',
     'capture_deposit',
     'release_deposit',
+    'merchant_payout',
+    'affiliate_payout',
     'webhook_verification',
   ])
 
@@ -190,14 +206,56 @@ export class PeachPaymentsProvider implements PaymentProvider {
     throw new NotImplementedError(this.name, 'refund')
   }
 
-  async createMerchantPayout(_input: MerchantPayoutInput): Promise<MerchantPayoutResult> {
-    void _input
-    throw new NotImplementedError(this.name, 'createMerchantPayout')
+  private requirePeachPayoutsConfig(): PeachPayoutsConfig {
+    const config = loadPeachPayoutsConfig()
+    if (!config) {
+      throw new PeachConfigurationError('Peach Payouts is not configured (PEACH_PAYOUTS_CLIENT_ID/CLIENT_SECRET/MERCHANT_ID)')
+    }
+    return config
   }
 
-  async createAffiliatePayout(_input: AffiliatePayoutInput): Promise<AffiliatePayoutResult> {
-    void _input
-    throw new NotImplementedError(this.name, 'createAffiliatePayout')
+  private payoutsClient(): PeachPayoutsClient {
+    return new PeachPayoutsClient(this.requirePeachPayoutsConfig())
+  }
+
+  /**
+   * E33: every field here is already server-resolved by the
+   * orchestrator before this is ever called (phase brief §33 -- this
+   * method never fetches banking/identity data itself). Submits
+   * exactly one payout per call; Peach's create response can already
+   * carry a final-ish status (confirmed live, the same 6-value enum
+   * the webhook uses), which is returned as-is -- this method never
+   * upgrades a non-'successful' status to anything resembling
+   * finality itself.
+   */
+  async createMerchantPayout(input: MerchantPayoutInput): Promise<MerchantPayoutResult> {
+    const client = this.payoutsClient()
+    const result = await client.createPayout({
+      payoutId: input.payoutId,
+      reference: input.reference,
+      amountMinorUnits: input.amountMinorUnits,
+      currency: input.currency,
+      bankName: input.bankName,
+      branchCode: input.branchCode,
+      accountNumber: input.accountNumber,
+      accountHolder: input.accountHolder,
+    })
+    return { providerPayoutId: result.payoutId, providerRequestId: result.payoutRequestId, status: result.status, resultCode: result.resultCode }
+  }
+
+  async createAffiliatePayout(input: AffiliatePayoutInput): Promise<AffiliatePayoutResult> {
+    const client = this.payoutsClient()
+    const result = await client.createPayout({
+      payoutId: input.payoutId,
+      reference: input.reference,
+      amountMinorUnits: input.amountMinorUnits,
+      currency: input.currency,
+      bankName: input.bankName,
+      branchCode: input.branchCode,
+      accountNumber: input.accountNumber,
+      accountHolder: input.accountHolder,
+    })
+    return { providerPayoutId: result.payoutId, providerRequestId: result.payoutRequestId, status: result.status, resultCode: result.resultCode }
   }
 
   /**
@@ -205,14 +263,18 @@ export class PeachPaymentsProvider implements PaymentProvider {
    * three distinct webhook schemes with no shared marker field (see
    * docs/PEACH_INTEGRATION.md "Webhook mapping"): Checkout/Payment-Links
    * (HMAC, `x-webhook-signature`), OPPWA/card (encrypted,
-   * `x-initialization-vector`), and Payouts (no documented signature
-   * mechanism at all). The Payouts case is the one deliberately
-   * conservative choice here: since Peach's docs never confirmed a
-   * verification mechanism for it, this treats it as unverifiable rather
-   * than assuming it's safe to trust unsigned -- `invalid` with no
-   * payload, same as a failed signature check. That must be revisited
-   * (confirmed with Peach support or in a sandbox trace) before Phase 2E
-   * processes a real payout webhook.
+   * `x-initialization-vector`), and Payouts (Svix/Standard Webhooks,
+   * `webhook-id`/`webhook-timestamp`/`webhook-signature` -- confirmed
+   * live, E31/E32; see providers/peach/payouts-webhook-signature.ts).
+   * The Payouts case here is STILL deliberately treated as unverifiable
+   * -- `invalid` with no payload, same as a failed signature check --
+   * not because the scheme is undocumented (it now is), but because a
+   * real Peach Payouts webhook is never meant to reach this GENERIC
+   * dispatcher at all: it has its own dedicated, signed route
+   * (src/app/api/payments/webhooks/peach-payouts/route.ts, E33), which
+   * uses verifyPayoutsWebhookSignature() directly against the raw body
+   * before this class is ever involved. If a delivery somehow reaches
+   * this generic path instead, failing closed is correct regardless.
    */
   async verifyWebhook(input: WebhookVerificationInput): Promise<WebhookVerificationResult> {
     const config = loadPeachConfig()

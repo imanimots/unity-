@@ -2,25 +2,40 @@ import type { PeachPayoutsConfig } from './payouts-config'
 import { ProviderTimeoutError, RetryableProviderError, TerminalProviderError } from '../../provider-errors'
 
 /**
- * E32: narrow Peach Payouts client covering ONLY bank account
- * verification (BANV) -- create + query. Deliberately does not include
- * create-payout; that is explicitly out of scope for this phase (no
- * payout execution yet, see docs/PEACH_INTEGRATION.md §0 and this
- * phase's own report).
+ * E32: Peach Payouts client, originally covering only bank account
+ * verification (BANV). E33 widens it with the real create-payout and
+ * query-by-payoutId methods (payout EXECUTION itself was explicitly
+ * out of scope for E32).
  *
- * Contract confirmed live against developer.peachpayments.com this
- * phase (not training knowledge, not a guess):
- *   - Auth: POST {baseUrl}/oauth/token { clientId, clientSecret,
- *     merchantId } -> { access_token, expires_in, token_type }.
- *   - Create: POST {baseUrl}/merchants/{merchantId}/banv
+ * Contract confirmed live against developer.peachpayments.com across
+ * both phases (not training knowledge, not a guess):
+ *   - Auth: POST {authBaseUrl}/api/oauth/token { clientId, clientSecret,
+ *     merchantId } -> { access_token, expires_in, token_type }. E33
+ *     CORRECTION: authBaseUrl (dashboard.peachpayments.com /
+ *     sandbox-dashboard.peachpayments.com) is a genuinely different
+ *     host from the Payouts API's own baseUrl -- E32 incorrectly used
+ *     baseUrl for this call; see payouts-config.ts's own comment.
+ *   - Create BANV: POST {baseUrl}/merchants/{merchantId}/banv
  *     { accountNumber, accountType, branchCode, idNumber, initials?,
  *     lastName? } -> { bankVerificationId, status, resultCode }.
- *   - Query: GET {baseUrl}/merchants/{merchantId}/banv/{id}/status ->
+ *   - Query BANV: GET {baseUrl}/merchants/{merchantId}/banv/{id}/status ->
  *     { bankVerificationId, status, resultCode, accountNumber,
  *     idNumber, initials, lastName, accountOpen, accountAcceptsCredits,
  *     accountAcceptsDebits, accountOpenGtThreeMonths, accountType }
  *     (the last 9 fields are each 'positive'|'negative'|'unverified'
  *     attestation outcomes, never raw banking values).
+ *   - Create payout (E33): POST {baseUrl}/merchants/{merchantId}/payouts
+ *     { payouts: [{ payoutId, reference, currency, amount, accountNumber,
+ *     branchCode, bankName, accountHolder, payoutMethod: 'realtime-eft' }] }
+ *     -> { payoutRequestId, created, payouts: [{ payoutId, status,
+ *     resultCode, lastUpdated, created, ... }] }. E33 submits exactly
+ *     ONE payout per request (phase brief §13) -- no batching.
+ *   - Query payout by payoutId (E33): GET {baseUrl}/merchants/{merchantId}
+ *     /payouts/status?payoutId={payoutId} -> a PayoutRequestStatus
+ *     object; a 404 means "not visible yet -- wait and call again; send
+ *     create again only if this call stays 404" (confirmed verbatim
+ *     from the live reference, introduced 2026-10-01 specifically for
+ *     the lost-create-response case).
  *
  * The access token is held only in memory for the lifetime of this
  * client instance -- never persisted to any table, never logged.
@@ -69,6 +84,38 @@ export interface GetBanvResultOutput {
 export interface PeachPayoutsClientOptions {
   fetchImpl?: typeof fetch
   timeoutMs?: number
+}
+
+export type PeachPayoutStatus = 'pending' | 'processing' | 'successful' | 'failed' | 'cancelled' | 'reversed'
+
+export interface CreatePayoutInput {
+  payoutId: string
+  reference: string
+  amountMinorUnits: number
+  currency: string
+  bankName: string
+  branchCode: string
+  accountNumber: string
+  accountHolder: string
+}
+
+export interface CreatePayoutResult {
+  payoutRequestId: string
+  payoutId: string
+  status: PeachPayoutStatus
+  resultCode: string
+}
+
+export interface QueryPayoutByPayoutIdResult {
+  payoutRequestId: string
+  payoutId: string
+  status: PeachPayoutStatus
+  resultCode: string
+  lastUpdated: string | null
+}
+
+function isPeachPayoutStatus(value: unknown): value is PeachPayoutStatus {
+  return value === 'pending' || value === 'processing' || value === 'successful' || value === 'failed' || value === 'cancelled' || value === 'reversed'
 }
 
 const ATTESTATION_FIELDS = [
@@ -133,12 +180,96 @@ export class PeachPayoutsClient {
     return parsed
   }
 
+  /**
+   * E33. Submits exactly ONE payout per request (phase brief §13 --
+   * no batching). The 1-element `payouts` array in the response is
+   * read back for its own echoed status/resultCode -- Peach's create
+   * response is NOT merely an acknowledgement, it can already carry a
+   * synchronous final-ish status (confirmed live: the same 6-value
+   * enum the webhook uses).
+   */
+  async createPayout(input: CreatePayoutInput): Promise<CreatePayoutResult> {
+    const raw = await this.request(
+      'POST',
+      `/merchants/${encodeURIComponent(this.config.merchantId)}/payouts`,
+      {
+        payouts: [
+          {
+            payoutId: input.payoutId,
+            reference: input.reference,
+            currency: input.currency,
+            amount: input.amountMinorUnits,
+            accountNumber: input.accountNumber,
+            branchCode: input.branchCode,
+            bankName: input.bankName,
+            accountHolder: input.accountHolder,
+            payoutMethod: 'realtime-eft',
+          },
+        ],
+      },
+      'createPayout'
+    )
+
+    const body = raw as Record<string, unknown>
+    const payoutRequestId = typeof body.payoutRequestId === 'string' ? body.payoutRequestId : null
+    const payouts = Array.isArray(body.payouts) ? body.payouts : null
+    const first = payouts && payouts.length > 0 ? (payouts[0] as Record<string, unknown>) : null
+    const status = first?.status
+    if (!payoutRequestId || !first || typeof first.payoutId !== 'string' || !isPeachPayoutStatus(status)) {
+      throw new TerminalProviderError('peach-payouts', 'createPayout', 'unexpected response shape')
+    }
+
+    return {
+      payoutRequestId,
+      payoutId: first.payoutId,
+      status,
+      resultCode: typeof first.resultCode === 'string' ? first.resultCode : '',
+    }
+  }
+
+  /**
+   * E33. For the lost-create-response case ONLY -- never used to
+   * submit a new payout. Returns null on a 404, which per the live
+   * reference means "not visible yet, wait and call again" -- never
+   * treated as a terminal error, never treated as proof the payout
+   * was never received (the caller's own bounded-attempt policy
+   * decides what a persistent 404 means, this method just reports the
+   * current fact).
+   */
+  async queryPayoutByPayoutId(payoutId: string): Promise<QueryPayoutByPayoutIdResult | null> {
+    const raw = await this.request(
+      'GET',
+      `/merchants/${encodeURIComponent(this.config.merchantId)}/payouts/status?payoutId=${encodeURIComponent(payoutId)}`,
+      undefined,
+      'queryPayoutByPayoutId',
+      { allowNotFound: true }
+    )
+    if (raw === null) return null
+
+    const body = raw as Record<string, unknown>
+    const payoutRequestId = typeof body.payoutRequestId === 'string' ? body.payoutRequestId : null
+    const payouts = Array.isArray(body.payouts) ? body.payouts : null
+    const match = payouts?.find((p) => (p as Record<string, unknown>).payoutId === payoutId) as Record<string, unknown> | undefined
+    const status = match?.status
+    if (!payoutRequestId || !match || !isPeachPayoutStatus(status)) {
+      throw new TerminalProviderError('peach-payouts', 'queryPayoutByPayoutId', 'unexpected response shape')
+    }
+
+    return {
+      payoutRequestId,
+      payoutId,
+      status,
+      resultCode: typeof match.resultCode === 'string' ? match.resultCode : '',
+      lastUpdated: typeof match.lastUpdated === 'string' ? match.lastUpdated : null,
+    }
+  }
+
   private async getAccessToken(): Promise<string> {
     if (this.cachedToken && this.cachedToken.expiresAt > Date.now() + TOKEN_EXPIRY_BUFFER_MS) {
       return this.cachedToken.accessToken
     }
 
-    const url = `${this.config.baseUrl}/oauth/token`
+    const url = `${this.config.authBaseUrl}/api/oauth/token`
     let response: Response
     try {
       response = await this.fetchImpl(url, {
@@ -170,7 +301,13 @@ export class PeachPayoutsClient {
     return accessToken
   }
 
-  private async request(method: 'GET' | 'POST', path: string, body: unknown, operation: string): Promise<unknown> {
+  private async request(
+    method: 'GET' | 'POST',
+    path: string,
+    body: unknown,
+    operation: string,
+    options: { allowNotFound?: boolean } = {}
+  ): Promise<unknown> {
     const accessToken = await this.getAccessToken()
     const url = `${this.config.baseUrl}${path}`
     const controller = new AbortController()
@@ -190,6 +327,8 @@ export class PeachPayoutsClient {
     } finally {
       clearTimeout(timeout)
     }
+
+    if (options.allowNotFound && response.status === 404) return null
 
     let parsedBody: unknown
     try {
