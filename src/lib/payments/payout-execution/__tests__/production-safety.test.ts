@@ -133,11 +133,19 @@ describe('no mass/backlog activation path exists (phase brief §36/§44/§57/§5
   })
 
   it('11. no admin UI source contains a "pay all" / "process backlog" style bulk action', () => {
-    const adminFiles = allSourceFiles(join(REPO_ROOT, 'src/app/admin/payouts'))
+    const adminFiles = allSourceFiles(join(REPO_ROOT, 'src/app/admin/payouts')).concat(allSourceFiles(join(REPO_ROOT, 'src/app/admin/payout-provider-attempts')))
     const forbidden = /pay all|process backlog|process all|bulk process|mass process/i
     for (const file of adminFiles) {
       const content = readFileSync(file, 'utf-8')
       expect(content, `${file} must not offer a bulk payout action`).not.toMatch(forbidden)
     }
+  })
+
+  it('12. the new admin provider-attempts list route never selects raw bank data, and its only mutating action is a single-id reconcile (never a client-supplied final state)', () => {
+    const listContent = readFileSync(join(REPO_ROOT, 'src/app/api/admin/payout-provider-attempts/route.ts'), 'utf-8')
+    expect(listContent).not.toMatch(/account_number|vault_secret|access_token|client_secret/)
+    const pageContent = readFileSync(join(REPO_ROOT, 'src/app/admin/payout-provider-attempts/page.tsx'), 'utf-8')
+    expect(pageContent).toMatch(/\/reconcile/)
+    expect(pageContent).not.toMatch(/p_provider_status:|body: JSON\.stringify\(\{\s*status/)
   })
 })

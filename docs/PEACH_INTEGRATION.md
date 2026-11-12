@@ -1119,3 +1119,108 @@ BLOCKERS:
   3. Live Peach credentials, Payouts product activation, source-of-funds approval, and live webhook configuration are all unknown/absent -- none can be verified or set by code.
   4. No canary candidate has been selected, and none may be without a completed sandbox certification first.
 ```
+
+## 22. Master Launch Phase update — merge review, operational visibility, launch policy
+
+**PR verification (not assumed):** PR #8 ("E33–E35: Peach payout execution, UX, and production-readiness controls")
+was independently confirmed via the public, unauthenticated GitHub REST API (no `gh` CLI is installed in this
+environment and no push credential exists, consistent with every prior phase) — `base: main @
+faea09ffe9b56e58633a5b2aceaa733ce0e7f284`, `head: e35-peach-production-payout-readiness @
+d0368567c5abd4dd928f4826e6eb5e308be86801`, `commits: 3`, `mergeable: true`, `mergeable_state: clean`,
+`draft: true`, `merged: false`. Its 56-file changed-file list was fetched and cross-checked file-by-file against
+this project's own local commit history for E33/E34/E35 — an exact match, confirming the remote branch is byte-
+for-byte what was intended, not just trusted from local git state.
+
+**Merge action: explicitly denied by this environment's own permission policy** ("Merge Without Review"), not
+by a missing credential. This is treated as a deliberate, correct safety boundary — the same category of
+human-review gate this project's own standing instructions require for hard-to-reverse, shared-state actions —
+and was not worked around. PR #8 remains open and in draft; converting it out of draft and merging it is a
+decision for a human reviewer, not this phase.
+
+**Financial invariants (phase brief §9) — all 11 re-verified directly against the committed source this phase**
+(not re-derived from memory): the partial unique indexes preventing two simultaneous active attempts per domain
+row; the ambiguous-provider-error path that never calls the completion RPC (so a timeout can never produce a
+second POST); both `complete_*_provider_attempt` functions' explicit non-terminal-status short-circuit (pending/
+processing never transitions the domain row); the `successful`-only gate before marking `paid`; the `reversed`-
+only-from-`paid` gate; the immutable `payout_destination_id` foreign key on every attempt row; a fresh
+`gen_random_uuid()` on every new attempt (never a reused `provider_payout_id`); the `_payout_provider_attempts_
+has_active` guard now present in all three manual merchant RPCs; `'refund'` confirmed absent from Peach's
+`SUPPORTED_CAPABILITIES` set; and `isMockPaymentAuthorityAllowed()`/`ProviderNotPermittedError` unchanged and
+still enforced in `registry.ts`. No violation found.
+
+**Migration review (phase brief §10):** `supabase/migrations/20261112134448_add_peach_payout_execution.sql`
+re-scanned for `DROP ... CASCADE` and any top-level (outside a function body) `INSERT`/`UPDATE` against
+`merchant_payouts`/`affiliate_commissions` — zero matches for either, confirming no destructive DDL and no
+historical backfill of any kind.
+
+### New operational visibility this phase: `/admin/payout-provider-attempts`
+
+A genuine, previously-missing gap (phase brief §50-53): before this phase, there was **no admin visibility into
+`payout_provider_attempts` at all** — only the pre-existing, per-booking `merchant_payouts` list existed, with
+no way to see Peach's own async state, attempt number, or a "stuck" (non-terminal for an extended period)
+attempt anywhere. Added:
+
+- `GET /api/admin/payout-provider-attempts` — read-only, safe fields only (no raw bank data, no provider
+  credentials, no raw request body — proved by a new static test), optional `?status=` filter.
+- `/admin/payout-provider-attempts` — a table view (domain, masked destination, amount, provider status with a
+  client-computed "STUCK" flag past 60 minutes non-terminal, attempt number, submission time) with a per-row
+  **Reconcile** action that calls the existing E33 admin reconciliation route — never a client-supplied final
+  state, always queries Peach directly, matching phase brief §54's requirement exactly.
+- Linked from the existing `/admin/payouts` page alongside the E34 readiness link.
+
+### Kill-switch runbook (phase brief §59-60, consolidating E35's own §21 procedure)
+
+**Turn OFF:** set `PEACH_PAYOUTS_EXECUTION_ENABLED` to anything other than the exact string `"true"` (or remove
+it) in the Vercel production environment, then redeploy/await config propagation.
+
+**Verify OFF:** `POST /api/admin/payouts/[id]/execute-provider` and the affiliate cron both return 503 with zero
+RPC calls made — proved statically by test in this environment; confirm the identical behavior against the real
+deployed environment once it exists, rather than assuming the static proof alone suffices live.
+
+**What continues after OFF:** reconciliation only — the signed payout webhook (`/api/payments/webhooks/peach-
+payouts`) and the new admin **Reconcile** action both continue to resolve any already-`pending`/`processing`
+attempt to its authoritative final state. Nothing new is ever submitted while the gate is off.
+
+**What never happens:** resubmission of an attempt whose outcome is uncertain. The gate stops new economic
+submissions; it never "cancels" or "retries" an existing one.
+
+### Launch policy preparation (phase brief §56-58, not activated)
+
+Recommended initial rollout mode, for a future, separately-approved activation phase:
+
+- New payouts only — never an automatic replay of the existing historical backlog (496 pending + 114
+  processing merchant payouts, 201 paid + 2 voided affiliate ZAR, per E33's own snapshot — all remain under
+  current manual/admin operational policy, untouched).
+- Merchant provider execution starts manual (admin clicks `execute-provider` per payout) — not a cron.
+- Affiliate automatic sweep stays off at first activation even after the gate is turned on for merchant
+  payouts — these are two independent decisions, not one switch.
+- One payout at a time; no batch/bulk action exists anywhere in the codebase to begin with (proved by test).
+- Reversal and failure both route to manual review — no automatic retry exists for either outcome.
+
+### Webhook URL preparation (phase brief §46)
+
+The exact production **paths** are fixed and already deployed in code (confirmed this phase):
+`/api/payments/webhooks/peach-payouts` (payout status) and `/api/payments/webhooks/peach-banv` (bank account
+verification) — these are two **separate** URLs, matching Peach's own Dashboard model (confirmed E34: "Payout
+status webhooks" and "Bank account verification service webhooks" are configured as separate sections). The
+production **domain** itself is not fabricated here — substitute this project's actual production domain
+(`NEXT_PUBLIC_APP_URL` in a real deployment, not the `http://localhost:3000` local-dev placeholder found in
+this environment's own `.env.local`) when registering these two URLs on the Peach Dashboard.
+
+### External action list (phase brief §45, §78)
+
+Every item below requires a human with the appropriate Peach Dashboard/business authority — none can be
+performed by this agent:
+
+1. Log in to the Peach Dashboard and activate Payouts (4-step process, confirmed live: login → Payouts →
+   Activate Payouts → agree to terms/pricing and confirm).
+2. Submit the required source-of-funds document to Peach for compliance review.
+3. Obtain live Payouts API credentials (`clientId`/`clientSecret`/`merchantId`) from the Dashboard once
+   activated.
+4. Register the two production webhook URLs above (payout-status and BANV) under Payouts settings, and obtain
+   the webhook signing secret for each.
+5. Fund the Peach payout float balance (confirmed: a separate, per-country balance, not shared with any other
+   Peach product).
+6. Provide the resulting credentials/secrets to whoever controls the Vercel **production** environment
+   variables (never preview/development) — this agent will not set them without that separate authority.
+7. Separately: review and merge PR #8 (a human-review action, deliberately not performed by this phase).

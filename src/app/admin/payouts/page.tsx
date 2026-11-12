@@ -84,9 +84,14 @@ export default function AdminPayoutsPage() {
     <div className="p-6 lg:p-8 space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <AdminPageHeader eyebrow="Marketplace" title="Merchant Payouts" />
-        <Link href="/admin/payouts/readiness" className={secondaryButtonClass}>
-          Peach Payouts Readiness
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/admin/payout-provider-attempts" className={secondaryButtonClass}>
+            Provider Attempts
+          </Link>
+          <Link href="/admin/payouts/readiness" className={secondaryButtonClass}>
+            Peach Payouts Readiness
+          </Link>
+        </div>
       </div>
 
       {merchantIdFilter ? (
