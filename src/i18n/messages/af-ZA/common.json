@@ -316,5 +316,73 @@
       "listItem": "Lys 'n item",
       "howItWorks": "Hoe dit werk"
     }
+  },
+  "payoutDestination": {
+    "heading": "Uitbetalingsrekening",
+    "description": "Bestuur die bankrekening waarin Unity jou verdienste betaal.",
+    "loading": "Laai tans…",
+    "errors": {
+      "couldNotLoad": "Kon nie jou uitbetalingsrekeningbesonderhede laai nie.",
+      "couldNotSave": "Kon nie jou bankbesonderhede stoor nie.",
+      "couldNotVerify": "Kon nie verifikasie begin nie.",
+      "couldNotCheckStatus": "Kon nie verifikasiestatus bevestig nie.",
+      "couldNotDisable": "Kon nie hierdie uitbetalingsrekening deaktiveer nie.",
+      "fillAllFields": "Kies asseblief 'n bank en voltooi elke veld."
+    },
+    "messages": {
+      "added": "Bankbesonderhede gestoor. Begin verifikasie om uitbetalings te aktiveer.",
+      "verificationStarted": "Verifikasie het begin.",
+      "statusChecked": "Verifikasiestatus opgedateer.",
+      "disabled": "Uitbetalingsrekening gedeaktiveer."
+    },
+    "kycBlock": {
+      "title": "Identiteitsverifikasie vereis",
+      "message": "Voltooi identiteitsverifikasie voordat jy 'n uitbetalingsrekening verifieer.",
+      "cta": "Verifieer identiteit"
+    },
+    "noDestination": {
+      "title": "Nog geen uitbetalingsrekening nie",
+      "message": "Voeg jou bankbesonderhede by om uitbetalings te ontvang."
+    },
+    "addButton": "Voeg bankbesonderhede by",
+    "formHeading": "Bankbesonderhede",
+    "bankLabel": "Bank",
+    "bankPlaceholder": "Kies jou bank",
+    "accountNumberLabel": "Rekeningnommer",
+    "accountTypeLabel": "Rekeningtipe",
+    "accountTypePlaceholder": "Kies rekeningtipe",
+    "banvUnsupportedNotice": "Outomatiese verifikasie is nie beskikbaar vir hierdie bank nie. Uitbetalingsaktivering vereis handmatige oorsig.",
+    "accountHolderNotice": "Uitbetalingsrekening moet gehou word in:",
+    "saveButton": "Stoor",
+    "saving": "Stoor tans…",
+    "cancelButton": "Kanselleer",
+    "replaceButton": "Vervang rekening",
+    "replaceWarning": {
+      "title": "Jou bankbesonderhede vervang",
+      "message": "Jou huidige uitbetalingsrekening sal onmiddellik ophou kwalifiseer vir nuwe uitbetalings. Die vervanging moet geverifieer word voordat uitbetalings kan hervat.",
+      "confirm": "Gaan voort"
+    },
+    "disableButton": "Deaktiveer",
+    "disableWarning": {
+      "title": "Deaktiveer hierdie uitbetalingsrekening?",
+      "message": "Jy sal nie meer kwalifiseer vir uitbetalings totdat jy 'n nuwe rekening byvoeg en verifieer nie.",
+      "confirm": "Deaktiveer"
+    },
+    "disabling": "Deaktiveer tans…",
+    "startVerificationButton": "Begin verifikasie",
+    "verifying": "Begin verifikasie…",
+    "checkStatusButton": "Bevestig verifikasiestatus",
+    "checkingStatus": "Bevestig tans…",
+    "verifiedOnNotice": "Geverifieer {date}",
+    "expiringSoonNotice": "Verifikasie verval binnekort — herverifikasie mag nodig wees.",
+    "failedNotice": "Verifikasie was onsuksesvol. Jy kan weer probeer of met ondersteuning kontak maak.",
+    "status": {
+      "unverified": "Ongeverifieer",
+      "pending": "Verifikasie hangend",
+      "processing": "Verifikasie in proses",
+      "verified": "Geverifieer",
+      "failed": "Verifikasie het misluk",
+      "stale": "Herverifikasie vereis"
+    }
   }
 }

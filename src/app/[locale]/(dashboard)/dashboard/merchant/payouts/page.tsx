@@ -80,6 +80,17 @@ export default function PayoutsPage() {
 
       <TestModeBanner className="mb-8" />
 
+      <Link
+        href="/dashboard/payout-settings"
+        className="flex items-center justify-between gap-3 p-4 mb-8 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] hover:border-[#8B1A1A] transition-colors"
+      >
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">{t('payoutAccountLink.title')}</p>
+          <p className="text-xs text-[#9B8B85] mt-0.5">{t('payoutAccountLink.description')}</p>
+        </div>
+        <ArrowLeft size={14} className="rotate-180 text-[#9B8B85] shrink-0" />
+      </Link>
+
       <div className="bg-[#8B1A1A] rounded-xl p-8 mb-8 border-l-4 border-l-[#C4511F]">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-white/60 mb-3">{t('totalPaid')}</p>
         <div className="text-5xl lg:text-6xl font-extrabold text-white leading-none mb-2">

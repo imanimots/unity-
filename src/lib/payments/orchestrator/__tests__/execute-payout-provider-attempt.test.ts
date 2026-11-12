@@ -4,7 +4,11 @@ vi.mock('../../registry', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../registry')>()
   return { ...actual, getActivePaymentProvider: vi.fn() }
 })
-vi.mock('../../payout-execution/gate', () => ({ isPayoutExecutionEnabled: vi.fn() }))
+vi.mock('../../payout-execution/gate', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../payout-execution/gate')>()
+  return { ...actual, isPayoutExecutionEnabled: vi.fn() }
+})
+vi.mock('../../providers/peach/payouts-config', () => ({ loadPeachPayoutsConfig: vi.fn() }))
 vi.mock('../payout-provider-attempt-shared', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../payout-provider-attempt-shared')>()
   return { ...actual, resolvePayoutDestinationDetails: vi.fn() }
@@ -12,6 +16,7 @@ vi.mock('../payout-provider-attempt-shared', async (importOriginal) => {
 
 import { getActivePaymentProvider, ProviderNotPermittedError } from '../../registry'
 import { isPayoutExecutionEnabled } from '../../payout-execution/gate'
+import { loadPeachPayoutsConfig } from '../../providers/peach/payouts-config'
 import { resolvePayoutDestinationDetails } from '../payout-provider-attempt-shared'
 import { executeMerchantPayoutProviderAttempt } from '../execute-merchant-payout-provider-attempt'
 import { executeAffiliatePayoutProviderAttempt } from '../execute-affiliate-payout-provider-attempt'
@@ -50,6 +55,15 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(isPayoutExecutionEnabled).mockReturnValue(true)
   vi.mocked(resolvePayoutDestinationDetails).mockResolvedValue(DESTINATION_DETAILS)
+  vi.mocked(loadPeachPayoutsConfig).mockReturnValue({
+    environment: 'sandbox',
+    baseUrl: 'https://sandbox-payouts.peachpayments.com/api',
+    authBaseUrl: 'https://sandbox-dashboard.peachpayments.com',
+    clientId: 'id',
+    clientSecret: 'secret',
+    merchantId: 'merchant-1',
+    webhookSigningSecret: null,
+  })
 })
 
 describe('executeMerchantPayoutProviderAttempt', () => {

@@ -813,3 +813,154 @@ server/admin-only).
 historical `merchant_payouts`/`affiliate_commissions` row was touched or auto-submitted to
 Peach. `refund` capability remains `false` (E31 still binding). Planned next: E34 (payout
 destination UX, Peach sandbox certification, and controlled production activation).
+
+## 20. E34 update — payout destination UX, sandbox certification & activation readiness
+
+**Sandbox credentials confirmed absent** (`.env.local` has no `PEACH_*` variables at all,
+confirmed by presence-only check this phase) — per this phase's own instruction, this blocks
+sandbox *certification* only; it does not block UX or readiness-control work, all of which is
+complete.
+
+### Peach docs re-verified live, 2026-11-12
+
+- **Hosts** (`developer.peachpayments.com/docs/payouts-dashboard`, `/docs/payment-links-authentication`): confirmed unchanged from E33 — sandbox auth
+  `sandbox-dashboard.peachpayments.com`, sandbox payouts `sandbox-payouts.peachpayments.com`,
+  live auth `dashboard.peachpayments.com`, live payouts `payouts.peachpayments.com`. Unity's
+  own client (`payouts-config.ts`) already only ever resolves one of these two enum-derived
+  pairs — never a raw `PEACH_PAYOUTS_BASE_URL` env var — satisfying §52's own stated
+  preference without any change needed.
+- **Payouts product activation** (`/docs/peach-payouts`): Dashboard-only, four manual steps
+  ("Log in... click Payouts... click Activate Payouts... agree to terms and click
+  Activate"). No API. Cannot be verified by code — reported `unknown` unless a new
+  `PEACH_PAYOUTS_PRODUCT_ACTIVE` attestation env var is explicitly set.
+- **Source of funds**: "Before executing any payouts, you should send Peach Payments a
+  source of funds document for compliance reasons" — an operational, human prerequisite,
+  same treatment as above (`PEACH_SOURCE_OF_FUNDS_APPROVED`).
+- **Webhook configuration** (`/docs/reference-webhooks`): Dashboard-only ("click **Add
+  webhook URL**"), no API. **Payout-status and BANV webhooks are separate dashboard
+  sections/URLs**, not one shared setting — confirmed directly, correcting any assumption
+  that one URL covers both. Cannot be verified by code; reported `unknown`.
+- **Available balance**: "The top of the Payouts page shows your available payout balance" —
+  Dashboard display only; no balance-query API was found in the current public docs, so E34
+  does not implement a balance check (phase brief §41 permits this only "if E33/E34 can query
+  balance safely" — it cannot, confirmed).
+- **Known limitations** (`/docs/peach-payouts`, quoted): RTC processing limits (R5,000,000
+  business-day daytime, R250,000 overnight/weekends/holidays); cannot pay Capitec Live
+  Better accounts or GoTyme SME accounts starting "53"; BANV 03:00–23:00 only; float balance
+  is held per-country, not fungible across countries; sandbox testing may fail outside South
+  African office hours.
+- **Sandbox test data** (`/docs/reference-test-and-go-live`, confirmed live, public — not the
+  login-walled support article): real documented test accounts exist, recorded here for a
+  future phase with credentials to actually exercise:
+  - Payout (any amount within float balance, `realtime-eft`): Absa `4047594620`/`632005`;
+    Nedbank `1012546144`/`198765`; Discovery Bank (multiple accounts)/`679000`.
+  - BANV: Absa `4047594620` → "all match"; Discovery Bank `10503060072` → "partial match";
+    GoTyme Bank `51000347387` → "no match".
+  - Mobile money: amount a multiple of 100 from 20000 up to sandbox float balance; result
+    code `2000.000.000` on success.
+
+### Sandbox certification report (phase brief §67)
+
+```text
+PEACH SANDBOX CERTIFICATION
+
+ENVIRONMENT: sandbox
+AUTH: NOT TESTABLE — no credentials available
+BANV FULL MATCH: NOT TESTABLE
+BANV PARTIAL MATCH: NOT TESTABLE
+BANV NO MATCH: NOT TESTABLE
+BANV WEBHOOK: NOT TESTABLE
+BANV QUERY RECONCILIATION: NOT TESTABLE
+PAYOUT CREATE: NOT TESTABLE
+PAYOUT STATUS: NOT TESTABLE
+PAYOUT WEBHOOK: NOT TESTABLE
+QUERY BY PAYOUT ID: NOT TESTABLE
+DUPLICATE WEBHOOK: NOT TESTABLE
+LOST RESPONSE SAFETY: NOT TESTABLE
+REAL MONEY MOVED: NO
+
+BLOCKED — SANDBOX CREDENTIALS NOT AVAILABLE
+```
+
+No PASS is claimed for anything not actually exercised, per the phase brief's own explicit
+instruction. The real, documented test account data above is recorded so a future phase with
+credentials does not need to re-research it.
+
+### Webhook config audit / live readiness (phase brief §37/§38)
+
+```text
+SANDBOX PAYOUT WEBHOOK: UNKNOWN — no Dashboard access this phase
+SANDBOX BANV WEBHOOK: UNKNOWN — no Dashboard access this phase
+LIVE PAYOUT WEBHOOK: NOT CHANGED — no credentials, no Dashboard access; endpoint ready: /api/payments/webhooks/peach-payouts
+LIVE BANV WEBHOOK: NOT CHANGED — no credentials, no Dashboard access; endpoint ready: /api/payments/webhooks/peach-banv
+```
+
+### Production readiness matrix (phase brief §69)
+
+```text
+PEACH PAYOUT PRODUCTION READINESS
+
+CODE:
+  provider client:         ready
+  async states:             ready (6-state ProviderPayoutStatus, E33)
+  signed webhook:           ready (Svix/Standard Webhooks, E32/E33)
+  query reconciliation:     ready (E33, reused by E34's "check status" UX)
+  duplicate protection:     ready (payment_webhook_events lease RPCs, unchanged)
+  destination binding:      ready (immutable snapshot, E32/E33)
+  lost-response handling:   ready (ambiguous-outcome classification, E33)
+  kill switch:              ready (PEACH_PAYOUTS_EXECUTION_ENABLED, E33; see below)
+  env-consistency guard:    ready (NEW, E34 -- app env vs Peach env cross-check)
+
+UX:
+  merchant bank settings:   ready (/dashboard/payout-settings, linked from merchant dashboard + payouts page)
+  affiliate bank settings:  ready (same shared page, linked from affiliate dashboard)
+  BANV:                     ready (start/check-status actions, KYC-gated)
+  replacement:               ready (explicit confirmation + warning copy)
+  masked display:            ready (bank + last4 + status only, never raw account number)
+
+SANDBOX:
+  credentials:               absent
+  BANV certified:            blocked
+  payout certified:          blocked
+  webhook certified:         blocked
+
+PEACH ACCOUNT:
+  Payouts activated:         unknown
+  source-of-funds approved:  unknown
+  live credentials:          absent
+  live webhook configured:   unknown
+  signing secret:            absent
+
+UNITY PRODUCTION:
+  PAYMENT_PROVIDER:          absent
+  payout execution gate:     absent (defaults false)
+
+REAL-MONEY CANARY APPROVED: NO
+
+PRODUCTION READY: NO
+```
+
+Code-ready and UX-ready are both `YES`; production-ready is correctly `NO` (phase brief §70 —
+this is a valid, expected outcome, not a failure to resolve).
+
+### Kill switch (phase brief §50)
+
+`PEACH_PAYOUTS_EXECUTION_ENABLED` (env var, exact string `"true"` required) is the kill
+switch, unchanged from E33, confirmed independent of `PAYMENT_PROVIDER`. Rollback procedure:
+unset it (or set to anything other than `"true"`) and redeploy / let the config change
+propagate — both `executeMerchantPayoutProviderAttempt`/`executeAffiliatePayoutProviderAttempt`
+check it first, before any DB mutation, so this alone stops all future provider submissions
+without a code rollback. In-flight attempts already `pending`/`processing` at the moment the
+switch is flipped are NOT auto-cancelled (Peach itself states payouts cannot be recalled once
+submitted) — they continue to resolve via webhook/query reconciliation as normal; the switch
+only prevents *new* submissions.
+
+### Environment-consistency guard (phase brief §51/§52, new this phase)
+
+`assertPeachEnvironmentConsistency()` (`src/lib/payments/payout-execution/gate.ts`) rejects,
+before any DB mutation: a real production app deployment pointed at Peach sandbox (unless
+`PEACH_SANDBOX_CERTIFICATION_MODE="true"` is explicitly set, for a deliberate controlled
+sandbox run from production), and any non-production app deployment pointed at Peach
+production (no exception). Peach hosts themselves remain enum-derived from `PEACH_ENVIRONMENT`
+(`'sandbox'|'production'`) only — never a raw base-URL env var — so there is no way to point
+at an arbitrary/custom host at all, satisfying §52 directly.

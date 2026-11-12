@@ -316,5 +316,73 @@
       "listItem": "Faka into ohlwini",
       "howItWorks": "Indlela okusebenza ngayo"
     }
+  },
+  "payoutDestination": {
+    "heading": "I-Akhawunti Yokukhokha",
+    "description": "Phatha i-akhawunti yebhange eyikhokhelwa imali yakho yenzuzo yi-Unity.",
+    "loading": "Iyalayisha…",
+    "errors": {
+      "couldNotLoad": "Ayikwazanga ukulayisha imininingwane ye-akhawunti yakho yokukhokha.",
+      "couldNotSave": "Ayikwazanga ukulondoloza imininingwane yebhange yakho.",
+      "couldNotVerify": "Ayikwazanga ukuqala ukuqinisekisa.",
+      "couldNotCheckStatus": "Ayikwazanga ukuhlola isimo sokuqinisekisa.",
+      "couldNotDisable": "Ayikwazanga ukuvala le akhawunti yokukhokha.",
+      "fillAllFields": "Sicela ukhethe ibhange bese ugcwalisa zonke izinkambu."
+    },
+    "messages": {
+      "added": "Imininingwane yebhange ilondolozwe. Qala ukuqinisekisa ukuze uvule ukukhokha.",
+      "verificationStarted": "Ukuqinisekisa kuqalisiwe.",
+      "statusChecked": "Isimo sokuqinisekisa sibuyekezwe.",
+      "disabled": "I-akhawunti yokukhokha ivaliwe."
+    },
+    "kycBlock": {
+      "title": "Kudingeka ukuqinisekiswa kobunikazi",
+      "message": "Qedela ukuqinisekiswa kobunikazi ngaphambi kokuqinisekisa i-akhawunti yokukhokha.",
+      "cta": "Qinisekisa ubunikazi"
+    },
+    "noDestination": {
+      "title": "Akukho akhawunti yokukhokha okwamanje",
+      "message": "Engeza imininingwane yakho yebhange ukuthola ukukhokha."
+    },
+    "addButton": "Engeza imininingwane yebhange",
+    "formHeading": "Imininingwane yebhange",
+    "bankLabel": "Ibhange",
+    "bankPlaceholder": "Khetha ibhange lakho",
+    "accountNumberLabel": "Inombolo ye-akhawunti",
+    "accountTypeLabel": "Uhlobo lwe-akhawunti",
+    "accountTypePlaceholder": "Khetha uhlobo lwe-akhawunti",
+    "banvUnsupportedNotice": "Ukuqinisekisa okuzenzakalelayo akutholakali kuleli bhange. Ukuvulwa kokukhokha kudinga ukubuyekezwa ngesandla.",
+    "accountHolderNotice": "I-akhawunti yokukhokha kufanele ibanjwe:",
+    "saveButton": "Londoloza",
+    "saving": "Iyalondoloza…",
+    "cancelButton": "Khansela",
+    "replaceButton": "Shintsha i-akhawunti",
+    "replaceWarning": {
+      "title": "Ushintsha imininingwane yakho yebhange",
+      "message": "I-akhawunti yakho yamanje yokukhokha izoyeka ngokushesha ukufaneleka ukukhokha okusha. Okushintshiwe kudinga ukuqinisekiswa ngaphambi kokuqhubeka kokukhokha.",
+      "confirm": "Qhubeka"
+    },
+    "disableButton": "Vala",
+    "disableWarning": {
+      "title": "Vala le akhawunti yokukhokha?",
+      "message": "Ngeke usafaneleka ukukhokha kuze kube uyengeza futhi uqinisekise i-akhawunti entsha.",
+      "confirm": "Vala"
+    },
+    "disabling": "Iyavala…",
+    "startVerificationButton": "Qala ukuqinisekisa",
+    "verifying": "Iqala ukuqinisekisa…",
+    "checkStatusButton": "Hlola isimo sokuqinisekisa",
+    "checkingStatus": "Iyahlola…",
+    "verifiedOnNotice": "Kuqinisekisiwe {date}",
+    "expiringSoonNotice": "Ukuqinisekisa kuzophelelwa isikhathi maduzane — kungase kudingeke ukuqinisekiswa kabusha.",
+    "failedNotice": "Ukuqinisekisa akuphumelele. Ungaphinda uzame noma uxhumane nosekelo.",
+    "status": {
+      "unverified": "Akuqinisekisiwe",
+      "pending": "Ukuqinisekisa kulindile",
+      "processing": "Ukuqinisekisa kuqhubeka",
+      "verified": "Kuqinisekisiwe",
+      "failed": "Ukuqinisekisa kwahluleka",
+      "stale": "Kudingeka ukuqinisekiswa kabusha"
+    }
   }
 }

@@ -73,7 +73,9 @@
       "affiliatesDesc": "Verwysingskommissies",
       "subscription": "Intekening",
       "tools": "Handelaargereedskap",
-      "toolsDesc": "Vraag-insigte, KI-assistent, CSV, groepprysing en meer"
+      "toolsDesc": "Vraag-insigte, KI-assistent, CSV, groepprysing en meer",
+      "payoutAccount": "Uitbetalingsrekening",
+      "payoutAccountDesc": "Bankbesonderhede vir uitbetalings"
     },
     "planStarter": "Beginner · Tot 5 lysings",
     "planUnlimited": "{plan} · Onbeperkte lysings",
@@ -107,7 +109,11 @@
       "failed": "Hierdie uitbetaling kon nie voltooi word nie. Unity sal dit hersien of weer probeer."
     },
     "footerNotice": "Uitbetalings word handmatig deur Unity aangeteken terwyl geen outomatiese uitbetalingsverskaffer gekoppel is nie.",
-    "contactSupport": "Kontak ondersteuning"
+    "contactSupport": "Kontak ondersteuning",
+    "payoutAccountLink": {
+      "title": "Uitbetalingsrekening",
+      "description": "Bekyk of bestuur die bankrekening waarheen uitbetalings gestuur word"
+    }
   },
   "affiliateProgram": {
     "sectionLabel": "Verwysingsprogram",
@@ -160,6 +166,10 @@
       "failed": "Uitbetaling het misluk",
       "voided": "Nietig verklaar",
       "reversed": "Omgekeer"
+    },
+    "payoutAccountLink": {
+      "title": "Uitbetalingsrekening",
+      "description": "Bekyk of bestuur die bankrekening waarin kommissies betaal word"
     }
   },
   "affiliateManagement": {

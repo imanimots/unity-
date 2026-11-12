@@ -2,7 +2,8 @@ import type { OrchestratorContext } from './types'
 import { OrchestrationError } from './errors'
 import { getActivePaymentProvider, assertProviderSupportsCapability, ProviderNotPermittedError } from '../registry'
 import { ProviderCapabilityUnsupportedError } from '../provider'
-import { isPayoutExecutionEnabled } from '../payout-execution/gate'
+import { isPayoutExecutionEnabled, assertPeachEnvironmentConsistency } from '../payout-execution/gate'
+import { loadPeachPayoutsConfig } from '../providers/peach/payouts-config'
 import { resolvePayoutDestinationDetails, buildReferenceForAttempt, classifyProviderCallError } from './payout-provider-attempt-shared'
 
 export interface ExecuteMerchantPayoutProviderAttemptResult {
@@ -52,6 +53,19 @@ export async function executeMerchantPayoutProviderAttempt(ctx: OrchestratorCont
       throw new OrchestrationError('provider_configuration_error', err.message)
     }
     throw err
+  }
+
+  // E34: app-environment vs Peach-environment consistency, before any
+  // DB mutation (phase brief §51/§52) -- Peach-specific, since 'mock'
+  // has no environment/host concept at all.
+  if (provider.name === 'peach') {
+    const peachConfig = loadPeachPayoutsConfig()
+    if (!peachConfig) throw new OrchestrationError('provider_configuration_error', 'Peach Payouts is not configured')
+    try {
+      assertPeachEnvironmentConsistency(peachConfig.environment)
+    } catch (err) {
+      throw new OrchestrationError('provider_configuration_error', err instanceof Error ? err.message : String(err))
+    }
   }
 
   const { data: startData, error: startError } = await admin.rpc('start_merchant_payout_provider_attempt', {

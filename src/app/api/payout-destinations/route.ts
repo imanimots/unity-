@@ -33,7 +33,9 @@ export async function GET() {
 
   const { data: destinations, error } = await admin
     .from('payout_destinations')
-    .select('id, version, bank_code, universal_branch_code, account_type, account_last4, verification_status, verified_at, verification_expires_at, disabled_at, created_at')
+    .select(
+      'id, version, is_current, bank_code, universal_branch_code, account_type, account_last4, verification_status, verified_at, verification_expires_at, disabled_at, created_at, payout_banks(display_name, banv_supported)'
+    )
     .eq('owner_id', requester.userId)
     .order('created_at', { ascending: false })
   if (error) {
