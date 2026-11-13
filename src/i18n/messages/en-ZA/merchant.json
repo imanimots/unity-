@@ -73,7 +73,9 @@
       "affiliatesDesc": "Referral commissions",
       "subscription": "Subscription",
       "tools": "Merchant Tools",
-      "toolsDesc": "Demand insights, AI assistant, CSV, bulk pricing & more"
+      "toolsDesc": "Demand insights, AI assistant, CSV, bulk pricing & more",
+      "payoutAccount": "Payout Account",
+      "payoutAccountDesc": "Bank details for payouts"
     },
     "planStarter": "Starter · Up to 5 listings",
     "planUnlimited": "{plan} · Unlimited listings",
@@ -107,7 +109,11 @@
       "failed": "This payout could not be completed. Unity will review or retry it."
     },
     "footerNotice": "Payouts are recorded manually by Unity while no automated payout provider is connected.",
-    "contactSupport": "Contact support"
+    "contactSupport": "Contact support",
+    "payoutAccountLink": {
+      "title": "Payout Account",
+      "description": "View or manage the bank account payouts are sent to"
+    }
   },
   "affiliateProgram": {
     "sectionLabel": "Referral Program",
@@ -160,6 +166,10 @@
       "failed": "Payout failed",
       "voided": "Voided",
       "reversed": "Reversed"
+    },
+    "payoutAccountLink": {
+      "title": "Payout Account",
+      "description": "View or manage the bank account commissions are paid to"
     }
   },
   "affiliateManagement": {

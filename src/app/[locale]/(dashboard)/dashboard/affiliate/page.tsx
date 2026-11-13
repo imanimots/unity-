@@ -231,6 +231,17 @@ export default function AffiliateDashboardPage() {
         </div>
       </div>
 
+      <Link
+        href="/dashboard/payout-settings"
+        className="flex items-center justify-between gap-3 p-4 mb-12 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] hover:border-[#8B1A1A] transition-colors"
+      >
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">{t('payoutAccountLink.title')}</p>
+          <p className="text-xs text-[#9B8B85] mt-0.5">{t('payoutAccountLink.description')}</p>
+        </div>
+        <ArrowLeft size={14} className="rotate-180 text-[#9B8B85] shrink-0" />
+      </Link>
+
       <div className="mb-12">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-4">{t('enabledListings')}</p>
         {loading ? (

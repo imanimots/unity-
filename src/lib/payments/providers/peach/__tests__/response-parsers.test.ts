@@ -59,15 +59,12 @@ describe('parseDepositResponse', () => {
 })
 
 describe('parsePayoutResponse', () => {
-  it('maps successful to paid', () => {
-    expect(parsePayoutResponse({ payoutId: 'po_1', status: 'successful' })).toEqual({ providerReference: 'po_1', status: 'paid' })
-  })
-
-  it.each(['pending', 'processing'] as const)('maps %s to pending', (status) => {
-    expect(parsePayoutResponse({ payoutId: 'po_1', status })).toEqual({ providerReference: 'po_1', status: 'pending' })
-  })
-
-  it.each(['failed', 'cancelled', 'reversed'] as const)('maps %s to failed', (status) => {
-    expect(parsePayoutResponse({ payoutId: 'po_1', status })).toEqual({ providerReference: 'po_1', status: 'failed' })
+  // E33: MerchantPayoutResult.status was widened to the exact same
+  // 6-value PayoutState union this function already received as input
+  // (see provider.ts) -- this is now a direct pass-through, a strict
+  // improvement over the previous lossy 3-state collapse (which this
+  // test used to assert).
+  it.each(['pending', 'processing', 'successful', 'failed', 'cancelled', 'reversed'] as const)('passes %s through unchanged, echoing payoutId as providerPayoutId', (status) => {
+    expect(parsePayoutResponse({ payoutId: 'po_1', status })).toEqual({ providerPayoutId: 'po_1', status })
   })
 })

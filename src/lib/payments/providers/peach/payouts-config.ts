@@ -17,14 +17,28 @@ import { PeachConfigurationError } from './config'
  * shape (an OAuth client-credentials triple is structurally one unit,
  * not four independent optional blocks like the classic peach/
  * config.ts).
+ *
+ * E33 CORRECTION: re-verifying current official docs this phase
+ * (developer.peachpayments.com/docs/payment-links-authentication,
+ * fetched live) found the OAuth token endpoint lives on a SEPARATE
+ * host from the Payouts API itself -- dashboard.peachpayments.com /
+ * sandbox-dashboard.peachpayments.com, not payouts.peachpayments.com.
+ * E32's client posted the token request to the Payouts host, which
+ * would have failed against the real API -- `authBaseUrl` is the fix,
+ * confirmed from the same live fetch alongside the already-correct
+ * request/response field names (clientId/clientSecret/merchantId ->
+ * access_token/expires_in/token_type).
  */
 
 const SANDBOX_BASE_URL = 'https://sandbox-payouts.peachpayments.com/api'
 const PRODUCTION_BASE_URL = 'https://payouts.peachpayments.com/api'
+const SANDBOX_AUTH_BASE_URL = 'https://sandbox-dashboard.peachpayments.com'
+const PRODUCTION_AUTH_BASE_URL = 'https://dashboard.peachpayments.com'
 
 export interface PeachPayoutsConfig {
   environment: 'sandbox' | 'production'
   baseUrl: string
+  authBaseUrl: string
   clientId: string
   clientSecret: string
   merchantId: string
@@ -65,6 +79,7 @@ export function loadPeachPayoutsConfig(env: NodeJS.ProcessEnv = process.env): Pe
   return {
     environment,
     baseUrl: environment === 'sandbox' ? SANDBOX_BASE_URL : PRODUCTION_BASE_URL,
+    authBaseUrl: environment === 'sandbox' ? SANDBOX_AUTH_BASE_URL : PRODUCTION_AUTH_BASE_URL,
     clientId,
     clientSecret,
     merchantId,

@@ -4,6 +4,7 @@ import { PeachPaymentsProvider } from '../providers/peach-provider'
 import { NotImplementedError } from '../provider'
 import { getPaymentProvider, listRegisteredProviders } from '../registry'
 import { OrchestrationConfigurationError } from '../providers/orchestration/config'
+import { PeachConfigurationError } from '../providers/peach/config'
 
 describe('MockProvider', () => {
   const provider = new MockProvider()
@@ -37,10 +38,22 @@ describe('MockProvider', () => {
     expect(refund.status).toBe('completed')
   })
 
-  it('createMerchantPayout returns a pending mock reference', async () => {
-    const payout = await provider.createMerchantPayout({ merchantId: 'm1', amount: 950, currency: 'ZAR' })
-    expect(payout.status).toBe('pending')
-    expect(payout.providerReference).toMatch(/^mock_payout_/)
+  it('createMerchantPayout returns a successful mock result, echoing the input payoutId', async () => {
+    const payout = await provider.createMerchantPayout({
+      merchantId: 'm1',
+      payoutId: 'payout-uuid-1',
+      reference: 'UNITY ABCD1234',
+      amount: 950,
+      amountMinorUnits: 95000,
+      currency: 'ZAR',
+      bankName: 'FNB',
+      branchCode: '250655',
+      accountNumber: '1234567890',
+      accountHolder: 'Jane Smith',
+    })
+    expect(payout.status).toBe('successful')
+    expect(payout.providerPayoutId).toBe('payout-uuid-1')
+    expect(payout.providerRequestId).toMatch(/^mock_request_/)
   })
 
   it('healthCheck reports healthy', async () => {
@@ -107,7 +120,6 @@ describe('PeachPaymentsProvider (stub)', () => {
     await expect(provider.captureDeposit({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })).rejects.toThrow(NotImplementedError)
     await expect(provider.releaseDeposit({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })).rejects.toThrow(NotImplementedError)
     await expect(provider.refund({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })).rejects.toThrow(NotImplementedError)
-    await expect(provider.createMerchantPayout({ merchantId: 'm1', amount: 500, currency: 'ZAR' })).rejects.toThrow(NotImplementedError)
   })
 
   it('authorizeDeposit/chargeRental are wired to Orchestration (P5C.1) -- with no config, they fail closed with OrchestrationConfigurationError, not NotImplementedError, and make no network call', async () => {
@@ -115,13 +127,35 @@ describe('PeachPaymentsProvider (stub)', () => {
     await expect(provider.chargeRental({ paymentId: 'p1', providerReference: '', amount: 500, currency: 'ZAR' })).rejects.toThrow(OrchestrationConfigurationError)
   })
 
-  it('E30: supportsCapability matches the class\'s own method bodies exactly -- supported for the 4 Orchestration-backed methods and webhook verification, unsupported for the 3 remaining NotImplementedError stubs', () => {
-    for (const capability of ['charge_rental', 'authorize_deposit', 'capture_deposit', 'release_deposit', 'webhook_verification'] as const) {
+  it('E33: createMerchantPayout/createAffiliatePayout are wired to Peach Payouts -- with no config, they fail closed with PeachConfigurationError, not NotImplementedError, and make no network call', async () => {
+    const payoutInput = {
+      payoutId: 'payout-uuid-1',
+      reference: 'UNITY ABCD1234',
+      amount: 500,
+      amountMinorUnits: 50000,
+      currency: 'ZAR',
+      bankName: 'FNB',
+      branchCode: '250655',
+      accountNumber: '1234567890',
+      accountHolder: 'Jane Smith',
+    }
+    await expect(provider.createMerchantPayout({ merchantId: 'm1', ...payoutInput })).rejects.toThrow(PeachConfigurationError)
+    await expect(provider.createAffiliatePayout({ affiliateId: 'a1', commissionId: 'c1', ...payoutInput })).rejects.toThrow(PeachConfigurationError)
+  })
+
+  it("E30/E33: supportsCapability matches the class's own method bodies exactly -- supported for the 4 Orchestration-backed methods, the 2 Peach-Payouts-backed payout methods, and webhook verification; unsupported only for refund (still a stub, E31)", () => {
+    for (const capability of [
+      'charge_rental',
+      'authorize_deposit',
+      'capture_deposit',
+      'release_deposit',
+      'merchant_payout',
+      'affiliate_payout',
+      'webhook_verification',
+    ] as const) {
       expect(provider.supportsCapability(capability)).toBe(true)
     }
-    for (const capability of ['refund', 'merchant_payout', 'affiliate_payout'] as const) {
-      expect(provider.supportsCapability(capability)).toBe(false)
-    }
+    expect(provider.supportsCapability('refund')).toBe(false)
   })
 
   // verifyWebhook() and healthCheck() are real, not stubbed -- neither moves

@@ -69,7 +69,7 @@ describe('POST /api/payments/webhooks/peach-banv', () => {
     resetEnv()
     vi.mocked(loadPeachPayoutsConfig).mockReturnValue({
       environment: 'sandbox',
-      baseUrl: 'https://sandbox-payouts.peachpayments.com/api',
+      baseUrl: 'https://sandbox-payouts.peachpayments.com/api',      authBaseUrl: 'https://sandbox-dashboard.peachpayments.com',
       clientId: 'id',
       clientSecret: 'secret',
       merchantId: 'merchant-1',

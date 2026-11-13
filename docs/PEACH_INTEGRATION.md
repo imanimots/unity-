@@ -717,3 +717,510 @@ unchanged, under a new `provider` value `'peach_banv'` — no new webhook ledger
 authoritative check a future payout-execution phase must call is
 `_payout_destination_eligibility(owner_id)` — eligible only for exactly one current,
 enabled, verified, non-stale destination.
+
+**STALE, superseded by E33 (see §19):** real Peach payout execution now exists for both
+merchant and affiliate payouts — `createMerchantPayout()`/`createAffiliatePayout()` are
+implemented, not stubs, and `supportsCapability('merchant_payout'|'affiliate_payout')` is
+`true`. Production remains disabled via a separate, independently-gated
+`PEACH_PAYOUTS_EXECUTION_ENABLED` control (default false) — the capability flag means "a
+real implementation exists," never "production execution is enabled."
+
+## 19. E33 update — Peach payout execution, async reconciliation & destination snapshot binding
+
+Closes steps 7+ of §17's migration plan (payout execution itself), consuming the E32
+destination authority rather than inventing recipient banking data during this phase.
+Production stays fail-closed: `PAYMENT_PROVIDER` remains absent, and the new
+`PEACH_PAYOUTS_EXECUTION_ENABLED` gate independently defaults `false` — `PAYMENT_PROVIDER=
+peach` alone was deliberately never allowed to auto-enable payouts, since Peach already
+serves charges/deposits under that same env var and payout activation may need separate
+operational sign-off (funded float, source-of-funds compliance, Dashboard webhook
+configuration — see E34, planned next).
+
+**Two critical corrections found by re-verifying current official docs this phase** (never
+assumed correct from E32's own research):
+1. **Auth host.** The OAuth token endpoint lives on `dashboard.peachpayments.com` /
+   `sandbox-dashboard.peachpayments.com` — a genuinely different host from the Payouts API
+   itself (`payouts.peachpayments.com`). E32's client posted the token request to the
+   Payouts host, which would have failed against the real API. Fixed in
+   `providers/peach/banv-client.ts`/`payouts-config.ts` (new `authBaseUrl` field).
+2. **bankName enum mismatch.** Peach's real-time-EFT `bankName` field only accepts 25
+   literal values (confirmed via the live `createpayoutrequest` reference), which do **not**
+   match E32's `payout_banks.display_name` strings, and exclude 3 banks E32 had marked
+   `payout_supported = true` (Mukuru, Mercantile Bank, Rand Merchant Bank) — those banks were
+   sourced from a different, less authoritative docs page. Fixed additively: a new nullable
+   `payout_banks.peach_payout_bank_name` column, populated only for the 22 confirmed
+   matches; the submission path requires it non-null, layered on top of (not replacing)
+   `payout_supported`.
+
+**Create-payout contract (confirmed live):** `POST /merchants/{merchantId}/payouts`, one
+payout per request (no batching) — `payoutId` (a genuine v4 UUID, generated and persisted
+server-side *before* any HTTP call), `reference` (≤20 chars, alnum+space, built
+deterministically from the attempt id, never PII), `currency: "ZAR"`, `amount` (integer
+minor units, exact decimal→cents conversion, no floating-point multiplication), `bankName`,
+`branchCode`, `accountNumber`, `accountHolder` (2-50 chars, strict pattern, built fresh from
+the destination owner's currently-approved `identity_verifications.legal_first_name`/
+`legal_surname` — re-checked at execution time, never trusted stale from BANV-submission
+time), `payoutMethod: "realtime-eft"`. The create response already carries a real status
+(the same 6-value enum the webhook uses) — never treated as mere acknowledgement.
+
+**Lost-create-response handling (confirmed live, introduced 2026-10-01 specifically for
+this case):** `GET /merchants/{merchantId}/payouts/status?payoutId={payoutId}` — "a 404
+means it is not visible yet; wait and call this again; send create again only if this call
+stays 404." A thrown `ProviderTimeoutError`/`RetryableProviderError`/unrecognized error from
+the create call is classified **ambiguous**, never automatically resolved: the attempt and
+the domain row are left in `processing`, relying on this query (by the identical
+`provider_payout_id`, never a new one) for reconciliation. Only an authoritative
+`TerminalProviderError` (a genuine 4xx rejection, proof the payout was never accepted) is
+safe to mark `failed` immediately.
+
+**Provider-attempt model:** one new table, `payout_provider_attempts`, with a domain-FK
+`CHECK` (exactly one of `merchant_payout_id`/`affiliate_commission_id`) rather than a
+polymorphic pair, and a real partial unique index enforcing at most one nonterminal attempt
+per domain row — the same idiom `payout_destinations_one_current_per_owner_idx` already
+established. Each attempt immutably binds the exact `payout_destinations.id` snapshot used
+at creation time; a later bank-detail change can never redirect an in-flight payout, and a
+retry after confirmed failure re-runs E32 eligibility fresh (so a corrected destination can
+be used) rather than reusing the old binding.
+
+**State application:** one shared RPC per domain
+(`complete_merchant_payout_provider_attempt` / `complete_affiliate_payout_provider_attempt`)
+is called identically from three places — the create-response handler, the payout webhook,
+and query reconciliation — so there is exactly one authority for what a Peach status means.
+Idempotent on a duplicate terminal result; monotonic on `provider_last_updated_at` (an older
+update can never regress a newer one). `payout_status` gained a `reversed` value (merchant
+side; `affiliate_commission_status` already had one, Phase 7) — a provider reversal after
+`successful` moves the domain row to `reversed` without rewriting its prior `paid` history.
+
+**Manual-flow conflict guard:** `mark_payout_paid`/`mark_payout_failed`/`retry_payout` each
+gained one additional check — refuse outright while a live (pending/processing) provider
+attempt exists for the payout — so manual admin action can never race live provider
+authority. The one deliberate exception to "don't touch unrelated historical functions":
+this phase's own brief explicitly required it.
+
+**Webhook & security:** a new dedicated signed route
+(`/api/payments/webhooks/peach-payouts`) reuses the same Svix/Standard Webhooks helper E32
+built for BANV, and the same provider-neutral `payment_webhook_events` lease RPCs
+(`record_webhook_event`/`claim_webhook_event_processing`/`mark_webhook_event_processed`/
+`mark_webhook_event_error`) unchanged, under provider value `'peach_payouts'`. Every new
+SQL function continues the E32-R1 lesson — `search_path = ''`, `REVOKE ALL FROM public,
+anon, authenticated`, `GRANT EXECUTE TO service_role`, no `auth.role()` caller guard. The
+new attempt table has RLS enabled with an explicit deny-all policy plus explicit client
+revokes (no owner-read policy at all — this is operational financial-execution authority,
+server/admin-only).
+
+**Scope boundary:** no production activation. `PAYMENT_PROVIDER` stays absent,
+`PEACH_PAYOUTS_EXECUTION_ENABLED` defaults false, no credentials were added anywhere, and no
+historical `merchant_payouts`/`affiliate_commissions` row was touched or auto-submitted to
+Peach. `refund` capability remains `false` (E31 still binding). Planned next: E34 (payout
+destination UX, Peach sandbox certification, and controlled production activation).
+
+## 20. E34 update — payout destination UX, sandbox certification & activation readiness
+
+**Sandbox credentials confirmed absent** (`.env.local` has no `PEACH_*` variables at all,
+confirmed by presence-only check this phase) — per this phase's own instruction, this blocks
+sandbox *certification* only; it does not block UX or readiness-control work, all of which is
+complete.
+
+### Peach docs re-verified live, 2026-11-12
+
+- **Hosts** (`developer.peachpayments.com/docs/payouts-dashboard`, `/docs/payment-links-authentication`): confirmed unchanged from E33 — sandbox auth
+  `sandbox-dashboard.peachpayments.com`, sandbox payouts `sandbox-payouts.peachpayments.com`,
+  live auth `dashboard.peachpayments.com`, live payouts `payouts.peachpayments.com`. Unity's
+  own client (`payouts-config.ts`) already only ever resolves one of these two enum-derived
+  pairs — never a raw `PEACH_PAYOUTS_BASE_URL` env var — satisfying §52's own stated
+  preference without any change needed.
+- **Payouts product activation** (`/docs/peach-payouts`): Dashboard-only, four manual steps
+  ("Log in... click Payouts... click Activate Payouts... agree to terms and click
+  Activate"). No API. Cannot be verified by code — reported `unknown` unless a new
+  `PEACH_PAYOUTS_PRODUCT_ACTIVE` attestation env var is explicitly set.
+- **Source of funds**: "Before executing any payouts, you should send Peach Payments a
+  source of funds document for compliance reasons" — an operational, human prerequisite,
+  same treatment as above (`PEACH_SOURCE_OF_FUNDS_APPROVED`).
+- **Webhook configuration** (`/docs/reference-webhooks`): Dashboard-only ("click **Add
+  webhook URL**"), no API. **Payout-status and BANV webhooks are separate dashboard
+  sections/URLs**, not one shared setting — confirmed directly, correcting any assumption
+  that one URL covers both. Cannot be verified by code; reported `unknown`.
+- **Available balance**: "The top of the Payouts page shows your available payout balance" —
+  Dashboard display only; no balance-query API was found in the current public docs, so E34
+  does not implement a balance check (phase brief §41 permits this only "if E33/E34 can query
+  balance safely" — it cannot, confirmed).
+- **Known limitations** (`/docs/peach-payouts`, quoted): RTC processing limits (R5,000,000
+  business-day daytime, R250,000 overnight/weekends/holidays); cannot pay Capitec Live
+  Better accounts or GoTyme SME accounts starting "53"; BANV 03:00–23:00 only; float balance
+  is held per-country, not fungible across countries; sandbox testing may fail outside South
+  African office hours.
+- **Sandbox test data** (`/docs/reference-test-and-go-live`, confirmed live, public — not the
+  login-walled support article): real documented test accounts exist, recorded here for a
+  future phase with credentials to actually exercise:
+  - Payout (any amount within float balance, `realtime-eft`): Absa `4047594620`/`632005`;
+    Nedbank `1012546144`/`198765`; Discovery Bank (multiple accounts)/`679000`.
+  - BANV: Absa `4047594620` → "all match"; Discovery Bank `10503060072` → "partial match";
+    GoTyme Bank `51000347387` → "no match".
+  - Mobile money: amount a multiple of 100 from 20000 up to sandbox float balance; result
+    code `2000.000.000` on success.
+
+### Sandbox certification report (phase brief §67)
+
+```text
+PEACH SANDBOX CERTIFICATION
+
+ENVIRONMENT: sandbox
+AUTH: NOT TESTABLE — no credentials available
+BANV FULL MATCH: NOT TESTABLE
+BANV PARTIAL MATCH: NOT TESTABLE
+BANV NO MATCH: NOT TESTABLE
+BANV WEBHOOK: NOT TESTABLE
+BANV QUERY RECONCILIATION: NOT TESTABLE
+PAYOUT CREATE: NOT TESTABLE
+PAYOUT STATUS: NOT TESTABLE
+PAYOUT WEBHOOK: NOT TESTABLE
+QUERY BY PAYOUT ID: NOT TESTABLE
+DUPLICATE WEBHOOK: NOT TESTABLE
+LOST RESPONSE SAFETY: NOT TESTABLE
+REAL MONEY MOVED: NO
+
+BLOCKED — SANDBOX CREDENTIALS NOT AVAILABLE
+```
+
+No PASS is claimed for anything not actually exercised, per the phase brief's own explicit
+instruction. The real, documented test account data above is recorded so a future phase with
+credentials does not need to re-research it.
+
+### Webhook config audit / live readiness (phase brief §37/§38)
+
+```text
+SANDBOX PAYOUT WEBHOOK: UNKNOWN — no Dashboard access this phase
+SANDBOX BANV WEBHOOK: UNKNOWN — no Dashboard access this phase
+LIVE PAYOUT WEBHOOK: NOT CHANGED — no credentials, no Dashboard access; endpoint ready: /api/payments/webhooks/peach-payouts
+LIVE BANV WEBHOOK: NOT CHANGED — no credentials, no Dashboard access; endpoint ready: /api/payments/webhooks/peach-banv
+```
+
+### Production readiness matrix (phase brief §69)
+
+```text
+PEACH PAYOUT PRODUCTION READINESS
+
+CODE:
+  provider client:         ready
+  async states:             ready (6-state ProviderPayoutStatus, E33)
+  signed webhook:           ready (Svix/Standard Webhooks, E32/E33)
+  query reconciliation:     ready (E33, reused by E34's "check status" UX)
+  duplicate protection:     ready (payment_webhook_events lease RPCs, unchanged)
+  destination binding:      ready (immutable snapshot, E32/E33)
+  lost-response handling:   ready (ambiguous-outcome classification, E33)
+  kill switch:              ready (PEACH_PAYOUTS_EXECUTION_ENABLED, E33; see below)
+  env-consistency guard:    ready (NEW, E34 -- app env vs Peach env cross-check)
+
+UX:
+  merchant bank settings:   ready (/dashboard/payout-settings, linked from merchant dashboard + payouts page)
+  affiliate bank settings:  ready (same shared page, linked from affiliate dashboard)
+  BANV:                     ready (start/check-status actions, KYC-gated)
+  replacement:               ready (explicit confirmation + warning copy)
+  masked display:            ready (bank + last4 + status only, never raw account number)
+
+SANDBOX:
+  credentials:               absent
+  BANV certified:            blocked
+  payout certified:          blocked
+  webhook certified:         blocked
+
+PEACH ACCOUNT:
+  Payouts activated:         unknown
+  source-of-funds approved:  unknown
+  live credentials:          absent
+  live webhook configured:   unknown
+  signing secret:            absent
+
+UNITY PRODUCTION:
+  PAYMENT_PROVIDER:          absent
+  payout execution gate:     absent (defaults false)
+
+REAL-MONEY CANARY APPROVED: NO
+
+PRODUCTION READY: NO
+```
+
+Code-ready and UX-ready are both `YES`; production-ready is correctly `NO` (phase brief §70 —
+this is a valid, expected outcome, not a failure to resolve).
+
+### Kill switch (phase brief §50)
+
+`PEACH_PAYOUTS_EXECUTION_ENABLED` (env var, exact string `"true"` required) is the kill
+switch, unchanged from E33, confirmed independent of `PAYMENT_PROVIDER`. Rollback procedure:
+unset it (or set to anything other than `"true"`) and redeploy / let the config change
+propagate — both `executeMerchantPayoutProviderAttempt`/`executeAffiliatePayoutProviderAttempt`
+check it first, before any DB mutation, so this alone stops all future provider submissions
+without a code rollback. In-flight attempts already `pending`/`processing` at the moment the
+switch is flipped are NOT auto-cancelled (Peach itself states payouts cannot be recalled once
+submitted) — they continue to resolve via webhook/query reconciliation as normal; the switch
+only prevents *new* submissions.
+
+### Environment-consistency guard (phase brief §51/§52, new this phase)
+
+`assertPeachEnvironmentConsistency()` (`src/lib/payments/payout-execution/gate.ts`) rejects,
+before any DB mutation: a real production app deployment pointed at Peach sandbox (unless
+`PEACH_SANDBOX_CERTIFICATION_MODE="true"` is explicitly set, for a deliberate controlled
+sandbox run from production), and any non-production app deployment pointed at Peach
+production (no exception). Peach hosts themselves remain enum-derived from `PEACH_ENVIRONMENT`
+(`'sandbox'|'production'`) only — never a raw base-URL env var — so there is no way to point
+at an arbitrary/custom host at all, satisfying §52 directly.
+
+## 21. E35 update — production payout activation audit, rollback & canary procedure
+
+**Fresh verification, 2026-11-12:** sandbox credentials remain completely absent from this
+environment (presence-only check of `.env.local` and `.env` — zero `PEACH_*` variables of
+any kind). Production environment likewise has zero Peach presence: `PAYMENT_PROVIDER`,
+every `PEACH_PAYOUTS_*` credential, every `PEACH_ORCHESTRATION_*` variable, and
+`PEACH_PAYOUTS_EXECUTION_ENABLED` are all absent. Remote `main` is still at the E32-R1 commit
+— E33/E34 are not published. This phase's own instruction (§10/§11) is explicit: do not
+bypass E34's sandbox blocker, and stop before production activation while it stands. Nothing
+this phase found changes that conclusion.
+
+**Peach docs re-confirmed live this phase** (`/docs/peach-payouts`): sandbox and live remain
+distinct hosts; Payouts maintains a separately-funded, per-country float balance ("Funds
+that you deposit for one country are not available for payouts in another country");
+sandbox is confirmed a test environment only ("may fail intermittently outside of South
+African office hours" — a test-environment characteristic, not a live-money one). No change
+from E34's own findings on activation (4 Dashboard-only steps), source-of-funds (required,
+no API), or webhook configuration (Dashboard-only, two separate URLs).
+
+### Security & financial safety tests added this phase
+
+E32/E32-R1/E33/E34 already proved nearly every item on this phase's own required test lists
+(§71/§72) — gate-off blocks the provider call, sandbox-from-production and
+production-from-preview are both rejected, duplicate webhooks are idempotent, no provider
+call happens without an eligible/non-stale destination, timeouts never trigger a second
+payout, non-terminal provider states never mark anything paid, and the affiliate sweep is
+bounded (never unbounded). Three specific gaps this phase's own list named but nothing
+before it had a dedicated test for were closed
+(`src/lib/payments/payout-execution/__tests__/production-safety.test.ts`, 11 tests):
+
+- **Unknown/custom provider host rejection** — proved that no env var of any name can ever
+  change the resolved Payouts/auth host away from the two hardcoded pairs, and that
+  `PEACH_ENVIRONMENT` outside `'sandbox'|'production'` throws rather than silently resolving
+  to an unrecognized value.
+- **Credentials never reach the client** — proved by scanning every `'use client'` file in
+  the new payout-destination UI for any Peach credential name, access-token reference, or
+  Vault/raw-secret RPC name.
+- **No mass/backlog activation path** — proved the merchant provider-execution route only
+  ever operates on one `[id]` at a time (no `.in()`/list-based bulk call), the affiliate
+  cron sweep stays bounded by `AFFILIATE_SWEEP_BATCH_LIMIT`, and no admin UI source contains
+  a "pay all"/"process backlog" action.
+
+### Kill switch — audited, not reinvented (phase brief §27/§31/§33)
+
+Confirmed exactly one execution gate exists: `PEACH_PAYOUTS_EXECUTION_ENABLED`
+(`src/lib/payments/payout-execution/gate.ts`, `isPayoutExecutionEnabled()`), checked first,
+before any DB mutation, in both `executeMerchantPayoutProviderAttempt()` and
+`executeAffiliatePayoutProviderAttempt()`. No second gate was added. Already proven by test
+(`execute-payout-provider-attempt.test.ts` #1/#11, `gate.test.ts` #1/#2) that the gate being
+off/absent/any-value-other-than-the-exact-string-`"true"` prevents the provider method from
+ever being called — this is a config-only control, never a database row, satisfying §33
+("emergency payout stop must not require Git revert, database rollback, schema rollback").
+
+### Rollback / emergency-stop procedure (phase brief §32/§34)
+
+1. Set `PEACH_PAYOUTS_EXECUTION_ENABLED` to anything other than the exact string `"true"`
+   (or remove it) in the Vercel production environment.
+2. Redeploy, or wait for the platform's own config-propagation (Vercel env var changes take
+   effect on the next deployment/cold start — confirm via the platform's own documented
+   propagation behavior before assuming it is instant).
+3. Confirm the execution routes now fail closed: `POST /api/admin/payouts/[id]/execute-provider`
+   and the affiliate cron (`GET/POST /api/internal/affiliate/process-payouts`) both return
+   503 with zero RPC calls made (proved statically by this phase's and E33's own tests; verify
+   the same behavior live against the actual deployed environment before relying on it).
+4. Any provider attempt already `pending`/`processing` at the moment the switch is flipped is
+   left exactly as-is — Peach's own documentation states a submitted payout cannot be
+   recalled, so there is nothing to "cancel" — reconciliation (signed webhook delivery and/or
+   admin-triggered query-by-payoutId, `POST /api/admin/payout-provider-attempts/[id]/reconcile`)
+   continues to resolve it to its authoritative final state.
+5. Do NOT resubmit any attempt whose outcome is uncertain at the time of the stop — the exact
+   same lost-response safety E33 already enforces (same `provider_payout_id`, never a new
+   one, only after the query endpoint's own 404-means-not-visible-yet guidance is satisfied).
+6. Monitor webhook delivery and/or run query reconciliation until every attempt open at stop
+   time reaches a terminal state (`successful`/`failed`/`cancelled`/`reversed`).
+
+### Canary selection criteria (not a selected candidate — phase brief §35-39)
+
+A future canary candidate, if and when sandbox certification completes and explicit approval
+is sought, must satisfy ALL of:
+
+- An existing, legitimate `merchant_payouts` or `affiliate_commissions` row — never a
+  fabricated obligation created merely to exercise Peach.
+- `_merchant_payout_full_eligibility_block` (merchant) or the destination-eligibility +
+  `payout_queued` status (affiliate) currently passes with zero blockers.
+- `_payout_destination_eligibility` reports `eligible: true` for the recipient — current,
+  enabled, verified, and not past the 90-day freshness window.
+- No open dispute, no pending financial disposition, no `account_restricted` state, no
+  active (`pending`/`processing`) provider attempt already on that row.
+- Currency is `ZAR` (the only currency this integration supports).
+- A small, real amount — never invented; whatever the existing obligation's own amount is.
+- The recipient is a real, known identity with currently-approved KYC — never a synthetic or
+  anonymized test subject.
+
+No candidate is selected by this phase. Selecting one is a future, separately-approved step,
+and even then only after sandbox certification is complete (phase brief §10/§11 — this phase
+does not have standing to waive that).
+
+### Production payout readiness matrix (phase brief §68)
+
+```text
+UNITY E35 — PRODUCTION PAYOUT READINESS MATRIX
+
+CODE STACK:
+  E33 present:            YES (local, commit 04c0d12e1ceda8aa9e3646047dc062bb959a5586)
+  E34 present:             YES (local, commit 661218a62cd62b4b4ad79809b4eb16de9e1ec2e9)
+  E35 present:             YES (this commit)
+
+REMOTE:
+  main contains E33:       NO
+  main contains E34:       NO
+  main contains E35:       NO
+
+SUPABASE:
+  migrations current:      unchanged (20261111184936_add_payout_destination_authority is still the latest LIVE migration; E33/E34/E35 migrations, where they exist, are not yet deployed)
+  health:                   not independently re-queried (no live project access in this environment)
+  security baseline:        unchanged (no new migration this phase)
+
+VERCEL:
+  deployment SHA:           faea09ffe9b56e58633a5b2aceaa733ce0e7f284 (E32-R1) -- unchanged
+  READY:                    YES (at that commit; E33/E34/E35 not yet deployed)
+
+SANDBOX:
+  credentials:              ABSENT
+  BANV certified:           BLOCKED
+  payout certified:         BLOCKED
+  webhook certified:        BLOCKED
+  lost-response certified:  BLOCKED
+
+PEACH LIVE:
+  Payouts product active:  UNKNOWN
+  source-of-funds:         UNKNOWN
+  live credentials:        ABSENT
+  webhooks configured:     UNKNOWN
+  signing enabled:         ABSENT (no secret present)
+  available float:         UNKNOWN (no authenticated access)
+
+UNITY:
+  PAYMENT_PROVIDER:                ABSENT
+  payout execution gate:            ABSENT (defaults false)
+  kill switch tested:                YES (statically, via test -- not yet tested against a live deployment, since nothing is deployed)
+  historical auto-sweep disabled:   YES (confirmed: no bulk/backlog code path exists anywhere, proved by test this phase)
+
+CANARY:
+  candidate selected:       NONE
+  explicit approval:        NO
+
+PRODUCTION READY FOR CANARY: NO
+
+BLOCKERS:
+  1. Sandbox credentials absent -- sandbox certification cannot proceed at all (external blocker, unchanged from E34).
+  2. E33/E34/E35 are not published to origin/main -- Supabase/Vercel are still on the E32-R1 commit.
+  3. Live Peach credentials, Payouts product activation, source-of-funds approval, and live webhook configuration are all unknown/absent -- none can be verified or set by code.
+  4. No canary candidate has been selected, and none may be without a completed sandbox certification first.
+```
+
+## 22. Master Launch Phase update — merge review, operational visibility, launch policy
+
+**PR verification (not assumed):** PR #8 ("E33–E35: Peach payout execution, UX, and production-readiness controls")
+was independently confirmed via the public, unauthenticated GitHub REST API (no `gh` CLI is installed in this
+environment and no push credential exists, consistent with every prior phase) — `base: main @
+faea09ffe9b56e58633a5b2aceaa733ce0e7f284`, `head: e35-peach-production-payout-readiness @
+d0368567c5abd4dd928f4826e6eb5e308be86801`, `commits: 3`, `mergeable: true`, `mergeable_state: clean`,
+`draft: true`, `merged: false`. Its 56-file changed-file list was fetched and cross-checked file-by-file against
+this project's own local commit history for E33/E34/E35 — an exact match, confirming the remote branch is byte-
+for-byte what was intended, not just trusted from local git state.
+
+**Merge action: explicitly denied by this environment's own permission policy** ("Merge Without Review"), not
+by a missing credential. This is treated as a deliberate, correct safety boundary — the same category of
+human-review gate this project's own standing instructions require for hard-to-reverse, shared-state actions —
+and was not worked around. PR #8 remains open and in draft; converting it out of draft and merging it is a
+decision for a human reviewer, not this phase.
+
+**Financial invariants (phase brief §9) — all 11 re-verified directly against the committed source this phase**
+(not re-derived from memory): the partial unique indexes preventing two simultaneous active attempts per domain
+row; the ambiguous-provider-error path that never calls the completion RPC (so a timeout can never produce a
+second POST); both `complete_*_provider_attempt` functions' explicit non-terminal-status short-circuit (pending/
+processing never transitions the domain row); the `successful`-only gate before marking `paid`; the `reversed`-
+only-from-`paid` gate; the immutable `payout_destination_id` foreign key on every attempt row; a fresh
+`gen_random_uuid()` on every new attempt (never a reused `provider_payout_id`); the `_payout_provider_attempts_
+has_active` guard now present in all three manual merchant RPCs; `'refund'` confirmed absent from Peach's
+`SUPPORTED_CAPABILITIES` set; and `isMockPaymentAuthorityAllowed()`/`ProviderNotPermittedError` unchanged and
+still enforced in `registry.ts`. No violation found.
+
+**Migration review (phase brief §10):** `supabase/migrations/20261112134448_add_peach_payout_execution.sql`
+re-scanned for `DROP ... CASCADE` and any top-level (outside a function body) `INSERT`/`UPDATE` against
+`merchant_payouts`/`affiliate_commissions` — zero matches for either, confirming no destructive DDL and no
+historical backfill of any kind.
+
+### New operational visibility this phase: `/admin/payout-provider-attempts`
+
+A genuine, previously-missing gap (phase brief §50-53): before this phase, there was **no admin visibility into
+`payout_provider_attempts` at all** — only the pre-existing, per-booking `merchant_payouts` list existed, with
+no way to see Peach's own async state, attempt number, or a "stuck" (non-terminal for an extended period)
+attempt anywhere. Added:
+
+- `GET /api/admin/payout-provider-attempts` — read-only, safe fields only (no raw bank data, no provider
+  credentials, no raw request body — proved by a new static test), optional `?status=` filter.
+- `/admin/payout-provider-attempts` — a table view (domain, masked destination, amount, provider status with a
+  client-computed "STUCK" flag past 60 minutes non-terminal, attempt number, submission time) with a per-row
+  **Reconcile** action that calls the existing E33 admin reconciliation route — never a client-supplied final
+  state, always queries Peach directly, matching phase brief §54's requirement exactly.
+- Linked from the existing `/admin/payouts` page alongside the E34 readiness link.
+
+### Kill-switch runbook (phase brief §59-60, consolidating E35's own §21 procedure)
+
+**Turn OFF:** set `PEACH_PAYOUTS_EXECUTION_ENABLED` to anything other than the exact string `"true"` (or remove
+it) in the Vercel production environment, then redeploy/await config propagation.
+
+**Verify OFF:** `POST /api/admin/payouts/[id]/execute-provider` and the affiliate cron both return 503 with zero
+RPC calls made — proved statically by test in this environment; confirm the identical behavior against the real
+deployed environment once it exists, rather than assuming the static proof alone suffices live.
+
+**What continues after OFF:** reconciliation only — the signed payout webhook (`/api/payments/webhooks/peach-
+payouts`) and the new admin **Reconcile** action both continue to resolve any already-`pending`/`processing`
+attempt to its authoritative final state. Nothing new is ever submitted while the gate is off.
+
+**What never happens:** resubmission of an attempt whose outcome is uncertain. The gate stops new economic
+submissions; it never "cancels" or "retries" an existing one.
+
+### Launch policy preparation (phase brief §56-58, not activated)
+
+Recommended initial rollout mode, for a future, separately-approved activation phase:
+
+- New payouts only — never an automatic replay of the existing historical backlog (496 pending + 114
+  processing merchant payouts, 201 paid + 2 voided affiliate ZAR, per E33's own snapshot — all remain under
+  current manual/admin operational policy, untouched).
+- Merchant provider execution starts manual (admin clicks `execute-provider` per payout) — not a cron.
+- Affiliate automatic sweep stays off at first activation even after the gate is turned on for merchant
+  payouts — these are two independent decisions, not one switch.
+- One payout at a time; no batch/bulk action exists anywhere in the codebase to begin with (proved by test).
+- Reversal and failure both route to manual review — no automatic retry exists for either outcome.
+
+### Webhook URL preparation (phase brief §46)
+
+The exact production **paths** are fixed and already deployed in code (confirmed this phase):
+`/api/payments/webhooks/peach-payouts` (payout status) and `/api/payments/webhooks/peach-banv` (bank account
+verification) — these are two **separate** URLs, matching Peach's own Dashboard model (confirmed E34: "Payout
+status webhooks" and "Bank account verification service webhooks" are configured as separate sections). The
+production **domain** itself is not fabricated here — substitute this project's actual production domain
+(`NEXT_PUBLIC_APP_URL` in a real deployment, not the `http://localhost:3000` local-dev placeholder found in
+this environment's own `.env.local`) when registering these two URLs on the Peach Dashboard.
+
+### External action list (phase brief §45, §78)
+
+Every item below requires a human with the appropriate Peach Dashboard/business authority — none can be
+performed by this agent:
+
+1. Log in to the Peach Dashboard and activate Payouts (4-step process, confirmed live: login → Payouts →
+   Activate Payouts → agree to terms/pricing and confirm).
+2. Submit the required source-of-funds document to Peach for compliance review.
+3. Obtain live Payouts API credentials (`clientId`/`clientSecret`/`merchantId`) from the Dashboard once
+   activated.
+4. Register the two production webhook URLs above (payout-status and BANV) under Payouts settings, and obtain
+   the webhook signing secret for each.
+5. Fund the Peach payout float balance (confirmed: a separate, per-country balance, not shared with any other
+   Peach product).
+6. Provide the resulting credentials/secrets to whoever controls the Vercel **production** environment
+   variables (never preview/development) — this agent will not set them without that separate authority.
+7. Separately: review and merge PR #8 (a human-review action, deliberately not performed by this phase).

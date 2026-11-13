@@ -91,6 +91,7 @@ export const PAGE_COVERAGE_MANIFEST: PageCoverageEntry[] = [
   { path: '(dashboard)/dashboard/merchant/orders/page.tsx', status: 'wired' },
   { path: '(dashboard)/dashboard/merchant/page.tsx', status: 'wired' },
   { path: '(dashboard)/dashboard/merchant/payouts/page.tsx', status: 'wired' },
+  { path: '(dashboard)/dashboard/payout-settings/page.tsx', status: 'wired' },
   { path: '(dashboard)/dashboard/personalization/page.tsx', status: 'wired' },
   // P6-POPIA-ERASURE-AND-ANONYMIZATION-I: self-service account erasure --
   // useTranslations('privacy.erasure') throughout the form, getTranslations

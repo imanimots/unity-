@@ -316,5 +316,73 @@
       "listItem": "List an item",
       "howItWorks": "How it works"
     }
+  },
+  "payoutDestination": {
+    "heading": "Payout Account",
+    "description": "Manage the bank account Unity pays your earnings into.",
+    "loading": "Loading…",
+    "errors": {
+      "couldNotLoad": "Could not load your payout account details.",
+      "couldNotSave": "Could not save your bank details.",
+      "couldNotVerify": "Could not start verification.",
+      "couldNotCheckStatus": "Could not check verification status.",
+      "couldNotDisable": "Could not disable this payout account.",
+      "fillAllFields": "Please select a bank and fill in every field."
+    },
+    "messages": {
+      "added": "Bank details saved. Start verification to activate payouts.",
+      "verificationStarted": "Verification started.",
+      "statusChecked": "Verification status updated.",
+      "disabled": "Payout account disabled."
+    },
+    "kycBlock": {
+      "title": "Identity verification required",
+      "message": "Complete identity verification before verifying a payout account.",
+      "cta": "Verify identity"
+    },
+    "noDestination": {
+      "title": "No payout account yet",
+      "message": "Add your bank details to receive payouts."
+    },
+    "addButton": "Add bank details",
+    "formHeading": "Bank details",
+    "bankLabel": "Bank",
+    "bankPlaceholder": "Select your bank",
+    "accountNumberLabel": "Account number",
+    "accountTypeLabel": "Account type",
+    "accountTypePlaceholder": "Select account type",
+    "banvUnsupportedNotice": "Automatic verification is unavailable for this bank. Payout activation requires manual review.",
+    "accountHolderNotice": "Payout account must be held in:",
+    "saveButton": "Save",
+    "saving": "Saving…",
+    "cancelButton": "Cancel",
+    "replaceButton": "Replace account",
+    "replaceWarning": {
+      "title": "Replacing your bank details",
+      "message": "Your current payout account will stop being eligible for new payouts immediately. The replacement must be verified before payouts can resume.",
+      "confirm": "Continue"
+    },
+    "disableButton": "Disable",
+    "disableWarning": {
+      "title": "Disable this payout account?",
+      "message": "You will no longer be eligible for payouts until you add and verify a new account.",
+      "confirm": "Disable"
+    },
+    "disabling": "Disabling…",
+    "startVerificationButton": "Start verification",
+    "verifying": "Starting verification…",
+    "checkStatusButton": "Check verification status",
+    "checkingStatus": "Checking…",
+    "verifiedOnNotice": "Verified {date}",
+    "expiringSoonNotice": "Verification expires soon — reverification may be required.",
+    "failedNotice": "Verification was unsuccessful. You can try again or contact support.",
+    "status": {
+      "unverified": "Unverified",
+      "pending": "Verification pending",
+      "processing": "Verification in progress",
+      "verified": "Verified",
+      "failed": "Verification failed",
+      "stale": "Reverification required"
+    }
   }
 }

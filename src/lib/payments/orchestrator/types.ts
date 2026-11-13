@@ -22,6 +22,8 @@ export interface OrchestratorContext {
   providerName?: string
   testRentalScenario?: MockScenario
   testDepositScenario?: MockScenario
+  /** E33: dev/test-only, mirrors testRentalScenario/testDepositScenario's own rationale -- lets a regression script deterministically force a payout provider outcome. Never set by any real caller. */
+  testPayoutScenario?: MockScenario
 }
 
 export interface PrepareBookingFinancialsResult {

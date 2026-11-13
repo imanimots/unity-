@@ -73,7 +73,9 @@
       "affiliatesDesc": "Amakhomishini okudlulisela",
       "subscription": "Ukubhalisela",
       "tools": "Amathuluzi Omthengisi",
-      "toolsDesc": "Imininingwane yesidingo, umsizi we-AI, i-CSV, intengo yeqoqo nokunye"
+      "toolsDesc": "Imininingwane yesidingo, umsizi we-AI, i-CSV, intengo yeqoqo nokunye",
+      "payoutAccount": "I-Akhawunti Yokukhokha",
+      "payoutAccountDesc": "Imininingwane yebhange yokukhokha"
     },
     "planStarter": "Isiqalo · Kuze kufike ku-5 izinto ohlwini",
     "planUnlimited": "I-{plan} · Izinto ohlwini ezingenamkhawulo",
@@ -107,7 +109,11 @@
       "failed": "Le nkokhelo ayikwazanga ukuqedwa. I-Unity izoyibuyekeza noma izame futhi."
     },
     "footerNotice": "Izinkokhelo zirekhodwa ngesandla yi-Unity ngenkathi kungekho msebenzisi wenkokhelo ozenzakalelayo oxhunyiwe.",
-    "contactSupport": "Xhumana nosizo"
+    "contactSupport": "Xhumana nosizo",
+    "payoutAccountLink": {
+      "title": "I-Akhawunti Yokukhokha",
+      "description": "Buka noma uphathe i-akhawunti yebhange okuthunyelwa kuyo ukukhokha"
+    }
   },
   "affiliateProgram": {
     "sectionLabel": "Uhlelo Lokudlulisela",
@@ -160,6 +166,10 @@
       "failed": "Inkokhelo yehlulekile",
       "voided": "Kuchithiwe",
       "reversed": "Kuguqulwe"
+    },
+    "payoutAccountLink": {
+      "title": "I-Akhawunti Yokukhokha",
+      "description": "Buka noma uphathe i-akhawunti yebhange ekhokhelwa kuyo amakhomishini"
     }
   },
   "affiliateManagement": {

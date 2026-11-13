@@ -131,7 +131,7 @@ describe('submitBankVerification -- KYC reuse and fail-closed gating', () => {
   it('8. reads idNumber/lastName live from identity_verifications and submits them to Peach, then records the submission via RPC', async () => {
     vi.mocked(loadPeachPayoutsConfig).mockReturnValue({
       environment: 'sandbox',
-      baseUrl: 'https://sandbox-payouts.peachpayments.com/api',
+      baseUrl: 'https://sandbox-payouts.peachpayments.com/api',      authBaseUrl: 'https://sandbox-dashboard.peachpayments.com',
       clientId: 'id',
       clientSecret: 'secret',
       merchantId: 'merchant-1',
@@ -171,7 +171,7 @@ describe('submitBankVerification -- KYC reuse and fail-closed gating', () => {
   it('9. never persists the raw account number or idNumber anywhere outside the single provider call -- no RPC call in this flow carries them as a param', async () => {
     vi.mocked(loadPeachPayoutsConfig).mockReturnValue({
       environment: 'sandbox',
-      baseUrl: 'https://sandbox-payouts.peachpayments.com/api',
+      baseUrl: 'https://sandbox-payouts.peachpayments.com/api',      authBaseUrl: 'https://sandbox-dashboard.peachpayments.com',
       clientId: 'id',
       clientSecret: 'secret',
       merchantId: 'merchant-1',
@@ -200,7 +200,7 @@ describe('reconcileBankVerification', () => {
   it('10. queries Peach and forwards the result via record_bank_verification_result with source=query_reconciliation', async () => {
     vi.mocked(loadPeachPayoutsConfig).mockReturnValue({
       environment: 'sandbox',
-      baseUrl: 'https://sandbox-payouts.peachpayments.com/api',
+      baseUrl: 'https://sandbox-payouts.peachpayments.com/api',      authBaseUrl: 'https://sandbox-dashboard.peachpayments.com',
       clientId: 'id',
       clientSecret: 'secret',
       merchantId: 'merchant-1',

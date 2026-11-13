@@ -43,11 +43,14 @@ describe('page coverage manifest', () => {
     // P6-POPIA-ERASURE-AND-ANONYMIZATION-I added one more genuinely new,
     // fully wired page: (dashboard)/dashboard/privacy/page.tsx (self-service
     // account erasure).
+    // E34 added one more genuinely new, fully wired page:
+    // (dashboard)/dashboard/payout-settings/page.tsx (the shared merchant/
+    // affiliate payout destination settings surface).
     const s = summarizePageCoverage()
-    expect(s.total).toBe(70)
-    expect(s.wired).toBe(58)
+    expect(s.total).toBe(71)
+    expect(s.wired).toBe(59)
     expect(s.sharedLayout).toBe(12)
-    expect(s.localizedTotal).toBe(70)
+    expect(s.localizedTotal).toBe(71)
   })
 
   it('5. page localization is genuinely, truthfully complete: zero unwired entries remain', () => {

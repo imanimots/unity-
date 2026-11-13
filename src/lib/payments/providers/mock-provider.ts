@@ -80,23 +80,37 @@ export class MockProvider implements PaymentProvider {
     return { providerReference: `mock_refund_${randomUUID()}`, status: 'completed' }
   }
 
+  /**
+   * E33: widened to Peach's real 6-state vocabulary. Always resolves
+   * synchronously to a terminal state ('successful'/'failed') --
+   * MockProvider has no async webhook/reconciliation path of its own,
+   * so there would be nothing to ever resolve a 'pending'/'processing'
+   * result; 'declined' resolves to a failed result, everything else
+   * succeeds, same scenario-selection contract as every other method.
+   * providerPayoutId echoes back Unity's own input.payoutId (Peach
+   * itself would do the same) rather than inventing a second id.
+   */
   async createMerchantPayout(input: MerchantPayoutInput): Promise<MerchantPayoutResult> {
     this.applyScenario('createMerchantPayout', input.mockScenario)
-    return { providerReference: `mock_payout_${randomUUID()}`, status: 'pending' }
+    if (input.mockScenario === 'declined') {
+      return { providerPayoutId: input.payoutId, providerRequestId: `mock_request_${randomUUID()}`, status: 'failed', failureReason: 'mock payout declined' }
+    }
+    return { providerPayoutId: input.payoutId, providerRequestId: `mock_request_${randomUUID()}`, status: 'successful' }
   }
 
   /**
-   * Deterministic mock affiliate payout -- clearly labeled ("mock_" prefix
-   * on every reference) so nothing here is ever mistaken for a real bank
-   * transfer. Same scenario-selection contract as every other method:
-   * 'declined' resolves to a failed result, everything else succeeds.
+   * Deterministic mock affiliate payout -- clearly labeled ("mock_"
+   * prefix on the provider request id) so nothing here is ever
+   * mistaken for a real bank transfer. Same scenario-selection contract
+   * as every other method: 'declined' resolves to a failed result,
+   * everything else succeeds.
    */
   async createAffiliatePayout(input: AffiliatePayoutInput): Promise<AffiliatePayoutResult> {
     this.applyScenario('createAffiliatePayout', input.mockScenario)
     if (input.mockScenario === 'declined') {
-      return { providerReference: `mock_affiliate_payout_failed_${randomUUID()}`, status: 'failed', failureReason: 'mock payout declined' }
+      return { providerPayoutId: input.payoutId, providerRequestId: `mock_request_${randomUUID()}`, status: 'failed', failureReason: 'mock payout declined' }
     }
-    return { providerReference: `mock_affiliate_payout_${randomUUID()}`, status: 'paid' }
+    return { providerPayoutId: input.payoutId, providerRequestId: `mock_request_${randomUUID()}`, status: 'successful' }
   }
 
   async verifyWebhook(input: WebhookVerificationInput): Promise<WebhookVerificationResult> {

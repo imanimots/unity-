@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { AFFILIATE_SWEEP_BATCH_LIMIT } from '@/lib/affiliate/constants'
 import { isMockScenarioSelectionAllowed } from '@/lib/checkout/test-scenario'
 import { getActivePaymentProvider, assertProviderSupportsCapability, ProviderNotPermittedError } from '@/lib/payments/registry'
+import { isPayoutExecutionEnabled } from '@/lib/payments/payout-execution/gate'
+import { loadPeachPayoutsConfig } from '@/lib/payments/providers/peach/payouts-config'
+import { getPayoutDestinationEligibility } from '@/lib/payments/payout-destinations/service'
+import { executeAffiliatePayoutProviderAttempt } from '@/lib/payments/orchestrator'
 import { notifyAffiliateOfCommission } from '@/lib/affiliate/notify'
 import type { MockScenario } from '@/lib/payments/provider'
 import { ProviderCapabilityUnsupportedError } from '@/lib/payments/provider'
@@ -11,26 +15,33 @@ import { hasCronAuthConfigured, isAuthorizedCronRequest, isAuthorizedGcpSchedule
  * GET|POST /api/internal/affiliate/process-payouts -- third step of the
  * affiliate automation chain (review-and-approve -> queue-payouts ->
  * process-payouts), scheduled via vercel.json (P4). payout_queued ->
- * processing -> paid/failed, calling the configured payout provider
- * once per commission.
+ * processing -> paid/failed, calling the real Peach payout provider
+ * once per commission (E33).
  *
- * E30: before this phase, an unset PAYMENT_PROVIDER in production meant
- * this sweep silently called MockProvider -- marking real affiliate
- * commissions "paid" with zero money ever moving. Both checks below now
- * run ONCE, before the candidate query, so a disallowed/unsupported
- * provider stops the entire sweep before any row is ever marked
- * 'processing': getActivePaymentProvider() rejects 'mock' outright
- * outside a permitted environment (see src/lib/payments/registry.ts),
- * and assertProviderSupportsCapability() rejects a real provider that
- * doesn't implement affiliate payouts yet (Peach does not, today).
+ * E33 rewrite -- the whole sweep now fails closed BEFORE the candidate
+ * query (phase brief §59) on FOUR independent gates, in order:
+ *   1. the dedicated payout-execution gate (PEACH_PAYOUTS_EXECUTION_ENABLED)
+ *   2. active provider + capability (unchanged from E30)
+ *   3. Peach Payouts configuration present
+ * Per candidate, a NEW destination-eligibility PRECHECK (phase brief
+ * §58) runs before ever calling mark_affiliate_commission_processing:
+ * an ineligible destination leaves the commission at payout_queued,
+ * untouched, logged as an operational exception -- never a processing
+ * transition with nothing to actually pay out to.
+ *
+ * E33 SAFETY FIX (phase brief §60): the old catch block here
+ * unconditionally marked a commission 'failed' on ANY thrown provider
+ * error, including a timeout/network error that may have occurred
+ * AFTER Peach already accepted the payout -- a real duplicate-payout
+ * risk on the next sweep. executeAffiliatePayoutProviderAttempt()
+ * already classifies this: an 'ambiguous' outcome leaves the
+ * commission in 'processing' (no RPC call at all here), relying on
+ * query-by-payoutId reconciliation, never an automatic retry.
  *
  * `mock_scenario` is only ever honoured when isMockScenarioSelectionAllowed()
- * -- the same dev/test-only gate checkout itself uses -- letting the
- * regression script deterministically force a payout failure to prove
- * "failed" and "retry" behave correctly. Never trusted in a real
- * deployment. GET (Vercel Cron) and POST (manual/curl) share one
- * handler and the shared isAuthorizedCronRequest() authority
- * (src/lib/internal-cron/auth.ts).
+ * -- the same dev/test-only gate checkout itself uses. GET (Vercel
+ * Cron) and POST (manual/curl) share one handler and the shared
+ * isAuthorizedCronRequest() authority (src/lib/internal-cron/auth.ts).
  */
 async function handleCronRequest(request: NextRequest) {
   if (!hasCronAuthConfigured()) {
@@ -56,6 +67,10 @@ async function handleCronRequest(request: NextRequest) {
     // No body / not JSON -- fine, this route takes no required fields.
   }
 
+  if (!isPayoutExecutionEnabled()) {
+    return NextResponse.json({ error: 'Payout execution is not enabled in this environment', considered: 0, paid: 0, failed: 0 }, { status: 503 })
+  }
+
   let provider
   try {
     provider = getActivePaymentProvider()
@@ -68,13 +83,17 @@ async function handleCronRequest(request: NextRequest) {
     throw err
   }
 
+  if (provider.name === 'peach' && !loadPeachPayoutsConfig()) {
+    return NextResponse.json({ error: 'Peach Payouts is not configured', considered: 0, paid: 0, failed: 0 }, { status: 503 })
+  }
+
   try {
     const { createClient: createServiceClient } = await import('@supabase/supabase-js')
     const admin = createServiceClient(url, serviceKey)
 
     const { data: candidates, error: selectError } = await admin
       .from('affiliate_commissions')
-      .select('id, affiliate_id, commission_amount, currency')
+      .select('id, affiliate_id')
       .eq('status', 'payout_queued')
       .limit(AFFILIATE_SWEEP_BATCH_LIMIT)
 
@@ -86,43 +105,43 @@ async function handleCronRequest(request: NextRequest) {
     let paidCount = 0
     let failedCount = 0
     for (const row of candidates ?? []) {
-      const { data: processing, error: processingError } = await admin.rpc('mark_affiliate_commission_processing', {
-        p_commission_id: row.id,
-        p_provider: provider.name,
-      })
-      if (processingError || processing?.status !== 'processing') {
-        console.error('[internal.affiliate.process-payouts] could not mark processing', { commissionId: row.id, processingError })
+      let eligibility
+      try {
+        eligibility = await getPayoutDestinationEligibility({ admin }, row.affiliate_id)
+      } catch (eligErr) {
+        console.error('[internal.affiliate.process-payouts] destination eligibility check failed', { commissionId: row.id, eligErr })
+        continue
+      }
+      if (!eligibility.eligible) {
+        // Left at payout_queued, untouched -- surfaced as an
+        // operational exception elsewhere (listOperationalExceptions),
+        // never silently dropped and never force-processed anyway.
+        console.error('[internal.affiliate.process-payouts] affiliate has no eligible payout destination -- leaving commission queued', {
+          commissionId: row.id,
+          affiliateId: row.affiliate_id,
+          reason: eligibility.reason,
+        })
         continue
       }
 
       try {
-        const payout = await provider.createAffiliatePayout({
-          affiliateId: row.affiliate_id,
-          commissionId: row.id,
-          amount: row.commission_amount,
-          currency: row.currency,
-          mockScenario,
-        })
+        const result = await executeAffiliatePayoutProviderAttempt({ admin, providerName: provider.name, testPayoutScenario: mockScenario }, row.id)
 
-        const { data: result, error: resultError } = await admin.rpc('record_affiliate_payout_result', {
-          p_commission_id: row.id,
-          p_status: payout.status,
-          p_provider_reference: payout.providerReference,
-          p_failure_reason: payout.failureReason ?? null,
-        })
-        if (resultError) {
-          console.error('[internal.affiliate.process-payouts] could not record result', { commissionId: row.id, resultError })
+        if (result.outcome === 'ambiguous') {
+          // Deliberately no count increment, no email -- the commission
+          // remains 'processing'; reconciliation resolves it later.
+          console.error('[internal.affiliate.process-payouts] ambiguous provider outcome -- left processing for reconciliation', { commissionId: row.id, reason: result.ambiguousReason })
           continue
         }
 
-        if (result?.status === 'paid') {
+        if (result.status === 'successful') {
           paidCount++
           try {
             await notifyAffiliateOfCommission(admin, row.id, 'affiliate.commission_paid', 'affiliate-commission-paid')
           } catch (emailErr) {
             console.error('[internal.affiliate.process-payouts] email dispatch failed', { commissionId: row.id, emailErr })
           }
-        } else {
+        } else if (result.status === 'failed' || result.status === 'cancelled') {
           failedCount++
           try {
             await notifyAffiliateOfCommission(admin, row.id, 'affiliate.payout_failed', 'affiliate-payout-failed')
@@ -130,14 +149,17 @@ async function handleCronRequest(request: NextRequest) {
             console.error('[internal.affiliate.process-payouts] email dispatch failed', { commissionId: row.id, emailErr })
           }
         }
-      } catch (providerErr) {
-        console.error('[internal.affiliate.process-payouts] provider call failed', { commissionId: row.id, providerErr })
-        await admin.rpc('record_affiliate_payout_result', {
-          p_commission_id: row.id,
-          p_status: 'failed',
-          p_failure_reason: providerErr instanceof Error ? providerErr.name : 'provider error',
-        })
-        failedCount++
+        // 'pending'/'processing' (and 'reversed', which cannot occur
+        // on a create response): no count increment, no email yet --
+        // the commission stays 'processing' until a webhook or
+        // reconciliation resolves it to a terminal state.
+      } catch (err) {
+        // A thrown OrchestrationError here means the attempt could not
+        // even be STARTED (ineligible, misconfigured, etc) -- never a
+        // provider-call ambiguity (that path returns a result, it
+        // never throws). Safe to skip without any state mutation.
+        console.error('[internal.affiliate.process-payouts] could not start provider attempt', { commissionId: row.id, err })
+        continue
       }
     }
 
