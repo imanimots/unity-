@@ -17,7 +17,7 @@ Environment Variables, not in a committed file.
 | `SUPABASE_SERVICE_ROLE_KEY` | dev project service-role key | required, **server-only** — never add a `NEXT_PUBLIC_` prefix to this |
 | `NEXT_PUBLIC_APP_URL` | the deployed Vercel URL (e.g. `https://unity-xxxx.vercel.app`) | update after first deploy, then redeploy — this value is baked into email links and legal-page absolute URLs |
 | `NEXT_PUBLIC_MOCK_MODE` | `false` | must be false for real Supabase persistence |
-| `PAYMENT_PROVIDER` | `mock` | real Peach integration is explicitly out of scope |
+| `PAYMENT_PROVIDER` | `mock` | public-test value. `peach` is also supported (see §1a) but requires its own variables below — selecting it is a separate, deliberate decision, not part of the default public-test matrix |
 | `OWNERSHIP_VERIFICATION_PROVIDER` | `manual` | admin reviews evidence by hand |
 | `IDENTITY_VERIFICATION_PROVIDER` | `manual` | admin reviews KYC by hand |
 | `EMAIL_PROVIDER` | `console` (or `resend` once real credentials exist) | console = logged only, never sent |
@@ -29,9 +29,40 @@ Environment Variables, not in a committed file.
 | `RESEND_API_KEY` | only if `EMAIL_PROVIDER=resend` | never required otherwise |
 | `VOYAGE_API_KEY` | optional | assistant falls back to ILIKE search without it |
 
-**Never set**: any `PEACH_*`, `SUMSUB_*`, `PAYFAST_*` variable, or `NODE_ENV=production` production
-credentials for a real payment/identity provider. The environment validator does not require
-them and their presence has no effect while the providers above stay `mock`/`manual`.
+**Never set**: any `SUMSUB_*` or `PAYFAST_*` variable. Neither provider is integrated; the
+environment validator does not require them and their presence has no effect while
+`IDENTITY_VERIFICATION_PROVIDER`/`OWNERSHIP_VERIFICATION_PROVIDER` stay `manual`.
+
+### 1a. Peach-capable production configuration (E38)
+
+`PAYMENT_PROVIDER` now supports two values, each with a distinct meaning:
+
+| `PAYMENT_PROVIDER` | Meaning |
+|---|---|
+| `mock` | Public-test mode (the table above). No real money ever moves; no Peach variable is required or read. |
+| `peach` | Production-capable mode. The app can initialize the real Peach client, but this **does not by itself enable any real payout** — see the kill switch below. |
+
+Selecting `PAYMENT_PROVIDER=peach` makes the following variables **required** — startup fails
+closed (the same way a missing `SUPABASE_SERVICE_ROLE_KEY` fails closed today) if any are missing
+or invalid:
+
+| Variable | Requirement when `PAYMENT_PROVIDER=peach` |
+|---|---|
+| `PEACH_PAYOUTS_CLIENT_ID` | required |
+| `PEACH_PAYOUTS_CLIENT_SECRET` | required |
+| `PEACH_PAYOUTS_MERCHANT_ID` | required |
+| `PEACH_PAYOUTS_WEBHOOK_SIGNING_SECRET` | required — webhook signatures are never trusted without it |
+| `PEACH_ENVIRONMENT` | required, and must be exactly `production` — a missing value never silently falls back to sandbox, and `sandbox` itself is rejected at this level. Sandbox certification exercises the Peach client directly, not through this app-level provider selector. |
+
+None of these five are required, or have any effect, while `PAYMENT_PROVIDER` stays `mock`.
+
+**Peach-capable does not mean payout-enabled.** A fully valid `PAYMENT_PROVIDER=peach`
+configuration only makes the provider initializable. Whether it may ever submit a real payout is
+controlled entirely separately by `PEACH_PAYOUTS_EXECUTION_ENABLED` (the payout kill switch — see
+`docs/PEACH_INTEGRATION.md`), which defaults to off/absent and is never implied by provider
+selection. Moving to `PAYMENT_PROVIDER=peach` in production is a deliberate step toward Peach
+sandbox certification and eventual live activation — it is not itself a go-live action, and real
+money cannot move until the execution gate is separately, explicitly turned on.
 
 See `docs/FEATURE_FLAG_MATRIX.md` for the full mapping of what each provider setting controls.
 
