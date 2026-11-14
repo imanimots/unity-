@@ -52,7 +52,7 @@ function httpCheck(label, result, assertFn) {
   assertFn(result.text, result.status, result.headers)
 }
 
-const NAMESPACES = ['common','navigation','auth','marketplace','buy','rent','barter','skills','tasks','lookingFor','rtb','advertising','merchant','errors','emails','legal','personalization']
+const NAMESPACES = ['common','navigation','auth','marketplace','buy','rent','barter','skills','tasks','lookingFor','rtb','advertising','merchant','errors','emails','legal','personalization','help']
 const LOCALES = ['en-ZA', 'af-ZA', 'zu-ZA']
 
 function loadMessages(locale, ns) {

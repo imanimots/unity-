@@ -1,0 +1,58 @@
+{
+  "sitemapPage": {
+    "metaTitle": "Sitemap — Unity",
+    "metaDescription": "A full map of every page on Unity — public, member, merchant, and admin.",
+    "eyebrow": "Where is everything?",
+    "heading": "Sitemap",
+    "introBeforeLink": "Every real page on Unity, grouped by who can reach it. Looking for step-by-step instructions instead? Try the",
+    "helpLinkText": "Help Center",
+    "introAfterLink": ".",
+    "sections": {
+      "public": "Public",
+      "user": "User / Member",
+      "merchant": "Merchant",
+      "admin": "Admin"
+    },
+    "sectionDescriptions": {
+      "public": "Open to everyone, no account required.",
+      "user": "Available once you're signed in.",
+      "merchant": "Available once you're signed in with a merchant account.",
+      "admin": "Available only to Unity administrators."
+    },
+    "badges": {
+      "loginRequired": "Login required",
+      "merchant": "Merchant",
+      "adminOnly": "Admin only",
+      "providerPending": "Real provider pending"
+    }
+  },
+  "helpCenterPage": {
+    "metaTitle": "Help Center — Unity",
+    "metaDescription": "Find exactly how to do something on Unity, step by step.",
+    "eyebrow": "How do I do something?",
+    "heading": "Help Center",
+    "introBeforeLink": "Choose what you want to do, and follow the exact steps. Looking for a specific page instead? Try the",
+    "sitemapLinkText": "Sitemap",
+    "introAfterLink": ".",
+    "searchLabel": "Search the Help Center",
+    "searchPlaceholder": "What do you want to do? e.g. list an item, verification, dispute",
+    "everyone": "Everyone",
+    "allCategories": "All categories",
+    "noResultsTitle": "No tasks match your search.",
+    "noResultsHint": "Try a different word, or clear the role/category filters.",
+    "providerPendingBadge": "Provider pending"
+  },
+  "taskPage": {
+    "breadcrumbHelpCenter": "Help Center",
+    "beforeYouStart": "Before you start",
+    "steps": "Steps",
+    "whereToGo": "Where to go",
+    "whatHappensNext": "What happens next",
+    "commonIssues": "Common issues",
+    "relatedTasks": "Related tasks",
+    "backToHelpCenter": "Back to Help Center",
+    "providerPendingBadge": "Real provider pending",
+    "partialProviderBadge": "Partially provider-dependent",
+    "providerBannerSuffix": "The internal workflow described below works today; the parts that need a real external provider are called out explicitly."
+  }
+}

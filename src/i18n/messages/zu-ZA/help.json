@@ -1,0 +1,58 @@
+{
+  "sitemapPage": {
+    "metaTitle": "Mephu Yesayithi — Unity",
+    "metaDescription": "Imephu ephelele yekhasi ngalinye ku-Unity — okuphelele, ilungu, umthengisi, kanye no-admin.",
+    "eyebrow": "Ikuphi yonke into?",
+    "heading": "Mephu Yesayithi",
+    "introBeforeLink": "Ikhasi ngalinye lempela ku-Unity, lihlanganiswe ngokuthi ubani ongalifinyelela. Ufuna izinyathelo ngezinyathelo esikhundleni? Zama i",
+    "helpLinkText": "Isikhungo Sosizo",
+    "introAfterLink": ".",
+    "sections": {
+      "public": "Okuphelele",
+      "user": "Umsebenzisi / Ilungu",
+      "merchant": "Umthengisi",
+      "admin": "Admin"
+    },
+    "sectionDescriptions": {
+      "public": "Ivulekele wonke umuntu, akudingeki i-akhawunti.",
+      "user": "Iyatholakala uma ungene ngemvume.",
+      "merchant": "Iyatholakala uma ungene ngemvume nge-akhawunti yomthengisi.",
+      "admin": "Itholakala kuphela kubaphathi be-Unity."
+    },
+    "badges": {
+      "loginRequired": "Kudingeka ukungena ngemvume",
+      "merchant": "Umthengisi",
+      "adminOnly": "Abaphathi kuphela",
+      "providerPending": "Umhlinzeki wangempela usalindile"
+    }
+  },
+  "helpCenterPage": {
+    "metaTitle": "Isikhungo Sosizo — Unity",
+    "metaDescription": "Thola kahle indlela yokwenza okuthile ku-Unity, isinyathelo ngesinyathelo.",
+    "eyebrow": "Ngenza kanjani okuthile?",
+    "heading": "Isikhungo Sosizo",
+    "introBeforeLink": "Khetha okufuna ukukwenza, ulandele izinyathelo ezinembile. Ufuna ikhasi elithile esikhundleni? Zama i",
+    "sitemapLinkText": "Mephu Yesayithi",
+    "introAfterLink": ".",
+    "searchLabel": "Sesha Isikhungo Sosizo",
+    "searchPlaceholder": "Ufuna ukwenza ini? isib. faka into, ukuqinisekiswa, ukuphikisana",
+    "everyone": "Wonke Umuntu",
+    "allCategories": "Zonke izigaba",
+    "noResultsTitle": "Azikho izinto ezifanele ukusesha kwakho.",
+    "noResultsHint": "Zama igama elihlukile, noma usule izihlungi zendima/sigaba.",
+    "providerPendingBadge": "Umhlinzeki usalindile"
+  },
+  "taskPage": {
+    "breadcrumbHelpCenter": "Isikhungo Sosizo",
+    "beforeYouStart": "Ngaphambi kokuqala",
+    "steps": "Izinyathelo",
+    "whereToGo": "Lapho okuzoya khona",
+    "whatHappensNext": "Okwenzeka ngemuva kwalokho",
+    "commonIssues": "Izinkinga ezivame ukuvela",
+    "relatedTasks": "Imisebenzi ehlobene",
+    "backToHelpCenter": "Buyela Esikhungweni Sosizo",
+    "providerPendingBadge": "Umhlinzeki wangempela usalindile",
+    "partialProviderBadge": "Ncikile ngokuyingxenye kumhlinzeki",
+    "providerBannerSuffix": "Inqubo yangaphakathi echazwe ngezansi isebenza namuhla; izingxenye ezidinga umhlinzeki wangempela wangaphandle zikhonjiswa ngokusobala."
+  }
+}

@@ -115,6 +115,13 @@ export const PAGE_COVERAGE_MANIFEST: PageCoverageEntry[] = [
   { path: '(marketing)/looking-for/new/page.tsx', status: 'wired' },
   { path: '(marketing)/pricing/page.tsx', status: 'wired' },
   { path: '(marketing)/profile/[id]/page.tsx', status: 'wired' },
+  // E46: real public sitemap + task-based Help Center. All three call
+  // getTranslations directly for their own chrome (help.sitemapPage /
+  // help.helpCenterPage / help.taskPage); task/sitemap registry content
+  // labels stay English-authoritative, same precedent as CATEGORIES.
+  { path: '(marketing)/sitemap/page.tsx', status: 'wired' },
+  { path: '(marketing)/help/page.tsx', status: 'wired' },
+  { path: '(marketing)/help/[slug]/page.tsx', status: 'wired' },
 
   // ---------------- LEGAL (12 pages, chrome wired via LegalPageLayout) ----------------
   { path: '(marketing)/terms/page.tsx', status: 'shared-layout' },

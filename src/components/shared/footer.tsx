@@ -63,6 +63,8 @@ export function Footer() {
             <div>
               <h4 className="section-label text-[#9B8B85] mb-4">{t('footer.support')}</h4>
               <ul className="space-y-2.5">
+                <li><Link href="/help" className="text-sm text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">{t('footer.helpCenter')}</Link></li>
+                <li><Link href="/sitemap" className="text-sm text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">{t('footer.sitemap')}</Link></li>
                 <li><Link href="/contact" className="text-sm text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">{t('footer.contact')}</Link></li>
               </ul>
             </div>

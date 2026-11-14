@@ -46,11 +46,14 @@ describe('page coverage manifest', () => {
     // E34 added one more genuinely new, fully wired page:
     // (dashboard)/dashboard/payout-settings/page.tsx (the shared merchant/
     // affiliate payout destination settings surface).
+    // E46 added three genuinely new, fully wired pages: the real public
+    // sitemap ((marketing)/sitemap/page.tsx) and the task-based Help
+    // Center ((marketing)/help/page.tsx, (marketing)/help/[slug]/page.tsx).
     const s = summarizePageCoverage()
-    expect(s.total).toBe(71)
-    expect(s.wired).toBe(59)
+    expect(s.total).toBe(74)
+    expect(s.wired).toBe(62)
     expect(s.sharedLayout).toBe(12)
-    expect(s.localizedTotal).toBe(71)
+    expect(s.localizedTotal).toBe(74)
   })
 
   it('5. page localization is genuinely, truthfully complete: zero unwired entries remain', () => {

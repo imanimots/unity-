@@ -1,0 +1,58 @@
+{
+  "sitemapPage": {
+    "metaTitle": "Werfkaart — Unity",
+    "metaDescription": "'n Volledige kaart van elke bladsy op Unity — publiek, lid, handelaar, en admin.",
+    "eyebrow": "Waar is alles?",
+    "heading": "Werfkaart",
+    "introBeforeLink": "Elke werklike bladsy op Unity, gegroepeer volgens wie dit kan bereik. Soek jy eerder stap-vir-stap instruksies? Probeer die",
+    "helpLinkText": "Hulpsentrum",
+    "introAfterLink": ".",
+    "sections": {
+      "public": "Publiek",
+      "user": "Gebruiker / Lid",
+      "merchant": "Handelaar",
+      "admin": "Admin"
+    },
+    "sectionDescriptions": {
+      "public": "Oop vir almal, geen rekening nodig nie.",
+      "user": "Beskikbaar sodra jy aangemeld is.",
+      "merchant": "Beskikbaar sodra jy aangemeld is met 'n handelaarrekening.",
+      "admin": "Slegs beskikbaar vir Unity-administrateurs."
+    },
+    "badges": {
+      "loginRequired": "Aanmelding vereis",
+      "merchant": "Handelaar",
+      "adminOnly": "Slegs admin",
+      "providerPending": "Werklike verskaffer hangend"
+    }
+  },
+  "helpCenterPage": {
+    "metaTitle": "Hulpsentrum — Unity",
+    "metaDescription": "Vind presies hoe om iets op Unity te doen, stap vir stap.",
+    "eyebrow": "Hoe doen ek iets?",
+    "heading": "Hulpsentrum",
+    "introBeforeLink": "Kies wat jy wil doen, en volg die presiese stappe. Soek jy eerder 'n spesifieke bladsy? Probeer die",
+    "sitemapLinkText": "Werfkaart",
+    "introAfterLink": ".",
+    "searchLabel": "Deursoek die Hulpsentrum",
+    "searchPlaceholder": "Wat wil jy doen? bv. lys 'n item, verifikasie, geskil",
+    "everyone": "Almal",
+    "allCategories": "Alle kategorieë",
+    "noResultsTitle": "Geen take pas by jou soektog nie.",
+    "noResultsHint": "Probeer 'n ander woord, of maak die rol-/kategoriefilters skoon.",
+    "providerPendingBadge": "Verskaffer hangend"
+  },
+  "taskPage": {
+    "breadcrumbHelpCenter": "Hulpsentrum",
+    "beforeYouStart": "Voor jy begin",
+    "steps": "Stappe",
+    "whereToGo": "Waarheen om te gaan",
+    "whatHappensNext": "Wat volgende gebeur",
+    "commonIssues": "Algemene probleme",
+    "relatedTasks": "Verwante take",
+    "backToHelpCenter": "Terug na Hulpsentrum",
+    "providerPendingBadge": "Werklike verskaffer hangend",
+    "partialProviderBadge": "Deels verskaffer-afhanklik",
+    "providerBannerSuffix": "Die interne werkvloei hieronder beskryf werk vandag; die dele wat 'n werklike eksterne verskaffer nodig het, word uitdruklik uitgewys."
+  }
+}
