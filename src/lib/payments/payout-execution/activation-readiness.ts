@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { isPayoutExecutionEnabled } from './gate'
+import { isLegacyPeachPayoutExecutionEnabled } from './gate'
 import { loadPeachPayoutsConfig } from '../providers/peach/payouts-config'
 
 /**
@@ -38,7 +38,7 @@ function readExactTrueFalse(value: string | undefined): ReadinessStatus {
 }
 
 export async function getPeachPayoutActivationReadiness(admin: SupabaseClient, env: NodeJS.ProcessEnv = process.env): Promise<PeachPayoutActivationReadiness> {
-  const executionGateConfigured = isPayoutExecutionEnabled(env)
+  const executionGateConfigured = isLegacyPeachPayoutExecutionEnabled(env)
 
   let credentialsPresent = false
   let providerClientHealthy = false
