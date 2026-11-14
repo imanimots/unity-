@@ -4,32 +4,27 @@ import { useState, useEffect, useCallback } from 'react'
 import { AdminPageHeader, Pill } from '@/components/admin/ui'
 
 interface Readiness {
+  activeProvider: string
+  realProviderConfigured: boolean
   executionGateConfigured: boolean
-  credentialsPresent: boolean
-  productActivationConfirmed: 'yes' | 'no' | 'unknown'
-  sourceOfFundsConfirmed: 'yes' | 'no' | 'unknown'
-  webhookConfigured: 'yes' | 'no' | 'unknown'
-  webhookSigningConfigured: boolean
   destinationAuthorityHealthy: boolean
-  providerClientHealthy: boolean
   sandboxCertified: boolean
-  sandboxCertificationBlockedReason: string | null
   productionCanaryApproved: boolean
+  integrationStatus: string
 }
 
-const BOOL_STYLES: Record<string, string> = { yes: 'bg-green-100 text-green-700', no: 'bg-red-100 text-red-700' }
-const TRISTATE_STYLES: Record<string, string> = { yes: 'bg-green-100 text-green-700', no: 'bg-red-100 text-red-700', unknown: 'bg-[#F2EDE8] text-[#6B5B55]' }
+const BOOL_STYLES: Record<string, string> = {
+  yes: 'bg-green-100 text-green-700',
+  no: 'bg-red-100 text-red-700',
+}
 
 function boolPill(value: boolean) {
   return <Pill value={value ? 'yes' : 'no'} styles={BOOL_STYLES} />
 }
 
 /**
- * /admin/payouts/readiness -- E34 phase brief §47: exposes
- * getPeachPayoutActivationReadiness() to authorized admins. Pure
- * read-only display -- no action on this page can flip any gate; that
- * is deliberate (phase brief §48/§50: activation is a separate,
- * explicit decision never made from a UI button).
+ * Read-only provider-neutral launch readiness. This surface cannot enable
+ * payment execution and deliberately contains no Peach activation logic.
  */
 export default function AdminPayoutReadinessPage() {
   const [readiness, setReadiness] = useState<Readiness | null>(null)
@@ -54,13 +49,16 @@ export default function AdminPayoutReadinessPage() {
   }, [])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      <AdminPageHeader eyebrow="Payments Operations" title="Peach Payouts Readiness" badge={productionReady ? undefined : 'Production gate OFF'} />
+      <AdminPageHeader
+        eyebrow="Payments Operations"
+        title="Payment Provider Readiness"
+        badge={productionReady ? undefined : 'Production gate OFF'}
+      />
 
       {loading && <p className="text-sm text-[#9B8B85]">Loading…</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -68,34 +66,26 @@ export default function AdminPayoutReadinessPage() {
       {readiness && (
         <>
           <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl divide-y divide-[#F2EDE8] dark:divide-[#2A1A1A]">
-            <Row label="Execution gate configured (PEACH_PAYOUTS_EXECUTION_ENABLED)">{boolPill(readiness.executionGateConfigured)}</Row>
-            <Row label="Payouts credentials present">{boolPill(readiness.credentialsPresent)}</Row>
-            <Row label="Peach Payouts product activated">
-              <Pill value={readiness.productActivationConfirmed} styles={TRISTATE_STYLES} />
+            <Row label="Configured provider">
+              <span className="text-sm font-semibold text-right">{readiness.activeProvider}</span>
             </Row>
-            <Row label="Source of funds approved">
-              <Pill value={readiness.sourceOfFundsConfirmed} styles={TRISTATE_STYLES} />
-            </Row>
-            <Row label="Webhook signing secret configured">{boolPill(readiness.webhookSigningConfigured)}</Row>
-            <Row label="Webhook URL registered on Dashboard (cannot be verified by code)">
-              <Pill value={readiness.webhookConfigured} styles={TRISTATE_STYLES} />
-            </Row>
-            <Row label="Destination authority (payout_banks) healthy">{boolPill(readiness.destinationAuthorityHealthy)}</Row>
-            <Row label="Provider client healthy">{boolPill(readiness.providerClientHealthy)}</Row>
-            <Row label="Sandbox certification completed">
-              <div className="text-right">
-                {boolPill(readiness.sandboxCertified)}
-                {readiness.sandboxCertificationBlockedReason && <p className="text-[11px] text-[#9B8B85] mt-1">{readiness.sandboxCertificationBlockedReason}</p>}
-              </div>
-            </Row>
+            <Row label="Real provider integrated">{boolPill(readiness.realProviderConfigured)}</Row>
+            <Row label="Provider-neutral payout execution gate enabled">{boolPill(readiness.executionGateConfigured)}</Row>
+            <Row label="Destination authority healthy">{boolPill(readiness.destinationAuthorityHealthy)}</Row>
+            <Row label="Sandbox certification completed">{boolPill(readiness.sandboxCertified)}</Row>
             <Row label="Real-money canary approved">{boolPill(readiness.productionCanaryApproved)}</Row>
+            <Row label="Integration status">
+              <span className="text-sm font-semibold text-right">{readiness.integrationStatus}</span>
+            </Row>
           </div>
 
           <div className={`rounded-xl p-5 border ${productionReady ? 'bg-green-50 border-green-200' : 'bg-[#F2EDE8] dark:bg-[#1A1010] border-[#E8E0D8] dark:border-[#2A1A1A]'}`}>
-            <p className="text-sm font-bold uppercase tracking-[0.08em]">{productionReady ? 'Production ready' : 'Production NOT ready'}</p>
+            <p className="text-sm font-bold uppercase tracking-[0.08em]">
+              {productionReady ? 'Production ready' : 'Production NOT ready'}
+            </p>
             <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-1">
-              Every readiness item above must be satisfied simultaneously. Even when all are, activation still requires a separate, explicit decision -- this page cannot enable
-              production execution.
+              TradeSafe or another real provider must be integrated and sandbox-certified before production
+              execution can be approved. This page is read-only and cannot enable money movement.
             </p>
           </div>
         </>

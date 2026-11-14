@@ -82,11 +82,11 @@ describe('getActivePaymentProvider -- all 3 named production-mock paths reject i
     expect(() => getActivePaymentProvider('mock')).toThrow(ProviderNotPermittedError)
   })
 
-  it('production + PAYMENT_PROVIDER=peach succeeds -- the gate only ever rejects "mock", never a real provider name', () => {
+  it('production + PAYMENT_PROVIDER=peach rejects because Peach is retained only as a legacy provider', () => {
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('VERCEL_ENV', 'production')
     vi.stubEnv('PAYMENT_PROVIDER', 'peach')
-    expect(getActivePaymentProvider().name).toBe('peach')
+    expect(() => getActivePaymentProvider()).toThrow(ProviderNotPermittedError)
   })
 
   it('preview + PAYMENT_PROVIDER absent still returns MockProvider', () => {

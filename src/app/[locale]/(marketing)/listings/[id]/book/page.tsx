@@ -11,14 +11,14 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps) {
   const { id } = await params
   const listing = await getListing(id)
-  if (!listing) return { title: 'Not found' }
+  if (!listing || listing.is_test) return { title: 'Not found' }
   return { title: `Book: ${listing.title} — Unity` }
 }
 
 export default async function BookPage({ params }: PageProps) {
   const { id } = await params
   const listing = await getListing(id)
-  if (!listing) notFound()
+  if (!listing || listing.is_test) notFound()
   // A sale-only listing has no daily rate to book — the "Book Now" CTA
   // is never shown for one (see the listing detail page), but this route
   // is still reachable by a direct/typed URL, so guard here too.

@@ -7,9 +7,10 @@ describe('isPayoutExecutionEnabled', () => {
   })
 
   it('2. only the exact string "true" enables it -- never a truthy-string coercion', () => {
-    expect(isPayoutExecutionEnabled({ PEACH_PAYOUTS_EXECUTION_ENABLED: 'TRUE' } as unknown as NodeJS.ProcessEnv)).toBe(false)
-    expect(isPayoutExecutionEnabled({ PEACH_PAYOUTS_EXECUTION_ENABLED: '1' } as unknown as NodeJS.ProcessEnv)).toBe(false)
-    expect(isPayoutExecutionEnabled({ PEACH_PAYOUTS_EXECUTION_ENABLED: 'true' } as unknown as NodeJS.ProcessEnv)).toBe(true)
+    expect(isPayoutExecutionEnabled({ PAYOUT_EXECUTION_ENABLED: 'TRUE' } as unknown as NodeJS.ProcessEnv)).toBe(false)
+    expect(isPayoutExecutionEnabled({ PAYOUT_EXECUTION_ENABLED: '1' } as unknown as NodeJS.ProcessEnv)).toBe(false)
+    expect(isPayoutExecutionEnabled({ PAYOUT_EXECUTION_ENABLED: 'true' } as unknown as NodeJS.ProcessEnv)).toBe(true)
+    expect(isPayoutExecutionEnabled({ PEACH_PAYOUTS_EXECUTION_ENABLED: 'true' } as unknown as NodeJS.ProcessEnv)).toBe(false)
   })
 })
 

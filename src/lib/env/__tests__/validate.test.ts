@@ -29,7 +29,7 @@ describe('environment validator (category: Environment Validation)', () => {
     expect(report.criticalFailures).toContain('SUPABASE_SERVICE_ROLE_KEY')
   })
 
-  it('3. fails when PAYMENT_PROVIDER is set to a value outside mock/peach (E38: peach is now a supported value, see the dedicated describe block below)', () => {
+  it('3. fails when PAYMENT_PROVIDER is set to anything except mock until TradeSafe is integrated', () => {
     const env = { ...VALID_ENV, PAYMENT_PROVIDER: 'payfast' }
     const report = validateEnvironment(env)
     expect(report.ok).toBe(false)
@@ -42,7 +42,7 @@ describe('environment validator (category: Environment Validation)', () => {
     expect(report.criticalFailures).toContain('OWNERSHIP_VERIFICATION_PROVIDER')
   })
 
-  it('5. Peach/Sumsub credentials being ABSENT never fails validation', () => {
+  it('5. legacy Peach/Sumsub credentials being ABSENT never fails validation', () => {
     const env = { ...VALID_ENV }
     const report = validateEnvironment(env)
     expect(report.ok).toBe(true)
@@ -109,86 +109,33 @@ describe('environment validator (category: Environment Validation)', () => {
   })
 })
 
-const VALID_PEACH_ENV = {
-  ...VALID_ENV,
-  PAYMENT_PROVIDER: 'peach',
-  PEACH_PAYOUTS_CLIENT_ID: 'client-id',
-  PEACH_PAYOUTS_CLIENT_SECRET: 'client-secret',
-  PEACH_PAYOUTS_MERCHANT_ID: 'merchant-id',
-  PEACH_PAYOUTS_WEBHOOK_SIGNING_SECRET: 'webhook-secret',
-  PEACH_ENVIRONMENT: 'production',
-} as unknown as NodeJS.ProcessEnv
-
-describe('PAYMENT_PROVIDER=peach -- Public-Test to Peach-capable production transition (E38)', () => {
-  it('1. PAYMENT_PROVIDER=mock passes without any Peach payout variables set', () => {
-    const report = validateEnvironment(VALID_ENV)
-    expect(report.ok).toBe(true)
-  })
-
-  it('2. PAYMENT_PROVIDER=peach with all four credentials present and PEACH_ENVIRONMENT=production passes', () => {
-    const report = validateEnvironment(VALID_PEACH_ENV)
-    expect(report.ok).toBe(true)
-    expect(report.criticalFailures).toEqual([])
-  })
-
-  it('3. PAYMENT_PROVIDER=peach with PEACH_PAYOUTS_CLIENT_ID missing fails closed', () => {
-    const env = { ...VALID_PEACH_ENV, PEACH_PAYOUTS_CLIENT_ID: undefined }
-    const report = validateEnvironment(env)
-    expect(report.ok).toBe(false)
-    expect(report.criticalFailures).toContain('PEACH_PAYOUTS_CLIENT_ID')
-  })
-
-  it('4. PAYMENT_PROVIDER=peach with PEACH_PAYOUTS_CLIENT_SECRET missing fails closed', () => {
-    const env = { ...VALID_PEACH_ENV, PEACH_PAYOUTS_CLIENT_SECRET: undefined }
-    const report = validateEnvironment(env)
-    expect(report.ok).toBe(false)
-    expect(report.criticalFailures).toContain('PEACH_PAYOUTS_CLIENT_SECRET')
-  })
-
-  it('5. PAYMENT_PROVIDER=peach with PEACH_PAYOUTS_MERCHANT_ID missing fails closed', () => {
-    const env = { ...VALID_PEACH_ENV, PEACH_PAYOUTS_MERCHANT_ID: undefined }
-    const report = validateEnvironment(env)
-    expect(report.ok).toBe(false)
-    expect(report.criticalFailures).toContain('PEACH_PAYOUTS_MERCHANT_ID')
-  })
-
-  it('6. PAYMENT_PROVIDER=peach with PEACH_PAYOUTS_WEBHOOK_SIGNING_SECRET missing fails closed', () => {
-    const env = { ...VALID_PEACH_ENV, PEACH_PAYOUTS_WEBHOOK_SIGNING_SECRET: undefined }
-    const report = validateEnvironment(env)
-    expect(report.ok).toBe(false)
-    expect(report.criticalFailures).toContain('PEACH_PAYOUTS_WEBHOOK_SIGNING_SECRET')
-  })
-
-  it('7. PAYMENT_PROVIDER=peach with PEACH_ENVIRONMENT missing fails closed', () => {
-    const env = { ...VALID_PEACH_ENV, PEACH_ENVIRONMENT: undefined }
-    const report = validateEnvironment(env)
-    expect(report.ok).toBe(false)
-    expect(report.criticalFailures).toContain('PEACH_ENVIRONMENT')
-  })
-
-  it('8. PAYMENT_PROVIDER=peach with PEACH_ENVIRONMENT=sandbox fails closed -- a missing value never silently falls back to sandbox, and sandbox itself is rejected at this app-provider-selector level', () => {
-    const env = { ...VALID_PEACH_ENV, PEACH_ENVIRONMENT: 'sandbox' }
-    const report = validateEnvironment(env)
-    expect(report.ok).toBe(false)
-    expect(report.criticalFailures).toContain('PEACH_ENVIRONMENT')
-  })
-
-  it('9. PAYMENT_PROVIDER set to an unsupported value (neither mock nor peach) fails closed', () => {
-    const env = { ...VALID_ENV, PAYMENT_PROVIDER: 'stripe' }
+describe('legacy Peach provider isolation', () => {
+  it('PAYMENT_PROVIDER=peach is rejected as an active runtime provider', () => {
+    const env = { ...VALID_ENV, PAYMENT_PROVIDER: 'peach' } as unknown as NodeJS.ProcessEnv
     const report = validateEnvironment(env)
     expect(report.ok).toBe(false)
     expect(report.criticalFailures).toContain('PAYMENT_PROVIDER')
   })
 
-  it('10. PAYMENT_PROVIDER=peach fully configured and valid, but the payout execution gate is OFF -- validation passes while real payout execution remains independently disabled', () => {
-    const env = { ...VALID_PEACH_ENV, PEACH_PAYOUTS_EXECUTION_ENABLED: undefined } as unknown as NodeJS.ProcessEnv
+  it('legacy Peach credentials are optional and never make mock-mode validation fail', () => {
+    const env = {
+      ...VALID_ENV,
+      PEACH_PAYOUTS_CLIENT_ID: 'legacy-client',
+      PEACH_PAYOUTS_CLIENT_SECRET: 'legacy-secret',
+      PEACH_PAYOUTS_MERCHANT_ID: 'legacy-merchant',
+      PEACH_PAYOUTS_WEBHOOK_SIGNING_SECRET: 'legacy-webhook',
+      PEACH_ENVIRONMENT: 'production',
+      PEACH_PAYOUTS_EXECUTION_ENABLED: 'true',
+    } as unknown as NodeJS.ProcessEnv
     const report = validateEnvironment(env)
     expect(report.ok).toBe(true)
-    // validateEnvironment has no knowledge of the execution gate at all --
-    // it is a completely separate module (payout-execution/gate.ts) that
-    // this phase deliberately does not merge into provider-selection
-    // validation (phase brief: "do not collapse provider selection and
-    // payout activation into one switch").
-    expect(report.checks.some((c) => c.name === 'PEACH_PAYOUTS_EXECUTION_ENABLED')).toBe(false)
+    expect(report.criticalFailures).toEqual([])
+  })
+
+  it('provider-neutral payout execution defaults off and accepts only exact booleans', () => {
+    expect(validateEnvironment(VALID_ENV).ok).toBe(true)
+
+    const invalid = validateEnvironment({ ...VALID_ENV, PAYOUT_EXECUTION_ENABLED: 'TRUE' } as unknown as NodeJS.ProcessEnv)
+    expect(invalid.checks.find((check) => check.name === 'PAYOUT_EXECUTION_ENABLED')?.status).toBe('invalid')
   })
 })

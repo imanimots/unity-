@@ -56,17 +56,6 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env): EnvVa
   const advertisingEnabledFlag = (env.ADVERTISING_ENABLED ?? 'false') === 'true'
   const advertisingUnsafeInProduction = env.NODE_ENV === 'production' && advertisingEnabledFlag
 
-  // E38: the Public-Test-only "PAYMENT_PROVIDER must be mock" restriction
-  // is replaced by this cross-field pattern (same shape as escrow/
-  // advertising above) — selecting 'peach' makes its four payout
-  // credentials and PEACH_ENVIRONMENT required and fail-closed; staying
-  // on 'mock' leaves them optional, exactly as before. This only ever
-  // governs whether the app CAN initialize the Peach provider — the
-  // separate PEACH_PAYOUTS_EXECUTION_ENABLED kill switch (src/lib/
-  // payments/payout-execution/gate.ts) independently controls whether
-  // it may actually submit a real payout, and is untouched by this flag.
-  const peachProviderSelected = (env.PAYMENT_PROVIDER ?? 'mock') === 'peach'
-
   const checks: EnvCheck[] = [
     check('NEXT_PUBLIC_SUPABASE_URL', env.NEXT_PUBLIC_SUPABASE_URL, { required: true }),
     check('NEXT_PUBLIC_SUPABASE_ANON_KEY', env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { required: true }),
@@ -75,33 +64,8 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env): EnvVa
     check('NEXT_PUBLIC_MOCK_MODE', env.NEXT_PUBLIC_MOCK_MODE ?? 'false', { required: true, allowed: ['false', 'true'], detail: 'must be "false" for any real (non-demo) deployment' }),
     check('PAYMENT_PROVIDER', env.PAYMENT_PROVIDER ?? 'mock', {
       required: true,
-      allowed: ['mock', 'peach'],
-      detail: '"mock" for public test; "peach" is the production-capable path and requires the four Peach payout variables below plus PEACH_ENVIRONMENT=production — selecting it does NOT by itself enable real payout execution, see PEACH_PAYOUTS_EXECUTION_ENABLED',
-    }),
-    check('PEACH_PAYOUTS_CLIENT_ID', env.PEACH_PAYOUTS_CLIENT_ID, {
-      required: peachProviderSelected,
-      detail: peachProviderSelected ? 'required when PAYMENT_PROVIDER=peach' : 'not required while PAYMENT_PROVIDER is "mock"',
-    }),
-    check('PEACH_PAYOUTS_CLIENT_SECRET', env.PEACH_PAYOUTS_CLIENT_SECRET, {
-      required: peachProviderSelected,
-      detail: peachProviderSelected ? 'required when PAYMENT_PROVIDER=peach' : 'not required while PAYMENT_PROVIDER is "mock"',
-    }),
-    check('PEACH_PAYOUTS_MERCHANT_ID', env.PEACH_PAYOUTS_MERCHANT_ID, {
-      required: peachProviderSelected,
-      detail: peachProviderSelected ? 'required when PAYMENT_PROVIDER=peach' : 'not required while PAYMENT_PROVIDER is "mock"',
-    }),
-    check('PEACH_PAYOUTS_WEBHOOK_SIGNING_SECRET', env.PEACH_PAYOUTS_WEBHOOK_SIGNING_SECRET, {
-      required: peachProviderSelected,
-      detail: peachProviderSelected
-        ? 'required when PAYMENT_PROVIDER=peach — webhook signatures are never trusted without it'
-        : 'not required while PAYMENT_PROVIDER is "mock"',
-    }),
-    check('PEACH_ENVIRONMENT', env.PEACH_ENVIRONMENT, {
-      required: peachProviderSelected,
-      allowed: peachProviderSelected ? ['production'] : undefined,
-      detail: peachProviderSelected
-        ? 'must be exactly "production" when PAYMENT_PROVIDER=peach — missing or "sandbox" fails closed here; sandbox certification exercises the Peach client directly, not through this app-level provider selector'
-        : 'not required while PAYMENT_PROVIDER is "mock"',
+      allowed: ['mock'],
+      detail: '"mock" is the only active provider until TradeSafe is integrated; Peach remains legacy code and is not a valid active runtime provider',
     }),
     check('OWNERSHIP_VERIFICATION_PROVIDER', env.OWNERSHIP_VERIFICATION_PROVIDER ?? 'manual', { required: true, allowed: ['manual'], detail: 'must be "manual" for public test' }),
     check('IDENTITY_VERIFICATION_PROVIDER', env.IDENTITY_VERIFICATION_PROVIDER ?? 'manual', { required: true, allowed: ['manual'], detail: 'must be "manual" for public test' }),
@@ -110,6 +74,7 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env): EnvVa
     check('INTERNAL_CRON_SECRET', env.INTERNAL_CRON_SECRET, { required: true, detail: 'protects the unpaid-expiry and email-sweep internal routes — required for those crons to ever run' }),
 
     // Optional
+    check('PAYOUT_EXECUTION_ENABLED', env.PAYOUT_EXECUTION_ENABLED ?? 'false', { required: false, allowed: ['false', 'true'], detail: 'provider-neutral real payout gate; keep "false" until a real provider is integrated and certified' }),
     check('SEO_INDEXING_ENABLED', env.SEO_INDEXING_ENABLED ?? 'false', { required: false, allowed: ['false', 'true'], detail: 'must stay "false" until a permanent domain, Search Console, legal approval, and real inventory are in place — see src/lib/seo/config.ts' }),
     check('SEO_MARKETPLACE_INDEXING_ENABLED', env.SEO_MARKETPLACE_INDEXING_ENABLED ?? 'false', { required: false, allowed: ['false', 'true'], detail: 'independent of SEO_INDEXING_ENABLED — must also stay "false" for now' }),
     check('ESCROW_ENABLED', env.ESCROW_ENABLED ?? 'false', { required: false, allowed: ['false', 'true'], detail: 'Phase 3 — must stay "false" until a real escrow provider is integrated; while false, no escrow transaction is ever created' }),
@@ -133,16 +98,17 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env): EnvVa
     check('VOYAGE_API_KEY', env.VOYAGE_API_KEY, { required: false, detail: 'assistant falls back to ILIKE search when unset' }),
   ]
 
-  // Peach/Sumsub credentials must never be REQUIRED for this deployment —
-  // explicitly assert none of them are silently expected. This is a
-  // negative check: presence is fine (harmless, unused while providers
-  // stay 'mock'/'manual'), but their ABSENCE must never fail validation.
+  // Legacy Peach and unintegrated KYC credentials must never be REQUIRED
+  // for the active application. Presence is harmless; absence must never
+  // fail validation while these providers are inactive.
   const neverRequired = [
     'PEACH_PAYMENTS_API_ENTITY_ID', 'PEACH_CHECKOUT_ENTITY_ID', 'PEACH_CARD_API_BACKOFFICE_BEARER_TOKEN',
+    'PEACH_PAYOUTS_CLIENT_ID', 'PEACH_PAYOUTS_CLIENT_SECRET', 'PEACH_PAYOUTS_MERCHANT_ID',
+    'PEACH_PAYOUTS_WEBHOOK_SIGNING_SECRET', 'PEACH_ENVIRONMENT', 'PEACH_PAYOUTS_EXECUTION_ENABLED',
     'SUMSUB_APP_TOKEN', 'SUMSUB_SECRET_KEY',
   ]
   for (const name of neverRequired) {
-    checks.push({ name, status: 'ok', required: false, detail: 'not required — Peach/Sumsub integration is out of scope' })
+    checks.push({ name, status: 'ok', required: false, detail: 'not required — legacy/unintegrated provider credential' })
   }
 
   const criticalFailures = checks.filter((c) => c.required && c.status !== 'ok').map((c) => c.name)

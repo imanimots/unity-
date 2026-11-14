@@ -1,27 +1,25 @@
 /**
- * E33: the dedicated payout-execution gate (phase brief §9-10).
- * PAYMENT_PROVIDER=peach, by itself, must NOT automatically enable
- * payout execution -- Peach already serves charges/deposit
- * authorization/capture/release under that same env var, and
- * production may legitimately want those live before payouts are
- * operationally approved (float funded, source-of-funds compliance
- * signed off, Dashboard webhook configured, etc -- see phase brief
- * §68 and the planned E34 phase). This is therefore a SEPARATE,
- * independently-defaulting-false control, checked in addition to (not
- * instead of) getActivePaymentProvider()/assertProviderSupportsCapability().
+ * Provider-neutral payout execution gate.
  *
- * Exact-string check only ("true"), matching this codebase's
- * established convention for every other safety-relevant boolean env
- * var (ESCROW_ENABLED, isMockPaymentAuthorityAllowed's own strict
- * checks) -- never a truthy-string coercion.
+ * Real payout execution remains disabled unless a future real provider
+ * integration explicitly sets PAYOUT_EXECUTION_ENABLED="true". Peach's
+ * old switch is deliberately ignored by active runtime code.
  */
 export function isPayoutExecutionEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.PAYOUT_EXECUTION_ENABLED === 'true'
+}
+
+/**
+ * Legacy Peach-only helper retained solely for the isolated historical
+ * readiness module/tests. Active payout routes must not use this.
+ */
+export function isLegacyPeachPayoutExecutionEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.PEACH_PAYOUTS_EXECUTION_ENABLED === 'true'
 }
 
 export class PayoutExecutionNotEnabledError extends Error {
   constructor() {
-    super('Peach payout execution is not enabled in this environment (PEACH_PAYOUTS_EXECUTION_ENABLED is not "true").')
+    super('Payout execution is not enabled in this environment (PAYOUT_EXECUTION_ENABLED is not "true").')
     this.name = 'PayoutExecutionNotEnabledError'
   }
 }

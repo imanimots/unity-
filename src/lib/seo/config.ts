@@ -57,8 +57,26 @@ export function getMarketplaceRobotsMeta(): RobotsMeta {
  * NEXT_PUBLIC_APP_URL is unset.
  */
 export function getAppUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-  return raw.replace(/\/+$/, '')
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim()
+  if (configured) return configured.replace(/\/+$/, '')
+
+  // Vercel exposes the canonical production hostname separately from
+  // per-deployment preview hostnames. Prefer that when available so
+  // production metadata never falls back to localhost simply because
+  // NEXT_PUBLIC_APP_URL was omitted.
+  const vercelProductionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim()
+  if (vercelProductionHost) {
+    const url = vercelProductionHost.startsWith('http') ? vercelProductionHost : `https://${vercelProductionHost}`
+    return url.replace(/\/+$/, '')
+  }
+
+  const vercelHost = process.env.VERCEL_URL?.trim()
+  if (vercelHost) {
+    const url = vercelHost.startsWith('http') ? vercelHost : `https://${vercelHost}`
+    return url.replace(/\/+$/, '')
+  }
+
+  return 'http://localhost:3000'
 }
 
 /** Builds an absolute URL from a site-relative path, using the configured app URL. */

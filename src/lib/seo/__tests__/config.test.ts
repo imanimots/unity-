@@ -65,12 +65,27 @@ describe('getAppUrl / absoluteUrl — never hardcodes a future permanent domain 
     expect(getAppUrl()).toBe('https://public-test.example.com')
   })
 
-  it('9. falls back to localhost only when unset', () => {
+  it('9. prefers Vercel production URL before falling back to localhost', () => {
     delete process.env.NEXT_PUBLIC_APP_URL
+    process.env.VERCEL_PROJECT_PRODUCTION_URL = 'unity.example.vercel.app'
+    expect(getAppUrl()).toBe('https://unity.example.vercel.app')
+  })
+
+  it('10. falls back to Vercel deployment URL when no production URL is present', () => {
+    delete process.env.NEXT_PUBLIC_APP_URL
+    delete process.env.VERCEL_PROJECT_PRODUCTION_URL
+    process.env.VERCEL_URL = 'unity-preview.example.vercel.app'
+    expect(getAppUrl()).toBe('https://unity-preview.example.vercel.app')
+  })
+
+  it('11. falls back to localhost only when app and Vercel URLs are all unset', () => {
+    delete process.env.NEXT_PUBLIC_APP_URL
+    delete process.env.VERCEL_PROJECT_PRODUCTION_URL
+    delete process.env.VERCEL_URL
     expect(getAppUrl()).toBe('http://localhost:3000')
   })
 
-  it('10. absoluteUrl joins the configured app URL with a relative path', () => {
+  it('12. absoluteUrl joins the configured app URL with a relative path', () => {
     process.env.NEXT_PUBLIC_APP_URL = 'https://public-test.example.com'
     expect(absoluteUrl('/listings')).toBe('https://public-test.example.com/listings')
     expect(absoluteUrl('listings')).toBe('https://public-test.example.com/listings')

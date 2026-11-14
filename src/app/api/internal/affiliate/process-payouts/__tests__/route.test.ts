@@ -35,41 +35,41 @@ function authorizedRequest(): NextRequest {
 }
 
 describe('GET /api/internal/affiliate/process-payouts -- E30: provider permission/capability gate runs before any DB mutation', () => {
-  it('production with PAYMENT_PROVIDER absent rejects with 503 before any candidate is queried or marked processing', async () => {
+  it('production with PAYMENT_PROVIDER absent safely no-ops before any candidate is queried or marked processing', async () => {
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('VERCEL_ENV', 'production')
     vi.stubEnv('PAYMENT_PROVIDER', undefined)
 
     const response = await GET(authorizedRequest())
 
-    expect(response.status).toBe(503)
+    expect(response.status).toBe(200)
     const json = await response.json()
-    expect(json).toMatchObject({ considered: 0, paid: 0, failed: 0 })
+    expect(json).toMatchObject({ status: 'skipped', reason: 'real_payment_provider_not_configured', considered: 0, paid: 0, failed: 0 })
   })
 
-  it('production with PAYMENT_PROVIDER=mock also rejects with 503', async () => {
+  it('production with PAYMENT_PROVIDER=mock safely no-ops', async () => {
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('VERCEL_ENV', 'production')
     vi.stubEnv('PAYMENT_PROVIDER', 'mock')
 
     const response = await GET(authorizedRequest())
 
-    expect(response.status).toBe(503)
+    expect(response.status).toBe(200)
   })
 
-  it('production with PAYMENT_PROVIDER=peach also rejects with 503 while PEACH_PAYOUTS_EXECUTION_ENABLED is unset -- E33 added a SEPARATE, independently-defaulting-false execution gate that must reject before even the provider/capability check runs', async () => {
+  it('production with legacy PAYMENT_PROVIDER=peach safely no-ops and never reaches legacy payout execution', async () => {
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('VERCEL_ENV', 'production')
     vi.stubEnv('PAYMENT_PROVIDER', 'peach')
 
     const response = await GET(authorizedRequest())
 
-    expect(response.status).toBe(503)
+    expect(response.status).toBe(200)
     const json = await response.json()
     expect(json).toMatchObject({ considered: 0, paid: 0, failed: 0 })
   })
 
-  it('E33: PAYMENT_PROVIDER=peach with PEACH_PAYOUTS_EXECUTION_ENABLED=true but no Peach Payouts credentials still rejects with 503, never proceeding to query a single candidate', async () => {
+  it('legacy Peach credentials cannot reactivate scheduled payout execution', async () => {
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('VERCEL_ENV', 'production')
     vi.stubEnv('PAYMENT_PROVIDER', 'peach')
@@ -80,10 +80,10 @@ describe('GET /api/internal/affiliate/process-payouts -- E30: provider permissio
 
     const response = await GET(authorizedRequest())
 
-    expect(response.status).toBe(503)
+    expect(response.status).toBe(200)
   })
 
-  it('E33: PEACH_PAYOUTS_EXECUTION_ENABLED set to any value other than the exact string "true" still fails closed', async () => {
+  it('legacy Peach execution flags are ignored by the active scheduled route', async () => {
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('VERCEL_ENV', 'production')
     vi.stubEnv('PAYMENT_PROVIDER', 'peach')
@@ -91,6 +91,6 @@ describe('GET /api/internal/affiliate/process-payouts -- E30: provider permissio
 
     const response = await GET(authorizedRequest())
 
-    expect(response.status).toBe(503)
+    expect(response.status).toBe(200)
   })
 })
