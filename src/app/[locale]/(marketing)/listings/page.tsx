@@ -52,7 +52,6 @@ const MODE_LABELS: Record<string, string> = {
   rent: 'available to rent',
   buy: 'available to buy',
   barter: 'available to barter',
-  rent_to_buy: 'available to rent-to-buy',
 }
 
 export default async function ListingsPage({ searchParams }: PageProps) {
@@ -62,7 +61,9 @@ export default async function ListingsPage({ searchParams }: PageProps) {
   const tLookingFor = await getTranslations('lookingFor')
   const tCommon = await getTranslations('common')
   const params = await searchParams
-  const mode = params.mode === 'buy' || params.mode === 'barter' || params.mode === 'rent_to_buy' ? params.mode : 'rent'
+  // Rent-to-Buy is intentionally part of Rent on customer browse pages.
+  // Legacy ?mode=rent_to_buy URLs therefore normalize to Rent.
+  const mode = params.mode === 'buy' || params.mode === 'barter' ? params.mode : 'rent'
   const isBarter = mode === 'barter'
   const isLookingFor = params.direction === 'looking-for'
   // Skills + Tasks under Barter -- kind is only meaningful under
@@ -78,12 +79,9 @@ export default async function ListingsPage({ searchParams }: PageProps) {
     category: params.category,
     sort: params.sort as ListingFilters['sort'],
     maxPrice: params.maxPrice ? Number(params.maxPrice) : undefined,
-    // Barter has no listing_type of its own -- any active, unlocked
-    // listing is barter-eligible (getListings() already excludes
-    // barter-locked listings unconditionally), so no type filter is
-    // applied for barter mode, same as before this phase. rent_to_buy
-    // DOES get its own mode value -- getListings() filters it via the
-    // 1:1 enabled rent_to_buy_listing_terms row, not listing_type.
+    // Barter has no listing_type of its own. Rent now deliberately
+    // includes ordinary rentals plus listings with enabled Rent-to-Buy
+    // terms; the search_listings RPC owns that combined eligibility rule.
     mode: isBarter ? undefined : mode,
     countryId,
   }
@@ -108,7 +106,7 @@ export default async function ListingsPage({ searchParams }: PageProps) {
   // result computation above (this reads its already-final output).
   const isZeroResult = listings.length === 0 && requests.length === 0 && skillTaskPosts.length === 0
   void recordSearchDemandEvent({
-    mode: isBarter ? 'barter' : mode === 'rent_to_buy' ? 'rent' : mode,
+    mode: isBarter ? 'barter' : mode,
     category: params.category ?? null,
     province: null,
     zeroResult: isZeroResult,
@@ -142,7 +140,7 @@ export default async function ListingsPage({ searchParams }: PageProps) {
     if (params.category) usp.set('category', params.category)
     if (params.sort) usp.set('sort', params.sort)
     if (params.maxPrice) usp.set('maxPrice', params.maxPrice)
-    if (params.mode) usp.set('mode', params.mode)
+    if (mode !== 'rent') usp.set('mode', mode)
     if (params.direction) usp.set('direction', params.direction)
     if (params.kind) usp.set('kind', params.kind)
     usp.set('cursor', nextCursor)
