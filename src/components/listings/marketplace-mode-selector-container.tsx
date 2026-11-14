@@ -16,7 +16,10 @@ function MarketplaceModeSelectorInner() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  const mode = (searchParams.get('mode') as MarketplaceMode | null) ?? 'rent'
+  const rawMode = searchParams.get('mode')
+  // Backward-compatible normalization: old rent_to_buy browse URLs now
+  // land in the combined Rent experience instead of exposing a fourth tab.
+  const mode: MarketplaceMode = rawMode === 'buy' || rawMode === 'barter' ? rawMode : 'rent'
 
   const handleChange = useCallback(
     (next: MarketplaceMode) => {
