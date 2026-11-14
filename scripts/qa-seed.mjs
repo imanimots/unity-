@@ -200,6 +200,12 @@ async function insertBaseListing(merchantId, overrides) {
     risk_tier: 'low',
     ownership_verified: false,
     condition_confirmed: true,
+    // E45: every QA-seeded listing must be excluded from public browse/
+    // search/recommendations by the same is_test flag every public query
+    // path already filters on -- the one-time backfill migration that
+    // set this for pre-existing rows does not cover listings created by
+    // a later run of this script, so it must be set explicitly here.
+    is_test: true,
   }
   const { data, error } = await admin.from('listings').insert({ ...base, ...overrides }).select('id').single()
   if (error) throw new Error(`insertBaseListing failed: ${error.message}`)
