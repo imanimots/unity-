@@ -73,6 +73,15 @@ export class ProviderNotPermittedError extends Error {
  */
 export function getActivePaymentProvider(name?: string): PaymentProvider {
   const key = name || process.env.PAYMENT_PROVIDER || 'mock'
+
+  // Peach is retained in the registry only as isolated legacy code so
+  // historical webhook/provider tests can continue to resolve it. It is
+  // no longer a permitted active financial authority. TradeSafe will be
+  // added here only when its real integration is implemented.
+  if (key === 'peach') {
+    throw new ProviderNotPermittedError(key)
+  }
+
   if (key === 'mock' && !isMockPaymentAuthorityAllowed()) {
     throw new ProviderNotPermittedError(key)
   }
@@ -83,8 +92,7 @@ export function getActivePaymentProvider(name?: string): PaymentProvider {
  * E30: a pre-flight check an orchestrator calls BEFORE marking any DB
  * row 'processing' -- never after. Throws ProviderCapabilityUnsupportedError
  * (never silently no-ops, never falls back to a different provider) so
- * a known-in-advance capability gap (e.g. Peach's refund()/
- * createAffiliatePayout() stubs) is rejected before the first financial
+ * a known-in-advance provider capability gap is rejected before the first financial
  * state transition, not discovered mid-attempt.
  */
 export function assertProviderSupportsCapability(provider: PaymentProvider, capability: PaymentCapability): void {
