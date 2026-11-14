@@ -11,14 +11,14 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps) {
   const { id } = await params
   const listing = await getListing(id)
-  if (!listing) return { title: 'Not found' }
+  if (!listing || listing.is_test) return { title: 'Not found' }
   return { title: `Buy: ${listing.title} — Unity` }
 }
 
 export default async function BuyPage({ params }: PageProps) {
   const { id } = await params
   const listing = await getListing(id)
-  if (!listing) notFound()
+  if (!listing || listing.is_test) notFound()
   // A rental-only listing has no sale price to buy — the "Buy Now" CTA
   // is never shown for one (see the listing detail page), but this route
   // is still reachable by a direct/typed URL, so guard here too.
