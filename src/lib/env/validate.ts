@@ -56,13 +56,53 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env): EnvVa
   const advertisingEnabledFlag = (env.ADVERTISING_ENABLED ?? 'false') === 'true'
   const advertisingUnsafeInProduction = env.NODE_ENV === 'production' && advertisingEnabledFlag
 
+  // E38: the Public-Test-only "PAYMENT_PROVIDER must be mock" restriction
+  // is replaced by this cross-field pattern (same shape as escrow/
+  // advertising above) — selecting 'peach' makes its four payout
+  // credentials and PEACH_ENVIRONMENT required and fail-closed; staying
+  // on 'mock' leaves them optional, exactly as before. This only ever
+  // governs whether the app CAN initialize the Peach provider — the
+  // separate PEACH_PAYOUTS_EXECUTION_ENABLED kill switch (src/lib/
+  // payments/payout-execution/gate.ts) independently controls whether
+  // it may actually submit a real payout, and is untouched by this flag.
+  const peachProviderSelected = (env.PAYMENT_PROVIDER ?? 'mock') === 'peach'
+
   const checks: EnvCheck[] = [
     check('NEXT_PUBLIC_SUPABASE_URL', env.NEXT_PUBLIC_SUPABASE_URL, { required: true }),
     check('NEXT_PUBLIC_SUPABASE_ANON_KEY', env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { required: true }),
     check('SUPABASE_SERVICE_ROLE_KEY', env.SUPABASE_SERVICE_ROLE_KEY, { required: true }),
     check('NEXT_PUBLIC_APP_URL', env.NEXT_PUBLIC_APP_URL, { required: true }),
     check('NEXT_PUBLIC_MOCK_MODE', env.NEXT_PUBLIC_MOCK_MODE ?? 'false', { required: true, allowed: ['false', 'true'], detail: 'must be "false" for any real (non-demo) deployment' }),
-    check('PAYMENT_PROVIDER', env.PAYMENT_PROVIDER ?? 'mock', { required: true, allowed: ['mock'], detail: 'must be "mock" — real Peach integration is out of scope for public test' }),
+    check('PAYMENT_PROVIDER', env.PAYMENT_PROVIDER ?? 'mock', {
+      required: true,
+      allowed: ['mock', 'peach'],
+      detail: '"mock" for public test; "peach" is the production-capable path and requires the four Peach payout variables below plus PEACH_ENVIRONMENT=production — selecting it does NOT by itself enable real payout execution, see PEACH_PAYOUTS_EXECUTION_ENABLED',
+    }),
+    check('PEACH_PAYOUTS_CLIENT_ID', env.PEACH_PAYOUTS_CLIENT_ID, {
+      required: peachProviderSelected,
+      detail: peachProviderSelected ? 'required when PAYMENT_PROVIDER=peach' : 'not required while PAYMENT_PROVIDER is "mock"',
+    }),
+    check('PEACH_PAYOUTS_CLIENT_SECRET', env.PEACH_PAYOUTS_CLIENT_SECRET, {
+      required: peachProviderSelected,
+      detail: peachProviderSelected ? 'required when PAYMENT_PROVIDER=peach' : 'not required while PAYMENT_PROVIDER is "mock"',
+    }),
+    check('PEACH_PAYOUTS_MERCHANT_ID', env.PEACH_PAYOUTS_MERCHANT_ID, {
+      required: peachProviderSelected,
+      detail: peachProviderSelected ? 'required when PAYMENT_PROVIDER=peach' : 'not required while PAYMENT_PROVIDER is "mock"',
+    }),
+    check('PEACH_PAYOUTS_WEBHOOK_SIGNING_SECRET', env.PEACH_PAYOUTS_WEBHOOK_SIGNING_SECRET, {
+      required: peachProviderSelected,
+      detail: peachProviderSelected
+        ? 'required when PAYMENT_PROVIDER=peach — webhook signatures are never trusted without it'
+        : 'not required while PAYMENT_PROVIDER is "mock"',
+    }),
+    check('PEACH_ENVIRONMENT', env.PEACH_ENVIRONMENT, {
+      required: peachProviderSelected,
+      allowed: peachProviderSelected ? ['production'] : undefined,
+      detail: peachProviderSelected
+        ? 'must be exactly "production" when PAYMENT_PROVIDER=peach — missing or "sandbox" fails closed here; sandbox certification exercises the Peach client directly, not through this app-level provider selector'
+        : 'not required while PAYMENT_PROVIDER is "mock"',
+    }),
     check('OWNERSHIP_VERIFICATION_PROVIDER', env.OWNERSHIP_VERIFICATION_PROVIDER ?? 'manual', { required: true, allowed: ['manual'], detail: 'must be "manual" for public test' }),
     check('IDENTITY_VERIFICATION_PROVIDER', env.IDENTITY_VERIFICATION_PROVIDER ?? 'manual', { required: true, allowed: ['manual'], detail: 'must be "manual" for public test' }),
     check('EMAIL_PROVIDER', env.EMAIL_PROVIDER ?? 'console', { required: true, allowed: ['console', 'resend'] }),
