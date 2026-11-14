@@ -3,7 +3,6 @@ import { AFFILIATE_SWEEP_BATCH_LIMIT } from '@/lib/affiliate/constants'
 import { isMockScenarioSelectionAllowed } from '@/lib/checkout/test-scenario'
 import { getActivePaymentProvider, assertProviderSupportsCapability, ProviderNotPermittedError } from '@/lib/payments/registry'
 import { isPayoutExecutionEnabled } from '@/lib/payments/payout-execution/gate'
-import { loadPeachPayoutsConfig } from '@/lib/payments/providers/peach/payouts-config'
 import { getPayoutDestinationEligibility } from '@/lib/payments/payout-destinations/service'
 import { executeAffiliatePayoutProviderAttempt } from '@/lib/payments/orchestrator'
 import { notifyAffiliateOfCommission } from '@/lib/affiliate/notify'
@@ -15,8 +14,7 @@ import { hasCronAuthConfigured, isAuthorizedCronRequest, isAuthorizedGcpSchedule
  * GET|POST /api/internal/affiliate/process-payouts -- third step of the
  * affiliate automation chain (review-and-approve -> queue-payouts ->
  * process-payouts), scheduled via vercel.json (P4). payout_queued ->
- * processing -> paid/failed, calling the real Peach payout provider
- * once per commission (E33).
+ * processing -> paid/failed once a real active provider is integrated.
  *
  * E33 rewrite -- the whole sweep now fails closed BEFORE the candidate
  * query (phase brief §59) on FOUR independent gates, in order:
@@ -67,6 +65,20 @@ async function handleCronRequest(request: NextRequest) {
     // No body / not JSON -- fine, this route takes no required fields.
   }
 
+  const configuredProvider = process.env.PAYMENT_PROVIDER || 'mock'
+  if (configuredProvider === 'mock' || configuredProvider === 'peach') {
+    // There is intentionally no active real provider until TradeSafe is
+    // integrated. Scheduled sweeps should safely no-op rather than emit
+    // recurring production errors or fall back to legacy Peach.
+    return NextResponse.json({
+      status: 'skipped',
+      reason: 'real_payment_provider_not_configured',
+      considered: 0,
+      paid: 0,
+      failed: 0,
+    })
+  }
+
   if (!isPayoutExecutionEnabled()) {
     return NextResponse.json({ error: 'Payout execution is not enabled in this environment', considered: 0, paid: 0, failed: 0 }, { status: 503 })
   }
@@ -81,10 +93,6 @@ async function handleCronRequest(request: NextRequest) {
       return NextResponse.json({ error: 'Affiliate payout processing is not available in this environment', considered: 0, paid: 0, failed: 0 }, { status: 503 })
     }
     throw err
-  }
-
-  if (provider.name === 'peach' && !loadPeachPayoutsConfig()) {
-    return NextResponse.json({ error: 'Peach Payouts is not configured', considered: 0, paid: 0, failed: 0 }, { status: 503 })
   }
 
   try {
