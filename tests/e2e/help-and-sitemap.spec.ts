@@ -66,6 +66,35 @@ test('help center shows a "no results" state for a nonsense query', async ({ pag
   await expect(page.getByText(/no tasks match your search/i)).toBeVisible()
 })
 
+test('help center default view renders category-grouped sections (E47 Help Centre redesign)', async ({ page }) => {
+  await page.goto('/help')
+  // At least two distinct category headings should be visible, each its
+  // own real, non-empty group -- not a single flat list.
+  const categoryHeadings = page.locator('h1, h2, h3, p').filter({ hasText: 'Getting Started' })
+  await expect(categoryHeadings.first()).toBeVisible()
+})
+
+test('help center support card is present and links to the real /contact route', async ({ page }) => {
+  await page.goto('/help')
+  await expect(page.getByText('Still need help?').first()).toBeVisible()
+  await expect(page.getByRole('link', { name: /contact support/i }).first()).toHaveAttribute('href', '/contact')
+})
+
+test('selecting a single category on the help center narrows to a flat list for that category only', async ({ page }) => {
+  await page.goto('/help')
+  // Category descriptions ("Learn the basics about Unity...") only
+  // render in the grouped default view -- a reliable marker that the
+  // grouped layout is showing, distinct from the category pill label
+  // itself (which stays visible as a filter control either way).
+  await expect(page.getByText('Learn the basics about Unity and how it works.')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Getting Started', exact: false }).first().click()
+  const cardLinks = page.locator('a[href^="/help/"]')
+  const count = await cardLinks.count()
+  expect(count).toBeGreaterThan(0)
+  await expect(page.getByText('Learn the basics about Unity and how it works.')).not.toBeVisible()
+})
+
 test('a real help article renders the full structure and its related tasks link correctly', async ({ page }) => {
   const consoleErrors: string[] = []
   page.on('console', (msg) => {

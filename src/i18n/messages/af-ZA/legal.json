@@ -1,5 +1,12 @@
 {
   "translationNotice": "Hierdie bladsy se raamwerk word in jou gekose taal vertoon. Die gesaghebbende regsteks hieronder is tans slegs in Engels beskikbaar.",
   "englishAuthoritative": "Die Engelse weergawe van hierdie dokument is gesaghebbend.",
-  "contactCta": "Vrae oor hierdie beleid? Kontak ons"
+  "contactCta": "Vrae oor hierdie beleid? Kontak ons",
+  "legalAndTrust": "Regte & Vertroue",
+  "version": "Weergawe {version}",
+  "effective": "Van krag {date}",
+  "lastUpdated": "Laas opgedateer {date}",
+  "draftStatus": "Konsep — wag op regsoorsig",
+  "approvedStatus": "Goedgekeur",
+  "relatedPolicies": "Verwante beleide"
 }

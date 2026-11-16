@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { Link } from '@/i18n/navigation'
-import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
+import { LegalPageLayout, LegalSection, LegalNotice } from '@/components/legal/legal-page-layout'
 import { getLegalDocument } from '@/lib/legal/registry'
 import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
 import { absoluteUrl } from '@/lib/seo/config'
@@ -17,10 +17,10 @@ export const metadata: Metadata = {
 export default function RentalTermsPage() {
   return (
     <LegalPageLayout doc={doc}>
-      <p>
+      <LegalNotice>
         This is a draft describing how a Unity rental booking works, matching the platform&apos;s current
         implementation. It is pending legal review.
-      </p>
+      </LegalNotice>
 
       <LegalSection title="Booking lifecycle">
         <ul className="list-disc pl-5 space-y-1.5">

@@ -1,5 +1,12 @@
 {
   "translationNotice": "This page's chrome is shown in your selected language. The authoritative legal text below is currently available in English only.",
   "englishAuthoritative": "The English version of this document is authoritative.",
-  "contactCta": "Questions about this policy? Contact us"
+  "contactCta": "Questions about this policy? Contact us",
+  "legalAndTrust": "Legal & Trust",
+  "version": "Version {version}",
+  "effective": "Effective {date}",
+  "lastUpdated": "Last updated {date}",
+  "draftStatus": "Draft — pending legal review",
+  "approvedStatus": "Approved",
+  "relatedPolicies": "Related policies"
 }

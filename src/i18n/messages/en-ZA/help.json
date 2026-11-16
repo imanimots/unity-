@@ -19,6 +19,7 @@
       "merchant": "Available once you're signed in with a merchant account.",
       "admin": "Available only to Unity administrators."
     },
+    "pageCount": "{count, plural, one {# page} other {# pages}}",
     "badges": {
       "loginRequired": "Login required",
       "merchant": "Merchant",
@@ -29,18 +30,22 @@
   "helpCenterPage": {
     "metaTitle": "Help Center — Unity",
     "metaDescription": "Find exactly how to do something on Unity, step by step.",
-    "eyebrow": "How do I do something?",
-    "heading": "Help Center",
-    "introBeforeLink": "Choose what you want to do, and follow the exact steps. Looking for a specific page instead? Try the",
+    "badge": "Help Center",
+    "heading": "How can we help?",
+    "subheading": "Find answers about renting, listing, and using Unity.",
+    "sitemapHintBeforeLink": "Looking for a specific page instead? Try the",
     "sitemapLinkText": "Sitemap",
-    "introAfterLink": ".",
+    "sitemapHintAfterLink": ".",
     "searchLabel": "Search the Help Center",
     "searchPlaceholder": "What do you want to do? e.g. list an item, verification, dispute",
     "everyone": "Everyone",
     "allCategories": "All categories",
     "noResultsTitle": "No tasks match your search.",
     "noResultsHint": "Try a different word, or clear the role/category filters.",
-    "providerPendingBadge": "Provider pending"
+    "providerPendingBadge": "Provider pending",
+    "stillNeedHelp": "Still need help?",
+    "stillNeedHelpDesc": "Can't find what you're looking for? Get in touch with our support team.",
+    "contactSupport": "Contact support"
   },
   "taskPage": {
     "breadcrumbHelpCenter": "Help Center",

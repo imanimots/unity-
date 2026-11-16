@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { Link } from '@/i18n/navigation'
-import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
+import { LegalPageLayout, LegalSection, LegalNotice } from '@/components/legal/legal-page-layout'
 import { getLegalDocument } from '@/lib/legal/registry'
 import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
 import { absoluteUrl } from '@/lib/seo/config'
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 export default function DeliveryAndHandoverPage() {
   return (
     <LegalPageLayout doc={doc}>
-      <p>This page reflects Unity&apos;s current MVP handover model. It is a draft, pending legal review.</p>
+      <LegalNotice>This page reflects Unity&apos;s current MVP handover model. It is a draft, pending legal review.</LegalNotice>
 
       <LegalSection title="Manual handover today">
         <ul className="list-disc pl-5 space-y-1.5">

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { Link } from '@/i18n/navigation'
-import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
+import { LegalPageLayout, LegalSection, LegalNotice } from '@/components/legal/legal-page-layout'
 import { getLegalDocument } from '@/lib/legal/registry'
 import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
 import { absoluteUrl } from '@/lib/seo/config'
@@ -17,12 +17,12 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <LegalPageLayout doc={doc}>
-      <p>
+      <LegalNotice>
         This is a draft Privacy Policy, published for Unity&apos;s public test phase and pending legal review. It
         describes the categories of personal information Unity&apos;s platform actually collects and how they are
         used. See also the <Link href="/popia" className="underline">POPIA Notice</Link> for South Africa-specific
         detail.
-      </p>
+      </LegalNotice>
 
       <LegalSection title="Categories of information we process">
         <ul className="list-disc pl-5 space-y-1.5">

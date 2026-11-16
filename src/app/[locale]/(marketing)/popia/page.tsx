@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { Link } from '@/i18n/navigation'
-import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
+import { LegalPageLayout, LegalSection, LegalNotice } from '@/components/legal/legal-page-layout'
 import { getLegalDocument } from '@/lib/legal/registry'
 import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
 import { absoluteUrl } from '@/lib/seo/config'
@@ -17,11 +17,11 @@ export const metadata: Metadata = {
 export default function PopiaPage() {
   return (
     <LegalPageLayout doc={doc}>
-      <p>
+      <LegalNotice>
         This is a draft notice under the Protection of Personal Information Act, 4 of 2013 (POPIA), published for
         Unity&apos;s public test phase and pending legal review. It supplements the{' '}
         <Link href="/privacy" className="underline">Privacy Policy</Link>.
-      </p>
+      </LegalNotice>
 
       <LegalSection title="Responsible party">
         <p>

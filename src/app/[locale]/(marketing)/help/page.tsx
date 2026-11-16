@@ -31,17 +31,20 @@ export default async function HelpCenterPage() {
 
   return (
     <div className="bg-[#FAF8F5] min-h-screen">
-      <section className="pt-24 pb-10 border-b border-[#F2EDE8]">
-        <div className="max-w-5xl mx-auto px-6 lg:px-12">
-          <p className="section-label mb-4 text-[#9B8B85]">{t('eyebrow')}</p>
-          <h1 className="text-3xl sm:text-4xl font-extrabold uppercase text-[#1A0A0A] tracking-tight mb-4">{t('heading')}</h1>
-          <p className="text-[#6B5B55] max-w-2xl">
-            {t('introBeforeLink')} <Link href="/sitemap" className="text-[#8B1A1A] underline">{t('sitemapLinkText')}</Link>{t('introAfterLink')}
+      <section className="pt-24 pb-10">
+        <div className="max-w-2xl mx-auto px-6 text-center">
+          <span className="inline-block mb-5 px-3 py-1 rounded-full bg-[#8B1A1A]/10 text-[#8B1A1A] text-xs font-bold uppercase tracking-[0.08em]">
+            {t('badge')}
+          </span>
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-[#1A0A0A] tracking-tight mb-3">{t('heading')}</h1>
+          <p className="text-[#6B5B55] mb-1">{t('subheading')}</p>
+          <p className="text-sm text-[#9B8B85]">
+            {t('sitemapHintBeforeLink')} <Link href="/sitemap" className="text-[#8B1A1A] underline">{t('sitemapLinkText')}</Link>{t('sitemapHintAfterLink')}
           </p>
         </div>
       </section>
 
-      <div className="max-w-5xl mx-auto px-6 lg:px-12 py-12">
+      <div className="max-w-6xl mx-auto px-6 lg:px-12 py-6 pb-16">
         <NextIntlClientProvider messages={scoped}>
           <HelpBrowser tasks={HELP_TASKS} />
         </NextIntlClientProvider>

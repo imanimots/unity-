@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { Link } from '@/i18n/navigation'
-import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
+import { LegalPageLayout, LegalSection, LegalNotice } from '@/components/legal/legal-page-layout'
 import { TestModeBanner } from '@/components/shared/test-mode-banner'
 import { getLegalDocument } from '@/lib/legal/registry'
 import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
@@ -20,7 +20,7 @@ export default function PaymentsAndDepositsPage() {
     <LegalPageLayout doc={doc}>
       <TestModeBanner />
 
-      <p className="mt-2">This page describes Unity&apos;s actual payment architecture. It is a draft, pending legal review.</p>
+      <LegalNotice>This page describes Unity&apos;s actual payment architecture. It is a draft, pending legal review.</LegalNotice>
 
       <LegalSection title="Public test environment (current)">
         <ul className="list-disc pl-5 space-y-1.5">

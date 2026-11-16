@@ -86,6 +86,24 @@ export const CATEGORY_LABELS: Record<HelpCategory, string> = {
   'admin-help': 'Admin Help',
 }
 
+/** One-line subtitle shown under each category's header card on /help (E47 Phase 2) -- content/taxonomy text, same English-authoritative precedent as CATEGORY_LABELS. */
+export const CATEGORY_DESCRIPTIONS: Record<HelpCategory, string> = {
+  'getting-started': 'Learn the basics about Unity and how it works.',
+  renting: 'Find answers about booking and renting items.',
+  buying: 'Find answers about buying and selling items outright.',
+  'selling-listing': 'Everything about creating and managing your listings.',
+  'rent-to-buy': 'How Rent-to-Buy agreements and payments work.',
+  barter: 'Trading items and skills directly, no cash involved.',
+  'looking-for': 'Posting and responding to Looking For requests.',
+  messages: 'Contacting and messaging other members.',
+  'problems-disputes': 'Raising and resolving a problem with a transaction.',
+  reviews: 'Leaving and managing reviews.',
+  'money-payouts': 'Earnings, commissions, and payout destinations.',
+  affiliate: 'Joining the affiliate program and tracking referrals.',
+  'account-privacy': 'Your account, profile, and privacy settings.',
+  'admin-help': 'Platform operations for Unity administrators.',
+}
+
 export const ROLE_LABELS: Record<HelpRole, string> = {
   guest: 'Guest',
   user: 'User',

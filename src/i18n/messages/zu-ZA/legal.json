@@ -1,5 +1,12 @@
 {
   "translationNotice": "Uhlaka lwalesi sikhala lukhonjiswa ngolimi olukhethile lwakho. Umbhalo osemthethweni ongezansi utholakala ngesiNgisi kuphela okwamanje.",
   "englishAuthoritative": "Inguqulo yesiNgisi yalo mqulu iyona esemthethweni.",
-  "contactCta": "Imibuzo ngale nqubomgomo? Xhumana nathi"
+  "contactCta": "Imibuzo ngale nqubomgomo? Xhumana nathi",
+  "legalAndTrust": "Okomthetho Nokwethembeka",
+  "version": "Inguqulo {version}",
+  "effective": "Iqala ukusebenza {date}",
+  "lastUpdated": "Kubuyekezwe ngokokugcina {date}",
+  "draftStatus": "Uhlaka — kulindwe ukubuyekezwa ngokomthetho",
+  "approvedStatus": "Kuvunyiwe",
+  "relatedPolicies": "Izinqubomgomo Ezihlobene"
 }

@@ -5,6 +5,7 @@ import { Link } from '@/i18n/navigation'
 import { ArrowRight, Hourglass, ShieldCheck, Store, LockKeyhole } from 'lucide-react'
 import { HELP_TASKS } from '@/lib/help/task-registry'
 import { CATEGORY_LABELS, ROLE_LABELS } from '@/lib/help/types'
+import { SupportCard } from '@/components/help/support-card'
 import { absoluteUrl, getDefaultRobotsMeta, PERMANENT_NOINDEX } from '@/lib/seo/config'
 
 interface PageProps {
@@ -55,7 +56,7 @@ export default async function HelpTaskPage({ params }: PageProps) {
   return (
     <div className="bg-[#FAF8F5] min-h-screen">
       <section className="pt-24 pb-10 border-b border-[#F2EDE8]">
-        <div className="max-w-3xl mx-auto px-6 lg:px-12">
+        <div className="max-w-5xl mx-auto px-6 lg:px-12">
           <nav aria-label="Breadcrumb" className="text-xs text-[#9B8B85] mb-4">
             <Link href="/help" className="hover:text-[#8B1A1A]">{t('breadcrumbHelpCenter')}</Link>
             <span className="mx-1.5">/</span>
@@ -81,7 +82,8 @@ export default async function HelpTaskPage({ params }: PageProps) {
         </div>
       </section>
 
-      <div className="max-w-3xl mx-auto px-6 lg:px-12 py-12 space-y-10">
+      <div className="max-w-5xl mx-auto px-6 lg:px-12 py-12 lg:grid lg:grid-cols-[1fr_260px] lg:gap-10 lg:items-start">
+      <div className="space-y-10 min-w-0">
         {task.providerDependency && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
             {PROVIDER_LABELS[task.providerDependency]}. {t('providerBannerSuffix')}
@@ -170,6 +172,15 @@ export default async function HelpTaskPage({ params }: PageProps) {
         <div className="pt-4 border-t border-[#F2EDE8]">
           <Link href="/help" className="text-sm text-[#8B1A1A] underline">{t('backToHelpCenter')}</Link>
         </div>
+
+        <div className="lg:hidden">
+          <SupportCard />
+        </div>
+      </div>
+
+      <div className="hidden lg:block sticky top-24">
+        <SupportCard />
+      </div>
       </div>
     </div>
   )

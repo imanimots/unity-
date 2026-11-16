@@ -19,6 +19,7 @@
       "merchant": "Beskikbaar sodra jy aangemeld is met 'n handelaarrekening.",
       "admin": "Slegs beskikbaar vir Unity-administrateurs."
     },
+    "pageCount": "{count, plural, one {# bladsy} other {# bladsye}}",
     "badges": {
       "loginRequired": "Aanmelding vereis",
       "merchant": "Handelaar",
@@ -29,18 +30,22 @@
   "helpCenterPage": {
     "metaTitle": "Hulpsentrum — Unity",
     "metaDescription": "Vind presies hoe om iets op Unity te doen, stap vir stap.",
-    "eyebrow": "Hoe doen ek iets?",
-    "heading": "Hulpsentrum",
-    "introBeforeLink": "Kies wat jy wil doen, en volg die presiese stappe. Soek jy eerder 'n spesifieke bladsy? Probeer die",
+    "badge": "Hulpsentrum",
+    "heading": "Hoe kan ons help?",
+    "subheading": "Vind antwoorde oor huur, lys, en die gebruik van Unity.",
+    "sitemapHintBeforeLink": "Soek jy eerder 'n spesifieke bladsy? Probeer die",
     "sitemapLinkText": "Werfkaart",
-    "introAfterLink": ".",
+    "sitemapHintAfterLink": ".",
     "searchLabel": "Deursoek die Hulpsentrum",
     "searchPlaceholder": "Wat wil jy doen? bv. lys 'n item, verifikasie, geskil",
     "everyone": "Almal",
     "allCategories": "Alle kategorieë",
     "noResultsTitle": "Geen take pas by jou soektog nie.",
     "noResultsHint": "Probeer 'n ander woord, of maak die rol-/kategoriefilters skoon.",
-    "providerPendingBadge": "Verskaffer hangend"
+    "providerPendingBadge": "Verskaffer hangend",
+    "stillNeedHelp": "Steeds hulp nodig?",
+    "stillNeedHelpDesc": "Kan nie vind waarna jy soek nie? Kontak ons ondersteuningspan.",
+    "contactSupport": "Kontak ondersteuning"
   },
   "taskPage": {
     "breadcrumbHelpCenter": "Hulpsentrum",

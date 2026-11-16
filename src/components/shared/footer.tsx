@@ -28,7 +28,7 @@ export function Footer() {
 
             {/* Platform */}
             <div>
-              <h4 className="section-label text-[#9B8B85] mb-4">{t('footer.platform')}</h4>
+              <h2 className="section-label text-[#9B8B85] mb-4">{t('footer.platform')}</h2>
               <ul className="space-y-2.5">
                 <li><Link href="/#how-it-works" className="text-sm text-[#6B5B55] hover:text-[#1A0A0A] transition-colors">{t('howItWorks')}</Link></li>
                 <li><Link href="/listings" className="text-sm text-[#6B5B55] hover:text-[#1A0A0A] transition-colors">{t('browse')}</Link></li>
@@ -38,7 +38,7 @@ export function Footer() {
 
             {/* Trust */}
             <div>
-              <h4 className="section-label text-[#9B8B85] mb-4">{t('footer.trust')}</h4>
+              <h2 className="section-label text-[#9B8B85] mb-4">{t('footer.trust')}</h2>
               <ul className="space-y-2.5">
                 <li><Link href="/verification-and-trust" className="text-sm text-[#6B5B55] hover:text-[#1A0A0A] transition-colors">{t('footer.verificationAndTrust')}</Link></li>
                 <li><Link href="/prohibited-items" className="text-sm text-[#6B5B55] hover:text-[#1A0A0A] transition-colors">{t('footer.prohibitedItems')}</Link></li>
@@ -48,7 +48,7 @@ export function Footer() {
 
             {/* Legal */}
             <div>
-              <h4 className="section-label text-[#9B8B85] mb-4">{t('footer.legal')}</h4>
+              <h2 className="section-label text-[#9B8B85] mb-4">{t('footer.legal')}</h2>
               <ul className="space-y-2.5">
                 <li><Link href="/terms" className="text-sm text-[#6B5B55] hover:text-[#1A0A0A] transition-colors">{t('footer.terms')}</Link></li>
                 <li><Link href="/privacy" className="text-sm text-[#6B5B55] hover:text-[#1A0A0A] transition-colors">{t('footer.privacy')}</Link></li>
@@ -63,7 +63,7 @@ export function Footer() {
 
             {/* Support */}
             <div>
-              <h4 className="section-label text-[#9B8B85] mb-4">{t('footer.support')}</h4>
+              <h2 className="section-label text-[#9B8B85] mb-4">{t('footer.support')}</h2>
               <ul className="space-y-2.5">
                 <li><Link href="/help" className="text-sm text-[#6B5B55] hover:text-[#1A0A0A] transition-colors">{t('footer.helpCenter')}</Link></li>
                 <li><Link href="/sitemap" className="text-sm text-[#6B5B55] hover:text-[#1A0A0A] transition-colors">{t('footer.sitemap')}</Link></li>

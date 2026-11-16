@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { Link } from '@/i18n/navigation'
-import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
+import { LegalPageLayout, LegalSection, LegalNotice } from '@/components/legal/legal-page-layout'
 import { getLegalDocument } from '@/lib/legal/registry'
 import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
 import { absoluteUrl } from '@/lib/seo/config'
@@ -17,11 +17,11 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <LegalPageLayout doc={doc}>
-      <p>
+      <LegalNotice>
         This is a draft Terms of Use, published for Unity&apos;s public test phase. It has not yet been reviewed
         or approved by Unity&apos;s legal advisors. Nothing on this page is legal advice, and nothing here creates
         a guarantee beyond what is expressly stated.
-      </p>
+      </LegalNotice>
 
       <LegalSection title="1. What Unity is">
         <p>

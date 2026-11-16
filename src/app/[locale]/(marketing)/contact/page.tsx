@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { Link } from '@/i18n/navigation'
-import { LegalPageLayout, LegalSection } from '@/components/legal/legal-page-layout'
+import { LegalPageLayout, LegalSection, LegalNotice } from '@/components/legal/legal-page-layout'
 import { getLegalDocument } from '@/lib/legal/registry'
 import { legalRobotsMeta } from '@/lib/seo/legal-metadata'
 import { absoluteUrl } from '@/lib/seo/config'
@@ -17,10 +17,10 @@ export const metadata: Metadata = {
 export default function ContactPage() {
   return (
     <LegalPageLayout doc={doc}>
-      <p>
+      <LegalNotice>
         Unity is currently in public test — the contact details below are the public-test support channel.
         Production contact details will be published once confirmed.
-      </p>
+      </LegalNotice>
 
       <LegalSection title="Support">
         <p>For questions about your account, a booking, or using the platform: <strong>support@unitytest.co.za</strong></p>

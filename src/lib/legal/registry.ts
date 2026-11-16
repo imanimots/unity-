@@ -29,6 +29,12 @@ export interface LegalDocument {
   route: string
   /** Which consent checkpoint(s) reference this document, for docs/traceability only. */
   consentContexts: Array<'registration' | 'booking_request' | 'checkout' | 'verification' | 'listing_submission'>
+  /** Chrome-level navigation only (E47 Phase 5/6) -- a small, curated set
+   * of genuinely related policy slugs shown as cards at the bottom of
+   * the shared layout. Never read by the legal body itself; purely
+   * additive navigation, so it carries no "do not rewrite legal
+   * content" risk. */
+  relatedSlugs: string[]
 }
 
 const DRAFT_DATE = '2026-08-06'
@@ -44,6 +50,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
     source: 'internal_draft',
     route: '/terms',
     consentContexts: ['registration'],
+    relatedSlugs: ['privacy', 'rental-terms', 'payments-and-deposits'],
   },
   {
     slug: 'privacy',
@@ -55,6 +62,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
     source: 'internal_draft',
     route: '/privacy',
     consentContexts: ['registration', 'verification'],
+    relatedSlugs: ['popia', 'terms'],
   },
   {
     slug: 'popia',
@@ -66,6 +74,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
     source: 'internal_draft',
     route: '/popia',
     consentContexts: ['registration', 'verification'],
+    relatedSlugs: ['privacy', 'terms'],
   },
   {
     slug: 'rental-terms',
@@ -77,6 +86,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
     source: 'internal_draft',
     route: '/rental-terms',
     consentContexts: ['booking_request'],
+    relatedSlugs: ['cancellations', 'refunds', 'delivery-and-handover', 'prohibited-items'],
   },
   {
     slug: 'payments-and-deposits',
@@ -88,6 +98,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
     source: 'internal_draft',
     route: '/payments-and-deposits',
     consentContexts: ['checkout'],
+    relatedSlugs: ['cancellations', 'refunds', 'disputes'],
   },
   {
     slug: 'cancellations',
@@ -99,6 +110,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
     source: 'internal_draft',
     route: '/cancellations',
     consentContexts: ['booking_request'],
+    relatedSlugs: ['refunds', 'rental-terms'],
   },
   {
     slug: 'refunds',
@@ -110,6 +122,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
     source: 'internal_draft',
     route: '/refunds',
     consentContexts: ['checkout'],
+    relatedSlugs: ['cancellations', 'payments-and-deposits'],
   },
   {
     slug: 'disputes',
@@ -121,6 +134,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
     source: 'internal_draft',
     route: '/disputes',
     consentContexts: [],
+    relatedSlugs: ['refunds', 'rental-terms', 'verification-and-trust'],
   },
   {
     slug: 'prohibited-items',
@@ -132,6 +146,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
     source: 'internal_draft',
     route: '/prohibited-items',
     consentContexts: ['listing_submission'],
+    relatedSlugs: ['rental-terms', 'verification-and-trust'],
   },
   {
     slug: 'delivery-and-handover',
@@ -143,6 +158,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
     source: 'internal_draft',
     route: '/delivery-and-handover',
     consentContexts: ['booking_request'],
+    relatedSlugs: ['rental-terms', 'cancellations'],
   },
   {
     slug: 'verification-and-trust',
@@ -154,6 +170,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
     source: 'internal_draft',
     route: '/verification-and-trust',
     consentContexts: ['verification'],
+    relatedSlugs: ['disputes', 'prohibited-items', 'terms'],
   },
   {
     slug: 'contact',
@@ -165,6 +182,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
     source: 'internal_draft',
     route: '/contact',
     consentContexts: [],
+    relatedSlugs: ['terms', 'disputes'],
   },
 ]
 

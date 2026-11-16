@@ -19,6 +19,7 @@
       "merchant": "Iyatholakala uma ungene ngemvume nge-akhawunti yomthengisi.",
       "admin": "Itholakala kuphela kubaphathi be-Unity."
     },
+    "pageCount": "{count, plural, one {ikhasi eli-#} other {amakhasi angu-#}}",
     "badges": {
       "loginRequired": "Kudingeka ukungena ngemvume",
       "merchant": "Umthengisi",
@@ -29,18 +30,22 @@
   "helpCenterPage": {
     "metaTitle": "Isikhungo Sosizo — Unity",
     "metaDescription": "Thola kahle indlela yokwenza okuthile ku-Unity, isinyathelo ngesinyathelo.",
-    "eyebrow": "Ngenza kanjani okuthile?",
-    "heading": "Isikhungo Sosizo",
-    "introBeforeLink": "Khetha okufuna ukukwenza, ulandele izinyathelo ezinembile. Ufuna ikhasi elithile esikhundleni? Zama i",
+    "badge": "Isikhungo Sosizo",
+    "heading": "Singakusiza kanjani?",
+    "subheading": "Thola izimpendulo mayelana nokuqasha, ukufaka izinto ohlwini, nokusebenzisa i-Unity.",
+    "sitemapHintBeforeLink": "Ufuna ikhasi elithile esikhundleni? Zama i",
     "sitemapLinkText": "Mephu Yesayithi",
-    "introAfterLink": ".",
+    "sitemapHintAfterLink": ".",
     "searchLabel": "Sesha Isikhungo Sosizo",
     "searchPlaceholder": "Ufuna ukwenza ini? isib. faka into, ukuqinisekiswa, ukuphikisana",
     "everyone": "Wonke Umuntu",
     "allCategories": "Zonke izigaba",
     "noResultsTitle": "Azikho izinto ezifanele ukusesha kwakho.",
     "noResultsHint": "Zama igama elihlukile, noma usule izihlungi zendima/sigaba.",
-    "providerPendingBadge": "Umhlinzeki usalindile"
+    "providerPendingBadge": "Umhlinzeki usalindile",
+    "stillNeedHelp": "Usadinga usizo?",
+    "stillNeedHelpDesc": "Awukutholi okufunayo? Xhumana neqembu lethu lokusekela.",
+    "contactSupport": "Xhumana Nokusekela"
   },
   "taskPage": {
     "breadcrumbHelpCenter": "Isikhungo Sosizo",
