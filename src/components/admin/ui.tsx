@@ -37,9 +37,9 @@ export const SEVERITY_STYLES: Record<string, string> = {
 
 export function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl px-5 py-4">
+    <div className="bg-white border border-[#F2EDE8] rounded-xl px-5 py-4">
       <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">{label}</p>
-      <p className="text-2xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{value}</p>
+      <p className="text-2xl font-extrabold text-[#1A0A0A] tabular-nums">{value}</p>
     </div>
   )
 }
@@ -49,7 +49,7 @@ export function AdminPageHeader({ eyebrow, title, badge }: { eyebrow: string; ti
     <div className="flex items-start justify-between gap-4 flex-wrap">
       <div>
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-1">{eyebrow}</p>
-        <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED]">{title}</h1>
+        <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A]">{title}</h1>
       </div>
       {badge ? (
         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200">
@@ -62,13 +62,13 @@ export function AdminPageHeader({ eyebrow, title, badge }: { eyebrow: string; ti
 }
 
 export const inputClass =
-  'bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg text-sm px-3 py-2 text-[#1A0A0A] dark:text-[#F5F0ED] placeholder:text-[#9B8B85] focus:outline-none focus:ring-1 focus:ring-[#8B1A1A]'
+  'bg-white border border-[#F2EDE8] rounded-lg text-sm px-3 py-2 text-[#1A0A0A] placeholder:text-[#9B8B85] focus:outline-none focus:ring-1 focus:ring-[#8B1A1A]'
 
 export const primaryButtonClass =
   'inline-flex items-center gap-1 bg-[#8B1A1A] text-white hover:bg-[#7A1616] text-xs font-medium uppercase tracking-[0.08em] px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed'
 
 export const secondaryButtonClass =
-  'inline-flex items-center gap-1 bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] text-xs font-medium uppercase tracking-[0.08em] px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed'
+  'inline-flex items-center gap-1 bg-white border border-[#F2EDE8] text-[#1A0A0A] hover:bg-[#FAF8F5] text-xs font-medium uppercase tracking-[0.08em] px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed'
 
 export function newIdempotencyKey(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `key-${Date.now()}-${Math.random()}`

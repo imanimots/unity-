@@ -31,9 +31,9 @@ export default async function RentToBuyReviewPage({ params }: Props) {
 
   if (!requester || !data) {
     return (
-      <div className="min-h-screen bg-[#FAF8F5] dark:bg-[#0F0A0A] flex items-center justify-center">
+      <div className="min-h-screen bg-[#FAF8F5] flex items-center justify-center">
         <div className="max-w-lg mx-auto px-4 py-16 text-center">
-          <p className="text-[#6B5B55] dark:text-[#9B8B85] font-['Plus_Jakarta_Sans']">{t('agreementNotFound')}</p>
+          <p className="text-[#6B5B55] font-['Plus_Jakarta_Sans']">{t('agreementNotFound')}</p>
           <Link href={backHref} className="text-sm text-[#8B1A1A] hover:text-[#7A1616] underline mt-2 inline-block font-['Plus_Jakarta_Sans'] transition-colors">
             ← {t('backToAgreements')}
           </Link>
@@ -43,22 +43,22 @@ export default async function RentToBuyReviewPage({ params }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] dark:bg-[#0F0A0A]">
+    <div className="min-h-screen bg-[#FAF8F5]">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center gap-3 mb-8">
-          <Link href={backHref} className="p-1.5 rounded-lg text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors">
+          <Link href={backHref} className="p-1.5 rounded-lg text-[#6B5B55] hover:text-[#1A0A0A] hover:bg-[#F2EDE8] transition-colors">
             <ArrowLeft size={18} />
           </Link>
           <div>
-            <h1 className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] font-['Plus_Jakarta_Sans']">{t('leaveReview')}</h1>
+            <h1 className="text-xl font-extrabold text-[#1A0A0A] font-['Plus_Jakarta_Sans']">{t('leaveReview')}</h1>
             <p className="text-xs text-[#9B8B85] mt-0.5 font-['Plus_Jakarta_Sans']">{data.transactionTitle}</p>
           </div>
         </div>
 
         {data.alreadySubmitted && data.existingReview ? (
-          <div className="max-w-lg mx-auto rounded-2xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] p-6 text-center space-y-2">
-            <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('alreadySubmittedTitle')}</p>
-            <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">{data.existingReview.publishedAt ? t('nowPublic') : t('submittedBlindExplainer')}</p>
+          <div className="max-w-lg mx-auto rounded-2xl border border-[#F2EDE8] bg-white p-6 text-center space-y-2">
+            <p className="text-sm font-semibold text-[#1A0A0A]">{t('alreadySubmittedTitle')}</p>
+            <p className="text-sm text-[#6B5B55]">{data.existingReview.publishedAt ? t('nowPublic') : t('submittedBlindExplainer')}</p>
           </div>
         ) : (
           <ReviewForm domain="rent_to_buy" transactionId={id} revieweeName={data.revieweeName} transactionTitle={data.transactionTitle} backHref={backHref} />

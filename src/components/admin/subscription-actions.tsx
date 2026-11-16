@@ -59,11 +59,11 @@ export function SubscriptionAdminActions({ merchantId, currentPlanId }: Props) {
       <button
         onClick={correct}
         disabled={pending}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors disabled:opacity-50"
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] rounded-lg border border-[#F2EDE8] text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors disabled:opacity-50"
       >
         <ShieldCheck size={13} /> {pending ? 'Working…' : 'Correct plan'}
       </button>
-      {error && <p className="text-xs text-red-600 dark:text-red-400 mt-2">{error}</p>}
+      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
     </div>
   )
 }

@@ -53,45 +53,45 @@ export function PaymentBreakdown(props: Props) {
   ]
 
   return (
-    <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-5">
+    <div className="bg-white rounded-xl border border-[#F2EDE8] p-5">
       <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-4">{t('summaryTitle')}</p>
 
       <dl className="space-y-2 mb-4">
         {rows.map((row) => (
           <div key={row.label} className="flex items-center justify-between gap-4 text-sm">
-            <dt className="text-[#6B5B55] dark:text-[#9B8B85]">{row.label}</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED] font-medium text-right">{row.value}</dd>
+            <dt className="text-[#6B5B55]">{row.label}</dt>
+            <dd className="text-[#1A0A0A] font-medium text-right">{row.value}</dd>
           </div>
         ))}
       </dl>
 
-      <div className="border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-4 space-y-2">
+      <div className="border-t border-[#F2EDE8] pt-4 space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('rentalSubtotal')}</span>
-          <span className="text-[#1A0A0A] dark:text-[#F5F0ED] font-medium">{money(subtotalAmount, currency)}</span>
+          <span className="text-[#6B5B55]">{t('rentalSubtotal')}</span>
+          <span className="text-[#1A0A0A] font-medium">{money(subtotalAmount, currency)}</span>
         </div>
         {platformFeeAmount !== null && platformFeeAmount > 0 && (
           <div className="flex items-center justify-between text-sm">
-            <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('platformFee')}</span>
-            <span className="text-[#1A0A0A] dark:text-[#F5F0ED] font-medium">{money(platformFeeAmount, currency)}</span>
+            <span className="text-[#6B5B55]">{t('platformFee')}</span>
+            <span className="text-[#1A0A0A] font-medium">{money(platformFeeAmount, currency)}</span>
           </div>
         )}
         <div className="flex items-center justify-between text-sm">
-          <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('depositRefundable')}</span>
-          <span className="text-[#1A0A0A] dark:text-[#F5F0ED] font-medium">{depositAmount && depositAmount > 0 ? money(depositAmount, currency) : t('none')}</span>
+          <span className="text-[#6B5B55]">{t('depositRefundable')}</span>
+          <span className="text-[#1A0A0A] font-medium">{depositAmount && depositAmount > 0 ? money(depositAmount, currency) : t('none')}</span>
         </div>
-        <div className="flex items-center justify-between text-base pt-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
-          <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('totalObligationLabel')}</span>
+        <div className="flex items-center justify-between text-base pt-2 border-t border-[#F2EDE8]">
+          <span className="font-semibold text-[#1A0A0A]">{t('totalObligationLabel')}</span>
           <span className="font-bold text-[#8B1A1A]">{money(totalAmount, currency)}</span>
         </div>
       </div>
 
-      <div className="border-t border-[#F2EDE8] dark:border-[#2A1A1A] mt-4 pt-4 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-xs text-[#6B5B55] dark:text-[#9B8B85]">
+      <div className="border-t border-[#F2EDE8] mt-4 pt-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-xs text-[#6B5B55]">
           {t('rentalPayment')} <PaymentStatusBadge status={rentalPaymentStatus} />
         </div>
         {depositAmount && depositAmount > 0 && (
-          <div className="flex items-center gap-2 text-xs text-[#6B5B55] dark:text-[#9B8B85]">
+          <div className="flex items-center gap-2 text-xs text-[#6B5B55]">
             {tRent('deposit')} <PaymentStatusBadge status={depositPaymentStatus} />
           </div>
         )}

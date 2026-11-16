@@ -4,8 +4,8 @@ import { Plus, Trash2 } from 'lucide-react'
 import type { BarterSkillTaskPublicPost, SkillTaskKind, SkillTaskDeliveryMode } from '@/types'
 
 const inputClass =
-  'w-full px-3 py-2 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-sm text-[#1A0A0A] dark:text-[#F5F0ED] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20'
-const labelClass = 'text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1 block'
+  'w-full px-3 py-2 rounded-lg border border-[#F2EDE8] bg-white text-sm text-[#1A0A0A] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20'
+const labelClass = 'text-xs font-medium text-[#6B5B55] mb-1 block'
 
 export interface ContributionMilestoneInput {
   title: string
@@ -74,7 +74,7 @@ function ContributionCard({ contribution, availablePosts, onChange, onRemove }: 
   const mSum = milestoneSum(contribution.milestones)
 
   return (
-    <div className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-3.5 space-y-3">
+    <div className="rounded-xl border border-[#F2EDE8] p-3.5 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex gap-2">
           {(['skill', 'task'] as const).map((k) => (
@@ -83,7 +83,7 @@ function ContributionCard({ contribution, availablePosts, onChange, onRemove }: 
               type="button"
               onClick={() => onChange({ ...contribution, kind: k, skill_task_post_id: undefined })}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                contribution.kind === k ? 'bg-[#8B1A1A] text-white border-[#8B1A1A]' : 'border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED]'
+                contribution.kind === k ? 'bg-[#8B1A1A] text-white border-[#8B1A1A]' : 'border-[#F2EDE8] text-[#1A0A0A]'
               }`}
             >
               {k === 'skill' ? 'Skill' : 'Task'}
@@ -146,7 +146,7 @@ function ContributionCard({ contribution, availablePosts, onChange, onRemove }: 
             <input type="text" value={m.title} onChange={(e) => updateMilestone(i, { title: e.target.value })} placeholder={`Milestone ${m.sequence}`} className={inputClass} />
             <input type="number" min={0} max={100} value={m.weight_percent || ''} onChange={(e) => updateMilestone(i, { weight_percent: Number(e.target.value) || 0 })} placeholder="%" className={inputClass} />
             {contribution.milestones.length > 1 && (
-              <button type="button" onClick={() => removeMilestone(i)} className="p-2 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#9B8B85] hover:text-red-600">
+              <button type="button" onClick={() => removeMilestone(i)} className="p-2 rounded-lg border border-[#F2EDE8] text-[#9B8B85] hover:text-red-600">
                 <Trash2 size={12} />
               </button>
             )}
@@ -171,7 +171,7 @@ export function ContributionListEditor({ title, contributions, availablePosts, o
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{title}</label>
+        <label className="text-sm font-semibold text-[#1A0A0A]">{title}</label>
         <button
           type="button"
           onClick={() => onChange([...contributions, newContribution()])}

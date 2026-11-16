@@ -272,31 +272,31 @@ export function Customer360({ userId, mode }: { userId: string; mode: 'customer'
 
   return (
     <div className="p-6 lg:p-8 space-y-6 max-w-5xl">
-      <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#8B1A1A]">
+      <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-[#6B5B55] hover:text-[#8B1A1A]">
         <ArrowLeft size={14} /> {backLabel}
       </Link>
 
       <AdminPageHeader eyebrow={mode === 'merchant' ? 'Merchant 360' : 'Customer 360'} title={detail.profile.fullName ?? detail.profile.displayName ?? detail.profile.id.slice(0, 8)} />
 
       {/* ── Account ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Account</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Account</h2>
         <div className="flex gap-2 flex-wrap">
           <Pill value={detail.profile.role} styles={{}} />
           <Pill value={detail.profile.kycStatus} styles={KYC_STYLES} />
           <Pill value={detail.profile.accountStatus} styles={ACCOUNT_STATUS_STYLES} />
         </div>
         <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm">
-          <div><dt className="text-[#9B8B85]">User ID</dt><dd className="text-[#1A0A0A] dark:text-[#F5F0ED] font-mono text-xs">{detail.profile.id}</dd></div>
-          <div><dt className="text-[#9B8B85]">Phone</dt><dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{detail.profile.phone ?? 'No phone on file'}</dd></div>
-          <div><dt className="text-[#9B8B85]">Unity Score</dt><dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{detail.profile.unityScore.toFixed(1)}</dd></div>
-          <div><dt className="text-[#9B8B85]">Created</dt><dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{formatDateTime(detail.profile.createdAt)}</dd></div>
+          <div><dt className="text-[#9B8B85]">User ID</dt><dd className="text-[#1A0A0A] font-mono text-xs">{detail.profile.id}</dd></div>
+          <div><dt className="text-[#9B8B85]">Phone</dt><dd className="text-[#1A0A0A]">{detail.profile.phone ?? 'No phone on file'}</dd></div>
+          <div><dt className="text-[#9B8B85]">Unity Score</dt><dd className="text-[#1A0A0A]">{detail.profile.unityScore.toFixed(1)}</dd></div>
+          <div><dt className="text-[#9B8B85]">Created</dt><dd className="text-[#1A0A0A]">{formatDateTime(detail.profile.createdAt)}</dd></div>
           {detail.profile.statusReason ? (
-            <div className="col-span-2"><dt className="text-[#9B8B85]">Status reason</dt><dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{detail.profile.statusReason}</dd></div>
+            <div className="col-span-2"><dt className="text-[#9B8B85]">Status reason</dt><dd className="text-[#1A0A0A]">{detail.profile.statusReason}</dd></div>
           ) : null}
         </dl>
         {detail.verification ? (
-          <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85]">
+          <p className="text-xs text-[#6B5B55]">
             KYC review: <span className="capitalize font-medium">{detail.verification.status.replace(/_/g, ' ')}</span>
             {detail.verification.reviewedAt ? ` — reviewed ${formatDateTime(detail.verification.reviewedAt)}` : ''} ·{' '}
             <Link href={`/admin/verifications/${userId}`} className="text-[#8B1A1A] underline">Open verification detail</Link>
@@ -305,29 +305,29 @@ export function Customer360({ userId, mode }: { userId: string; mode: 'customer'
       </section>
 
       {/* ── Auth & Access ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Auth & Access</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Auth & Access</h2>
         {authLoading ? (
           <p className="text-sm text-[#9B8B85]">Loading…</p>
         ) : !authInfo || authInfo.authUserExists === false ? (
           <p className="text-sm text-red-600">No matching auth user found for this profile id.</p>
         ) : authInfo.erased ? (
-          <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">
+          <p className="text-sm text-[#6B5B55]">
             This account is erased. Auth & Access details (including email and phone) are not shown for erased accounts — the server never fetches them for an erased profile.
           </p>
         ) : (
           <>
             <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm">
-              <div><dt className="text-[#9B8B85]">Email</dt><dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{authInfo.email ?? '—'}</dd></div>
-              <div><dt className="text-[#9B8B85]">Email confirmed</dt><dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{authInfo.emailConfirmedAt ? formatDateTime(authInfo.emailConfirmedAt) : 'Not confirmed'}</dd></div>
-              <div><dt className="text-[#9B8B85]">Phone (auth)</dt><dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{authInfo.phone || '—'}</dd></div>
-              <div><dt className="text-[#9B8B85]">Phone confirmed</dt><dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{authInfo.phoneConfirmedAt ? formatDateTime(authInfo.phoneConfirmedAt) : 'Not confirmed'}</dd></div>
-              <div><dt className="text-[#9B8B85]">Last successful sign-in</dt><dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{authInfo.lastSignInAt ? formatDateTime(authInfo.lastSignInAt) : 'Never'}</dd></div>
-              <div><dt className="text-[#9B8B85]">Auth user created</dt><dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{formatDateTime(authInfo.createdAt)}</dd></div>
-              <div><dt className="text-[#9B8B85]">Ban state</dt><dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{authInfo.bannedUntil ? `Banned until ${formatDateTime(authInfo.bannedUntil)}` : 'Not banned'}</dd></div>
-              <div><dt className="text-[#9B8B85]">MFA factors</dt><dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{authInfo.mfaFactorCount} ({authInfo.mfaVerifiedFactorCount} verified)</dd></div>
-              <div><dt className="text-[#9B8B85]">Last recovery email sent</dt><dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{authInfo.lastRecoveryEmailSentAt ? formatDateTime(authInfo.lastRecoveryEmailSentAt) : '—'}</dd></div>
-              <div><dt className="text-[#9B8B85]">Last confirmation email sent</dt><dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{authInfo.lastConfirmationEmailSentAt ? formatDateTime(authInfo.lastConfirmationEmailSentAt) : '—'}</dd></div>
+              <div><dt className="text-[#9B8B85]">Email</dt><dd className="text-[#1A0A0A]">{authInfo.email ?? '—'}</dd></div>
+              <div><dt className="text-[#9B8B85]">Email confirmed</dt><dd className="text-[#1A0A0A]">{authInfo.emailConfirmedAt ? formatDateTime(authInfo.emailConfirmedAt) : 'Not confirmed'}</dd></div>
+              <div><dt className="text-[#9B8B85]">Phone (auth)</dt><dd className="text-[#1A0A0A]">{authInfo.phone || '—'}</dd></div>
+              <div><dt className="text-[#9B8B85]">Phone confirmed</dt><dd className="text-[#1A0A0A]">{authInfo.phoneConfirmedAt ? formatDateTime(authInfo.phoneConfirmedAt) : 'Not confirmed'}</dd></div>
+              <div><dt className="text-[#9B8B85]">Last successful sign-in</dt><dd className="text-[#1A0A0A]">{authInfo.lastSignInAt ? formatDateTime(authInfo.lastSignInAt) : 'Never'}</dd></div>
+              <div><dt className="text-[#9B8B85]">Auth user created</dt><dd className="text-[#1A0A0A]">{formatDateTime(authInfo.createdAt)}</dd></div>
+              <div><dt className="text-[#9B8B85]">Ban state</dt><dd className="text-[#1A0A0A]">{authInfo.bannedUntil ? `Banned until ${formatDateTime(authInfo.bannedUntil)}` : 'Not banned'}</dd></div>
+              <div><dt className="text-[#9B8B85]">MFA factors</dt><dd className="text-[#1A0A0A]">{authInfo.mfaFactorCount} ({authInfo.mfaVerifiedFactorCount} verified)</dd></div>
+              <div><dt className="text-[#9B8B85]">Last recovery email sent</dt><dd className="text-[#1A0A0A]">{authInfo.lastRecoveryEmailSentAt ? formatDateTime(authInfo.lastRecoveryEmailSentAt) : '—'}</dd></div>
+              <div><dt className="text-[#9B8B85]">Last confirmation email sent</dt><dd className="text-[#1A0A0A]">{authInfo.lastConfirmationEmailSentAt ? formatDateTime(authInfo.lastConfirmationEmailSentAt) : '—'}</dd></div>
               <div><dt className="text-[#9B8B85]">Failed login attempts</dt><dd className="text-[#9B8B85] text-xs">{NOT_AVAILABLE}</dd></div>
               <div><dt className="text-[#9B8B85]">Active sessions</dt><dd className="text-[#9B8B85] text-xs">{NOT_AVAILABLE}</dd></div>
             </dl>
@@ -346,8 +346,8 @@ export function Customer360({ userId, mode }: { userId: string; mode: 'customer'
       </section>
 
       {/* ── Marketplace ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Marketplace</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Marketplace</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <SummaryLink label="Listings" value={detail.listingsCount} href="/admin/listings" />
           <SummaryLink label="Bookings (renter)" value={detail.bookingsAsRenterCount} href={`/admin/bookings?userId=${userId}`} />
@@ -361,8 +361,8 @@ export function Customer360({ userId, mode }: { userId: string; mode: 'customer'
       </section>
 
       {/* ── Trust & Safety ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Trust & Safety</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Trust & Safety</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <SummaryLink label="Disputes" value={detail.disputeCount} href={`/admin/disputes?userId=${userId}`} />
           <SummaryLink label="Reviews" value={detail.reviewsCount} href="/admin/reviews" />
@@ -370,9 +370,9 @@ export function Customer360({ userId, mode }: { userId: string; mode: 'customer'
       </section>
 
       {/* ── Support ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Support</h2>
+          <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Support</h2>
           <button disabled={creatingCase} onClick={() => createSupportCase('general_other', '')} className={secondaryButtonClass}>
             Create support case
           </button>
@@ -385,8 +385,8 @@ export function Customer360({ userId, mode }: { userId: string; mode: 'customer'
           <ul className="space-y-1.5">
             {detail.recentSupportCases.map((c) => (
               <li key={c.id}>
-                <Link href={`/admin/support/${c.id}`} className="flex items-center justify-between gap-3 text-sm bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg px-3 py-2 hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors">
-                  <span className="truncate text-[#1A0A0A] dark:text-[#F5F0ED]">{c.caseNumber} — {c.title}</span>
+                <Link href={`/admin/support/${c.id}`} className="flex items-center justify-between gap-3 text-sm bg-[#FAF8F5] rounded-lg px-3 py-2 hover:bg-[#F2EDE8] transition-colors">
+                  <span className="truncate text-[#1A0A0A]">{c.caseNumber} — {c.title}</span>
                   <span className="text-[#9B8B85] capitalize whitespace-nowrap">{c.status.replace(/_/g, ' ')}</span>
                 </Link>
               </li>
@@ -399,8 +399,8 @@ export function Customer360({ userId, mode }: { userId: string; mode: 'customer'
       </section>
 
       {/* ── Financial ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Financial</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Financial</h2>
         <p className="text-xs text-[#9B8B85]">Monitoring data only — no live payment execution exists in this environment.</p>
         <div className="flex flex-wrap gap-2 text-sm">
           <Link href="/admin/financial-operations" className="text-[#8B1A1A] underline">Payments</Link>
@@ -415,19 +415,19 @@ export function Customer360({ userId, mode }: { userId: string; mode: 'customer'
       </section>
 
       {/* ── Privacy ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Privacy</h2>
-        <p className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Privacy</h2>
+        <p className="text-sm text-[#1A0A0A]">
           Erasure state: <span className="font-medium capitalize">{detail.profile.accountStatus === 'erased' ? 'Erased' : 'Not erased'}</span>
         </p>
-        {cleanupNotice ? <p className="text-xs text-amber-700 dark:text-amber-400">{cleanupNotice}</p> : null}
+        {cleanupNotice ? <p className="text-xs text-amber-700">{cleanupNotice}</p> : null}
         {detail.profile.accountStatus === 'erased' ? (
           <button disabled={actionPending} onClick={performRetryCleanup} className={secondaryButtonClass}>Retry cleanup</button>
         ) : null}
       </section>
 
       {/* ── Account actions ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#8B1A1A]/20 dark:border-[#8B1A1A]/30 rounded-xl p-5 space-y-3">
+      <section className="bg-white border border-[#8B1A1A]/20 rounded-xl p-5 space-y-3">
         <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#8B1A1A]">Account action</h2>
         {actionError ? <p className="text-xs text-red-600">{actionError}</p> : null}
         <input
@@ -456,14 +456,14 @@ export function Customer360({ userId, mode }: { userId: string; mode: 'customer'
       </section>
 
       {/* ── History ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Account history</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Account history</h2>
         {detail.accountHistory.length === 0 ? (
           <p className="text-xs text-[#9B8B85]">No status changes recorded.</p>
         ) : (
           <ul className="space-y-2">
             {detail.accountHistory.map((h) => (
-              <li key={h.id} className="text-xs text-[#6B5B55] dark:text-[#9B8B85]">
+              <li key={h.id} className="text-xs text-[#6B5B55]">
                 <span className="font-medium capitalize">{h.actionType}</span> ({h.previousStatus} → {h.newStatus}) — {formatDateTime(h.createdAt)}
                 {h.userReason ? <div>Reason: {h.userReason}</div> : null}
               </li>
@@ -476,10 +476,10 @@ export function Customer360({ userId, mode }: { userId: string; mode: 'customer'
       </section>
 
       {/* ── Notes ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Internal notes</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Internal notes</h2>
         {detail.notes.map((n) => (
-          <div key={n.id} className="text-xs text-[#6B5B55] dark:text-[#9B8B85] bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg px-3 py-2">
+          <div key={n.id} className="text-xs text-[#6B5B55] bg-[#FAF8F5] rounded-lg px-3 py-2">
             {n.note}
             <div className="text-[10px] text-[#9B8B85] mt-1">{formatDateTime(n.createdAt)}</div>
           </div>
@@ -493,8 +493,8 @@ export function Customer360({ userId, mode }: { userId: string; mode: 'customer'
 
 function SummaryLink({ label, value, href }: { label: string; value: number; href: string }) {
   return (
-    <Link href={href} className="bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg py-2 px-2 text-center hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors block">
-      <p className="text-lg font-bold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{value}</p>
+    <Link href={href} className="bg-[#FAF8F5] rounded-lg py-2 px-2 text-center hover:bg-[#F2EDE8] transition-colors block">
+      <p className="text-lg font-bold text-[#1A0A0A] tabular-nums">{value}</p>
       <p className="text-[10px] uppercase text-[#9B8B85]">{label}</p>
     </Link>
   )

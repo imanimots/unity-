@@ -26,7 +26,7 @@ export default async function MerchantMediaPage({ params }: PageProps) {
   if (!data || !data.isMerchant) notFound()
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] dark:bg-[#0F0A0A]">
+    <div className="min-h-screen bg-[#FAF8F5]">
       <ConditionEvidencePanel
         bookingId={data.bookingId}
         userId={requester.userId}

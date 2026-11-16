@@ -80,19 +80,19 @@ export function RequestForm() {
     }
   }
 
-  const inputClass = 'w-full h-11 px-4 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30'
+  const inputClass = 'w-full h-11 px-4 rounded-lg border border-[#E8E0D8] bg-white text-[#1A0A0A] focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30'
 
   return (
     <form onSubmit={handleSubmit} className="max-w-xl space-y-5">
       <div>
-        <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('imLookingTo')}</label>
+        <label className="block text-sm font-semibold mb-2 text-[#1A0A0A]">{t('imLookingTo')}</label>
         <div className="flex gap-2">
           {(['buy', 'rent', 'barter'] as const).map((opt) => (
             <button
               key={opt}
               type="button"
               onClick={() => setTransactionType(opt)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold capitalize transition-colors ${transactionType === opt ? 'bg-[#8B1A1A] text-white' : 'bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]'}`}
+              className={`px-4 py-2 rounded-full text-sm font-semibold capitalize transition-colors ${transactionType === opt ? 'bg-[#8B1A1A] text-white' : 'bg-[#F2EDE8] text-[#6B5B55]'}`}
             >
               {tMode(opt)}
             </button>
@@ -101,22 +101,22 @@ export function RequestForm() {
       </div>
 
       <div>
-        <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('title')}</label>
+        <label className="block text-sm font-semibold mb-2 text-[#1A0A0A]">{t('title')}</label>
         <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('titlePlaceholder')} className={inputClass} />
       </div>
 
       <div>
-        <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('description')}</label>
+        <label className="block text-sm font-semibold mb-2 text-[#1A0A0A]">{t('description')}</label>
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className={`${inputClass} h-auto py-3`} />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('category')}</label>
+          <label className="block text-sm font-semibold mb-2 text-[#1A0A0A]">{t('category')}</label>
           <input value={category} onChange={(e) => setCategory(e.target.value)} className={inputClass} />
         </div>
         <div>
-          <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('city')}</label>
+          <label className="block text-sm font-semibold mb-2 text-[#1A0A0A]">{t('city')}</label>
           <input value={city} onChange={(e) => setCity(e.target.value)} className={inputClass} />
         </div>
       </div>
@@ -124,11 +124,11 @@ export function RequestForm() {
       {transactionType !== 'barter' && (
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('budgetMin')}</label>
+            <label className="block text-sm font-semibold mb-2 text-[#1A0A0A]">{t('budgetMin')}</label>
             <input type="number" min={0} value={budgetMin} onChange={(e) => setBudgetMin(e.target.value)} className={inputClass} />
           </div>
           <div>
-            <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('budgetMax')}</label>
+            <label className="block text-sm font-semibold mb-2 text-[#1A0A0A]">{t('budgetMax')}</label>
             <input type="number" min={0} value={budgetMax} onChange={(e) => setBudgetMax(e.target.value)} className={inputClass} />
           </div>
         </div>
@@ -137,11 +137,11 @@ export function RequestForm() {
       {transactionType === 'rent' && (
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('startDate')}</label>
+            <label className="block text-sm font-semibold mb-2 text-[#1A0A0A]">{t('startDate')}</label>
             <input required type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />
           </div>
           <div>
-            <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('endDate')}</label>
+            <label className="block text-sm font-semibold mb-2 text-[#1A0A0A]">{t('endDate')}</label>
             <input required type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputClass} />
           </div>
         </div>
@@ -149,12 +149,12 @@ export function RequestForm() {
 
       {transactionType === 'barter' && (
         <div>
-          <label className="block text-sm font-semibold mb-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t('barterOfferLabel')}</label>
+          <label className="block text-sm font-semibold mb-2 text-[#1A0A0A]">{t('barterOfferLabel')}</label>
           <textarea value={barterOfferDescription} onChange={(e) => setBarterOfferDescription(e.target.value)} rows={3} className={`${inputClass} h-auto py-3`} />
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       <button type="submit" disabled={submitting} className="px-6 py-3 rounded-full font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors disabled:opacity-50">
         {submitting ? t('posting') : t('postRequestButton')}

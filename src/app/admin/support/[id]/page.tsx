@@ -35,7 +35,7 @@ export default async function AdminSupportCaseDetailPage({ params }: PageProps) 
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
-      <Link href="/admin/support" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+      <Link href="/admin/support" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
         <ArrowLeft size={13} /> Back to support
       </Link>
 

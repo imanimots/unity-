@@ -113,17 +113,17 @@ export default function AdminReviewsPage() {
             const reviewHistory = history.filter((h) => h.review_id === r.review?.id)
             const key = r.id
             return (
-              <div key={r.id} className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4 space-y-3">
+              <div key={r.id} className="rounded-xl border border-neutral-200 p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-semibold">
                     Report: {r.target_type} — {r.reason} {r.status !== 'open' && <span className="text-neutral-500">({r.status})</span>}
                   </div>
                   <div className="text-xs text-neutral-500">{formatDateTime(r.created_at)}</div>
                 </div>
-                {r.description && <p className="text-sm text-neutral-600 dark:text-neutral-400">{r.description}</p>}
+                {r.description && <p className="text-sm text-neutral-600">{r.description}</p>}
 
                 {r.review && (
-                  <div className="rounded-lg bg-neutral-50 dark:bg-neutral-900 p-3 text-sm space-y-1">
+                  <div className="rounded-lg bg-neutral-50 p-3 text-sm space-y-1">
                     <p className="font-medium">{r.review.header_snapshot?.title ?? 'Transaction'}</p>
                     <p>Rating: {r.review.rating} / 5</p>
                     <p>{r.review.text_hidden_at ? <span className="italic text-neutral-500">Text hidden</span> : r.review.comment}</p>
@@ -133,7 +133,7 @@ export default function AdminReviewsPage() {
                   </div>
                 )}
                 {r.reply && (
-                  <div className="rounded-lg bg-neutral-50 dark:bg-neutral-900 p-3 text-sm space-y-1">
+                  <div className="rounded-lg bg-neutral-50 p-3 text-sm space-y-1">
                     <p className="font-medium">Reply</p>
                     <p>{r.reply.hidden_at ? <span className="italic text-neutral-500">Reply hidden</span> : r.reply.reply_text}</p>
                   </div>
@@ -153,13 +153,13 @@ export default function AdminReviewsPage() {
                 )}
 
                 {r.status === 'open' && (
-                  <div className="space-y-2 pt-2 border-t border-neutral-200 dark:border-neutral-800">
+                  <div className="space-y-2 pt-2 border-t border-neutral-200">
                     <input
                       type="text"
                       placeholder="Reason (required for any action)"
                       value={reasonFor(key)}
                       onChange={(e) => setReasonDraft((prev) => ({ ...prev, [key]: e.target.value }))}
-                      className="w-full text-sm px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-950"
+                      className="w-full text-sm px-3 py-1.5 rounded-lg border border-neutral-300 bg-white"
                     />
                     <div className="flex flex-wrap gap-2">
                       <button

@@ -120,29 +120,29 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-10">
-      <Link href="/dashboard/merchant/advertising" className="inline-flex items-center gap-1.5 text-sm text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#8B1A1A] mb-6">
+      <Link href="/dashboard/merchant/advertising" className="inline-flex items-center gap-1.5 text-sm text-[#6B5B55] hover:text-[#8B1A1A] mb-6">
         <ArrowLeft size={14} /> Back to advertising
       </Link>
 
       <div className="flex items-center justify-between mb-2">
-        <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED]">
+        <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A]">
           {report.placement_type.replace(/_/g, ' ')}
         </h1>
-        <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]">
+        <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-[#F2EDE8] text-[#6B5B55]">
           {STATUS_LABEL[report.status] ?? report.status}
         </span>
       </div>
-      <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-8">{report.placement_tier} tier{report.position_band ? ` · ${report.position_band}` : ''}</p>
+      <p className="text-sm text-[#6B5B55] mb-8">{report.placement_tier} tier{report.position_band ? ` · ${report.position_band}` : ''}</p>
 
       {actionError && <p className="text-sm text-red-500 mb-4">{actionError}</p>}
 
       {report.status === 'draft' && (
-        <div className="mb-8 rounded-xl border border-dashed border-[#E8E0D8] dark:border-[#2A1A1A] px-5 py-4">
+        <div className="mb-8 rounded-xl border border-dashed border-[#E8E0D8] px-5 py-4">
           <PricingBreakdown report={report} money={money} />
           <p className="text-xs text-[#9B8B85] mt-3 mb-3">
             This is a live preview, not a guaranteed price — it may change if the package price or your subscription plan changes before you fund. The final amount is locked in the moment you click Fund, before any charge happens.
           </p>
-          <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-3">
+          <p className="text-sm text-[#6B5B55] mb-3">
             Fund this campaign to activate it. This is a development mock charge — no real money moves.
           </p>
           <button
@@ -156,7 +156,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
       )}
 
       {report.status !== 'draft' && (
-        <div className="mb-8 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] px-5 py-4">
+        <div className="mb-8 rounded-xl border border-[#F2EDE8] px-5 py-4">
           <PricingBreakdown report={report} money={money} />
         </div>
       )}
@@ -184,16 +184,16 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
       {(report.status === 'active' || report.status === 'paused') && (
         <div className="flex gap-3">
           {report.status === 'active' && (
-            <button onClick={() => runAction('pause')} disabled={actionBusy} className="px-4 py-2 rounded-full text-sm font-semibold border border-[#E8E0D8] dark:border-[#2A1A1A] hover:border-[#8B1A1A] transition-colors disabled:opacity-50">
+            <button onClick={() => runAction('pause')} disabled={actionBusy} className="px-4 py-2 rounded-full text-sm font-semibold border border-[#E8E0D8] hover:border-[#8B1A1A] transition-colors disabled:opacity-50">
               Pause
             </button>
           )}
           {report.status === 'paused' && (
-            <button onClick={() => runAction('resume')} disabled={actionBusy} className="px-4 py-2 rounded-full text-sm font-semibold border border-[#E8E0D8] dark:border-[#2A1A1A] hover:border-[#8B1A1A] transition-colors disabled:opacity-50">
+            <button onClick={() => runAction('resume')} disabled={actionBusy} className="px-4 py-2 rounded-full text-sm font-semibold border border-[#E8E0D8] hover:border-[#8B1A1A] transition-colors disabled:opacity-50">
               Resume
             </button>
           )}
-          <button onClick={() => runAction('cancel')} disabled={actionBusy} className="px-4 py-2 rounded-full text-sm font-semibold text-red-500 border border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-50">
+          <button onClick={() => runAction('cancel')} disabled={actionBusy} className="px-4 py-2 rounded-full text-sm font-semibold text-red-500 border border-red-200 hover:bg-red-50 transition-colors disabled:opacity-50">
             Cancel
           </button>
         </div>
@@ -212,20 +212,20 @@ function PricingBreakdown({ report, money }: { report: AdCampaignReport; money: 
         {report.pricing_is_live_quote ? 'Pricing' : 'Amount charged'}
       </p>
       <div className="flex justify-between text-sm">
-        <span className="text-[#6B5B55] dark:text-[#9B8B85]">Package price</span>
-        <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{money(report.base_price_cents, report.currency)}</span>
+        <span className="text-[#6B5B55]">Package price</span>
+        <span className="font-medium text-[#1A0A0A]">{money(report.base_price_cents, report.currency)}</span>
       </div>
       {report.discount_bps > 0 && (
         <div className="flex justify-between text-sm">
-          <span className="text-[#6B5B55] dark:text-[#9B8B85]">
+          <span className="text-[#6B5B55]">
             {planLabel} discount ({discountPercent}%)
           </span>
           <span className="font-medium text-[#1A7A3A]">-{money(report.discount_cents, report.currency)}</span>
         </div>
       )}
-      <div className="flex justify-between text-sm pt-1.5 mt-1.5 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
-        <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{report.pricing_is_live_quote ? 'Amount due' : 'Amount charged'}</span>
-        <span className="font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{money(report.funded_amount_cents, report.currency)}</span>
+      <div className="flex justify-between text-sm pt-1.5 mt-1.5 border-t border-[#F2EDE8]">
+        <span className="font-semibold text-[#1A0A0A]">{report.pricing_is_live_quote ? 'Amount due' : 'Amount charged'}</span>
+        <span className="font-bold text-[#1A0A0A]">{money(report.funded_amount_cents, report.currency)}</span>
       </div>
     </div>
   )
@@ -233,9 +233,9 @@ function PricingBreakdown({ report, money }: { report: AdCampaignReport; money: 
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] px-4 py-3">
+    <div className="rounded-xl border border-[#F2EDE8] px-4 py-3">
       <p className="text-xs text-[#9B8B85] mb-0.5">{label}</p>
-      <p className="text-sm font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{value}</p>
+      <p className="text-sm font-bold text-[#1A0A0A]">{value}</p>
     </div>
   )
 }

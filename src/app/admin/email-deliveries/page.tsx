@@ -99,17 +99,17 @@ export default function AdminEmailDeliveriesPage() {
         <a href={`/api/admin/email-deliveries?format=csv${statusFilter !== 'all' ? `&status=${statusFilter}` : ''}`} className={secondaryButtonClass}>
           <Download size={11} /> CSV
         </a>
-        {retryMessage ? <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85]">{retryMessage}</p> : null}
+        {retryMessage ? <p className="text-xs text-[#6B5B55]">{retryMessage}</p> : null}
         <a href="/admin/email-previews" className={secondaryButtonClass}>Template previews</a>
       </div>
 
-      <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+      <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
                 {['Event', 'Template', 'Recipient', 'Status', 'Attempts', 'Provider', 'Created', 'Sent', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A] whitespace-nowrap">
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -124,15 +124,15 @@ export default function AdminEmailDeliveriesPage() {
                 <tr><td colSpan={9} className="px-4 py-16 text-center text-sm text-[#9B8B85]">No email deliveries match your filters.</td></tr>
               ) : (
                 rows.map((r) => (
-                  <tr key={r.id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors last:border-0">
-                    <td className="px-4 py-3 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] whitespace-nowrap">{r.eventType}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{r.templateId}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{r.recipientEmail ?? '—'}</td>
+                  <tr key={r.id} className="border-b border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors last:border-0">
+                    <td className="px-4 py-3 text-sm text-[#1A0A0A] whitespace-nowrap">{r.eventType}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{r.templateId}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">{r.recipientEmail ?? '—'}</td>
                     <td className="px-4 py-3"><Pill value={r.status} styles={STATUS_STYLES} /></td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55] dark:text-[#9B8B85]">{r.attempts}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{r.provider ?? '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{formatDateTime(r.createdAt)}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{formatDateTime(r.sentAt)}</td>
+                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55]">{r.attempts}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">{r.provider ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{formatDateTime(r.createdAt)}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{formatDateTime(r.sentAt)}</td>
                     <td className="px-4 py-3">
                       {r.status === 'failed_retryable' ? (
                         <button disabled={retryingId === r.id} onClick={() => retry(r.id)} className={secondaryButtonClass}>

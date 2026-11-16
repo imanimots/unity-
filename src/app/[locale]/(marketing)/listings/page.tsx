@@ -148,7 +148,7 @@ export default async function ListingsPage({ searchParams }: PageProps) {
   })()
 
   return (
-    <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen">
+    <div className="bg-[#FAF8F5] min-h-screen">
       <SearchAnalyticsTracker
         routeKey={routeKey}
         hasExecutedSearch={isSearchExecution}
@@ -159,14 +159,14 @@ export default async function ListingsPage({ searchParams }: PageProps) {
       />
 
       {/* ── PAGE HEADER ── */}
-      <section className="bg-[#FAF8F5] dark:bg-[#0F0A0A] pt-24 pb-10 border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
+      <section className="bg-[#FAF8F5] pt-24 pb-10 border-b border-[#F2EDE8]">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
 
           {/* Section label */}
           <p className="section-label mb-4">{t('browseLabel')}</p>
 
           {/* Big heading */}
-          <h1 className="section-heading font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight mb-8">
+          <h1 className="section-heading font-extrabold uppercase text-[#1A0A0A] tracking-tight mb-8">
             {t('findWhatYouNeed')}
           </h1>
 
@@ -182,7 +182,7 @@ export default async function ListingsPage({ searchParams }: PageProps) {
                 name="q"
                 defaultValue={params.q ?? ''}
                 placeholder={t('searchTools')}
-                className="w-full h-14 pl-14 pr-6 rounded-xl border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] placeholder-[#9B8B85] text-base focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-colors shadow-sm"
+                className="w-full h-14 pl-14 pr-6 rounded-xl border border-[#E8E0D8] bg-white text-[#1A0A0A] placeholder-[#9B8B85] text-base focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-colors shadow-sm"
               />
             </form>
           </div>
@@ -199,7 +199,7 @@ export default async function ListingsPage({ searchParams }: PageProps) {
       </section>
 
       {/* ── FILTER ROW ── */}
-      <div className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] bg-[#FAF8F5] dark:bg-[#0F0A0A]">
+      <div className="border-b border-[#F2EDE8] bg-[#FAF8F5]">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-4 flex flex-wrap items-center justify-between gap-4">
           <FilterBar entity={isSkillTask ? 'skill_task' : isLookingFor ? 'requests' : 'listings'} />
           <div className="flex items-center gap-3">
@@ -228,10 +228,10 @@ export default async function ListingsPage({ searchParams }: PageProps) {
           skillTaskPosts.length === 0 ? (
             <div className="text-center py-24">
               <p className="text-5xl mb-5">🤝</p>
-              <h2 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] mb-3">
+              <h2 className="text-2xl font-extrabold uppercase text-[#1A0A0A] mb-3">
                 {t('noResults')}
               </h2>
-              <p className="text-[#6B5B55] dark:text-[#9B8B85]">
+              <p className="text-[#6B5B55]">
                 {isLookingFor ? t('beFirstSkillTask.lookingFor') : t('beFirstSkillTask.available')}
               </p>
             </div>
@@ -246,8 +246,8 @@ export default async function ListingsPage({ searchParams }: PageProps) {
           requests.length === 0 ? (
             <div className="text-center py-24">
               <p className="text-5xl mb-5">🔍</p>
-              <h2 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] mb-3">{t('noRequestsFound')}</h2>
-              <p className="text-[#6B5B55] dark:text-[#9B8B85]">{t('beFirstRequest')}</p>
+              <h2 className="text-2xl font-extrabold uppercase text-[#1A0A0A] mb-3">{t('noRequestsFound')}</h2>
+              <p className="text-[#6B5B55]">{t('beFirstRequest')}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-8">
@@ -259,10 +259,10 @@ export default async function ListingsPage({ searchParams }: PageProps) {
         ) : listings.length === 0 ? (
           <div className="text-center py-24">
             <p className="text-5xl mb-5">🔍</p>
-            <h2 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] mb-3">
+            <h2 className="text-2xl font-extrabold uppercase text-[#1A0A0A] mb-3">
               {t('noListingsFound')}
             </h2>
-            <p className="text-[#6B5B55] dark:text-[#9B8B85] mb-6">
+            <p className="text-[#6B5B55] mb-6">
               {t('tryAdjusting')}
             </p>
             <Link href={`/looking-for/new${params.q ? `?title=${encodeURIComponent(params.q)}` : ''}`} className="inline-block px-5 py-2.5 rounded-full text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors">
@@ -284,7 +284,7 @@ export default async function ListingsPage({ searchParams }: PageProps) {
 
         {nextPageUrl && (
           <div className="flex justify-center mt-10">
-            <Link href={nextPageUrl} className="px-6 py-3 rounded-full text-sm font-semibold border border-[#E8E0D8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:border-[#8B1A1A] hover:text-[#8B1A1A] transition-colors">
+            <Link href={nextPageUrl} className="px-6 py-3 rounded-full text-sm font-semibold border border-[#E8E0D8] text-[#1A0A0A] hover:border-[#8B1A1A] hover:text-[#8B1A1A] transition-colors">
               Load more
             </Link>
           </div>

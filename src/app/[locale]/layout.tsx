@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation'
 import { NextIntlClientProvider, hasLocale } from 'next-intl'
 import { getMessages } from 'next-intl/server'
 import { Plus_Jakarta_Sans } from 'next/font/google'
-import { ThemeProvider } from 'next-themes'
 import { Toaster } from 'sonner'
 import { AssistantWidgetLoader } from '@/components/assistant/assistant-widget-loader'
 import { PageViewTracker } from '@/components/analytics/page-view-tracker'
@@ -94,8 +93,8 @@ export default async function LocaleRootLayout({
   }
 
   return (
-    <html lang={locale} suppressHydrationWarning className={`${plusJakarta.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-[#FAF8F5] dark:bg-[#0F0A0A] text-[#1A0A0A] dark:text-[#F5F0ED]">
+    <html lang={locale} className={`${plusJakarta.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col bg-[#FAF8F5] text-[#1A0A0A]">
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-[#8B1A1A] focus:text-white focus:text-sm focus:font-semibold"
@@ -103,12 +102,10 @@ export default async function LocaleRootLayout({
           Skip to main content
         </a>
         <NextIntlClientProvider messages={publicClientMessages}>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-            {children}
-            <PageViewTracker />
-            <AssistantWidgetLoader />
-            <Toaster position="top-center" richColors />
-          </ThemeProvider>
+          {children}
+          <PageViewTracker />
+          <AssistantWidgetLoader />
+          <Toaster position="top-center" richColors />
         </NextIntlClientProvider>
       </body>
     </html>

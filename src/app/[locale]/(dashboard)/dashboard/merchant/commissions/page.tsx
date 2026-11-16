@@ -27,11 +27,11 @@ interface MerchantCommission {
 }
 
 const STATUS_BADGE_CLASSES: Record<MerchantCommission['status'], string> = {
-  pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-  held: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  earned: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  adjusted: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  voided: 'bg-[#F2EDE8] text-[#6B5B55] dark:bg-[#2A1A1A] dark:text-[#9B8B85]',
+  pending: 'bg-amber-100 text-amber-800',
+  held: 'bg-red-100 text-red-800',
+  earned: 'bg-green-100 text-green-800',
+  adjusted: 'bg-blue-100 text-blue-800',
+  voided: 'bg-[#F2EDE8] text-[#6B5B55]',
 }
 
 /**
@@ -80,14 +80,14 @@ export default function MerchantCommissionsPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <Link href="/dashboard/merchant" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+        <Link href="/dashboard/merchant" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
           <ArrowLeft size={13} /> {t('backLabel')}
         </Link>
       </div>
 
       <div className="mb-12">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{t('earningsLabel')}</p>
-        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight">
+        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] tracking-tight">
           {t('heading')}
         </h1>
       </div>
@@ -109,12 +109,12 @@ export default function MerchantCommissionsPage() {
             <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">{t('noCommissionedTransactions')}</p>
           </div>
         ) : (
-          <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] overflow-hidden">
+          <div className="bg-white rounded-xl border border-[#F2EDE8] overflow-hidden">
             {commissions.map((c) => (
-              <div key={c.id} className="px-5 py-4 border-b border-[#F2EDE8] dark:border-[#2A1A1A] last:border-b-0">
+              <div key={c.id} className="px-5 py-4 border-b border-[#F2EDE8] last:border-b-0">
                 <div className="flex items-center justify-between gap-4 mb-2">
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] truncate capitalize">
+                    <div className="text-sm font-medium text-[#1A0A0A] truncate capitalize">
                       {c.listingTitle ?? (c.transactionType === 'sale' ? t('transactionFallbackSale') : t('transactionFallbackRental'))}
                     </div>
                     <div className="text-xs text-[#9B8B85]">{formatDate(c.createdAt, locale)}{c.reference ? ` · ${c.reference}` : ''}</div>
@@ -125,19 +125,19 @@ export default function MerchantCommissionsPage() {
                 </div>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                   <dt className="text-[#9B8B85]">{t('eligibleAmountLabel')}</dt>
-                  <dd className="text-[#1A0A0A] dark:text-[#F5F0ED] text-right">{money(c.eligibleBase, c.currency)}</dd>
+                  <dd className="text-[#1A0A0A] text-right">{money(c.eligibleBase, c.currency)}</dd>
                   <dt className="text-[#9B8B85]">
                     {t('unityCommissionLabel', { rate: (c.standardRateBps / 100).toFixed(1), excess: c.excessBase > 0 ? t('excessSuffix') : '' })}
                   </dt>
-                  <dd className="text-[#1A0A0A] dark:text-[#F5F0ED] text-right">-{money(c.commissionAmount, c.currency)}</dd>
+                  <dd className="text-[#1A0A0A] text-right">-{money(c.commissionAmount, c.currency)}</dd>
                   {c.affiliateReward > 0 && (
                     <>
                       <dt className="text-[#9B8B85]">{t('affiliateRewardLabel')}</dt>
-                      <dd className="text-[#1A0A0A] dark:text-[#F5F0ED] text-right">-{money(c.affiliateReward, c.currency)}</dd>
+                      <dd className="text-[#1A0A0A] text-right">-{money(c.affiliateReward, c.currency)}</dd>
                     </>
                   )}
-                  <dt className="text-[#1A0A0A] dark:text-[#F5F0ED] font-semibold">{t('proceedsBasisLabel')}</dt>
-                  <dd className="text-[#1A0A0A] dark:text-[#F5F0ED] font-semibold text-right">{money(c.merchantProceedsBasis, c.currency)}</dd>
+                  <dt className="text-[#1A0A0A] font-semibold">{t('proceedsBasisLabel')}</dt>
+                  <dd className="text-[#1A0A0A] font-semibold text-right">{money(c.merchantProceedsBasis, c.currency)}</dd>
                 </dl>
                 {c.excessBase > 0 && (
                   <p className="text-[11px] text-[#9B8B85] mt-2">
@@ -156,7 +156,7 @@ export default function MerchantCommissionsPage() {
 
       <p className="text-xs text-[#9B8B85] text-center">
         {t('footerNotice')}{' '}
-        <Link href="/dashboard/merchant/subscription" className="underline hover:text-[#6B5B55] dark:hover:text-[#9B8B85]">{t('managePlanLink')}</Link>
+        <Link href="/dashboard/merchant/subscription" className="underline hover:text-[#6B5B55]">{t('managePlanLink')}</Link>
       </p>
     </div>
   )

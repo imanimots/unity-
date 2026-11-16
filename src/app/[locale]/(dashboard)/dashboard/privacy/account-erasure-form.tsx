@@ -57,9 +57,9 @@ export function AccountErasureForm() {
 
   if (phase === 'success') {
     return (
-      <div className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] p-6 space-y-2">
-        <h2 className="text-lg font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('successTitle')}</h2>
-        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">
+      <div className="rounded-xl border border-[#F2EDE8] bg-white p-6 space-y-2">
+        <h2 className="text-lg font-bold text-[#1A0A0A]">{t('successTitle')}</h2>
+        <p className="text-sm text-[#6B5B55]">
           {cleanupPending ? t('successBodyCleanupPending') : t('successBody')}
         </p>
       </div>
@@ -68,18 +68,18 @@ export function AccountErasureForm() {
 
   if (phase === 'blocked') {
     return (
-      <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-[#1A1010] dark:border-amber-900/40 p-6 space-y-3">
-        <h2 className="text-lg font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('blockedTitle')}</h2>
-        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">{t('blockedIntro')}</p>
-        <ul className="list-disc pl-5 text-sm text-[#6B5B55] dark:text-[#9B8B85] space-y-1">
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 space-y-3">
+        <h2 className="text-lg font-bold text-[#1A0A0A]">{t('blockedTitle')}</h2>
+        <p className="text-sm text-[#6B5B55]">{t('blockedIntro')}</p>
+        <ul className="list-disc pl-5 text-sm text-[#6B5B55] space-y-1">
           {reasons.map((reason, i) => (
             <li key={i}>{reason}</li>
           ))}
         </ul>
-        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">{t('blockedOutro')}</p>
+        <p className="text-sm text-[#6B5B55]">{t('blockedOutro')}</p>
         <button
           onClick={() => setPhase('idle')}
-          className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] underline"
+          className="text-sm font-medium text-[#1A0A0A] underline"
         >
           {t('cancelButton')}
         </button>
@@ -88,24 +88,24 @@ export function AccountErasureForm() {
   }
 
   return (
-    <div className="rounded-xl border border-red-200 dark:border-red-900/40 bg-white dark:bg-[#1A1010] p-6 space-y-4">
+    <div className="rounded-xl border border-red-200 bg-white p-6 space-y-4">
       <div>
-        <h2 className="text-lg font-bold text-red-700 dark:text-red-400">{t('warningTitle')}</h2>
-        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mt-1">{t('warningBody')}</p>
+        <h2 className="text-lg font-bold text-red-700">{t('warningTitle')}</h2>
+        <p className="text-sm text-[#6B5B55] mt-1">{t('warningBody')}</p>
       </div>
 
       {errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}
 
       {phase === 'confirming' || phase === 'submitting' ? (
         <div className="space-y-3">
-          <label className="block text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <label className="block text-sm font-medium text-[#1A0A0A]">
             {t('confirmLabel')}
             <input
               type="text"
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
               placeholder={t('confirmPlaceholder')}
-              className="mt-1 w-full rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] bg-transparent px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-lg border border-[#F2EDE8] bg-transparent px-3 py-2 text-sm"
             />
           </label>
           <div className="flex gap-3">
@@ -121,7 +121,7 @@ export function AccountErasureForm() {
                 setPhase('idle')
                 setConfirmText('')
               }}
-              className="px-4 py-2 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]"
+              className="px-4 py-2 rounded-lg border border-[#F2EDE8] text-sm font-medium text-[#1A0A0A]"
             >
               {t('cancelButton')}
             </button>
@@ -130,7 +130,7 @@ export function AccountErasureForm() {
       ) : (
         <button
           onClick={() => setPhase('confirming')}
-          className="px-4 py-2 rounded-lg border border-red-300 dark:border-red-900/50 text-sm font-medium text-red-700 dark:text-red-400"
+          className="px-4 py-2 rounded-lg border border-red-300 text-sm font-medium text-red-700"
         >
           {t('startButton')}
         </button>

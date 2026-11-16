@@ -142,14 +142,14 @@ export default function MerchantSubscriptionPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <Link href="/dashboard/merchant" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+        <Link href="/dashboard/merchant" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
           <ArrowLeft size={13} /> {t('backLabel')}
         </Link>
       </div>
 
       <div className="mb-8">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{t('eyebrow')}</p>
-        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight">{t('heading')}</h1>
+        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] tracking-tight">{t('heading')}</h1>
       </div>
 
       <TestModeBanner className="mb-8" />
@@ -157,7 +157,7 @@ export default function MerchantSubscriptionPage() {
       {loading ? (
         <p className="text-sm text-[#9B8B85]">{t('loading')}</p>
       ) : error || !data ? (
-        <p className="text-sm text-red-600 dark:text-red-400">{error ?? t('couldNotLoad')}</p>
+        <p className="text-sm text-red-600">{error ?? t('couldNotLoad')}</p>
       ) : (
         <>
           {data.subscription?.publicationFrozen && <ResolveFrozenBanner publicationLimit={data.plan.active_publication_limit} onResolved={() => void load()} />}
@@ -195,30 +195,30 @@ export default function MerchantSubscriptionPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
-            <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+            <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
               <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{t('activeListings')}</p>
-              <div className="text-2xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">
+              <div className="text-2xl font-extrabold text-[#1A0A0A] leading-none">
                 {data.publicationUsage.activeCount}
                 {data.publicationUsage.limit !== null && <span className="text-[#9B8B85] text-base"> / {data.publicationUsage.limit}</span>}
               </div>
-              {data.publicationUsage.atLimit && <p className="text-[11px] text-red-600 dark:text-red-400 mt-1.5">{t('limitReached')}</p>}
+              {data.publicationUsage.atLimit && <p className="text-[11px] text-red-600 mt-1.5">{t('limitReached')}</p>}
             </div>
-            <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+            <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
               <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{t('thisMonthsCost')}</p>
-              <div className="text-2xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">{money(data.economics.currentPlanCost.totalCostCents)}</div>
+              <div className="text-2xl font-extrabold text-[#1A0A0A] leading-none">{money(data.economics.currentPlanCost.totalCostCents)}</div>
             </div>
-            <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+            <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
               <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{t('volumeThisMonth')}</p>
-              <div className="text-2xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">
+              <div className="text-2xl font-extrabold text-[#1A0A0A] leading-none">
                 {money(data.economics.currentMonthVolume.salesVolumeCents + data.economics.currentMonthVolume.rentalVolumeCents)}
               </div>
             </div>
           </div>
 
           {data.economics.recommendations.length > 0 && (
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900/40 rounded-xl p-5 mb-10 flex items-start gap-3">
-              <TrendingDown size={18} className="text-green-700 dark:text-green-400 shrink-0 mt-0.5" />
-              <p className="text-sm text-green-800 dark:text-green-300">
+            <div className="bg-green-50 border border-green-200 rounded-xl p-5 mb-10 flex items-start gap-3">
+              <TrendingDown size={18} className="text-green-700 shrink-0 mt-0.5" />
+              <p className="text-sm text-green-800">
                 {t('savingsNotice', {
                   amount: money(Math.max(...data.economics.recommendations.map((r) => r.savingsCents))),
                   plans: data.economics.recommendations
@@ -238,12 +238,12 @@ export default function MerchantSubscriptionPage() {
               const targetRank = { starter: 0, pro: 1, elite: 2 }[breakdown.planId] ?? 0
               const isCheapest = data.economics.recommendations.some((r) => r.planId === breakdown.planId) || isCurrent
               return (
-                <div key={breakdown.planId} className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+                <div key={breakdown.planId} className="bg-white border border-[#F2EDE8] rounded-xl p-5">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{tPlanNames(breakdown.planId as 'starter' | 'pro' | 'elite')}</p>
+                    <p className="text-sm font-semibold text-[#1A0A0A]">{tPlanNames(breakdown.planId as 'starter' | 'pro' | 'elite')}</p>
                     {isCurrent && <Check size={16} className="text-green-600" />}
                   </div>
-                  <p className="text-lg font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] mb-3">{money(breakdown.totalCostCents)}<span className="text-xs font-normal text-[#9B8B85]">{t('estimatedPerMonth')}</span></p>
+                  <p className="text-lg font-extrabold text-[#1A0A0A] mb-3">{money(breakdown.totalCostCents)}<span className="text-xs font-normal text-[#9B8B85]">{t('estimatedPerMonth')}</span></p>
                   {!isCurrent && (
                     <button
                       onClick={() => changePlan(breakdown.planId, targetRank < currentRank)}
@@ -253,13 +253,13 @@ export default function MerchantSubscriptionPage() {
                       {busyPlanId === breakdown.planId ? t('working') : targetRank > currentRank ? t('upgrade') : t('downgrade')}
                     </button>
                   )}
-                  {isCheapest && !isCurrent && <p className="text-[11px] text-green-700 dark:text-green-400 mt-1.5">{t('cheapestForVolume')}</p>}
+                  {isCheapest && !isCurrent && <p className="text-[11px] text-green-700 mt-1.5">{t('cheapestForVolume')}</p>}
                 </div>
               )
             })}
           </div>
 
-          {actionError && <p className="text-xs text-red-600 dark:text-red-400 mb-6">{actionError}</p>}
+          {actionError && <p className="text-xs text-red-600 mb-6">{actionError}</p>}
 
           <BusinessNameSettings />
 

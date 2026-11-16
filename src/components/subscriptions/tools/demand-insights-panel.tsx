@@ -29,11 +29,11 @@ export function DemandInsightsPanel() {
   if (!data || !data.hasSufficientData) return <p className="text-sm text-[#9B8B85]">{t('insufficientData')}</p>
 
   return (
-    <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-6">
+    <div className="bg-white border border-[#F2EDE8] rounded-xl p-6">
       <p className="text-xs text-[#9B8B85] mb-4">{t('windowNotice', { days: data.windowDays })}</p>
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-[11px] uppercase tracking-[0.08em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
+          <tr className="text-left text-[11px] uppercase tracking-[0.08em] text-[#9B8B85] border-b border-[#F2EDE8]">
             <th className="py-2">{t('columns.category')}</th>
             <th className="py-2">{t('columns.mode')}</th>
             <th className="py-2">{t('columns.searches')}</th>
@@ -42,11 +42,11 @@ export function DemandInsightsPanel() {
         </thead>
         <tbody>
           {data.trends.map((trend, i) => (
-            <tr key={i} className="border-b border-[#F2EDE8]/50 dark:border-[#2A1A1A]/50">
-              <td className="py-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{trend.category ?? t('columns.allCategories')}</td>
-              <td className="py-2 text-[#6B5B55] dark:text-[#9B8B85]">{trend.mode ?? '—'}</td>
-              <td className="py-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{trend.searchCount}</td>
-              <td className="py-2 text-[#6B5B55] dark:text-[#9B8B85]">{(trend.zeroResultShare * 100).toFixed(0)}%</td>
+            <tr key={i} className="border-b border-[#F2EDE8]/50">
+              <td className="py-2 text-[#1A0A0A]">{trend.category ?? t('columns.allCategories')}</td>
+              <td className="py-2 text-[#6B5B55]">{trend.mode ?? '—'}</td>
+              <td className="py-2 text-[#1A0A0A]">{trend.searchCount}</td>
+              <td className="py-2 text-[#6B5B55]">{(trend.zeroResultShare * 100).toFixed(0)}%</td>
             </tr>
           ))}
         </tbody>

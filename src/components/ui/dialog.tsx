@@ -34,14 +34,14 @@ function DialogContent({ className, children, showClose = true, ...props }: Dial
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <DialogPrimitive.Popup
           className={cn(
-            'relative w-full max-h-[90vh] overflow-y-auto rounded-2xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#0F0A0A] p-6 shadow-xl',
+            'relative w-full max-h-[90vh] overflow-y-auto rounded-2xl border border-[#F2EDE8] bg-white p-6 shadow-xl',
             'transition-all data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0',
             className
           )}
           {...props}
         >
           {showClose && (
-            <DialogClose className="absolute right-4 top-4 text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B1A1A] rounded-full p-1">
+            <DialogClose className="absolute right-4 top-4 text-[#9B8B85] hover:text-[#1A0A0A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B1A1A] rounded-full p-1">
               <X size={18} />
               <span className="sr-only">Close</span>
             </DialogClose>
@@ -58,11 +58,11 @@ function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
 }
 
 function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
-  return <DialogPrimitive.Title className={cn('text-lg font-bold text-[#1A0A0A] dark:text-[#F5F0ED]', className)} {...props} />
+  return <DialogPrimitive.Title className={cn('text-lg font-bold text-[#1A0A0A]', className)} {...props} />
 }
 
 function DialogDescription({ className, ...props }: DialogPrimitive.Description.Props) {
-  return <DialogPrimitive.Description className={cn('text-sm text-[#6B5B55] dark:text-[#9B8B85]', className)} {...props} />
+  return <DialogPrimitive.Description className={cn('text-sm text-[#6B5B55]', className)} {...props} />
 }
 
 function DialogFooter({ className, ...props }: React.ComponentProps<'div'>) {

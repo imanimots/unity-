@@ -58,14 +58,14 @@ export default function MerchantToolsPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <Link href="/dashboard/merchant" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+        <Link href="/dashboard/merchant" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
           <ArrowLeft size={13} /> {t('backLabel')}
         </Link>
       </div>
 
       <div className="mb-8">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{t('eyebrow')}</p>
-        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight">{t('heading')}</h1>
+        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] tracking-tight">{t('heading')}</h1>
       </div>
 
       <TestModeBanner className="mb-8" />
@@ -73,8 +73,8 @@ export default function MerchantToolsPage() {
       {loading ? (
         <p className="text-sm text-[#9B8B85]">{t('loading')}</p>
       ) : !entitlements || TABS.every((tb) => !tb.enabled) ? (
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-8 text-center">
-          <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-4">{t('starterExplanation')}</p>
+        <div className="bg-white border border-[#F2EDE8] rounded-xl p-8 text-center">
+          <p className="text-sm text-[#6B5B55] mb-4">{t('starterExplanation')}</p>
           <Link href="/dashboard/merchant/subscription" className="inline-block px-5 py-2.5 rounded-xl font-semibold uppercase text-xs tracking-[0.1em] bg-[#8B1A1A] text-white hover:bg-[#7A1616] transition-colors">
             {t('upgradeAction')}
           </Link>
@@ -87,7 +87,7 @@ export default function MerchantToolsPage() {
                 key={tb.id}
                 onClick={() => setTab(tb.id)}
                 className={`px-4 py-2 text-xs font-semibold uppercase tracking-[0.08em] rounded-lg transition-colors ${
-                  tab === tb.id ? 'bg-[#8B1A1A] text-white' : 'bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]'
+                  tab === tb.id ? 'bg-[#8B1A1A] text-white' : 'bg-white border border-[#F2EDE8] text-[#6B5B55]'
                 }`}
               >
                 {tb.label}

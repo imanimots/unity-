@@ -186,20 +186,20 @@ export function PayoutDestinationSettings() {
   }
 
   if (loading) return <p className="text-sm text-[#9B8B85]">{t('loading')}</p>
-  if (error) return <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+  if (error) return <p className="text-sm text-red-600">{error}</p>
 
   const selectedBank = banks.find((b) => b.bank_code === bankCode)
 
   return (
     <div className="space-y-6">
-      {actionMessage && <p className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">{actionMessage}</p>}
+      {actionMessage && <p className="text-sm text-[#1A0A0A]">{actionMessage}</p>}
 
       {/* KYC blocker -- phase brief §54 */}
       {!kycApproved && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-center justify-between gap-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold text-amber-800 dark:text-amber-300">{t('kycBlock.title')}</div>
-            <div className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">{t('kycBlock.message')}</div>
+            <div className="text-sm font-semibold text-amber-800">{t('kycBlock.title')}</div>
+            <div className="text-xs text-amber-600 mt-0.5">{t('kycBlock.message')}</div>
           </div>
           <Link href="/verify" className="shrink-0 px-4 py-2 bg-amber-600 text-white text-xs font-semibold uppercase tracking-[0.08em] rounded-lg hover:bg-amber-700 transition-colors">
             {t('kycBlock.cta')}
@@ -209,10 +209,10 @@ export function PayoutDestinationSettings() {
 
       {/* Current destination card */}
       {current && !showForm && (
-        <div className="p-5 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] space-y-3">
+        <div className="p-5 bg-white rounded-xl border border-[#F2EDE8] space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+              <p className="text-sm font-semibold text-[#1A0A0A]">
                 {current.payout_banks?.display_name ?? current.bank_code} •••• {current.account_last4}
               </p>
               <p className="text-xs text-[#9B8B85] mt-0.5">{accountTypeLabel(current.account_type)}</p>
@@ -227,7 +227,7 @@ export function PayoutDestinationSettings() {
 
           {legalName && (
             <p className="text-xs text-[#9B8B85]">
-              {t('accountHolderNotice')} <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{legalName}</span>
+              {t('accountHolderNotice')} <span className="font-medium text-[#1A0A0A]">{legalName}</span>
             </p>
           )}
 
@@ -237,10 +237,10 @@ export function PayoutDestinationSettings() {
             </p>
           )}
 
-          {current.verification_status === 'failed' && <p className="text-xs text-red-600 dark:text-red-400">{t('failedNotice')}</p>}
+          {current.verification_status === 'failed' && <p className="text-xs text-red-600">{t('failedNotice')}</p>}
 
           {current.payout_banks?.banv_supported === false && current.verification_status === 'unverified' && (
-            <p className="text-xs text-amber-600 dark:text-amber-500">{t('banvUnsupportedNotice')}</p>
+            <p className="text-xs text-amber-600">{t('banvUnsupportedNotice')}</p>
           )}
 
           <div className="flex flex-wrap gap-2 pt-1">
@@ -259,7 +259,7 @@ export function PayoutDestinationSettings() {
                 type="button"
                 onClick={() => checkStatus(current.id)}
                 disabled={checkingStatus}
-                className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] border border-[#E8E0D8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors disabled:opacity-50"
+                className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] border border-[#E8E0D8] text-[#6B5B55] hover:bg-[#F2EDE8] transition-colors disabled:opacity-50"
               >
                 {checkingStatus ? t('checkingStatus') : t('checkStatusButton')}
               </button>
@@ -267,23 +267,23 @@ export function PayoutDestinationSettings() {
             <button
               type="button"
               onClick={() => setConfirmingReplace(true)}
-              className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] border border-[#E8E0D8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors"
+              className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] border border-[#E8E0D8] text-[#6B5B55] hover:bg-[#F2EDE8] transition-colors"
             >
               {t('replaceButton')}
             </button>
             <button
               type="button"
               onClick={() => setConfirmingDisable(true)}
-              className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] text-red-600 hover:bg-red-50 transition-colors"
             >
               {t('disableButton')}
             </button>
           </div>
 
           {confirmingReplace && (
-            <div className="p-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 mt-2">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">{t('replaceWarning.title')}</p>
-              <p className="text-xs text-amber-700 dark:text-amber-400 mb-3">{t('replaceWarning.message')}</p>
+            <div className="p-4 rounded-lg border border-amber-200 bg-amber-50 mt-2">
+              <p className="text-sm font-semibold text-amber-800 mb-1">{t('replaceWarning.title')}</p>
+              <p className="text-xs text-amber-700 mb-3">{t('replaceWarning.message')}</p>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -298,7 +298,7 @@ export function PayoutDestinationSettings() {
                 <button
                   type="button"
                   onClick={() => setConfirmingReplace(false)}
-                  className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors"
+                  className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] text-[#6B5B55] hover:bg-[#F2EDE8] transition-colors"
                 >
                   {t('cancelButton')}
                 </button>
@@ -307,9 +307,9 @@ export function PayoutDestinationSettings() {
           )}
 
           {confirmingDisable && (
-            <div className="p-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 mt-2">
-              <p className="text-sm font-semibold text-red-700 dark:text-red-400 mb-1">{t('disableWarning.title')}</p>
-              <p className="text-xs text-red-600 dark:text-red-400 mb-3">{t('disableWarning.message')}</p>
+            <div className="p-4 rounded-lg border border-red-200 bg-red-50 mt-2">
+              <p className="text-sm font-semibold text-red-700 mb-1">{t('disableWarning.title')}</p>
+              <p className="text-xs text-red-600 mb-3">{t('disableWarning.message')}</p>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -322,7 +322,7 @@ export function PayoutDestinationSettings() {
                 <button
                   type="button"
                   onClick={() => setConfirmingDisable(false)}
-                  className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors"
+                  className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] text-[#6B5B55] hover:bg-[#F2EDE8] transition-colors"
                 >
                   {t('cancelButton')}
                 </button>
@@ -334,8 +334,8 @@ export function PayoutDestinationSettings() {
 
       {/* No destination at all -- phase brief §59, never a "process anyway" shortcut */}
       {!current && !showForm && (
-        <div className="p-5 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-center">
-          <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] mb-1">{t('noDestination.title')}</p>
+        <div className="p-5 bg-white rounded-xl border border-[#F2EDE8] text-center">
+          <p className="text-sm font-semibold text-[#1A0A0A] mb-1">{t('noDestination.title')}</p>
           <p className="text-xs text-[#9B8B85] mb-4">{t('noDestination.message')}</p>
           <button
             type="button"
@@ -350,20 +350,20 @@ export function PayoutDestinationSettings() {
 
       {/* Add/replace form */}
       {showForm && (
-        <div className="p-5 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] space-y-4">
-          <p className="text-sm font-bold uppercase tracking-[0.08em] text-[#1A0A0A] dark:text-[#F5F0ED]">{t('formHeading')}</p>
+        <div className="p-5 bg-white rounded-xl border border-[#F2EDE8] space-y-4">
+          <p className="text-sm font-bold uppercase tracking-[0.08em] text-[#1A0A0A]">{t('formHeading')}</p>
 
-          {formError && <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>}
+          {formError && <p className="text-sm text-red-600">{formError}</p>}
 
           <div>
-            <label htmlFor="payout-bank" className="block text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1.5">
+            <label htmlFor="payout-bank" className="block text-xs font-medium text-[#6B5B55] mb-1.5">
               {t('bankLabel')}
             </label>
             <select
               id="payout-bank"
               value={bankCode}
               onChange={(e) => setBankCode(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] text-sm"
+              className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] bg-white text-[#1A0A0A] text-sm"
             >
               <option value="">{t('bankPlaceholder')}</option>
               {banks.map((bank) => (
@@ -372,11 +372,11 @@ export function PayoutDestinationSettings() {
                 </option>
               ))}
             </select>
-            {selectedBank && !selectedBank.banv_supported && <p className="text-xs text-amber-600 dark:text-amber-500 mt-1.5">{t('banvUnsupportedNotice')}</p>}
+            {selectedBank && !selectedBank.banv_supported && <p className="text-xs text-amber-600 mt-1.5">{t('banvUnsupportedNotice')}</p>}
           </div>
 
           <div>
-            <label htmlFor="payout-account-number" className="block text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1.5">
+            <label htmlFor="payout-account-number" className="block text-xs font-medium text-[#6B5B55] mb-1.5">
               {t('accountNumberLabel')}
             </label>
             <input
@@ -388,19 +388,19 @@ export function PayoutDestinationSettings() {
               maxLength={13}
               value={accountNumber}
               onChange={(e) => setAccountNumber(e.target.value.replace(/[^0-9]/g, ''))}
-              className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] text-sm"
+              className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] bg-white text-[#1A0A0A] text-sm"
             />
           </div>
 
           <div>
-            <label htmlFor="payout-account-type" className="block text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1.5">
+            <label htmlFor="payout-account-type" className="block text-xs font-medium text-[#6B5B55] mb-1.5">
               {t('accountTypeLabel')}
             </label>
             <select
               id="payout-account-type"
               value={accountType}
               onChange={(e) => setAccountType(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] text-sm"
+              className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] bg-white text-[#1A0A0A] text-sm"
             >
               <option value="">{t('accountTypePlaceholder')}</option>
               {ACCOUNT_TYPE_OPTIONS.map((opt) => (
@@ -413,7 +413,7 @@ export function PayoutDestinationSettings() {
 
           {legalName && (
             <p className="text-xs text-[#9B8B85]">
-              {t('accountHolderNotice')} <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{legalName}</span>
+              {t('accountHolderNotice')} <span className="font-medium text-[#1A0A0A]">{legalName}</span>
             </p>
           )}
 
@@ -433,7 +433,7 @@ export function PayoutDestinationSettings() {
                 setFormError(null)
                 setAccountNumber('')
               }}
-              className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors"
+              className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] text-[#6B5B55] hover:bg-[#F2EDE8] transition-colors"
             >
               {t('cancelButton')}
             </button>

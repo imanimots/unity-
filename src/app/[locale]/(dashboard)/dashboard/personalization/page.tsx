@@ -44,11 +44,11 @@ export default async function PersonalizationSettingsPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
       <div className="mb-8">
-        <Link href="/dashboard/renter" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+        <Link href="/dashboard/renter" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
           <ArrowLeft size={13} /> {t('heading')}
         </Link>
-        <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] mt-4">{t('heading')}</h1>
-        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mt-2 max-w-lg">{t('description')}</p>
+        <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] mt-4">{t('heading')}</h1>
+        <p className="text-sm text-[#6B5B55] mt-2 max-w-lg">{t('description')}</p>
       </div>
       <NextIntlClientProvider messages={scoped}>
         <PersonalizationSettingsForm />

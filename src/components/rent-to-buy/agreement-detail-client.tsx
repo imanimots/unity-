@@ -53,7 +53,7 @@ export function RentToBuyAgreementActions({
   const base = `/api/rent-to-buy/agreements/${agreementId}`
   const btn = 'px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-[0.08em] transition-colors disabled:opacity-50'
   const primary = `${btn} bg-[#8B1A1A] text-white hover:bg-[#7A1616]`
-  const secondary = `${btn} border border-[#E8E0D8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:border-[#8B1A1A]/40`
+  const secondary = `${btn} border border-[#E8E0D8] text-[#1A0A0A] hover:border-[#8B1A1A]/40`
   const danger = `${btn} border border-[#8B1A1A] text-[#8B1A1A] hover:bg-[#8B1A1A]/10`
 
   return (
@@ -107,7 +107,7 @@ export function RentToBuyAgreementActions({
         <div className="rounded-xl border border-[#8B1A1A]/30 bg-[#8B1A1A]/5 p-4 space-y-2">
           <p className="text-sm text-[#8B1A1A] font-medium">{t('initiateDefaultWarning')}</p>
           <textarea
-            className="w-full px-3 py-2 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-sm"
+            className="w-full px-3 py-2 rounded-lg border border-[#E8E0D8] bg-white text-sm"
             placeholder={t('defaultReasonPlaceholder')}
             value={defaultReason}
             onChange={(e) => setDefaultReason(e.target.value)}

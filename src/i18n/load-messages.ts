@@ -29,6 +29,7 @@ export const MESSAGE_NAMESPACES = [
   'personalization',
   'privacy',
   'help',
+  'account',
 ] as const
 
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number]

@@ -425,11 +425,11 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
 
   return (
     <div className={`flex flex-col ${containerHeight}`}>
-      <div ref={scrollContainerRef} className={`flex-1 overflow-y-auto ${variant === 'embedded' ? 'space-y-3 py-2' : 'px-5 py-5 space-y-4 bg-[#FAF8F5] dark:bg-[#0F0A0A]'}`}>
+      <div ref={scrollContainerRef} className={`flex-1 overflow-y-auto ${variant === 'embedded' ? 'space-y-3 py-2' : 'px-5 py-5 space-y-4 bg-[#FAF8F5]'}`}>
         {loading ? (
           <p className="text-sm text-[#9B8B85] text-center py-8">{labels.loadingMessages}</p>
         ) : messages.length === 0 ? (
-          <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] text-center py-8">{labels.noMessagesYet}</p>
+          <p className="text-sm text-[#6B5B55] text-center py-8">{labels.noMessagesYet}</p>
         ) : (
           <>
             {hasMoreOlder && (
@@ -441,16 +441,16 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
                 >
                   {loadingOlder ? '…' : labels.loadEarlierMessages}
                 </button>
-                {olderError && <span className="text-xs text-red-600 dark:text-red-400">{olderError}</span>}
+                {olderError && <span className="text-xs text-red-600">{olderError}</span>}
               </div>
             )}
             {groups.map(({ date, items }) => (
             <div key={date}>
               {variant === 'full' && (
                 <div className="flex items-center gap-3 my-5">
-                  <div className="h-px flex-1 bg-[#F2EDE8] dark:bg-[#2A1A1A]" />
+                  <div className="h-px flex-1 bg-[#F2EDE8]" />
                   <span className="text-[11px] text-[#9B8B85] uppercase tracking-[0.06em] px-2">{date}</span>
-                  <div className="h-px flex-1 bg-[#F2EDE8] dark:bg-[#2A1A1A]" />
+                  <div className="h-px flex-1 bg-[#F2EDE8]" />
                 </div>
               )}
               <div className="space-y-2">
@@ -459,7 +459,7 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
                   if (msg.is_filtered) {
                     return (
                       <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-                        <div className="flex items-start gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-600 dark:text-red-400 max-w-xs">
+                        <div className="flex items-start gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 max-w-xs">
                           <ShieldAlert size={13} className="shrink-0 mt-0.5" />
                           <div>
                             <p className="font-semibold">{labels.messageBlocked}</p>
@@ -476,7 +476,7 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
                           className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                             isMine
                               ? `bg-[#8B1A1A] text-white rounded-br-sm ${msg._pending ? 'opacity-60' : ''} ${msg._failed ? 'opacity-70 border-2 border-red-400' : ''}`
-                              : 'bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-bl-sm'
+                              : 'bg-white text-[#1A0A0A] border border-[#F2EDE8] rounded-bl-sm'
                           }`}
                         >
                           {msg.content}
@@ -507,9 +507,9 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
       </div>
 
       {canSend && (
-        <div className={variant === 'embedded' ? 'pt-3 border-t border-[#F2EDE8] dark:border-[#2A1A1A]' : 'px-5 py-3 border-t border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] shrink-0'}>
+        <div className={variant === 'embedded' ? 'pt-3 border-t border-[#F2EDE8]' : 'px-5 py-3 border-t border-[#F2EDE8] bg-white shrink-0'}>
           {pendingFile && (
-            <div className="flex items-center gap-2 mb-2 px-2.5 py-1.5 rounded-lg bg-[#F2EDE8] dark:bg-[#2A1A1A] text-xs text-[#6B5B55] dark:text-[#9B8B85] w-fit">
+            <div className="flex items-center gap-2 mb-2 px-2.5 py-1.5 rounded-lg bg-[#F2EDE8] text-xs text-[#6B5B55] w-fit">
               <Paperclip size={11} />
               <span className="truncate max-w-[200px]">{pendingFile.name}</span>
               <button onClick={() => setPendingFile(null)} className="hover:text-red-500">
@@ -517,10 +517,10 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
               </button>
             </div>
           )}
-          {fileError && <p className="text-xs text-red-600 dark:text-red-400 mb-2">{fileError}</p>}
-          {sendError && <p className="text-xs text-red-600 dark:text-red-400 mb-2">{sendError}</p>}
+          {fileError && <p className="text-xs text-red-600 mb-2">{fileError}</p>}
+          {sendError && <p className="text-xs text-red-600 mb-2">{sendError}</p>}
           <div className="flex items-end gap-2">
-            <label className="p-2.5 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] cursor-pointer transition-colors shrink-0">
+            <label className="p-2.5 rounded-xl border border-[#F2EDE8] text-[#6B5B55] hover:bg-[#FAF8F5] cursor-pointer transition-colors shrink-0">
               <Paperclip size={15} />
               <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={handleFileSelected} disabled={sending} />
             </label>
@@ -536,7 +536,7 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
               placeholder={labels.messagePlaceholder}
               rows={1}
               maxLength={2000}
-              className="flex-1 resize-none px-4 py-2.5 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-[#FAF8F5] dark:bg-[#0F0A0A] text-sm text-[#1A0A0A] dark:text-[#F5F0ED] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20 transition-colors max-h-28"
+              className="flex-1 resize-none px-4 py-2.5 rounded-xl border border-[#F2EDE8] bg-[#FAF8F5] text-sm text-[#1A0A0A] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20 transition-colors max-h-28"
             />
             <button
               onClick={handleSend}

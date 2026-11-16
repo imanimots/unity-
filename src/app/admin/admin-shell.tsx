@@ -58,7 +58,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] dark:bg-[#0F0A0A] flex">
+    <div className="min-h-screen bg-[#FAF8F5] flex">
 
       {/* ── Sidebar ── */}
       {/* Mobile overlay */}
@@ -71,7 +71,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
       <aside className={`
         fixed inset-y-0 left-0 z-40 w-60 flex flex-col
-        bg-[#1A0A0A] dark:bg-[#0F0A0A]
+        bg-[#1A0A0A]
         border-r border-[#2A1A1A]
         transition-transform duration-300
         lg:translate-x-0 lg:static lg:z-auto
@@ -141,11 +141,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       {/* ── Main ── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="h-16 flex items-center justify-between px-6 bg-white dark:bg-[#1A1010] border-b border-[#F2EDE8] dark:border-[#2A1A1A] shrink-0">
+        <header className="h-16 flex items-center justify-between px-6 bg-white border-b border-[#F2EDE8] shrink-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-lg text-[#6B5B55] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A]"
+              className="lg:hidden p-2 rounded-lg text-[#6B5B55] hover:bg-[#F2EDE8]"
             >
               <Menu size={18} />
             </button>
@@ -156,9 +156,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#FAF8F5] dark:bg-[#2A1A1A] border border-[#F2EDE8] dark:border-[#2A1A1A]">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#FAF8F5] border border-[#F2EDE8]">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-[11px] font-medium text-[#6B5B55] dark:text-[#9B8B85] uppercase tracking-[0.1em]">
+            <span className="text-[11px] font-medium text-[#6B5B55] uppercase tracking-[0.1em]">
               {IS_MOCK_MODE ? 'Live · Mock Mode' : 'Live'}
             </span>
           </div>

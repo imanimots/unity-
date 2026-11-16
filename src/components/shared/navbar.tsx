@@ -2,17 +2,15 @@
 
 import { useTranslations } from 'next-intl'
 import { Link, usePathname } from '@/i18n/navigation'
-import { useTheme } from 'next-themes'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import {
-  Sun, Moon, Menu, X, Home, Search,
+  Menu, X, Home, Search,
   MessageCircle, User, ChevronDown, LogOut,
   Package, Calendar, ExternalLink, Link2,
   ShoppingBag, Store, Repeat, AlertTriangle, Sparkles, Wallet, ShieldCheck,
+  HelpCircle, Settings,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
-import { CountrySelector } from '@/components/shared/country-selector'
-import { LanguageSelector } from '@/components/shared/language-selector'
 
 interface NavbarProps {
   /** Server-resolved PERSONALIZATION_ENABLED state (never
@@ -28,28 +26,32 @@ interface NavbarProps {
 }
 
 export function Navbar({ personalizationEnabled = false, rentToBuyEnabled = false }: NavbarProps) {
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const { user, profile, signOut } = useAuth()
   const pathname = usePathname()
   const t = useTranslations('navigation')
 
-  useEffect(() => setMounted(true), [])
-
+  // E47: single, restrained public nav -- Home / Browse / How it works /
+  // Chat / Help. Language, country, and dark-mode controls are removed
+  // from here entirely (E47 Phase D/E): dark mode no longer exists, and
+  // language/country now live in Account Settings for signed-in members
+  // and in the footer for anonymous visitors (the one place CLAUDE.md's
+  // binding "country selector in UI" requirement still applies to a
+  // visitor with no account yet).
   const navLinks = [
     { href: '/', label: t('home') },
     { href: '/listings', label: t('browse') },
     { href: '/#how-it-works', label: t('howItWorks') },
     { href: '/chat', label: t('chat') },
+    { href: '/help', label: t('help') },
   ]
 
   const isActive = (href: string) => pathname === href
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-[#0F0A0A]/95 backdrop-blur-sm border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-[#F2EDE8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
 
@@ -58,16 +60,18 @@ export function Navbar({ personalizationEnabled = false, rentToBuyEnabled = fals
               <span className="text-[#8B1A1A] font-extrabold text-xl tracking-tight">UNITY</span>
             </Link>
 
-            {/* Desktop nav links */}
+            {/* Desktop nav links — underline active state (matches the
+                Help Centre reference) rather than a filled pill, kept
+                consistent across every page for one coherent identity. */}
             <div className="hidden md:flex items-center gap-1">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`px-4 py-2 text-sm font-medium uppercase tracking-[0.05em] transition-colors rounded-lg ${
+                  className={`relative px-4 py-2 text-sm font-medium transition-colors ${
                     isActive(link.href)
-                      ? 'text-[#1A0A0A] dark:text-[#F5F0ED] bg-[#F2EDE8] dark:bg-[#2A1A1A]'
-                      : 'text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010]'
+                      ? 'text-[#8B1A1A] after:absolute after:left-4 after:right-4 after:-bottom-[1px] after:h-[2px] after:bg-[#8B1A1A]'
+                      : 'text-[#6B5B55] hover:text-[#1A0A0A]'
                   }`}
                 >
                   {link.label}
@@ -78,94 +82,91 @@ export function Navbar({ personalizationEnabled = false, rentToBuyEnabled = fals
             {/* Right side */}
             <div className="flex items-center gap-2">
 
-              {/* Dark mode toggle */}
-              {mounted && (
-                <button
-                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                  className="p-2 rounded-lg text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors"
-                  aria-label={t('toggleDarkMode')}
-                >
-                  {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-                </button>
-              )}
-
-              {/* Language selector */}
-              <LanguageSelector />
-
-              {/* Country selector */}
-              <CountrySelector />
-
-              {/* Auth: desktop */}
+              {/* Auth: desktop — ONE primary CTA when signed out (Sign
+                  Up); signed in replaces it with avatar + name, never both
+                  Login and Sign Up side by side. */}
               {user ? (
                 <div className="relative hidden md:block">
                   <button
                     onClick={() => setProfileOpen(!profileOpen)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#F2EDE8] transition-colors"
                   >
-                    <div className="w-7 h-7 rounded-full bg-[#F2EDE8] dark:bg-[#2A1A1A] flex items-center justify-center text-xs font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+                    <div className="w-7 h-7 rounded-full bg-[#F2EDE8] flex items-center justify-center text-xs font-semibold text-[#1A0A0A]">
                       {profile?.display_name?.[0]?.toUpperCase() ?? user.email?.[0]?.toUpperCase() ?? 'U'}
                     </div>
-                    <span className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] max-w-[100px] truncate">
+                    <span className="text-sm font-medium text-[#1A0A0A] max-w-[100px] truncate">
                       {profile?.display_name ?? user.email?.split('@')[0]}
                     </span>
                     <ChevronDown size={13} className="text-[#9B8B85]" />
                   </button>
 
                   {profileOpen && (
-                    <div className="absolute right-0 top-full mt-1.5 w-52 bg-white dark:bg-[#1A1010] rounded-xl shadow-lg border border-[#F2EDE8] dark:border-[#2A1A1A] py-1 z-50">
+                    <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-xl shadow-lg border border-[#F2EDE8] py-1 z-50">
+                      <Link href="/dashboard/profile" onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors">
+                        <User size={14} className="text-[#9B8B85]" /> {t('myProfile')}
+                      </Link>
                       <Link href="/dashboard/renter" onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors">
                         <Calendar size={14} className="text-[#9B8B85]" /> {t('bookings')}
                       </Link>
                       <Link href="/dashboard/merchant" onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors">
                         <Package size={14} className="text-[#9B8B85]" /> {t('myListings')}
                       </Link>
                       <Link href="/dashboard/orders" onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors">
                         <ShoppingBag size={14} className="text-[#9B8B85]" /> {t('myPurchases')}
                       </Link>
                       <Link href="/dashboard/merchant/orders" onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors">
                         <Store size={14} className="text-[#9B8B85]" /> {t('mySales')}
                       </Link>
                       <Link href="/dashboard/barter" onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors">
                         <Repeat size={14} className="text-[#9B8B85]" /> {t('myTrades')}
                       </Link>
                       {rentToBuyEnabled && (
                         <Link href="/dashboard/rent-to-buy" onClick={() => setProfileOpen(false)}
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors">
                           <Wallet size={14} className="text-[#9B8B85]" /> {t('rentToBuy')}
                         </Link>
                       )}
                       <Link href="/dashboard/disputes" onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors">
                         <AlertTriangle size={14} className="text-[#9B8B85]" /> {t('myDisputes')}
                       </Link>
                       <Link href="/dashboard/affiliate" onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors">
                         <Link2 size={14} className="text-[#9B8B85]" /> {t('affiliate')}
                       </Link>
                       {personalizationEnabled && (
                         <Link href="/dashboard/personalization" onClick={() => setProfileOpen(false)}
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors">
                           <Sparkles size={14} className="text-[#9B8B85]" /> {t('personalization')}
                         </Link>
                       )}
                       {process.env.NEXT_PUBLIC_WARP_AFFILIATE_URL && (
                         <a href={process.env.NEXT_PUBLIC_WARP_AFFILIATE_URL} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors">
                           <ExternalLink size={14} className="text-[#9B8B85]" /> {t('ambassadorProgram')}
                         </a>
                       )}
                       <Link href="/dashboard/privacy" onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors">
                         <ShieldCheck size={14} className="text-[#9B8B85]" /> {t('privacy')}
                       </Link>
-                      <div className="border-t border-[#F2EDE8] dark:border-[#2A1A1A] mt-1 pt-1">
+                      <Link href="/dashboard/settings" onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors">
+                        <Settings size={14} className="text-[#9B8B85]" /> {t('settings')}
+                      </Link>
+                      <Link href="/help" onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors">
+                        <HelpCircle size={14} className="text-[#9B8B85]" /> {t('help')}
+                      </Link>
+                      <div className="border-t border-[#F2EDE8] mt-1 pt-1">
                         <button onClick={() => { setProfileOpen(false); signOut() }}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-[#FAF8F5] transition-colors">
                           <LogOut size={14} /> {t('signOut')}
                         </button>
                       </div>
@@ -173,13 +174,9 @@ export function Navbar({ personalizationEnabled = false, rentToBuyEnabled = fals
                   )}
                 </div>
               ) : (
-                <div className="hidden md:flex items-center gap-2">
-                  <Link href="/login"
-                    className="px-4 py-2 text-sm font-medium uppercase tracking-[0.05em] text-[#1A0A0A] dark:text-[#F5F0ED] border border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] rounded-lg transition-colors">
-                    {t('login')}
-                  </Link>
+                <div className="hidden md:flex items-center">
                   <Link href="/register"
-                    className="px-4 py-2 text-sm font-medium uppercase tracking-[0.05em] bg-[#8B1A1A] text-white hover:bg-[#7A1616] rounded-lg transition-colors">
+                    className="px-4 py-2 text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#7A1616] rounded-lg transition-colors">
                     {t('register')}
                   </Link>
                 </div>
@@ -188,7 +185,7 @@ export function Navbar({ personalizationEnabled = false, rentToBuyEnabled = fals
               {/* Mobile hamburger */}
               <button
                 onClick={() => setMobileOpen(!mobileOpen)}
-                className="md:hidden p-2 rounded-lg text-[#6B5B55] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors"
+                className="md:hidden p-2 rounded-lg text-[#6B5B55] hover:bg-[#F2EDE8] transition-colors"
               >
                 {mobileOpen ? <X size={19} /> : <Menu size={19} />}
               </button>
@@ -198,16 +195,16 @@ export function Navbar({ personalizationEnabled = false, rentToBuyEnabled = fals
 
         {/* Mobile drawer */}
         {mobileOpen && (
-          <div className="md:hidden border-t border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#0F0A0A] px-4 py-3 space-y-1">
+          <div className="md:hidden border-t border-[#F2EDE8] bg-white px-4 py-3 space-y-1">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
-                className={`block px-3 py-2.5 rounded-lg text-sm font-medium uppercase tracking-[0.05em] transition-colors ${
+                className={`block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive(link.href)
-                    ? 'text-[#1A0A0A] dark:text-[#F5F0ED] bg-[#F2EDE8] dark:bg-[#2A1A1A]'
-                    : 'text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010]'
+                    ? 'text-[#8B1A1A] bg-[#F2EDE8]'
+                    : 'text-[#6B5B55] hover:bg-[#FAF8F5]'
                 }`}
               >
                 {link.label}
@@ -216,19 +213,19 @@ export function Navbar({ personalizationEnabled = false, rentToBuyEnabled = fals
             {user ? (
               <button
                 onClick={() => { setMobileOpen(false); signOut() }}
-                className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] mt-2 transition-colors"
+                className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-[#FAF8F5] mt-2 transition-colors"
               >
                 {t('signOut')}
               </button>
             ) : (
-              <div className="flex gap-2 pt-2">
-                <Link href="/login" onClick={() => setMobileOpen(false)}
-                  className="flex-1 text-center px-4 py-2.5 text-sm font-medium uppercase tracking-[0.05em] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors">
-                  {t('login')}
-                </Link>
+              <div className="pt-2 space-y-2">
                 <Link href="/register" onClick={() => setMobileOpen(false)}
-                  className="flex-1 text-center px-4 py-2.5 text-sm font-medium uppercase tracking-[0.05em] bg-[#8B1A1A] text-white hover:bg-[#7A1616] rounded-lg transition-colors">
+                  className="block text-center px-4 py-2.5 text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#7A1616] rounded-lg transition-colors">
                   {t('register')}
+                </Link>
+                <Link href="/login" onClick={() => setMobileOpen(false)}
+                  className="block text-center px-4 py-2 text-sm font-medium text-[#6B5B55]">
+                  {t('alreadyHaveAccount')}
                 </Link>
               </div>
             )}
@@ -237,7 +234,7 @@ export function Navbar({ personalizationEnabled = false, rentToBuyEnabled = fals
       </nav>
 
       {/* Mobile bottom nav */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-[#0F0A0A]/95 backdrop-blur-sm border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-t border-[#F2EDE8]">
         <div className="grid grid-cols-4 h-16">
           {[
             { href: '/', icon: Home, label: t('home') },
@@ -249,9 +246,7 @@ export function Navbar({ personalizationEnabled = false, rentToBuyEnabled = fals
               key={href}
               href={href}
               className={`flex flex-col items-center justify-center gap-1 transition-colors ${
-                isActive(href)
-                  ? 'text-[#8B1A1A]'
-                  : 'text-[#9B8B85] dark:text-[#6B5B55]'
+                isActive(href) ? 'text-[#8B1A1A]' : 'text-[#9B8B85]'
               }`}
             >
               <Icon size={19} />

@@ -32,7 +32,7 @@ export function BookingCard({ listing }: { listing: Listing & { daily_rate: numb
   const total = rentalFee + deposit + insurance
 
   return (
-    <div className="bg-white dark:bg-[#1A1010] rounded-2xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-5 space-y-5 shadow-sm">
+    <div className="bg-white rounded-2xl border border-[#F2EDE8] p-5 space-y-5 shadow-sm">
       {/* Price */}
       <div>
         <div className="flex items-baseline gap-2 mb-1">
@@ -44,7 +44,7 @@ export function BookingCard({ listing }: { listing: Listing & { daily_rate: numb
         </div>
         <div className="flex items-center gap-1 text-xs text-[#9B8B85]">
           <Star size={11} className="text-amber-400 fill-amber-400" />
-          <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <span className="font-medium text-[#1A0A0A]">
             {listing.merchant?.unity_score?.toFixed(1) ?? '5.0'}
           </span>
           <span className="flex items-center gap-1">
@@ -61,14 +61,14 @@ export function BookingCard({ listing }: { listing: Listing & { daily_rate: numb
         </label>
         <div className="flex items-center gap-3">
           <button onClick={() => setDays(Math.max(listing.min_rental_days, days - 1))}
-            className="w-9 h-9 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] flex items-center justify-center text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors font-bold">
+            className="w-9 h-9 rounded-lg border border-[#F2EDE8] flex items-center justify-center text-[#6B5B55] hover:bg-[#F2EDE8] transition-colors font-bold">
             −
           </button>
-          <span className="flex-1 text-center font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <span className="flex-1 text-center font-extrabold text-[#1A0A0A]">
             {t('days', { count: days })}
           </span>
           <button onClick={() => setDays(days + 1)}
-            className="w-9 h-9 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] flex items-center justify-center text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors font-bold">
+            className="w-9 h-9 rounded-lg border border-[#F2EDE8] flex items-center justify-center text-[#6B5B55] hover:bg-[#F2EDE8] transition-colors font-bold">
             +
           </button>
         </div>
@@ -78,13 +78,13 @@ export function BookingCard({ listing }: { listing: Listing & { daily_rate: numb
       </div>
 
       {/* Breakdown */}
-      <div className="space-y-2 text-sm border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-4">
-        <div className="flex justify-between text-[#6B5B55] dark:text-[#9B8B85]">
+      <div className="space-y-2 text-sm border-t border-[#F2EDE8] pt-4">
+        <div className="flex justify-between text-[#6B5B55]">
           <span>{t('rateLine', { rate: money(Math.round(rate)), days })}</span>
           <span>{money(rentalFee)}</span>
         </div>
         {listing.deposit_required && (
-          <div className="flex justify-between text-[#6B5B55] dark:text-[#9B8B85]">
+          <div className="flex justify-between text-[#6B5B55]">
             <span className="flex items-center gap-1">
               {t('refundableDeposit')} <Info size={12} className="text-[#9B8B85]" />
             </span>
@@ -92,12 +92,12 @@ export function BookingCard({ listing }: { listing: Listing & { daily_rate: numb
           </div>
         )}
         {insurance > 0 && (
-          <div className="flex justify-between text-[#6B5B55] dark:text-[#9B8B85]">
+          <div className="flex justify-between text-[#6B5B55]">
             <span>{t('insuranceCover')}</span>
             <span>{money(insurance)}</span>
           </div>
         )}
-        <div className="flex justify-between font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-2 mt-2">
+        <div className="flex justify-between font-extrabold text-[#1A0A0A] border-t border-[#F2EDE8] pt-2 mt-2">
           <span>{t('total')}</span>
           <span>{money(total)}</span>
         </div>
@@ -107,9 +107,9 @@ export function BookingCard({ listing }: { listing: Listing & { daily_rate: numb
       </div>
 
       {/* Shipping */}
-      <div className="flex items-center justify-between text-xs text-[#6B5B55] dark:text-[#9B8B85] bg-[#FAF8F5] dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl px-3 py-2.5">
+      <div className="flex items-center justify-between text-xs text-[#6B5B55] bg-[#FAF8F5] border border-[#F2EDE8] rounded-xl px-3 py-2.5">
         <span>{t('shipping')}</span>
-        <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">
+        <span className="font-medium text-[#1A0A0A]">
           {SHIPPING_LABEL[listing.shipping_payer]}
         </span>
       </div>

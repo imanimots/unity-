@@ -115,20 +115,20 @@ export function RequestRentToBuyButton({ listingId, terms, locale, className }: 
                   [t('returnWindowLabel'), t('daysCount', { count: terms.return_window_days })],
                   [t('earlyPayoffLabel'), terms.early_payoff_allowed ? t('yes') : t('no')],
                 ].map(([label, value]) => (
-                  <div key={label} className="flex justify-between items-start gap-4 px-3 py-2 rounded-lg bg-[#FAF8F5] dark:bg-[#1A1010]">
-                    <span className="text-[#6B5B55] dark:text-[#9B8B85]">{label}</span>
-                    <span className="font-medium text-right text-[#1A0A0A] dark:text-[#F5F0ED]">{value}</span>
+                  <div key={label} className="flex justify-between items-start gap-4 px-3 py-2 rounded-lg bg-[#FAF8F5]">
+                    <span className="text-[#6B5B55]">{label}</span>
+                    <span className="font-medium text-right text-[#1A0A0A]">{value}</span>
                   </div>
                 ))}
                 {terms.wear_damage_standard && (
-                  <div className="px-3 py-2 rounded-lg bg-[#FAF8F5] dark:bg-[#1A1010]">
-                    <p className="text-[#6B5B55] dark:text-[#9B8B85] mb-1">{t('wearDamageStandardLabel')}</p>
-                    <p className="text-[#1A0A0A] dark:text-[#F5F0ED]">{terms.wear_damage_standard}</p>
+                  <div className="px-3 py-2 rounded-lg bg-[#FAF8F5]">
+                    <p className="text-[#6B5B55] mb-1">{t('wearDamageStandardLabel')}</p>
+                    <p className="text-[#1A0A0A]">{terms.wear_damage_standard}</p>
                   </div>
                 )}
               </div>
 
-              <div className="mt-4 rounded-xl bg-[#FFF8E8] dark:bg-[#2A2010] border border-[#E8D8A8] dark:border-[#4A3A1A] p-4 text-xs text-[#5A4A20] dark:text-[#D8C888] space-y-1.5">
+              <div className="mt-4 rounded-xl bg-[#FFF8E8] border border-[#E8D8A8] p-4 text-xs text-[#5A4A20] space-y-1.5">
                 <p>{t('disclosurePossession')}</p>
                 <p>{t('disclosureOwnership')}</p>
                 <p>{t('disclosureEscrow')}</p>

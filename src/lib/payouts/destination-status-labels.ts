@@ -10,12 +10,12 @@
 export type PayoutDestinationDisplayStatus = 'unverified' | 'pending' | 'processing' | 'verified' | 'failed' | 'stale'
 
 export const PAYOUT_DESTINATION_STATUS_CLASSES: Record<PayoutDestinationDisplayStatus, string> = {
-  unverified: 'bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]',
-  pending: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
-  processing: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
-  verified: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
-  failed: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
-  stale: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
+  unverified: 'bg-[#F2EDE8] text-[#6B5B55]',
+  pending: 'bg-amber-100 text-amber-700',
+  processing: 'bg-amber-100 text-amber-700',
+  verified: 'bg-green-100 text-green-700',
+  failed: 'bg-red-100 text-red-700',
+  stale: 'bg-amber-100 text-amber-700',
 }
 
 export function computeDisplayStatus(verificationStatus: string, verificationExpiresAt: string | null): PayoutDestinationDisplayStatus {

@@ -105,14 +105,14 @@ export default async function RenterBookingsPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <Link href="/dashboard/renter" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+        <Link href="/dashboard/renter" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
           <ArrowLeft size={13} /> {t('back')}
         </Link>
       </div>
 
       <div className="mb-12">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{t('yourBookings')}</p>
-        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight">{t('bookingsTitle')}</h1>
+        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] tracking-tight">{t('bookingsTitle')}</h1>
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mt-3">
           {t('bookingCount', { count: bookings.length })}
         </p>
@@ -121,10 +121,10 @@ export default async function RenterBookingsPage() {
       <TestModeBanner className="mb-8" text={tCommon('testMode')} />
 
       {bookings.length === 0 ? (
-        <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-16 text-center">
+        <div className="bg-white rounded-xl border border-[#F2EDE8] p-16 text-center">
           <Package size={36} className="mx-auto text-[#9B8B85] mb-4" />
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{t('noBookings')}</p>
-          <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-6">{t('noBookingsDesc')}</p>
+          <p className="text-sm text-[#6B5B55] mb-6">{t('noBookingsDesc')}</p>
           <Link href="/listings" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#8B1A1A] text-white font-semibold uppercase text-xs tracking-[0.1em] rounded-xl hover:bg-[#7A1616] transition-colors">
             {t('browseListings')}
           </Link>
@@ -135,9 +135,9 @@ export default async function RenterBookingsPage() {
             const sc = BOOKING_STATUS_LABELS[b.status]
             const readiness = readinessByBooking.get(b.id)
             return (
-              <div key={b.id} className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-5">
+              <div key={b.id} className="bg-white rounded-xl border border-[#F2EDE8] p-5">
                 <div className="flex items-start justify-between gap-2 flex-wrap mb-2">
-                  <Link href={`/listings/${b.listing_id}`} className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] hover:underline">
+                  <Link href={`/listings/${b.listing_id}`} className="text-sm font-semibold text-[#1A0A0A] hover:underline">
                     {t('booking')} {b.booking_reference}
                   </Link>
                   <span className={`shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.classes}`}>{t(`status.${b.status}`)}</span>
@@ -145,13 +145,13 @@ export default async function RenterBookingsPage() {
                 <p className="text-xs text-[#9B8B85] flex items-center gap-1.5">
                   <Clock size={11} /> {fmt(b.start_at)} – {fmt(b.end_at)}
                 </p>
-                <p className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mt-0.5">
+                <p className="text-xs font-medium text-[#6B5B55] mt-0.5">
                   R{b.subtotal_amount ?? 0} {t('rentalLabel')}
                   {b.deposit_amount_snapshot > 0 && ` · R${b.deposit_amount_snapshot} ${t('depositLabel')}`}
                   {' · '}{t('totalObligation')} R{b.renter_total_amount ?? 0}
                 </p>
                 {readiness && readiness !== 'not_prepared' && (
-                  <p className="text-xs font-semibold mt-1.5 text-[#1A0A0A] dark:text-[#F5F0ED]">{t(`financialReadiness.renter.${READINESS_KEYS[readiness]}`)}</p>
+                  <p className="text-xs font-semibold mt-1.5 text-[#1A0A0A]">{t(`financialReadiness.renter.${READINESS_KEYS[readiness]}`)}</p>
                 )}
                 {b.status === 'accepted' && readiness !== 'financially_ready' && readiness !== 'no_payment_required' && b.payment_due_at && (
                   <PaymentDeadlineNote label={t('payBy', { date: formatDateTime(b.payment_due_at, locale) })} />

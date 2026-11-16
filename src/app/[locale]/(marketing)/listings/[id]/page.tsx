@@ -141,7 +141,7 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
 
   return (
     <NextIntlClientProvider messages={scoped}>
-    <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen">
+    <div className="bg-[#FAF8F5] min-h-screen">
       <ListingViewTracker listingId={listing.id} category={listing.category} />
       {isPersonalizationEnabled() && (
         <RecordListingView
@@ -167,14 +167,14 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12 pt-8 pb-4">
         <Link
           href="/listings"
-          className="inline-flex items-center gap-1.5 text-sm text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors"
+          className="inline-flex items-center gap-1.5 text-sm text-[#6B5B55] hover:text-[#1A0A0A] transition-colors"
         >
           <ArrowLeft size={14} /> {t('backToListings')}
         </Link>
       </div>
 
       {/* ── HERO IMAGE ── */}
-      <div className="w-full min-h-[420px] lg:min-h-[500px] aspect-[21/9] relative bg-[#F2EDE8] dark:bg-[#1A1010] overflow-hidden">
+      <div className="w-full min-h-[420px] lg:min-h-[500px] aspect-[21/9] relative bg-[#F2EDE8] overflow-hidden">
         <ImageGallery media={listing.media ?? []} title={listing.title} />
         {/* Category badge overlaid on image */}
         <div className="absolute top-5 left-6 z-10">
@@ -194,29 +194,29 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
             {/* Title block */}
             <div>
               <p className="section-label mb-3">{categoryLabel}</p>
-              <h1 className="text-3xl lg:text-5xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] leading-tight mb-5">
+              <h1 className="text-3xl lg:text-5xl font-extrabold uppercase text-[#1A0A0A] leading-tight mb-5">
                 {listing.title}
               </h1>
 
               {/* Condition + rating row */}
               <div className="flex items-center gap-3 flex-wrap">
                 {listing.condition && (
-                  <span className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] bg-[#F2EDE8] dark:bg-[#2A1A1A] px-2.5 py-1 rounded-full">
+                  <span className="text-xs font-medium text-[#6B5B55] bg-[#F2EDE8] px-2.5 py-1 rounded-full">
                     {CONDITION_LABEL[listing.condition]}
                   </span>
                 )}
                 {listing.ownership_verified && (
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2.5 py-1 rounded-full">
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2.5 py-1 rounded-full">
                     <ShieldCheck size={11} /> {t('ownershipVerified')}
                   </span>
                 )}
-                <span className="flex items-center gap-1.5 text-sm text-[#6B5B55] dark:text-[#9B8B85]">
+                <span className="flex items-center gap-1.5 text-sm text-[#6B5B55]">
                   <MapPin size={13} /> {city}
                 </span>
                 {reviews.length > 0 && (
-                  <span className="flex items-center gap-1.5 text-sm text-[#6B5B55] dark:text-[#9B8B85]">
+                  <span className="flex items-center gap-1.5 text-sm text-[#6B5B55]">
                     <Star size={13} className="text-amber-400 fill-amber-400" />
-                    <strong className="text-[#1A0A0A] dark:text-[#F5F0ED]">{avgRating.toFixed(1)}</strong>
+                    <strong className="text-[#1A0A0A]">{avgRating.toFixed(1)}</strong>
                     <span>({t('reviewCount', { count: reviews.length })})</span>
                   </span>
                 )}
@@ -226,7 +226,7 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
             {/* Description */}
             <div>
               <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-3">{t('aboutThisItem')}</h2>
-              <p className="text-base text-[#6B5B55] dark:text-[#9B8B85] leading-relaxed">{listing.description}</p>
+              <p className="text-base text-[#6B5B55] leading-relaxed">{listing.description}</p>
             </div>
 
             {/* Renter requirements */}
@@ -235,14 +235,14 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                 <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-4">
                   {t('renterRequirements')}
                 </h2>
-                <div className="rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-5 space-y-4">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 space-y-4">
                   <div className="flex items-start gap-3">
                     <ShieldCheck size={16} className="text-amber-500 shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+                      <p className="text-sm font-semibold text-[#1A0A0A]">
                         {t('riskTierItem', { tier: RISK_TIER_LABELS[listing.risk_tier] })}
                       </p>
-                      <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-0.5">
+                      <p className="text-xs text-[#6B5B55] mt-0.5">
                         {t('riskTierDesc')}
                       </p>
                     </div>
@@ -251,10 +251,10 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                     <div className="flex items-start gap-3">
                       <Star size={16} className="text-amber-500 fill-amber-500 shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+                        <p className="text-sm font-semibold text-[#1A0A0A]">
                           {t('unityScoreRequired', { score: listing.min_unity_score })}
                         </p>
-                        <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-0.5">
+                        <p className="text-xs text-[#6B5B55] mt-0.5">
                           {t('unityScoreDesc', { score: listing.min_unity_score })}
                         </p>
                       </div>
@@ -264,10 +264,10 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                     <div className="flex items-start gap-3">
                       <ShieldCheck size={16} className="text-amber-500 shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+                        <p className="text-sm font-semibold text-[#1A0A0A]">
                           {t('securityDeposit', { amount: formatMoneyFromRands(listing.deposit_amount ?? 0, 'ZAR', locale) })}
                         </p>
-                        <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-0.5">
+                        <p className="text-xs text-[#6B5B55] mt-0.5">
                           {t('securityDepositDesc')}
                         </p>
                       </div>
@@ -277,10 +277,10 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                     <div className="flex items-start gap-3">
                       <UserCheck size={16} className="text-amber-500 shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+                        <p className="text-sm font-semibold text-[#1A0A0A]">
                           {t('ownershipVerificationRequired')}
                         </p>
-                        <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-0.5">
+                        <p className="text-xs text-[#6B5B55] mt-0.5">
                           {t('ownershipVerificationDesc')}
                         </p>
                       </div>
@@ -290,10 +290,10 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                     <div className="flex items-start gap-3">
                       <ShieldCheck size={16} className="text-amber-500 shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+                        <p className="text-sm font-semibold text-[#1A0A0A]">
                           {t('insuranceRequired')}
                         </p>
-                        <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-0.5">
+                        <p className="text-xs text-[#6B5B55] mt-0.5">
                           {t('insuranceRequiredDesc')}
                         </p>
                       </div>
@@ -307,8 +307,8 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
             {listing.merchant && (
               <div>
                 <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-4">{t('listedBy')}</h2>
-                <div className="flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A]">
-                  <div className="w-12 h-12 rounded-full bg-[#F2EDE8] dark:bg-[#2A1A1A] flex items-center justify-center text-lg font-bold text-[#6B5B55] dark:text-[#9B8B85] shrink-0">
+                <div className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-[#F2EDE8]">
+                  <div className="w-12 h-12 rounded-full bg-[#F2EDE8] flex items-center justify-center text-lg font-bold text-[#6B5B55] shrink-0">
                     {listing.merchant.display_name?.[0]?.toUpperCase() ?? 'M'}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -317,16 +317,16 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                         userId={listing.merchant.id}
                         displayName={resolveMerchantPublicIdentity(listing.merchant).publicName}
                         currentUserId={viewer?.userId ?? null}
-                        className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]"
+                        className="font-semibold text-[#1A0A0A]"
                       />
                       {resolveMerchantPublicIdentity(listing.merchant).isElite && <EliteBadge label={t('eliteBadgeLabel')} />}
                       {listing.merchant.is_verified && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded-full">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
                           <ShieldCheck size={9} /> {t('kycVerified')}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-0.5 text-xs text-[#6B5B55] dark:text-[#9B8B85]">
+                    <div className="flex items-center gap-3 mt-0.5 text-xs text-[#6B5B55]">
                       <span className="flex items-center gap-1">
                         <Star size={11} className="text-amber-400 fill-amber-400" />
                         {listing.merchant.unity_score?.toFixed(1)} {t('unityScoreLabel')}
@@ -354,10 +354,10 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                   ].map(({ label, value }) => (
                     <div
                       key={label}
-                      className="flex justify-between items-center px-4 py-3 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm"
+                      className="flex justify-between items-center px-4 py-3 bg-white rounded-xl border border-[#F2EDE8] text-sm"
                     >
-                      <span className="text-[#6B5B55] dark:text-[#9B8B85]">{label}</span>
-                      <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{value}</span>
+                      <span className="text-[#6B5B55]">{label}</span>
+                      <span className="font-medium text-[#1A0A0A]">{value}</span>
                     </div>
                   ))}
                 </div>
@@ -376,10 +376,10 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                   ].map(({ label, value }) => (
                     <div
                       key={label}
-                      className="flex justify-between items-center px-4 py-3 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm"
+                      className="flex justify-between items-center px-4 py-3 bg-white rounded-xl border border-[#F2EDE8] text-sm"
                     >
-                      <span className="text-[#6B5B55] dark:text-[#9B8B85]">{label}</span>
-                      <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{value}</span>
+                      <span className="text-[#6B5B55]">{label}</span>
+                      <span className="font-medium text-[#1A0A0A]">{value}</span>
                     </div>
                   ))}
                 </div>
@@ -392,7 +392,7 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                 <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-4 flex items-center gap-2">
                   <Wallet size={14} /> {tRtb('rtbSectionTitle')}
                 </h2>
-                <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-4">{tRtb('rtbSectionDesc')}</p>
+                <p className="text-sm text-[#6B5B55] mb-4">{tRtb('rtbSectionDesc')}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
                     { label: tRtb('totalPurchasePriceLabel'), value: formatMoneyFromRands(rtbTerms.total_purchase_price, rtbTerms.currency, locale) },
@@ -403,10 +403,10 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                   ].map(({ label, value }) => (
                     <div
                       key={label}
-                      className="flex justify-between items-center px-4 py-3 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm"
+                      className="flex justify-between items-center px-4 py-3 bg-white rounded-xl border border-[#F2EDE8] text-sm"
                     >
-                      <span className="text-[#6B5B55] dark:text-[#9B8B85]">{label}</span>
-                      <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{value}</span>
+                      <span className="text-[#6B5B55]">{label}</span>
+                      <span className="font-medium text-[#1A0A0A]">{value}</span>
                     </div>
                   ))}
                 </div>
@@ -420,11 +420,11 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                 { icon: <CheckCircle size={18} className="text-blue-500" />, title: t('reviewedListing'), desc: t('reviewedListingDesc') },
                 { icon: <Star size={18} className="text-amber-400 fill-amber-400" />, title: t('reviewedMerchant'), desc: t('reviewedMerchantDesc') },
               ].map(({ icon, title, desc }) => (
-                <div key={title} className="flex items-start gap-3 p-4 rounded-xl bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A]">
+                <div key={title} className="flex items-start gap-3 p-4 rounded-xl bg-white border border-[#F2EDE8]">
                   <div className="shrink-0 mt-0.5">{icon}</div>
                   <div>
-                    <div className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{title}</div>
-                    <div className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-0.5">{desc}</div>
+                    <div className="text-sm font-semibold text-[#1A0A0A]">{title}</div>
+                    <div className="text-xs text-[#6B5B55] mt-0.5">{desc}</div>
                   </div>
                 </div>
               ))}
@@ -442,15 +442,15 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                   <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85]">{t('reviews')}</h2>
                   <span className="flex items-center gap-1 text-sm">
                     <Star size={14} className="text-amber-400 fill-amber-400" />
-                    <strong className="text-[#1A0A0A] dark:text-[#F5F0ED]">{avgRating.toFixed(1)}</strong>
+                    <strong className="text-[#1A0A0A]">{avgRating.toFixed(1)}</strong>
                     <span className="text-[#9B8B85]">({reviews.length})</span>
                   </span>
                 </div>
                 <div className="space-y-5">
                   {reviews.map((review) => (
-                    <div key={review.id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] pb-5 last:border-0">
+                    <div key={review.id} className="border-b border-[#F2EDE8] pb-5 last:border-0">
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-[#F2EDE8] dark:bg-[#2A1A1A] flex items-center justify-center text-xs font-bold text-[#6B5B55] dark:text-[#9B8B85]">
+                        <div className="w-8 h-8 rounded-full bg-[#F2EDE8] flex items-center justify-center text-xs font-bold text-[#6B5B55]">
                           {review.reviewer?.display_name?.[0]?.toUpperCase() ?? '?'}
                         </div>
                         <div>
@@ -458,7 +458,7 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                             userId={review.reviewer?.id}
                             displayName={review.reviewer?.display_name ?? review.reviewer?.full_name ?? 'Anonymous'}
                             currentUserId={viewer?.userId ?? null}
-                            className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]"
+                            className="text-sm font-medium text-[#1A0A0A]"
                           />
                           <div className="flex items-center gap-1">
                             {Array.from({ length: 5 }).map((_, i) => (
@@ -468,7 +468,7 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                                 className={
                                   i < review.rating
                                     ? 'text-amber-400 fill-amber-400'
-                                    : 'text-[#F2EDE8] dark:text-[#2A1A1A]'
+                                    : 'text-[#F2EDE8]'
                                 }
                               />
                             ))}
@@ -479,7 +479,7 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                         </span>
                       </div>
                       {review.comment && (
-                        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] leading-relaxed pl-11">
+                        <p className="text-sm text-[#6B5B55] leading-relaxed pl-11">
                           {review.comment}
                         </p>
                       )}
@@ -496,10 +496,10 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
               {isCommitted ? (
                 <div className="rounded-2xl border border-[#8B1A1A]/30 bg-[#8B1A1A]/5 p-5 text-center">
                   {isBarterLocked ? <Repeat size={22} className="mx-auto text-[#8B1A1A] mb-2" /> : <Wallet size={22} className="mx-auto text-[#8B1A1A] mb-2" />}
-                  <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+                  <p className="text-sm font-semibold text-[#1A0A0A]">
                     {isBarterLocked ? t('committedToTrade') : tRtb('committedToRentToBuy')}
                   </p>
-                  <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-1">
+                  <p className="text-xs text-[#6B5B55] mt-1">
                     {isBarterLocked ? t('committedToTradeDesc') : tRtb('committedToRentToBuyDesc')}
                   </p>
                 </div>
@@ -530,9 +530,9 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
 
         {/* ── SIMILAR LISTINGS ── */}
         {similar.length > 0 && (
-          <div className="mt-20 pt-10 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
+          <div className="mt-20 pt-10 border-t border-[#F2EDE8]">
             <p className="section-label mb-3">{t('youMightAlsoLike')}</p>
-            <h2 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] mb-8">
+            <h2 className="text-2xl font-extrabold uppercase text-[#1A0A0A] mb-8">
               {t('similarListings')}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -545,9 +545,9 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
       </div>
 
       {/* ── Mobile sticky CTA ── */}
-      <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 px-4 pb-2 bg-gradient-to-t from-[#FAF8F5] dark:from-[#0F0A0A] pt-4 space-y-2">
+      <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 px-4 pb-2 bg-gradient-to-t from-[#FAF8F5] pt-4 space-y-2">
         {isCommitted ? (
-          <div className="flex items-center justify-center gap-2 w-full py-3.5 bg-white dark:bg-[#1A1010] border border-[#8B1A1A]/30 text-[#8B1A1A] font-semibold rounded-xl text-sm shadow-lg">
+          <div className="flex items-center justify-center gap-2 w-full py-3.5 bg-white border border-[#8B1A1A]/30 text-[#8B1A1A] font-semibold rounded-xl text-sm shadow-lg">
             {isBarterLocked ? <Repeat size={15} /> : <Wallet size={15} />} {isBarterLocked ? t('committedToTrade') : tRtb('committedToRentToBuy')}
           </div>
         ) : (
@@ -572,7 +572,7 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                 listingId={listing.id}
                 terms={rtbTerms!}
                 locale={locale}
-                className="flex items-center justify-center gap-2 w-full py-3.5 bg-white dark:bg-[#1A1010] border border-[#8B1A1A] text-[#8B1A1A] font-semibold rounded-xl text-sm shadow-lg hover:bg-[#8B1A1A]/5 transition-colors"
+                className="flex items-center justify-center gap-2 w-full py-3.5 bg-white border border-[#8B1A1A] text-[#8B1A1A] font-semibold rounded-xl text-sm shadow-lg hover:bg-[#8B1A1A]/5 transition-colors"
               />
             )}
             {canProposeTrade && (
@@ -581,7 +581,7 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                 currentUserId={viewer!.userId}
                 myListings={viewerListings}
                 ownerListings={ownerListings}
-                className="flex items-center justify-center gap-2 w-full py-3.5 bg-white dark:bg-[#1A1010] border border-[#8B1A1A] text-[#8B1A1A] font-semibold rounded-xl text-sm shadow-lg hover:bg-[#8B1A1A]/5 transition-colors"
+                className="flex items-center justify-center gap-2 w-full py-3.5 bg-white border border-[#8B1A1A] text-[#8B1A1A] font-semibold rounded-xl text-sm shadow-lg hover:bg-[#8B1A1A]/5 transition-colors"
               />
             )}
           </>

@@ -70,25 +70,25 @@ export function ReviewForm({ domain, transactionId, revieweeName, transactionTit
 
   if (submitted) {
     return (
-      <div className="rounded-2xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] p-6 text-center space-y-2">
-        <p className="text-sm font-semibold text-green-600 dark:text-green-400">{t('submittedTitle')}</p>
-        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">{t('submittedBlindExplainer')}</p>
+      <div className="rounded-2xl border border-[#F2EDE8] bg-white p-6 text-center space-y-2">
+        <p className="text-sm font-semibold text-green-600">{t('submittedTitle')}</p>
+        <p className="text-sm text-[#6B5B55]">{t('submittedBlindExplainer')}</p>
       </div>
     )
   }
 
   return (
     <form onSubmit={handleSubmit} className="max-w-lg mx-auto font-['Plus_Jakarta_Sans']">
-      <div className="bg-white dark:bg-[#1A1010] rounded-2xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-6 space-y-6">
+      <div className="bg-white rounded-2xl border border-[#F2EDE8] p-6 space-y-6">
         <div>
           <p className="text-sm text-[#9B8B85] mb-0.5">{t('reviewingTransactionFor')}</p>
-          <p className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{transactionTitle}</p>
+          <p className="font-semibold text-[#1A0A0A]">{transactionTitle}</p>
         </div>
 
-        <p className="text-xs text-[#9B8B85] bg-[#F2EDE8] dark:bg-[#2A1A1A] rounded-lg px-3 py-2">{t('blindExplainer')}</p>
+        <p className="text-xs text-[#9B8B85] bg-[#F2EDE8] rounded-lg px-3 py-2">{t('blindExplainer')}</p>
 
         <div>
-          <label className="block text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] mb-2">
+          <label className="block text-sm font-medium text-[#1A0A0A] mb-2">
             {t('rate', { reviewee: revieweeName })}
           </label>
           <div className="flex gap-2">
@@ -104,7 +104,7 @@ export function ReviewForm({ domain, transactionId, revieweeName, transactionTit
               >
                 <Star
                   size={32}
-                  className={s <= (hoverRating || rating) ? 'text-amber-400' : 'text-[#F2EDE8] dark:text-[#2A1A1A]'}
+                  className={s <= (hoverRating || rating) ? 'text-amber-400' : 'text-[#F2EDE8]'}
                   fill="currentColor"
                 />
               </button>
@@ -113,7 +113,7 @@ export function ReviewForm({ domain, transactionId, revieweeName, transactionTit
         </div>
 
         <div>
-          <label htmlFor={`comment-${transactionId}`} className="block text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] mb-2">
+          <label htmlFor={`comment-${transactionId}`} className="block text-sm font-medium text-[#1A0A0A] mb-2">
             {t('writeReview')}
           </label>
           <textarea
@@ -122,11 +122,11 @@ export function ReviewForm({ domain, transactionId, revieweeName, transactionTit
             onChange={(e) => setComment(e.target.value)}
             placeholder={t('sharePlaceholder', { reviewee: revieweeName })}
             rows={4}
-            className="w-full px-3 py-2.5 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-sm text-[#1A0A0A] dark:text-[#F5F0ED] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20 resize-none"
+            className="w-full px-3 py-2.5 rounded-xl border border-[#F2EDE8] bg-white text-sm text-[#1A0A0A] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20 resize-none"
           />
         </div>
 
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
 
         <button
           type="submit"

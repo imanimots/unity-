@@ -66,7 +66,7 @@ export default async function AdminSkillTaskReportsPage() {
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
-      <Link href="/admin/barter" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+      <Link href="/admin/barter" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
         <ArrowLeft size={13} /> Back to barter trades
       </Link>
 
@@ -80,14 +80,14 @@ export default async function AdminSkillTaskReportsPage() {
             const post = postById.get(postId)
             if (!post) return null
             return (
-              <div key={postId} className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
+              <div key={postId} className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-[10px] font-bold uppercase tracking-wide text-[#9B8B85]">{post.kind} · {post.direction}</span>
                       <Pill value={post.status} styles={STATUS_STYLES} />
                     </div>
-                    <h2 className="font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{post.title || 'Untitled'}</h2>
+                    <h2 className="font-bold text-[#1A0A0A]">{post.title || 'Untitled'}</h2>
                   </div>
                   <a href={`/barter/skill-task/${post.id}`} target="_blank" rel="noreferrer" className="text-xs font-semibold text-[#8B1A1A] hover:underline">
                     View public post
@@ -96,8 +96,8 @@ export default async function AdminSkillTaskReportsPage() {
 
                 <div className="space-y-1.5">
                   {postReports.map((r) => (
-                    <div key={r.id} className="text-xs text-[#6B5B55] dark:text-[#9B8B85] border-l-2 border-[#F2EDE8] dark:border-[#2A1A1A] pl-2.5">
-                      <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{r.reason.replace('_', ' ')}</span> — {formatDate(r.created_at)}
+                    <div key={r.id} className="text-xs text-[#6B5B55] border-l-2 border-[#F2EDE8] pl-2.5">
+                      <span className="font-semibold text-[#1A0A0A]">{r.reason.replace('_', ' ')}</span> — {formatDate(r.created_at)}
                       {r.description && <p className="mt-0.5">{r.description}</p>}
                     </div>
                   ))}

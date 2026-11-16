@@ -185,7 +185,7 @@ export default function AdminListingReviewPage({ params }: { params: Promise<{ i
 
   return (
     <div className="p-6 lg:p-8 space-y-6 max-w-5xl">
-      <Link href="/admin/listings" className="inline-flex items-center gap-1.5 text-sm text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#8B1A1A]">
+      <Link href="/admin/listings" className="inline-flex items-center gap-1.5 text-sm text-[#6B5B55] hover:text-[#8B1A1A]">
         <ArrowLeft size={14} /> Back to queue
       </Link>
 
@@ -194,8 +194,8 @@ export default function AdminListingReviewPage({ params }: { params: Promise<{ i
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-1">
             {listing.category} · {listing.riskTier} risk
           </p>
-          <h1 className="text-2xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED]">{listing.title}</h1>
-          <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mt-1">
+          <h1 className="text-2xl font-extrabold text-[#1A0A0A]">{listing.title}</h1>
+          <p className="text-sm text-[#6B5B55] mt-1">
             <Link href={`/admin/merchants/${listing.merchantId}`} className="text-[#8B1A1A] underline">{listing.merchantName ?? listing.merchantId}</Link> · status: <span className="font-medium capitalize">{listing.status}</span>
           </p>
         </div>
@@ -211,39 +211,39 @@ export default function AdminListingReviewPage({ params }: { params: Promise<{ i
       )}
 
       {/* ── Public listing information ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Public listing information</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Public listing information</h2>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
           <div>
             <dt className="text-[#9B8B85]">Condition</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED] capitalize">{listing.condition ?? '—'}</dd>
+            <dd className="text-[#1A0A0A] capitalize">{listing.condition ?? '—'}</dd>
           </div>
           <div>
             <dt className="text-[#9B8B85]">Known defects</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{listing.knownDefects ?? 'None declared'}</dd>
+            <dd className="text-[#1A0A0A]">{listing.knownDefects ?? 'None declared'}</dd>
           </div>
           <div>
             <dt className="text-[#9B8B85]">Daily rate</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">R{listing.dailyRate?.toLocaleString()}</dd>
+            <dd className="text-[#1A0A0A]">R{listing.dailyRate?.toLocaleString()}</dd>
           </div>
           <div>
             <dt className="text-[#9B8B85]">Replacement value</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{listing.replacementValue ? `R${listing.replacementValue.toLocaleString()}` : '—'}</dd>
+            <dd className="text-[#1A0A0A]">{listing.replacementValue ? `R${listing.replacementValue.toLocaleString()}` : '—'}</dd>
           </div>
           <div>
             <dt className="text-[#9B8B85]">Location</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">
+            <dd className="text-[#1A0A0A]">
               {listing.city ?? '—'}, {listing.province ?? '—'}
             </dd>
           </div>
           <div>
             <dt className="text-[#9B8B85]">Available from</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{listing.availableFrom ?? '—'}</dd>
+            <dd className="text-[#1A0A0A]">{listing.availableFrom ?? '—'}</dd>
           </div>
         </dl>
         <div>
           <dt className="text-[#9B8B85] text-sm">Description</dt>
-          <dd className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED] whitespace-pre-wrap">{listing.description ?? '—'}</dd>
+          <dd className="text-sm text-[#1A0A0A] whitespace-pre-wrap">{listing.description ?? '—'}</dd>
         </div>
         <div>
           <dt className="text-[#9B8B85] text-sm mb-1">Declarations accepted</dt>
@@ -260,39 +260,39 @@ export default function AdminListingReviewPage({ params }: { params: Promise<{ i
           <dd className="flex flex-wrap gap-2">
             {data.media.map((m) => (
               // eslint-disable-next-line @next/next/no-img-element -- Supabase storage host isn't in next.config's image remotePatterns; out of scope to add here for an admin-only thumbnail grid.
-              <img key={m.id} src={m.url} alt="" className="w-20 h-20 object-cover rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A]" />
+              <img key={m.id} src={m.url} alt="" className="w-20 h-20 object-cover rounded-lg border border-[#F2EDE8]" />
             ))}
           </dd>
         </div>
       </section>
 
       {/* ── Private merchant evidence ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Private merchant evidence</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Private merchant evidence</h2>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
           <div>
             <dt className="text-[#9B8B85]">Purchase date</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{data.privateDetails?.purchaseDate ?? '—'}</dd>
+            <dd className="text-[#1A0A0A]">{data.privateDetails?.purchaseDate ?? '—'}</dd>
           </div>
           <div>
             <dt className="text-[#9B8B85]">Purchase price</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{data.privateDetails?.purchasePrice ? `R${data.privateDetails.purchasePrice.toLocaleString()}` : '—'}</dd>
+            <dd className="text-[#1A0A0A]">{data.privateDetails?.purchasePrice ? `R${data.privateDetails.purchasePrice.toLocaleString()}` : '—'}</dd>
           </div>
           <div>
             <dt className="text-[#9B8B85]">Retailer / seller</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{data.privateDetails?.retailerOrSeller ?? '—'}</dd>
+            <dd className="text-[#1A0A0A]">{data.privateDetails?.retailerOrSeller ?? '—'}</dd>
           </div>
           <div>
             <dt className="text-[#9B8B85]">Serial number</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{data.privateDetails?.serialNumber ?? '—'}</dd>
+            <dd className="text-[#1A0A0A]">{data.privateDetails?.serialNumber ?? '—'}</dd>
           </div>
           <div>
             <dt className="text-[#9B8B85]">Merchant KYC status</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED] capitalize">{listing.merchantKycStatus}</dd>
+            <dd className="text-[#1A0A0A] capitalize">{listing.merchantKycStatus}</dd>
           </div>
           <div>
             <dt className="text-[#9B8B85]">Merchant Unity Score</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{listing.merchantUnityScore ?? '—'}</dd>
+            <dd className="text-[#1A0A0A]">{listing.merchantUnityScore ?? '—'}</dd>
           </div>
         </dl>
 
@@ -305,7 +305,7 @@ export default function AdminListingReviewPage({ params }: { params: Promise<{ i
                 <button
                   onClick={() => viewEvidence(ev.id)}
                   disabled={actionPending === `evidence:${ev.id}`}
-                  className="inline-flex items-center gap-1.5 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 border border-[#F2EDE8] text-[#6B5B55] hover:bg-[#F2EDE8] text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
                 >
                   <Eye size={12} /> View evidence (link expires in 2 min)
                 </button>
@@ -321,9 +321,9 @@ export default function AdminListingReviewPage({ params }: { params: Promise<{ i
       </section>
 
       {/* ── Risk and completeness ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Risk and completeness</h2>
-        <p className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Risk and completeness</h2>
+        <p className="text-sm text-[#1A0A0A]">
           Risk tier: <span className="font-medium capitalize">{listing.riskTier}</span> · Ownership verification required:{' '}
           <span className="font-medium">{riskRequirements.ownershipVerificationRequired ? 'Yes' : 'No'}</span> · Deposit required:{' '}
           <span className="font-medium">{riskRequirements.depositRequired ? 'Yes' : 'No'}</span> · Insurance required:{' '}
@@ -352,23 +352,23 @@ export default function AdminListingReviewPage({ params }: { params: Promise<{ i
       </section>
 
       {/* ── Ownership verification actions ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Ownership verification</h2>
-        <p className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Ownership verification</h2>
+        <p className="text-sm text-[#1A0A0A]">
           Current status: <span className="font-medium capitalize">{ownershipVerification.status.replace(/_/g, ' ')}</span>
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <input placeholder="Reason code" value={reasonCode} onChange={(e) => setReasonCode(e.target.value)} className="border border-[#F2EDE8] dark:border-[#2A1A1A] bg-transparent rounded-lg text-sm px-3 py-2" />
-          <input placeholder="Reviewer notes (internal)" value={internalNote} onChange={(e) => setInternalNote(e.target.value)} className="border border-[#F2EDE8] dark:border-[#2A1A1A] bg-transparent rounded-lg text-sm px-3 py-2" />
-          <input placeholder="Merchant-visible feedback" value={merchantFeedback} onChange={(e) => setMerchantFeedback(e.target.value)} className="border border-[#F2EDE8] dark:border-[#2A1A1A] bg-transparent rounded-lg text-sm px-3 py-2" />
+          <input placeholder="Reason code" value={reasonCode} onChange={(e) => setReasonCode(e.target.value)} className="border border-[#F2EDE8] bg-transparent rounded-lg text-sm px-3 py-2" />
+          <input placeholder="Reviewer notes (internal)" value={internalNote} onChange={(e) => setInternalNote(e.target.value)} className="border border-[#F2EDE8] bg-transparent rounded-lg text-sm px-3 py-2" />
+          <input placeholder="Merchant-visible feedback" value={merchantFeedback} onChange={(e) => setMerchantFeedback(e.target.value)} className="border border-[#F2EDE8] bg-transparent rounded-lg text-sm px-3 py-2" />
         </div>
 
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => runAction('/ownership/start', {})}
             disabled={!!actionPending}
-            className="inline-flex items-center gap-1.5 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] hover:bg-[#F2EDE8] text-xs font-medium px-3 py-1.5 rounded-lg disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 border border-[#F2EDE8] text-[#6B5B55] hover:bg-[#F2EDE8] text-xs font-medium px-3 py-1.5 rounded-lg disabled:opacity-50"
           >
             <ShieldQuestion size={13} /> Start review
           </button>
@@ -397,9 +397,9 @@ export default function AdminListingReviewPage({ params }: { params: Promise<{ i
       </section>
 
       {/* ── Moderation actions ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Moderation</h2>
-        <p className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Moderation</h2>
+        <p className="text-sm text-[#1A0A0A]">
           Current status: <span className="font-medium capitalize">{moderation.moderation_status.replace(/_/g, ' ')}</span>
         </p>
         <div className="flex flex-wrap gap-2">
@@ -428,8 +428,8 @@ export default function AdminListingReviewPage({ params }: { params: Promise<{ i
       </section>
 
       {/* ── Activation / suspension ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Activation</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Activation</h2>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => runAction('/activate', {})}
@@ -441,7 +441,7 @@ export default function AdminListingReviewPage({ params }: { params: Promise<{ i
           <button
             onClick={() => runAction('/suspend', { reason_code: reasonCode || null, internal_note: internalNote || null, merchant_feedback: merchantFeedback || null })}
             disabled={!!actionPending || listing.status !== 'active'}
-            className="inline-flex items-center gap-1.5 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] hover:bg-[#F2EDE8] text-xs font-medium px-3 py-1.5 rounded-lg disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 border border-[#F2EDE8] text-[#6B5B55] hover:bg-[#F2EDE8] text-xs font-medium px-3 py-1.5 rounded-lg disabled:opacity-40"
           >
             <PauseCircle size={13} /> Suspend listing
           </button>
@@ -449,23 +449,23 @@ export default function AdminListingReviewPage({ params }: { params: Promise<{ i
       </section>
 
       {/* ── Audit timeline ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Audit timeline</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Audit timeline</h2>
         <ul className="space-y-2">
           {data.history.map((h) => (
-            <li key={h.id} className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">
-              <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED] capitalize">{h.change_reason.replace(/_/g, ' ')}</span> — {new Date(h.created_at).toLocaleString('en-ZA')}
+            <li key={h.id} className="text-sm text-[#6B5B55]">
+              <span className="font-medium text-[#1A0A0A] capitalize">{h.change_reason.replace(/_/g, ' ')}</span> — {new Date(h.created_at).toLocaleString('en-ZA')}
             </li>
           ))}
         </ul>
       </section>
 
       {/* ── Internal admin notes ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Internal admin notes</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Internal admin notes</h2>
         <p className="text-[11px] text-[#9B8B85]">Admin-only, never visible to the merchant.</p>
         {notes.map((n) => (
-          <div key={n.id} className="text-xs text-[#6B5B55] dark:text-[#9B8B85] bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg px-3 py-2">
+          <div key={n.id} className="text-xs text-[#6B5B55] bg-[#FAF8F5] rounded-lg px-3 py-2">
             {n.note}
             <div className="text-[10px] text-[#9B8B85] mt-1">{new Date(n.createdAt).toLocaleString('en-ZA')}</div>
           </div>
@@ -474,13 +474,13 @@ export default function AdminListingReviewPage({ params }: { params: Promise<{ i
           placeholder="Add an internal note…"
           value={noteInput}
           onChange={(e) => setNoteInput(e.target.value)}
-          className="w-full border border-[#F2EDE8] dark:border-[#2A1A1A] bg-transparent rounded-lg text-sm px-3 py-2"
+          className="w-full border border-[#F2EDE8] bg-transparent rounded-lg text-sm px-3 py-2"
           rows={2}
         />
         <button
           disabled={notePending || !noteInput.trim()}
           onClick={submitNote}
-          className="inline-flex items-center gap-1.5 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] hover:bg-[#F2EDE8] text-xs font-medium px-3 py-1.5 rounded-lg disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 border border-[#F2EDE8] text-[#6B5B55] hover:bg-[#F2EDE8] text-xs font-medium px-3 py-1.5 rounded-lg disabled:opacity-50"
         >
           Add note
         </button>

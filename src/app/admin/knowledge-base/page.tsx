@@ -100,7 +100,7 @@ export default function KnowledgeBasePage() {
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-1">
             AI ASSISTANT
           </p>
-          <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A]">
             KNOWLEDGE BASE
           </h1>
         </div>
@@ -146,28 +146,28 @@ export default function KnowledgeBasePage() {
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-4">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <BookOpen className="w-4 h-4 text-[#9B8B85]" />
             <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Total Entries</p>
           </div>
-          <p className="text-2xl font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{totalEntries}</p>
+          <p className="text-2xl font-bold text-[#1A0A0A]">{totalEntries}</p>
         </div>
 
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-4">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <RefreshCw className="w-4 h-4 text-[#9B8B85]" />
             <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Categories</p>
           </div>
-          <p className="text-2xl font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{uniqueCategories}</p>
+          <p className="text-2xl font-bold text-[#1A0A0A]">{uniqueCategories}</p>
         </div>
 
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-4 col-span-2 lg:col-span-1">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl p-4 col-span-2 lg:col-span-1">
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle className="w-4 h-4 text-[#9B8B85]" />
             <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Last Updated</p>
           </div>
-          <p className="text-2xl font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">Today</p>
+          <p className="text-2xl font-bold text-[#1A0A0A]">Today</p>
         </div>
       </div>
 
@@ -176,13 +176,13 @@ export default function KnowledgeBasePage() {
         {!showAdd ? (
           <button
             onClick={() => setShowAdd(true)}
-            className="flex items-center gap-2 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] text-xs px-3 py-1.5 rounded-lg transition-colors font-medium uppercase tracking-[0.08em]"
+            className="flex items-center gap-2 border border-[#F2EDE8] text-[#6B5B55] hover:bg-[#F2EDE8] text-xs px-3 py-1.5 rounded-lg transition-colors font-medium uppercase tracking-[0.08em]"
           >
             <Plus className="w-3.5 h-3.5" />
             Add Entry
           </button>
         ) : (
-          <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+          <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
             <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-4">
               NEW ENTRY
             </p>
@@ -192,12 +192,12 @@ export default function KnowledgeBasePage() {
                 placeholder="Title"
                 value={addTitle}
                 onChange={e => setAddTitle(e.target.value)}
-                className="w-full bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg px-3 py-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] focus:outline-none focus:border-[#8B1A1A]"
+                className="w-full bg-white border border-[#F2EDE8] rounded-lg px-3 py-2 text-sm text-[#1A0A0A] focus:outline-none focus:border-[#8B1A1A]"
               />
               <select
                 value={addCategory}
                 onChange={e => setAddCategory(e.target.value)}
-                className="w-full bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg px-3 py-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] focus:outline-none focus:border-[#8B1A1A]"
+                className="w-full bg-white border border-[#F2EDE8] rounded-lg px-3 py-2 text-sm text-[#1A0A0A] focus:outline-none focus:border-[#8B1A1A]"
               >
                 {CATEGORIES.map(c => (
                   <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
@@ -208,7 +208,7 @@ export default function KnowledgeBasePage() {
                 value={addContent}
                 onChange={e => setAddContent(e.target.value)}
                 rows={4}
-                className="w-full bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg px-3 py-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] focus:outline-none focus:border-[#8B1A1A] resize-none h-32"
+                className="w-full bg-white border border-[#F2EDE8] rounded-lg px-3 py-2 text-sm text-[#1A0A0A] focus:outline-none focus:border-[#8B1A1A] resize-none h-32"
               />
               <div className="flex items-center gap-2">
                 <button
@@ -224,7 +224,7 @@ export default function KnowledgeBasePage() {
                     setAddCategory('platform')
                     setAddContent('')
                   }}
-                  className="border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] text-xs px-3 py-1.5 rounded-lg transition-colors"
+                  className="border border-[#F2EDE8] text-[#6B5B55] hover:bg-[#F2EDE8] text-xs px-3 py-1.5 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
@@ -243,7 +243,7 @@ export default function KnowledgeBasePage() {
             className={`text-xs font-medium uppercase tracking-[0.08em] px-3 py-1.5 rounded-lg transition-colors ${
               categoryFilter === cat
                 ? 'bg-[#8B1A1A] text-white'
-                : 'border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A]'
+                : 'border border-[#F2EDE8] text-[#6B5B55] hover:bg-[#F2EDE8]'
             }`}
           >
             {cat === 'all' ? 'All' : CATEGORY_LABELS[cat]}
@@ -254,7 +254,7 @@ export default function KnowledgeBasePage() {
       {/* Entries List */}
       <div className="flex flex-col gap-4">
         {filteredEntries.length === 0 && (
-          <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-12 text-center">
+          <div className="bg-white border border-[#F2EDE8] rounded-xl p-12 text-center">
             <p className="text-sm text-[#9B8B85]">No entries in this category.</p>
           </div>
         )}
@@ -262,7 +262,7 @@ export default function KnowledgeBasePage() {
         {filteredEntries.map(entry => (
           <div
             key={entry.id}
-            className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden"
+            className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden"
           >
             {editingId === entry.id ? (
               /* Edit Mode */
@@ -275,12 +275,12 @@ export default function KnowledgeBasePage() {
                     type="text"
                     value={editTitle}
                     onChange={e => setEditTitle(e.target.value)}
-                    className="w-full bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg px-3 py-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] focus:outline-none focus:border-[#8B1A1A]"
+                    className="w-full bg-white border border-[#F2EDE8] rounded-lg px-3 py-2 text-sm text-[#1A0A0A] focus:outline-none focus:border-[#8B1A1A]"
                   />
                   <select
                     value={editCategory}
                     onChange={e => setEditCategory(e.target.value)}
-                    className="w-full bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg px-3 py-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] focus:outline-none focus:border-[#8B1A1A]"
+                    className="w-full bg-white border border-[#F2EDE8] rounded-lg px-3 py-2 text-sm text-[#1A0A0A] focus:outline-none focus:border-[#8B1A1A]"
                   >
                     {CATEGORIES.map(c => (
                       <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
@@ -289,7 +289,7 @@ export default function KnowledgeBasePage() {
                   <textarea
                     value={editContent}
                     onChange={e => setEditContent(e.target.value)}
-                    className="w-full bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg px-3 py-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] focus:outline-none focus:border-[#8B1A1A] resize-none h-40"
+                    className="w-full bg-white border border-[#F2EDE8] rounded-lg px-3 py-2 text-sm text-[#1A0A0A] focus:outline-none focus:border-[#8B1A1A] resize-none h-40"
                   />
                   <div className="flex items-center gap-2">
                     <button
@@ -301,7 +301,7 @@ export default function KnowledgeBasePage() {
                     </button>
                     <button
                       onClick={() => setEditingId(null)}
-                      className="flex items-center gap-1.5 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] text-xs px-3 py-1.5 rounded-lg transition-colors"
+                      className="flex items-center gap-1.5 border border-[#F2EDE8] text-[#6B5B55] hover:bg-[#F2EDE8] text-xs px-3 py-1.5 rounded-lg transition-colors"
                     >
                       <X className="w-3.5 h-3.5" />
                       Cancel
@@ -313,7 +313,7 @@ export default function KnowledgeBasePage() {
               /* View Mode */
               <>
                 {/* Card Header */}
-                <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
+                <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[#F2EDE8]">
                   <div className="flex items-center gap-2 min-w-0">
                     <span
                       className={`text-[10px] font-semibold uppercase tracking-[0.08em] px-2 py-0.5 rounded-full flex-shrink-0 ${
@@ -322,21 +322,21 @@ export default function KnowledgeBasePage() {
                     >
                       {CATEGORY_LABELS[entry.category] ?? entry.category}
                     </span>
-                    <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] truncate">
+                    <p className="text-sm font-semibold text-[#1A0A0A] truncate">
                       {entry.title}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                       onClick={() => startEdit(entry)}
-                      className="p-1.5 rounded-lg text-[#9B8B85] hover:text-[#6B5B55] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors"
+                      className="p-1.5 rounded-lg text-[#9B8B85] hover:text-[#6B5B55] hover:bg-[#F2EDE8] transition-colors"
                       title="Edit"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => deleteEntry(entry.id)}
-                      className="p-1.5 rounded-lg text-[#9B8B85] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+                      className="p-1.5 rounded-lg text-[#9B8B85] hover:text-red-600 hover:bg-red-50 transition-colors"
                       title="Delete"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -346,7 +346,7 @@ export default function KnowledgeBasePage() {
 
                 {/* Card Body */}
                 <div className="px-5 py-4">
-                  <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] leading-relaxed whitespace-pre-wrap">
+                  <p className="text-sm text-[#6B5B55] leading-relaxed whitespace-pre-wrap">
                     {entry.content}
                   </p>
                   <p className="text-[11px] text-[#9B8B85] mt-3">

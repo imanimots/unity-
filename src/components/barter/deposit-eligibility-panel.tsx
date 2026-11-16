@@ -68,9 +68,9 @@ export function DepositEligibilityPanel({ depositTerms, items, partyAId, partyBI
           const percent = eligiblePercentFor(term.payer_id)
           const amount = Math.round(((term.amount * percent) / 100) * 100) / 100
           return (
-            <div key={term.id} className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-4 bg-white dark:bg-[#1A1010]">
+            <div key={term.id} className="rounded-xl border border-[#F2EDE8] p-4 bg-white">
               <p className="text-xs text-[#9B8B85] mb-1">{nameFor(term.payer_id)}&apos;s deposit</p>
-              <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+              <p className="text-sm font-semibold text-[#1A0A0A]">
                 {labels ? labels.eligibleText(`R${amount.toFixed(2)}`) : `R${amount.toFixed(2)} of your deposit is now eligible for release`}
               </p>
               <p className="text-xs text-[#9B8B85] mt-1">

@@ -41,7 +41,7 @@ export function AmendmentRespondButtons({ agreementId, amendmentId }: Props) {
       <button disabled={busy !== null} onClick={() => respond(true)} className="text-xs font-semibold uppercase tracking-wide text-[#8B1A1A] disabled:opacity-50">
         {t('amendmentAccept')}
       </button>
-      <button disabled={busy !== null} onClick={() => respond(false)} className="text-xs font-semibold uppercase tracking-wide text-[#6B5B55] dark:text-[#9B8B85] disabled:opacity-50">
+      <button disabled={busy !== null} onClick={() => respond(false)} className="text-xs font-semibold uppercase tracking-wide text-[#6B5B55] disabled:opacity-50">
         {t('amendmentDecline')}
       </button>
     </div>

@@ -55,7 +55,7 @@ function DeadlineCountdown({ paymentDueAt }: { paymentDueAt: string | null }) {
 
   if (remainingMs <= 0) {
     return (
-      <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5">
+      <p className="text-xs text-red-600 flex items-center gap-1.5">
         <Clock3 size={12} /> {t('deadlinePassed')}
       </p>
     )
@@ -72,7 +72,7 @@ function DeadlineCountdown({ paymentDueAt }: { paymentDueAt: string | null }) {
       : t('timeToPaySeconds', { seconds })
 
   return (
-    <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+    <p className="text-xs text-amber-600 flex items-center gap-1.5">
       <Clock3 size={12} /> {t('timeToPay', { label })}
     </p>
   )
@@ -157,7 +157,7 @@ export function CheckoutFlow({ bookingId, initial }: { bookingId: string; initia
   }
 
   if (loadError) {
-    return <p className="text-sm text-red-600 dark:text-red-400">{loadError}</p>
+    return <p className="text-sm text-red-600">{loadError}</p>
   }
 
   if (!status) {
@@ -201,14 +201,14 @@ export function CheckoutFlow({ bookingId, initial }: { bookingId: string; initia
       )}
 
       {lateSuccessNotice && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/40 rounded-xl p-4 flex items-start gap-2.5">
-          <Info size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-800 dark:text-amber-300">{lateSuccessNotice}</p>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-2.5">
+          <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-800">{lateSuccessNotice}</p>
         </div>
       )}
 
       {(status.rentalPaymentStatus === 'failed' || status.depositPaymentStatus === 'failed') && (
-        <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-5">
+        <div className="bg-white rounded-xl border border-[#F2EDE8] p-5">
           <PaymentAttemptSummary
             rentalPaymentStatus={status.rentalPaymentStatus}
             rentalFailureReason={status.rentalFailureReason}
@@ -226,7 +226,7 @@ export function CheckoutFlow({ bookingId, initial }: { bookingId: string; initia
       {canAct && status.testModeAvailable && <TestPaymentScenarioSelector value={scenario} onChange={setScenario} disabled={submitting} />}
 
       {canAct && (
-        <label className="flex items-start gap-2.5 text-xs text-[#6B5B55] dark:text-[#9B8B85] cursor-pointer">
+        <label className="flex items-start gap-2.5 text-xs text-[#6B5B55] cursor-pointer">
           <input
             type="checkbox"
             checked={agreedToPaymentTerms}
@@ -252,12 +252,12 @@ export function CheckoutFlow({ bookingId, initial }: { bookingId: string; initia
         </button>
       )}
 
-      {submitError && <p className="text-xs text-red-600 dark:text-red-400">{submitError}</p>}
+      {submitError && <p className="text-xs text-red-600">{submitError}</p>}
 
       {status.readiness === 'financially_ready' && (
         <Link
           href="/dashboard/renter/bookings"
-          className="block text-center w-full py-3 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm font-semibold uppercase tracking-[0.08em] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A]"
+          className="block text-center w-full py-3 rounded-lg border border-[#F2EDE8] text-sm font-semibold uppercase tracking-[0.08em] text-[#1A0A0A] hover:bg-[#FAF8F5]"
         >
           {tRent('backToBookings')}
         </Link>

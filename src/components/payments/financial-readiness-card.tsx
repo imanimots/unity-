@@ -30,14 +30,14 @@ const ICONS: Record<FinancialReadinessState, typeof CheckCircle2> = {
 
 const TONE: Record<FinancialReadinessState, string> = {
   not_prepared: 'text-[#9B8B85]',
-  awaiting_payment: 'text-blue-600 dark:text-blue-400',
-  processing: 'text-blue-600 dark:text-blue-400',
-  payment_failed_retryable: 'text-amber-600 dark:text-amber-400',
-  payment_failed_terminal: 'text-red-600 dark:text-red-400',
-  deposit_failed_retryable: 'text-amber-600 dark:text-amber-400',
-  deposit_failed_terminal: 'text-red-600 dark:text-red-400',
-  financially_ready: 'text-green-600 dark:text-green-400',
-  no_payment_required: 'text-green-600 dark:text-green-400',
+  awaiting_payment: 'text-blue-600',
+  processing: 'text-blue-600',
+  payment_failed_retryable: 'text-amber-600',
+  payment_failed_terminal: 'text-red-600',
+  deposit_failed_retryable: 'text-amber-600',
+  deposit_failed_terminal: 'text-red-600',
+  financially_ready: 'text-green-600',
+  no_payment_required: 'text-green-600',
   expired_unpaid: 'text-[#9B8B85]',
 }
 
@@ -57,15 +57,15 @@ export function FinancialReadinessCard({ readiness, audience, children }: Props)
   const tone = TONE[readiness]
 
   return (
-    <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-5">
+    <div className="bg-white rounded-xl border border-[#F2EDE8] p-5">
       <div className="flex items-start gap-3">
         <Icon size={20} className={`shrink-0 mt-0.5 ${tone}`} />
         <div className="min-w-0">
           <p className={`text-sm font-semibold ${tone}`}>{label}</p>
-          {description && <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-1">{description}</p>}
+          {description && <p className="text-xs text-[#6B5B55] mt-1">{description}</p>}
         </div>
       </div>
-      {children && <div className="mt-4 pt-4 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">{children}</div>}
+      {children && <div className="mt-4 pt-4 border-t border-[#F2EDE8]">{children}</div>}
     </div>
   )
 }

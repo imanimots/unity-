@@ -65,7 +65,7 @@ export default function AdminPayoutReadinessPage() {
 
       {readiness && (
         <>
-          <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl divide-y divide-[#F2EDE8] dark:divide-[#2A1A1A]">
+          <div className="bg-white border border-[#F2EDE8] rounded-xl divide-y divide-[#F2EDE8]">
             <Row label="Configured provider">
               <span className="text-sm font-semibold text-right">{readiness.activeProvider}</span>
             </Row>
@@ -79,11 +79,11 @@ export default function AdminPayoutReadinessPage() {
             </Row>
           </div>
 
-          <div className={`rounded-xl p-5 border ${productionReady ? 'bg-green-50 border-green-200' : 'bg-[#F2EDE8] dark:bg-[#1A1010] border-[#E8E0D8] dark:border-[#2A1A1A]'}`}>
+          <div className={`rounded-xl p-5 border ${productionReady ? 'bg-green-50 border-green-200' : 'bg-[#F2EDE8] border-[#E8E0D8]'}`}>
             <p className="text-sm font-bold uppercase tracking-[0.08em]">
               {productionReady ? 'Production ready' : 'Production NOT ready'}
             </p>
-            <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-1">
+            <p className="text-xs text-[#6B5B55] mt-1">
               TradeSafe or another real provider must be integrated and sandbox-certified before production
               execution can be approved. This page is read-only and cannot enable money movement.
             </p>
@@ -97,7 +97,7 @@ export default function AdminPayoutReadinessPage() {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 px-5 py-4">
-      <p className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED] max-w-md">{label}</p>
+      <p className="text-sm text-[#1A0A0A] max-w-md">{label}</p>
       {children}
     </div>
   )

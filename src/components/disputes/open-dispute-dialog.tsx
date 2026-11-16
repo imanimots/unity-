@@ -85,7 +85,7 @@ export function OpenDisputeDialog({ transactionType, transactionId, className, t
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="dispute-title" className="block text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] mb-1.5">
+              <label htmlFor="dispute-title" className="block text-sm font-medium text-[#1A0A0A] mb-1.5">
                 {t('titleLabel')}
               </label>
               <input
@@ -95,13 +95,13 @@ export function OpenDisputeDialog({ transactionType, transactionId, className, t
                 maxLength={200}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30"
+                className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] bg-white text-[#1A0A0A] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30"
                 placeholder={t('titlePlaceholder')}
               />
             </div>
 
             <div>
-              <label htmlFor="dispute-description" className="block text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] mb-1.5">
+              <label htmlFor="dispute-description" className="block text-sm font-medium text-[#1A0A0A] mb-1.5">
                 {t('descriptionLabel')}
               </label>
               <textarea
@@ -111,13 +111,13 @@ export function OpenDisputeDialog({ transactionType, transactionId, className, t
                 maxLength={5000}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30"
+                className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] bg-white text-[#1A0A0A] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30"
                 placeholder={t('descriptionPlaceholder')}
               />
             </div>
 
             <div>
-              <label htmlFor="dispute-resolution" className="block text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] mb-1.5">
+              <label htmlFor="dispute-resolution" className="block text-sm font-medium text-[#1A0A0A] mb-1.5">
                 {t('resolutionLabel')}
               </label>
               <textarea
@@ -127,11 +127,11 @@ export function OpenDisputeDialog({ transactionType, transactionId, className, t
                 maxLength={2000}
                 value={requestedResolution}
                 onChange={(e) => setRequestedResolution(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30"
+                className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] bg-white text-[#1A0A0A] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30"
               />
             </div>
 
-            {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+            {error && <p className="text-sm text-red-600">{error}</p>}
 
             <button
               type="submit"

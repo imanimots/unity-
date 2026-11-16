@@ -76,7 +76,7 @@ export default async function LookingForDetailPage({ params }: PageProps) {
 
   return (
     <NextIntlClientProvider messages={scoped}>
-      <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen pt-24 pb-24 px-6 lg:px-12">
+      <div className="bg-[#FAF8F5] min-h-screen pt-24 pb-24 px-6 lg:px-12">
         <div className="max-w-[1400px] mx-auto">
           <RequestDetailClient
             request={detail.request as never}

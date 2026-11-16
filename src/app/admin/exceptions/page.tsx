@@ -88,7 +88,7 @@ export default function AdminExceptionsPage() {
           <option value="medium">Medium</option>
           <option value="low">Low</option>
         </select>
-        <label className="flex items-center gap-2 text-sm text-[#6B5B55] dark:text-[#9B8B85]">
+        <label className="flex items-center gap-2 text-sm text-[#6B5B55]">
           <input type="checkbox" checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} />
           Show resolved
         </label>
@@ -97,13 +97,13 @@ export default function AdminExceptionsPage() {
         </a>
       </div>
 
-      <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+      <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
                 {['Type', 'Severity', 'Summary', 'Detected', 'Suggested action', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A] whitespace-nowrap">
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -118,12 +118,12 @@ export default function AdminExceptionsPage() {
                 <tr><td colSpan={6} className="px-4 py-16 text-center text-sm text-[#9B8B85]">No open exceptions — everything looks healthy.</td></tr>
               ) : (
                 visible.map((e) => (
-                  <tr key={e.id} className={`border-b border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors last:border-0 ${e.resolved ? 'opacity-50' : ''}`}>
-                    <td className="px-4 py-3 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] whitespace-nowrap">{e.type.replace(/_/g, ' ')}</td>
+                  <tr key={e.id} className={`border-b border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors last:border-0 ${e.resolved ? 'opacity-50' : ''}`}>
+                    <td className="px-4 py-3 text-sm text-[#1A0A0A] whitespace-nowrap">{e.type.replace(/_/g, ' ')}</td>
                     <td className="px-4 py-3"><Pill value={e.severity} styles={SEVERITY_STYLES} /></td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] max-w-md">{e.summary}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{formatDateTime(e.detectedAt)}</td>
-                    <td className="px-4 py-3 text-xs text-[#6B5B55] dark:text-[#9B8B85] max-w-xs">{e.suggestedAction}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] max-w-md">{e.summary}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{formatDateTime(e.detectedAt)}</td>
+                    <td className="px-4 py-3 text-xs text-[#6B5B55] max-w-xs">{e.suggestedAction}</td>
                     <td className="px-4 py-3">
                       {e.resolved ? (
                         <span className="text-xs text-green-700">Resolved</span>

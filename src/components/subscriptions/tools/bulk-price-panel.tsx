@@ -67,13 +67,13 @@ export function BulkPricePanel() {
   if (!listings) return <p className="text-sm text-[#9B8B85]">{t('loading')}</p>
 
   return (
-    <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-6">
+    <div className="bg-white border border-[#F2EDE8] rounded-xl p-6">
       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#9B8B85] mb-4">{t('title')}</p>
       <ul className="space-y-2 mb-4 max-h-64 overflow-y-auto">
         {listings.map((l) => (
           <li key={l.id} className="flex items-center gap-2">
             <input type="checkbox" id={`price-${l.id}`} checked={selected.has(l.id)} onChange={() => toggle(l.id)} />
-            <label htmlFor={`price-${l.id}`} className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+            <label htmlFor={`price-${l.id}`} className="text-sm text-[#1A0A0A]">
               {l.title}
             </label>
           </li>
@@ -81,7 +81,7 @@ export function BulkPricePanel() {
       </ul>
       <div className="flex items-center gap-3 mb-4">
         <label className="text-xs text-[#9B8B85]">{t('newDailyRate')}</label>
-        <input type="number" min={0} value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} className="px-3 py-1.5 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] bg-transparent text-sm w-32" />
+        <input type="number" min={0} value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} className="px-3 py-1.5 rounded-lg border border-[#F2EDE8] bg-transparent text-sm w-32" />
       </div>
       {!confirming ? (
         <button
@@ -93,7 +93,7 @@ export function BulkPricePanel() {
         </button>
       ) : (
         <div>
-          <p className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED] mb-3">{t('confirmMessage', { count: selected.size, rate: dailyRate })}</p>
+          <p className="text-sm text-[#1A0A0A] mb-3">{t('confirmMessage', { count: selected.size, rate: dailyRate })}</p>
           <div className="flex gap-3">
             <button onClick={() => setConfirming(false)} className="text-xs uppercase text-[#9B8B85]">
               {t('backAction')}
@@ -104,7 +104,7 @@ export function BulkPricePanel() {
           </div>
         </div>
       )}
-      {result && <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-3">{result}</p>}
+      {result && <p className="text-xs text-[#6B5B55] mt-3">{result}</p>}
     </div>
   )
 }

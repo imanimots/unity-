@@ -84,11 +84,11 @@ function EvidenceSection({
   if (evidence.length === 0) return null
   return (
     <div>
-      <h2 className="text-sm font-bold uppercase tracking-wide text-[#6B5B55] dark:text-[#9B8B85] mb-3">{title}</h2>
+      <h2 className="text-sm font-bold uppercase tracking-wide text-[#6B5B55] mb-3">{title}</h2>
       <ul className="space-y-2">
         {evidence.map((e) => (
-          <li key={e.id} className="flex items-center justify-between gap-3 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] px-4 py-3">
-            <span className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED] truncate">
+          <li key={e.id} className="flex items-center justify-between gap-3 rounded-xl border border-[#F2EDE8] px-4 py-3">
+            <span className="text-sm text-[#1A0A0A] truncate">
               {e.file_type === 'video' ? '🎬' : '📷'} {new Date(e.created_at).toLocaleString()}
               {e.caption ? ` — ${e.caption}` : ''}
             </span>

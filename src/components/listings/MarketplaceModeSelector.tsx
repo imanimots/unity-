@@ -70,8 +70,8 @@ export function MarketplaceModeSelector({ selectedMode, onChange, className }: M
         // restores the original position once the bottom nav is gone.
         'fixed bottom-20 md:bottom-6 left-1/2 z-40 hidden -translate-x-1/2 min-[380px]:flex',
         'h-[76px] w-[92vw] max-w-[620px] items-center gap-1 rounded-full px-2.5',
-        'border border-[#ECECEC] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010]',
-        'shadow-[0_12px_32px_-8px_rgba(26,10,10,0.18)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)]',
+        'border border-[#ECECEC] bg-white',
+        'shadow-[0_12px_32px_-8px_rgba(26,10,10,0.18)],0,0,0.5)]',
         'transition-all duration-300',
         className
       )}
@@ -97,8 +97,8 @@ export function MarketplaceModeSelector({ selectedMode, onChange, className }: M
               'transition-all duration-300 ease-out',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B1A1A] focus-visible:ring-offset-2',
               selected
-                ? 'scale-[1.02] bg-[#F2EDE8] text-[#1A0A0A] shadow-sm dark:bg-[#2A1A1A] dark:text-[#F5F0ED]'
-                : 'bg-transparent text-[#6B5B55] hover:bg-[#FAF8F5] dark:text-[#9B8B85] dark:hover:bg-[#1F1515]'
+                ? 'scale-[1.02] bg-[#F2EDE8] text-[#1A0A0A] shadow-sm'
+                : 'bg-transparent text-[#6B5B55] hover:bg-[#FAF8F5]'
             )}
           >
             <Icon size={18} strokeWidth={selected ? 2.25 : 1.75} />

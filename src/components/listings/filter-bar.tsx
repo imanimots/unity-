@@ -84,7 +84,7 @@ function FilterBarInner({ entity }: { entity: FilterBarEntity }) {
         <select
           value={sort}
           onChange={(e) => router.push(createURL('sort', e.target.value), { scroll: false })}
-          className="px-3 py-2.5 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A] transition-colors"
+          className="px-3 py-2.5 rounded-xl border border-[#F2EDE8] bg-white text-[#1A0A0A] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A] transition-colors"
         >
           {sortOptions.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
@@ -99,7 +99,7 @@ function FilterBarInner({ entity }: { entity: FilterBarEntity }) {
           className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
             !category
               ? 'bg-[#8B1A1A] text-white border-[#8B1A1A]'
-              : 'border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] hover:border-[#8B1A1A] hover:text-[#8B1A1A]'
+              : 'border-[#F2EDE8] text-[#6B5B55] hover:border-[#8B1A1A] hover:text-[#8B1A1A]'
           }`}
         >
           All
@@ -114,7 +114,7 @@ function FilterBarInner({ entity }: { entity: FilterBarEntity }) {
             className={`shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
               category === cat.id
                 ? 'bg-[#8B1A1A] text-white border-[#8B1A1A]'
-                : 'border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] hover:border-[#8B1A1A] hover:text-[#8B1A1A]'
+                : 'border-[#F2EDE8] text-[#6B5B55] hover:border-[#8B1A1A] hover:text-[#8B1A1A]'
             }`}
           >
             <span>{cat.icon}</span>
@@ -128,11 +128,11 @@ function FilterBarInner({ entity }: { entity: FilterBarEntity }) {
         {entity === 'listings' && (
           <div className="flex items-center gap-2">
             <SlidersHorizontal size={14} className="text-[#9B8B85]" />
-            <span className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">Max price:</span>
+            <span className="text-sm text-[#6B5B55]">Max price:</span>
             <select
               value={maxPrice}
               onChange={(e) => refineAndNavigate(createURL('maxPrice', e.target.value || null), category, e.target.value)}
-              className="px-3 py-1.5 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A] transition-colors"
+              className="px-3 py-1.5 rounded-lg border border-[#F2EDE8] bg-white text-[#1A0A0A] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A] transition-colors"
             >
               <option value="">Any</option>
               <option value="100">Under R100/day</option>
@@ -146,7 +146,7 @@ function FilterBarInner({ entity }: { entity: FilterBarEntity }) {
         {activeFiltersCount > 0 && (
           <button
             onClick={() => refineAndNavigate(pathname, '', '')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#8B1A1A] border border-[#F2EDE8] dark:border-[#2A1A1A] hover:border-[#8B1A1A] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#6B5B55] hover:text-[#8B1A1A] border border-[#F2EDE8] hover:border-[#8B1A1A] transition-colors"
           >
             <X size={12} /> Clear filters ({activeFiltersCount})
           </button>
@@ -158,7 +158,7 @@ function FilterBarInner({ entity }: { entity: FilterBarEntity }) {
 
 export function FilterBar({ entity = 'listings' }: { entity?: FilterBarEntity }) {
   return (
-    <Suspense fallback={<div className="h-32 rounded-2xl bg-[#F2EDE8] dark:bg-[#2A1A1A] animate-pulse" />}>
+    <Suspense fallback={<div className="h-32 rounded-2xl bg-[#F2EDE8] animate-pulse" />}>
       <FilterBarInner entity={entity} />
     </Suspense>
   )

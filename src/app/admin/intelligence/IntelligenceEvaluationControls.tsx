@@ -71,7 +71,7 @@ export function IntelligenceEvaluationControls({
   }
 
   return (
-    <div className="pt-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
+    <div className="pt-2 border-t border-[#F2EDE8]">
       <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#9B8B85]">Human evaluation -- rate this Intelligence finding</p>
       <div className="flex flex-wrap gap-1.5 mt-1.5">
         {EVALUATION_OPTIONS.map((option) => {
@@ -86,7 +86,7 @@ export function IntelligenceEvaluationControls({
               className={`px-2 py-1 rounded-full text-[11px] font-medium border transition-colors disabled:opacity-50 ${
                 isCurrent
                   ? 'bg-[#8B1A1A] text-white border-[#8B1A1A]'
-                  : 'bg-white dark:bg-[#1A1010] text-[#6B5B55] dark:text-[#9B8B85] border-[#F2EDE8] dark:border-[#2A1A1A] hover:border-[#8B1A1A]'
+                  : 'bg-white text-[#6B5B55] border-[#F2EDE8] hover:border-[#8B1A1A]'
               }`}
             >
               {isCurrent ? `✓ ${option.label}` : option.label}
@@ -95,7 +95,7 @@ export function IntelligenceEvaluationControls({
           )
         })}
       </div>
-      {error && <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1">{error}</p>}
+      {error && <p className="text-[11px] text-amber-700 mt-1">{error}</p>}
     </div>
   )
 }

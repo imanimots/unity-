@@ -128,15 +128,15 @@ export default function AdminVerificationReviewPage({ params }: { params: Promis
 
   return (
     <div className="p-6 lg:p-8 space-y-6 max-w-5xl">
-      <Link href="/admin/verifications" className="inline-flex items-center gap-1.5 text-sm text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#8B1A1A]">
+      <Link href="/admin/verifications" className="inline-flex items-center gap-1.5 text-sm text-[#6B5B55] hover:text-[#8B1A1A]">
         <ArrowLeft size={14} /> Back to queue
       </Link>
 
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-1 capitalize">{user.role}</p>
-          <h1 className="text-2xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED]">{user.fullName ?? user.id}</h1>
-          <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mt-1">
+          <h1 className="text-2xl font-extrabold text-[#1A0A0A]">{user.fullName ?? user.id}</h1>
+          <p className="text-sm text-[#6B5B55] mt-1">
             KYC status: <span className="font-medium capitalize">{user.kycStatus}</span> · Verification status: <span className="font-medium capitalize">{verification.status.replace(/_/g, ' ')}</span>
           </p>
         </div>
@@ -148,87 +148,87 @@ export default function AdminVerificationReviewPage({ params }: { params: Promis
       )}
 
       {/* ── Account details ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Account details</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Account details</h2>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
           <div>
             <dt className="text-[#9B8B85]">Role</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED] capitalize">{user.role}</dd>
+            <dd className="text-[#1A0A0A] capitalize">{user.role}</dd>
           </div>
           <div>
             <dt className="text-[#9B8B85]">Unity Score</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{user.unityScore ?? '—'}</dd>
+            <dd className="text-[#1A0A0A]">{user.unityScore ?? '—'}</dd>
           </div>
           <div>
             <dt className="text-[#9B8B85]">Account created</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{new Date(user.accountCreatedAt).toLocaleDateString('en-ZA')}</dd>
+            <dd className="text-[#1A0A0A]">{new Date(user.accountCreatedAt).toLocaleDateString('en-ZA')}</dd>
           </div>
           <div>
             <dt className="text-[#9B8B85]">Account country</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{user.accountCountry ?? '—'}</dd>
+            <dd className="text-[#1A0A0A]">{user.accountCountry ?? '—'}</dd>
           </div>
         </dl>
       </section>
 
       {/* ── Submitted legal identity information ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Submitted legal identity information</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Submitted legal identity information</h2>
         {verification.status === 'not_started' ? (
           <p className="text-sm text-[#9B8B85]">No submission yet.</p>
         ) : (
           <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
             <div>
               <dt className="text-[#9B8B85]">Legal name</dt>
-              <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">
+              <dd className="text-[#1A0A0A]">
                 {verification.legalFirstName} {verification.legalSurname}
               </dd>
             </div>
             <div>
               <dt className="text-[#9B8B85]">Date of birth</dt>
-              <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{verification.dateOfBirth}</dd>
+              <dd className="text-[#1A0A0A]">{verification.dateOfBirth}</dd>
             </div>
             <div>
               <dt className="text-[#9B8B85]">ID reference</dt>
-              <dd className="text-[#1A0A0A] dark:text-[#F5F0ED] capitalize">
+              <dd className="text-[#1A0A0A] capitalize">
                 {verification.idReferenceType?.replace('_', ' ')}: {verification.idReferenceNumber}
               </dd>
             </div>
             <div>
               <dt className="text-[#9B8B85]">Nationality</dt>
-              <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{verification.nationality}</dd>
+              <dd className="text-[#1A0A0A]">{verification.nationality}</dd>
             </div>
             <div>
               <dt className="text-[#9B8B85]">Country of residence</dt>
-              <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{verification.countryOfResidence}</dd>
+              <dd className="text-[#1A0A0A]">{verification.countryOfResidence}</dd>
             </div>
             <div>
               <dt className="text-[#9B8B85]">Residential address</dt>
-              <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{verification.residentialAddress}</dd>
+              <dd className="text-[#1A0A0A]">{verification.residentialAddress}</dd>
             </div>
             <div>
               <dt className="text-[#9B8B85]">Prior review attempts</dt>
-              <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{verification.reviewCount ?? 0}</dd>
+              <dd className="text-[#1A0A0A]">{verification.reviewCount ?? 0}</dd>
             </div>
             <div>
               <dt className="text-[#9B8B85]">Submitted</dt>
-              <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{verification.submittedAt ? new Date(verification.submittedAt).toLocaleString('en-ZA') : '—'}</dd>
+              <dd className="text-[#1A0A0A]">{verification.submittedAt ? new Date(verification.submittedAt).toLocaleString('en-ZA') : '—'}</dd>
             </div>
           </dl>
         )}
       </section>
 
       {/* ── Documents ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Submitted documents ({data.documents.length})</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Submitted documents ({data.documents.length})</h2>
         {data.documents.length === 0 && <p className="text-sm text-[#9B8B85]">No documents uploaded.</p>}
         <div className="space-y-2">
           {data.documents.map((doc) => (
             <div key={doc.id} className="flex items-center gap-3">
-              <span className="text-sm capitalize text-[#1A0A0A] dark:text-[#F5F0ED] w-40">{doc.documentType.replace(/_/g, ' ')}</span>
+              <span className="text-sm capitalize text-[#1A0A0A] w-40">{doc.documentType.replace(/_/g, ' ')}</span>
               <button
                 onClick={() => viewDocument(doc.id)}
                 disabled={actionPending === `doc:${doc.id}`}
-                className="inline-flex items-center gap-1.5 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 border border-[#F2EDE8] text-[#6B5B55] hover:bg-[#F2EDE8] text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
               >
                 <Eye size={12} /> View document (link expires in 2 min)
               </button>
@@ -243,20 +243,20 @@ export default function AdminVerificationReviewPage({ params }: { params: Promis
       </section>
 
       {/* ── Review actions ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Review</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Review</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <input placeholder="Reason code" value={reasonCode} onChange={(e) => setReasonCode(e.target.value)} className="border border-[#F2EDE8] dark:border-[#2A1A1A] bg-transparent rounded-lg text-sm px-3 py-2" />
-          <input placeholder="Reviewer notes (internal)" value={reviewerNotes} onChange={(e) => setReviewerNotes(e.target.value)} className="border border-[#F2EDE8] dark:border-[#2A1A1A] bg-transparent rounded-lg text-sm px-3 py-2" />
-          <input placeholder="User-visible feedback" value={userFeedback} onChange={(e) => setUserFeedback(e.target.value)} className="border border-[#F2EDE8] dark:border-[#2A1A1A] bg-transparent rounded-lg text-sm px-3 py-2" />
+          <input placeholder="Reason code" value={reasonCode} onChange={(e) => setReasonCode(e.target.value)} className="border border-[#F2EDE8] bg-transparent rounded-lg text-sm px-3 py-2" />
+          <input placeholder="Reviewer notes (internal)" value={reviewerNotes} onChange={(e) => setReviewerNotes(e.target.value)} className="border border-[#F2EDE8] bg-transparent rounded-lg text-sm px-3 py-2" />
+          <input placeholder="User-visible feedback" value={userFeedback} onChange={(e) => setUserFeedback(e.target.value)} className="border border-[#F2EDE8] bg-transparent rounded-lg text-sm px-3 py-2" />
         </div>
 
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => runAction('/start', {})}
             disabled={!!actionPending}
-            className="inline-flex items-center gap-1.5 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] hover:bg-[#F2EDE8] text-xs font-medium px-3 py-1.5 rounded-lg disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 border border-[#F2EDE8] text-[#6B5B55] hover:bg-[#F2EDE8] text-xs font-medium px-3 py-1.5 rounded-lg disabled:opacity-50"
           >
             <ShieldQuestion size={13} /> Start review
           </button>
@@ -285,13 +285,13 @@ export default function AdminVerificationReviewPage({ params }: { params: Promis
       </section>
 
       {/* ── Audit timeline ── */}
-      <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">Audit timeline</h2>
+      <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-[#1A0A0A]">Audit timeline</h2>
         {data.history.length === 0 && <p className="text-sm text-[#9B8B85]">No history yet.</p>}
         <ul className="space-y-2">
           {data.history.map((h) => (
-            <li key={h.id} className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">
-              <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED] capitalize">{h.action_type.replace(/_/g, ' ')}</span> — {new Date(h.created_at).toLocaleString('en-ZA')}
+            <li key={h.id} className="text-sm text-[#6B5B55]">
+              <span className="font-medium text-[#1A0A0A] capitalize">{h.action_type.replace(/_/g, ' ')}</span> — {new Date(h.created_at).toLocaleString('en-ZA')}
             </li>
           ))}
         </ul>

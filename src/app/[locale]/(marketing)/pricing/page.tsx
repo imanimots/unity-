@@ -74,8 +74,8 @@ export default async function PricingPage() {
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
       <div className="text-center mb-12">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{t('sectionLabel')}</p>
-        <h1 className="text-3xl lg:text-5xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight mb-4">{t('heading')}</h1>
-        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] max-w-xl mx-auto">
+        <h1 className="text-3xl lg:text-5xl font-extrabold uppercase text-[#1A0A0A] tracking-tight mb-4">{t('heading')}</h1>
+        <p className="text-sm text-[#6B5B55] max-w-xl mx-auto">
           {t('subheading')}
         </p>
       </div>
@@ -88,7 +88,7 @@ export default async function PricingPage() {
             <div
               key={plan.id}
               className={`rounded-2xl p-8 border ${
-                isFeatured ? 'bg-[#8B1A1A] border-[#8B1A1A] text-white' : 'bg-white dark:bg-[#1A1010] border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED]'
+                isFeatured ? 'bg-[#8B1A1A] border-[#8B1A1A] text-white' : 'bg-white border-[#F2EDE8] text-[#1A0A0A]'
               }`}
             >
               {isCurrent && (

@@ -9,8 +9,8 @@ interface PageProps {
   params: Promise<{ id: string }>
 }
 
-const inputClass = 'w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-sm text-[#1A0A0A] dark:text-[#F5F0ED]'
-const labelClass = 'block text-xs font-semibold uppercase tracking-wide text-[#6B5B55] dark:text-[#9B8B85] mb-1.5'
+const inputClass = 'w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] bg-white text-sm text-[#1A0A0A]'
+const labelClass = 'block text-xs font-semibold uppercase tracking-wide text-[#6B5B55] mb-1.5'
 
 /**
  * Merchant configures the RTB terms for their own listing. Enabling
@@ -108,17 +108,17 @@ export default function MerchantRentToBuyTermsPage({ params }: PageProps) {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <Link href="/dashboard/merchant/listings" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+        <Link href="/dashboard/merchant/listings" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
           <ArrowLeft size={13} /> {t('back')}
         </Link>
       </div>
-      <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight mb-2">{t('heading')}</h1>
-      <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-8">
+      <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] tracking-tight mb-2">{t('heading')}</h1>
+      <p className="text-sm text-[#6B5B55] mb-8">
         {enabled ? t('enabledNotice') : t('disabledNotice')} {t('ownershipNotice')}
       </p>
 
       {error && <p className="text-sm text-[#8B1A1A] mb-4">{error}</p>}
-      {saved && <p className="text-sm text-green-700 dark:text-green-500 mb-4">{t('termsSaved')}</p>}
+      {saved && <p className="text-sm text-green-700 mb-4">{t('termsSaved')}</p>}
 
       <div className="space-y-5">
         <div>
@@ -149,8 +149,8 @@ export default function MerchantRentToBuyTermsPage({ params }: PageProps) {
           <p className="text-xs text-[#9B8B85] mt-1">{t('securityDepositNotice')}</p>
         </div>
 
-        <div className="pt-2 border-t border-[#E8E0D8] dark:border-[#2A1A1A]">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1A0A0A] dark:text-[#F5F0ED] mt-4 mb-3">{t('possessionSection')}</h2>
+        <div className="pt-2 border-t border-[#E8E0D8]">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1A0A0A] mt-4 mb-3">{t('possessionSection')}</h2>
           <div>
             <label className={labelClass}>{t('possessionTrigger')}</label>
             <select className={inputClass} value={possessionTriggerType} onChange={(e) => setPossessionTriggerType(e.target.value as typeof possessionTriggerType)}>
@@ -168,8 +168,8 @@ export default function MerchantRentToBuyTermsPage({ params }: PageProps) {
           )}
         </div>
 
-        <div className="pt-2 border-t border-[#E8E0D8] dark:border-[#2A1A1A]">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1A0A0A] dark:text-[#F5F0ED] mt-4 mb-3">{t('rentalUseSection')}</h2>
+        <div className="pt-2 border-t border-[#E8E0D8]">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1A0A0A] mt-4 mb-3">{t('rentalUseSection')}</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>{t('rentalUseRateAmount')}</label>
@@ -203,7 +203,7 @@ export default function MerchantRentToBuyTermsPage({ params }: PageProps) {
           </div>
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+        <label className="flex items-center gap-2 text-sm text-[#1A0A0A]">
           <input type="checkbox" checked={earlyPayoffAllowed} onChange={(e) => setEarlyPayoffAllowed(e.target.checked)} />
           {t('allowEarlyPayoff')}
         </label>
@@ -213,7 +213,7 @@ export default function MerchantRentToBuyTermsPage({ params }: PageProps) {
           <button disabled={saving} onClick={() => submit(true)} className="px-5 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-[0.08em] bg-[#8B1A1A] text-white hover:bg-[#7A1616] disabled:opacity-50">
             {t('saveAndEnable')}
           </button>
-          <button disabled={saving} onClick={() => submit(false)} className="px-5 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-[0.08em] border border-[#E8E0D8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] disabled:opacity-50">
+          <button disabled={saving} onClick={() => submit(false)} className="px-5 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-[0.08em] border border-[#E8E0D8] text-[#1A0A0A] disabled:opacity-50">
             {t('saveAsDisabled')}
           </button>
         </div>

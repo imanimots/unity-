@@ -214,13 +214,13 @@ export default function AdminBookingsPage() {
         </a>
       </div>
 
-      <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+      <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
                 {['Reference', 'Listing', 'Renter', 'Merchant', 'Status', 'Financial', 'Payment due', 'Created', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A] whitespace-nowrap">
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -235,15 +235,15 @@ export default function AdminBookingsPage() {
                 <tr><td colSpan={9} className="px-4 py-16 text-center text-sm text-[#9B8B85]">No bookings match your filters.</td></tr>
               ) : (
                 bookings.map((b) => (
-                  <tr key={b.id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors last:border-0">
-                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] whitespace-nowrap">{b.bookingReference}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{b.listingTitle ?? '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{b.renterName ?? '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{b.merchantName ?? '—'}</td>
+                  <tr key={b.id} className="border-b border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors last:border-0">
+                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] whitespace-nowrap">{b.bookingReference}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">{b.listingTitle ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">{b.renterName ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">{b.merchantName ?? '—'}</td>
                     <td className="px-4 py-3"><Pill value={b.status} styles={STATUS_STYLES} /></td>
                     <td className="px-4 py-3"><Pill value={b.financialReadiness} styles={READINESS_STYLES} /></td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{formatDateTime(b.paymentDueAt)}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{formatDate(b.createdAt)}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{formatDateTime(b.paymentDueAt)}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{formatDate(b.createdAt)}</td>
                     <td className="px-4 py-3">
                       <button onClick={() => setSelectedId(b.id)} className={secondaryButtonClass}>Inspect</button>
                     </td>
@@ -258,9 +258,9 @@ export default function AdminBookingsPage() {
       {selectedId ? (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/40" onClick={() => setSelectedId(null)} />
-          <div className="relative w-full max-w-lg bg-white dark:bg-[#0F0A0A] border-l border-[#F2EDE8] dark:border-[#2A1A1A] h-full overflow-y-auto p-6 space-y-5">
+          <div className="relative w-full max-w-lg bg-white border-l border-[#F2EDE8] h-full overflow-y-auto p-6 space-y-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">Booking detail</h2>
+              <h2 className="text-lg font-bold text-[#1A0A0A]">Booking detail</h2>
               <button onClick={() => setSelectedId(null)} className="text-[#9B8B85] hover:text-[#1A0A0A]"><X size={18} /></button>
             </div>
 
@@ -269,14 +269,14 @@ export default function AdminBookingsPage() {
             ) : (
               <>
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{detail.booking.bookingReference} — {detail.booking.listingTitle}</p>
+                  <p className="text-sm font-semibold text-[#1A0A0A]">{detail.booking.bookingReference} — {detail.booking.listingTitle}</p>
                   <div className="flex gap-2 pt-1 flex-wrap">
                     <Pill value={detail.booking.status} styles={STATUS_STYLES} />
                     <Pill value={detail.booking.financialReadiness} styles={READINESS_STYLES} />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 text-xs text-[#6B5B55] dark:text-[#9B8B85]">
+                <div className="grid grid-cols-2 gap-3 text-xs text-[#6B5B55]">
                   <div>Renter: <Link href={`/admin/users/${detail.booking.renterId}`} className="text-[#8B1A1A] underline">{detail.booking.renterName}</Link> <Pill value={detail.renterAccountStatus ?? 'active'} styles={ACCOUNT_STATUS_STYLES} /></div>
                   <div>Merchant: <Link href={`/admin/merchants/${detail.booking.merchantId}`} className="text-[#8B1A1A] underline">{detail.booking.merchantName}</Link> <Pill value={detail.merchantAccountStatus ?? 'active'} styles={ACCOUNT_STATUS_STYLES} /></div>
                   <div>Start: {formatDateTime(detail.booking.startAt)}</div>
@@ -287,34 +287,34 @@ export default function AdminBookingsPage() {
                   <div>Total: {formatMoney(detail.booking.renterTotalAmount, detail.booking.currency ?? 'ZAR')}</div>
                 </div>
 
-                <div className="space-y-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-4">
+                <div className="space-y-2 border-t border-[#F2EDE8] pt-4">
                   <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85]">Financial summary</p>
-                  <div className="text-xs text-[#6B5B55] dark:text-[#9B8B85] space-y-1">
+                  <div className="text-xs text-[#6B5B55] space-y-1">
                     <div>Workflow: {detail.financial.workflowStatus ?? 'none'}</div>
                     <div>Rental payment: {detail.financial.rentalPaymentStatus ?? 'none'}{detail.financial.rentalFailureReason ? ` — ${detail.financial.rentalFailureReason}` : ''}</div>
                     <div>Deposit payment: {detail.financial.depositPaymentStatus ?? 'none'}{detail.financial.depositFailureReason ? ` — ${detail.financial.depositFailureReason}` : ''}</div>
                   </div>
                 </div>
 
-                <div className="space-y-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-4">
+                <div className="space-y-2 border-t border-[#F2EDE8] pt-4">
                   <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85]">Lifecycle history</p>
                   <ul className="space-y-1.5">
                     {detail.history.map((h) => (
-                      <li key={h.id} className="text-xs text-[#6B5B55] dark:text-[#9B8B85]">
+                      <li key={h.id} className="text-xs text-[#6B5B55]">
                         <span className="font-medium">{h.eventType}</span> ({h.previousStatus ?? '—'} → {h.newStatus}) — {formatDateTime(h.createdAt)}
                       </li>
                     ))}
                   </ul>
                 </div>
 
-                <div className="space-y-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-4">
+                <div className="space-y-2 border-t border-[#F2EDE8] pt-4">
                   <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85]">Email events</p>
                   {detail.emailEvents.length === 0 ? (
                     <p className="text-xs text-[#9B8B85]">No email events recorded.</p>
                   ) : (
                     <ul className="space-y-1.5">
                       {detail.emailEvents.map((e) => (
-                        <li key={e.id} className="text-xs text-[#6B5B55] dark:text-[#9B8B85]">
+                        <li key={e.id} className="text-xs text-[#6B5B55]">
                           {e.eventType} — {e.status} — {formatDateTime(e.createdAt)}
                         </li>
                       ))}
@@ -322,10 +322,10 @@ export default function AdminBookingsPage() {
                   )}
                 </div>
 
-                <div className="space-y-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-4">
+                <div className="space-y-2 border-t border-[#F2EDE8] pt-4">
                   <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85]">Internal admin notes</p>
                   {notes.map((n) => (
-                    <div key={n.id} className="text-xs text-[#6B5B55] dark:text-[#9B8B85] bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg px-3 py-2">
+                    <div key={n.id} className="text-xs text-[#6B5B55] bg-[#FAF8F5] rounded-lg px-3 py-2">
                       {n.note}
                       <div className="text-[10px] text-[#9B8B85] mt-1">{formatDateTime(n.createdAt)}</div>
                     </div>

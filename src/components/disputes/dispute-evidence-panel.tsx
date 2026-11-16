@@ -93,11 +93,11 @@ export function DisputeEvidencePanel({ disputeId, currentUserId, evidence, canUp
       <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-4">{l.title}</h2>
 
       {evidence.length === 0 ? (
-        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-4">{l.noEvidence}</p>
+        <p className="text-sm text-[#6B5B55] mb-4">{l.noEvidence}</p>
       ) : (
         <ul className="space-y-2 mb-4">
           {evidence.map((item) => (
-            <li key={item.id} className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+            <li key={item.id} className="flex items-center gap-2 text-sm text-[#1A0A0A]">
               {item.file_type === 'image' ? <ImageIcon size={14} className="text-[#9B8B85]" /> : <FileText size={14} className="text-[#9B8B85]" />}
               <span className="truncate flex-1">{item.file_type}</span>
               <EvidenceAccessButton accessUrl={`/api/disputes/${disputeId}/evidence/${item.id}/access`} label={l.viewEvidence} errorLabel={l.couldNotAccess} />
@@ -107,13 +107,13 @@ export function DisputeEvidencePanel({ disputeId, currentUserId, evidence, canUp
       )}
 
       {canUpload && (
-        <label className="flex items-center justify-center gap-2 py-2.5 border border-dashed border-[#E8E0D8] dark:border-[#2A1A1A] rounded-lg text-sm text-[#6B5B55] dark:text-[#9B8B85] cursor-pointer hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors">
+        <label className="flex items-center justify-center gap-2 py-2.5 border border-dashed border-[#E8E0D8] rounded-lg text-sm text-[#6B5B55] cursor-pointer hover:bg-[#FAF8F5] transition-colors">
           <Upload size={14} />
           {uploading ? l.uploading : l.uploadEvidence}
           <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={handleFileSelected} disabled={uploading} />
         </label>
       )}
-      {error && <p className="text-sm text-red-600 dark:text-red-400 mt-2">{error}</p>}
+      {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
     </div>
   )
 }

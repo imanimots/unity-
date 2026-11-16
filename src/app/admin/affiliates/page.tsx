@@ -74,13 +74,13 @@ export default function AdminAffiliatesPage() {
         </Link>
       </div>
 
-      <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+      <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
                 {['Name', 'Code', 'Attributions', 'Commissions', 'Pending', 'Paid', 'Joined', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A] whitespace-nowrap">
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -95,14 +95,14 @@ export default function AdminAffiliatesPage() {
                 <tr><td colSpan={8} className="px-4 py-16 text-center text-sm text-[#9B8B85]">No affiliates match your search.</td></tr>
               ) : (
                 affiliates.map((a) => (
-                  <tr key={a.id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors last:border-0">
-                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{a.name ?? '—'}</td>
-                    <td className="px-4 py-3 text-sm font-mono text-[#6B5B55] dark:text-[#9B8B85]">{a.affiliateCode ?? '—'}</td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55] dark:text-[#9B8B85]">{a.attributionCount}</td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55] dark:text-[#9B8B85]">{a.commissionCount}</td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55] dark:text-[#9B8B85]">{a.pendingCount}</td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55] dark:text-[#9B8B85]">{formatMoney(a.paidAmount)}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{formatDate(a.createdAt)}</td>
+                  <tr key={a.id} className="border-b border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors last:border-0">
+                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A]">{a.name ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm font-mono text-[#6B5B55]">{a.affiliateCode ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55]">{a.attributionCount}</td>
+                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55]">{a.commissionCount}</td>
+                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55]">{a.pendingCount}</td>
+                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55]">{formatMoney(a.paidAmount)}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{formatDate(a.createdAt)}</td>
                     <td className="px-4 py-3">
                       <Link href={`/admin/affiliates/${a.id}`} className={secondaryButtonClass}>Inspect</Link>
                     </td>

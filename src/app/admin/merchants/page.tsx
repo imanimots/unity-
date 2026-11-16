@@ -101,13 +101,13 @@ export default function AdminMerchantsPage() {
         </select>
       </div>
 
-      <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+      <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
                 {['Name', 'KYC', 'Account status', 'Active listings', 'Pending ownership', 'Subscription', 'Joined', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A] whitespace-nowrap">
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -122,17 +122,17 @@ export default function AdminMerchantsPage() {
                 <tr><td colSpan={8} className="px-4 py-16 text-center text-sm text-[#9B8B85]">No merchants match your filters.</td></tr>
               ) : (
                 merchants.map((m) => (
-                  <tr key={m.id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors last:border-0">
-                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{m.fullName ?? m.displayName ?? m.id.slice(0, 8)}</td>
+                  <tr key={m.id} className="border-b border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors last:border-0">
+                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A]">{m.fullName ?? m.displayName ?? m.id.slice(0, 8)}</td>
                     <td className="px-4 py-3"><Pill value={m.kycStatus} styles={KYC_STYLES} /></td>
                     <td className="px-4 py-3"><Pill value={m.accountStatus} styles={ACCOUNT_STATUS_STYLES} /></td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55] dark:text-[#9B8B85]">{m.activeListingCount}</td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55] dark:text-[#9B8B85]">{m.pendingOwnershipCount}</td>
-                    <td className="px-4 py-3 text-sm capitalize text-[#6B5B55] dark:text-[#9B8B85]">
+                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55]">{m.activeListingCount}</td>
+                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55]">{m.pendingOwnershipCount}</td>
+                    <td className="px-4 py-3 text-sm capitalize text-[#6B5B55]">
                       {m.subscriptionPlanId}
                       {m.hasFailedPayout ? <AlertTriangle size={12} className="inline ml-1 text-red-600" aria-label="Has a failed payout" /> : null}
                     </td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{formatDate(m.createdAt)}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{formatDate(m.createdAt)}</td>
                     <td className="px-4 py-3">
                       <Link href={`/admin/merchants/${m.id}`} className={secondaryButtonClass}>View</Link>
                     </td>

@@ -7,12 +7,12 @@ import { MilestoneEvidencePanel, type MilestoneEvidencePanelLabels } from './mil
 import type { BarterOfferItem, BarterMilestoneEvidence } from '@/types'
 
 const inputClass =
-  'w-full px-3 py-2 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-sm text-[#1A0A0A] dark:text-[#F5F0ED] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20'
+  'w-full px-3 py-2 rounded-lg border border-[#F2EDE8] bg-white text-sm text-[#1A0A0A] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20'
 
 const STATUS_META: Record<string, { label: string; classes: string; icon: typeof Check }> = {
   pending: { label: 'Pending', classes: 'text-[#9B8B85]', icon: Circle },
   active: { label: 'Active', classes: 'text-[#8B1A1A]', icon: Clock },
-  completed: { label: 'Completed', classes: 'text-green-600 dark:text-green-400', icon: Check },
+  completed: { label: 'Completed', classes: 'text-green-600', icon: Check },
 }
 
 interface ScheduleLabels {
@@ -162,20 +162,20 @@ function ScheduleWidget({
   }
 
   return (
-    <div className="rounded-lg bg-[#FAF8F5] dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] p-2.5 space-y-2">
+    <div className="rounded-lg bg-[#FAF8F5] border border-[#F2EDE8] p-2.5 space-y-2">
       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#9B8B85] flex items-center gap-1.5">
         <CalendarClock size={12} /> {labels?.inPersonSchedule ?? 'In-person schedule'}
       </p>
       {hasSchedule ? (
-        <div className="text-xs text-[#1A0A0A] dark:text-[#F5F0ED] space-y-1">
+        <div className="text-xs text-[#1A0A0A] space-y-1">
           <p>
             {new Date(scheduledAt!).toLocaleString()} · {scheduledCity}, {scheduledProvince}
           </p>
           <div className="flex gap-3">
-            <span className={confirmedBy.includes(partyAId) ? 'text-green-600 dark:text-green-400' : 'text-[#9B8B85]'}>
+            <span className={confirmedBy.includes(partyAId) ? 'text-green-600' : 'text-[#9B8B85]'}>
               {confirmedBy.includes(partyAId) ? '✓' : '—'} {partyAName}
             </span>
-            <span className={confirmedBy.includes(partyBId) ? 'text-green-600 dark:text-green-400' : 'text-[#9B8B85]'}>
+            <span className={confirmedBy.includes(partyBId) ? 'text-green-600' : 'text-[#9B8B85]'}>
               {confirmedBy.includes(partyBId) ? '✓' : '—'} {partyBName}
             </span>
           </div>
@@ -202,13 +202,13 @@ function ScheduleWidget({
               </button>
             </div>
           ) : (
-            <button onClick={() => setProposing(true)} className="px-3 py-1.5 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] text-xs font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors">
+            <button onClick={() => setProposing(true)} className="px-3 py-1.5 rounded-lg border border-[#F2EDE8] text-xs font-semibold text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors">
               {labels?.proposeDateTimeLocation ?? 'Propose a date, time & location'}
             </button>
           )}
         </>
       )}
-      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   )
 }
@@ -257,13 +257,13 @@ export function ContributionMilestonesPanel({
   }
 
   return (
-    <div className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-4 space-y-3">
+    <div className="rounded-xl border border-[#F2EDE8] p-4 space-y-3">
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#8B1A1A]">
           {offerItem.kind === 'skill' ? (labels?.skill ?? 'Skill') : (labels?.task ?? 'Task')}
         </p>
-        <h3 className="font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{details?.title ?? labels?.contribution ?? 'Contribution'}</h3>
-        {details?.description && <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mt-0.5">{details.description}</p>}
+        <h3 className="font-bold text-[#1A0A0A]">{details?.title ?? labels?.contribution ?? 'Contribution'}</h3>
+        {details?.description && <p className="text-sm text-[#6B5B55] mt-0.5">{details.description}</p>}
         <p className="text-xs text-[#9B8B85] mt-1">
           {labels ? labels.contributionPercent(offerItem.contribution_weight_percent ?? 0) : `${offerItem.contribution_weight_percent}% of this side's contribution`}
         </p>
@@ -275,18 +275,18 @@ export function ContributionMilestonesPanel({
           const Icon = meta.icon
           const statusLabel = labels?.status[m.status as 'pending' | 'active' | 'completed'] ?? meta.label
           return (
-            <div key={m.id} className="rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] p-3 space-y-2">
+            <div key={m.id} className="rounded-lg border border-[#F2EDE8] p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <Icon size={14} className={meta.classes} />
-                  <span className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] truncate">
+                  <span className="text-sm font-semibold text-[#1A0A0A] truncate">
                     {m.sequence}. {m.title}
                   </span>
                   <span className="text-xs text-[#9B8B85]">({m.weight_percent}%)</span>
                 </div>
                 <span className={`text-[10px] font-bold uppercase tracking-[0.06em] shrink-0 ${meta.classes}`}>{statusLabel}</span>
               </div>
-              {m.description && <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85]">{m.description}</p>}
+              {m.description && <p className="text-xs text-[#6B5B55]">{m.description}</p>}
 
               {m.status === 'active' && (
                 <div className="space-y-2 pt-1">
@@ -334,7 +334,7 @@ export function ContributionMilestonesPanel({
           )
         })}
       </div>
-      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   )
 }

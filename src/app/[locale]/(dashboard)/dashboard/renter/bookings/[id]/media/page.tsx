@@ -30,7 +30,7 @@ export default async function MediaPage({ params }: PageProps) {
   if (!data || !data.isRenter) notFound()
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] dark:bg-[#0F0A0A]">
+    <div className="min-h-screen bg-[#FAF8F5]">
       <ConditionEvidencePanel
         bookingId={data.bookingId}
         userId={requester.userId}

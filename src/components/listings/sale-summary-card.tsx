@@ -13,7 +13,7 @@ export async function SaleSummaryCard({ listing }: { listing: Listing & { sale_p
   const money = (amount: number) => formatMoneyFromRands(amount, 'ZAR', locale)
 
   return (
-    <div className="bg-white dark:bg-[#1A1010] rounded-2xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-5 space-y-4 shadow-sm">
+    <div className="bg-white rounded-2xl border border-[#F2EDE8] p-5 space-y-4 shadow-sm">
       <div className="flex items-center gap-2 text-[#9B8B85]">
         <ShoppingBag size={16} strokeWidth={1.75} />
         <span className="text-xs font-medium uppercase tracking-[0.1em]">{t('forSale')}</span>
@@ -24,13 +24,13 @@ export async function SaleSummaryCard({ listing }: { listing: Listing & { sale_p
       </div>
 
       {typeof listing.quantity_available === 'number' && (
-        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">
+        <p className="text-sm text-[#6B5B55]">
           {soldOut ? t('soldOut') : t('available', { count: listing.quantity_available })}
         </p>
       )}
 
       {soldOut ? (
-        <div className="flex items-center justify-center w-full py-3.5 bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#9B8B85] font-semibold rounded-xl text-sm">
+        <div className="flex items-center justify-center w-full py-3.5 bg-[#F2EDE8] text-[#9B8B85] font-semibold rounded-xl text-sm">
           {t('soldOut')}
         </div>
       ) : (

@@ -42,16 +42,16 @@ export function ScheduledPublicationsPanel() {
   if (items.length === 0) return <p className="text-sm text-[#9B8B85]">{t('none')}</p>
 
   return (
-    <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-6">
+    <div className="bg-white border border-[#F2EDE8] rounded-xl p-6">
       <p className="text-xs text-[#9B8B85] mb-4">{t('description')}</p>
       <ul className="space-y-3">
         {items.map((s) => (
           <li key={s.id} className="flex items-center justify-between text-sm">
             <div>
-              <p className="text-[#1A0A0A] dark:text-[#F5F0ED]">
+              <p className="text-[#1A0A0A]">
                 {s.entity_type} · {new Date(s.scheduled_at).toLocaleString()}
               </p>
-              <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] uppercase">
+              <p className="text-xs text-[#6B5B55] uppercase">
                 {s.status}
                 {s.block_reason ? ` — ${s.block_reason}` : ''}
               </p>

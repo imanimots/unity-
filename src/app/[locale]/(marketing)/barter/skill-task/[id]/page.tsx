@@ -89,7 +89,7 @@ export default async function SkillTaskPostDetailPage({ params }: PageProps) {
   }
 
   return (
-    <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen">
+    <div className="bg-[#FAF8F5] min-h-screen">
       <SkillTaskPostDetailClient
         post={post as BarterSkillTaskPublicPost}
         isOwner={isOwner}

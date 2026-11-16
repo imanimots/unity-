@@ -1,10 +1,10 @@
 export type PayoutStatus = 'pending' | 'processing' | 'paid' | 'failed'
 
 export const PAYOUT_STATUS_LABELS: Record<PayoutStatus, { label: string; classes: string }> = {
-  pending: { label: 'Pending', classes: 'bg-[#F2EDE8] text-[#6B5B55] dark:bg-[#2A1A1A] dark:text-[#9B8B85]' },
-  processing: { label: 'Processing', classes: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' },
-  paid: { label: 'Paid', classes: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
-  failed: { label: 'Failed', classes: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
+  pending: { label: 'Pending', classes: 'bg-[#F2EDE8] text-[#6B5B55]' },
+  processing: { label: 'Processing', classes: 'bg-amber-100 text-amber-800' },
+  paid: { label: 'Paid', classes: 'bg-green-100 text-green-800' },
+  failed: { label: 'Failed', classes: 'bg-red-100 text-red-800' },
 }
 
 export type PayoutFailureCategory =

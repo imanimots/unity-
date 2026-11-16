@@ -42,13 +42,13 @@ export default async function MerchantDisputePage({ params }: PageProps) {
   const listingTitle = (booking.listings as unknown as { title: string } | null)?.title ?? t('dispute.thisBooking')
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] dark:bg-[#0F0A0A] px-4 sm:px-6 lg:px-8 py-10">
+    <div className="min-h-screen bg-[#FAF8F5] px-4 sm:px-6 lg:px-8 py-10">
       <div className="max-w-lg mx-auto">
-        <Link href="/dashboard/merchant/bookings" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors mb-8">
+        <Link href="/dashboard/merchant/bookings" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors mb-8">
           <ArrowLeft size={13} /> {t('backToBookings')}
         </Link>
-        <h1 className="text-2xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] mb-2">{t('dispute.raiseDispute')}</h1>
-        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-8">
+        <h1 className="text-2xl font-extrabold text-[#1A0A0A] mb-2">{t('dispute.raiseDispute')}</h1>
+        <p className="text-sm text-[#6B5B55] mb-8">
           {t('dispute.regarding', { reference: booking.booking_reference ?? bookingId.slice(0, 8).toUpperCase(), listing: listingTitle })}
         </p>
         <OpenDisputeDialog transactionType="booking" transactionId={bookingId} triggerLabel={t('dispute.openDisputeForm')} className="w-full py-3 bg-[#8B1A1A] text-white font-semibold rounded-xl text-sm hover:bg-[#6B1414] transition-colors" />

@@ -25,18 +25,18 @@ export function LegalPageLayout({ doc, children }: { doc: LegalDocument; childre
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16 print:py-4">
       <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2 print:hidden">Legal &amp; Trust</p>
-      <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight mb-4">{doc.title}</h1>
+      <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] tracking-tight mb-4">{doc.title}</h1>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-8 text-xs text-[#6B5B55] dark:text-[#9B8B85] print:mb-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-8 text-xs text-[#6B5B55] print:mb-4">
         <span>Version {doc.version}</span>
         <span>Effective {fmtDate(doc.effectiveDate, locale)}</span>
         <span>Last updated {fmtDate(doc.lastUpdated, locale)}</span>
         {doc.status === 'draft' ? (
-          <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-semibold uppercase tracking-wide">
+          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold uppercase tracking-wide">
             Draft — pending legal review
           </span>
         ) : (
-          <span className="px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold uppercase tracking-wide">
+          <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold uppercase tracking-wide">
             Approved
           </span>
         )}
@@ -50,16 +50,16 @@ export function LegalPageLayout({ doc, children }: { doc: LegalDocument; childre
         never touched here, in any locale, by design.
       */}
       {locale !== 'en-ZA' && (
-        <div className="mb-8 rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-300 print:hidden">
+        <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 print:hidden">
           {t('translationNotice')}
         </div>
       )}
 
-      <div className="prose-legal text-sm text-[#1A0A0A] dark:text-[#F5F0ED] leading-relaxed max-w-[65ch] space-y-6">
+      <div className="prose-legal text-sm text-[#1A0A0A] leading-relaxed max-w-[65ch] space-y-6">
         {children}
       </div>
 
-      <div className="mt-14 pt-6 border-t border-[#F2EDE8] dark:border-[#2A1A1A] print:hidden">
+      <div className="mt-14 pt-6 border-t border-[#F2EDE8] print:hidden">
         <Link href="/contact" className="text-sm font-semibold text-[#8B1A1A] hover:text-[#C4511F] transition-colors">
           {t('contactCta')} →
         </Link>
@@ -72,7 +72,7 @@ export function LegalPageLayout({ doc, children }: { doc: LegalDocument; childre
 export function LegalSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="text-base font-extrabold uppercase tracking-wide text-[#1A0A0A] dark:text-[#F5F0ED] mb-2 mt-8 first:mt-0">{title}</h2>
+      <h2 className="text-base font-extrabold uppercase tracking-wide text-[#1A0A0A] mb-2 mt-8 first:mt-0">{title}</h2>
       <div className="space-y-3">{children}</div>
     </section>
   )

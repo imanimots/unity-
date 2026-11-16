@@ -63,7 +63,7 @@ export function HelpBrowser({ tasks }: HelpBrowserProps) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t('searchPlaceholder')}
-          className="w-full h-12 pl-11 pr-4 rounded-xl border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] placeholder-[#9B8B85] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-colors"
+          className="w-full h-12 pl-11 pr-4 rounded-xl border border-[#E8E0D8] bg-white text-[#1A0A0A] placeholder-[#9B8B85] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-colors"
         />
       </div>
 
@@ -73,7 +73,7 @@ export function HelpBrowser({ tasks }: HelpBrowserProps) {
           type="button"
           onClick={() => setRole('all')}
           aria-pressed={role === 'all'}
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-[0.04em] transition-colors ${role === 'all' ? 'bg-[#8B1A1A] text-white' : 'bg-white dark:bg-[#1A1010] border border-[#E8E0D8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]'}`}
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-[0.04em] transition-colors ${role === 'all' ? 'bg-[#8B1A1A] text-white' : 'bg-white border border-[#E8E0D8] text-[#6B5B55]'}`}
         >
           {t('everyone')}
         </button>
@@ -83,7 +83,7 @@ export function HelpBrowser({ tasks }: HelpBrowserProps) {
             type="button"
             onClick={() => setRole(r)}
             aria-pressed={role === r}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-[0.04em] transition-colors ${role === r ? 'bg-[#8B1A1A] text-white' : 'bg-white dark:bg-[#1A1010] border border-[#E8E0D8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]'}`}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-[0.04em] transition-colors ${role === r ? 'bg-[#8B1A1A] text-white' : 'bg-white border border-[#E8E0D8] text-[#6B5B55]'}`}
           >
             {ROLE_LABELS[r]}
           </button>
@@ -96,7 +96,7 @@ export function HelpBrowser({ tasks }: HelpBrowserProps) {
           type="button"
           onClick={() => setCategory('all')}
           aria-pressed={category === 'all'}
-          className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${category === 'all' ? 'bg-[#1A0A0A] dark:bg-[#F5F0ED] text-white dark:text-[#1A0A0A]' : 'bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]'}`}
+          className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${category === 'all' ? 'bg-[#1A0A0A] text-white' : 'bg-[#F2EDE8] text-[#6B5B55]'}`}
         >
           {t('allCategories')}
         </button>
@@ -106,7 +106,7 @@ export function HelpBrowser({ tasks }: HelpBrowserProps) {
             type="button"
             onClick={() => setCategory(c)}
             aria-pressed={category === c}
-            className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${category === c ? 'bg-[#1A0A0A] dark:bg-[#F5F0ED] text-white dark:text-[#1A0A0A]' : 'bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]'}`}
+            className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors ${category === c ? 'bg-[#1A0A0A] text-white' : 'bg-[#F2EDE8] text-[#6B5B55]'}`}
           >
             {CATEGORY_LABELS[c]}
           </button>
@@ -117,7 +117,7 @@ export function HelpBrowser({ tasks }: HelpBrowserProps) {
       {filtered.length === 0 ? (
         <div className="text-center py-20">
           <p className="text-4xl mb-4">🔍</p>
-          <p className="text-[#6B5B55] dark:text-[#9B8B85]">{t('noResultsTitle')} {t('noResultsHint')}</p>
+          <p className="text-[#6B5B55]">{t('noResultsTitle')} {t('noResultsHint')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -125,14 +125,14 @@ export function HelpBrowser({ tasks }: HelpBrowserProps) {
             <Link
               key={task.id}
               href={`/help/${task.slug}`}
-              className="block h-full rounded-2xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] p-5 hover:border-[#8B1A1A]/40 transition-colors"
+              className="block h-full rounded-2xl border border-[#F2EDE8] bg-white p-5 hover:border-[#8B1A1A]/40 transition-colors"
             >
-              <p className="font-semibold text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">{task.iWantTo}</p>
-              <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-1.5 leading-relaxed">{task.summary}</p>
+              <p className="font-semibold text-sm text-[#1A0A0A]">{task.iWantTo}</p>
+              <p className="text-xs text-[#6B5B55] mt-1.5 leading-relaxed">{task.summary}</p>
               <div className="flex flex-wrap items-center gap-1.5 mt-3">
                 <span className="text-[10px] font-medium uppercase tracking-[0.05em] text-[#9B8B85]">{CATEGORY_LABELS[task.category]}</span>
                 {task.providerDependency && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
                     <Hourglass size={9} /> {t('providerPendingBadge')}
                   </span>
                 )}

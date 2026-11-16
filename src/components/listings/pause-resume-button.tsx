@@ -54,7 +54,7 @@ export function PauseResumeButton({ listingId, status }: Props) {
           type="button"
           disabled={busy}
           onClick={() => setConfirmOpen(true)}
-          className="p-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 text-[#9B8B85] hover:text-amber-600 dark:hover:text-amber-400 transition-colors disabled:opacity-50"
+          className="p-2 rounded-lg hover:bg-amber-50 text-[#9B8B85] hover:text-amber-600 transition-colors disabled:opacity-50"
           title={t('pauseListingTitle')}
         >
           <PauseCircle size={16} />
@@ -79,7 +79,7 @@ export function PauseResumeButton({ listingId, status }: Props) {
                 type="button"
                 disabled={busy}
                 onClick={() => setConfirmOpen(false)}
-                className="flex-1 py-2.5 border border-[#E8E0D8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] font-semibold rounded-xl text-sm disabled:opacity-50"
+                className="flex-1 py-2.5 border border-[#E8E0D8] text-[#1A0A0A] font-semibold rounded-xl text-sm disabled:opacity-50"
               >
                 {t('cancel')}
               </button>
@@ -95,7 +95,7 @@ export function PauseResumeButton({ listingId, status }: Props) {
       type="button"
       disabled={busy}
       onClick={() => callAction('resume')}
-      className="p-2 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 text-[#9B8B85] hover:text-green-600 dark:hover:text-green-400 transition-colors disabled:opacity-50"
+      className="p-2 rounded-lg hover:bg-green-50 text-[#9B8B85] hover:text-green-600 transition-colors disabled:opacity-50"
       title={t('activateListingTitle')}
     >
       <PlayCircle size={16} />

@@ -83,7 +83,7 @@ export function RentToBuyEvidenceUpload({ agreementId, userId, evidenceType, lab
 
   return (
     <div className="space-y-1.5">
-      <label className="block text-xs font-semibold uppercase tracking-wide text-[#6B5B55] dark:text-[#9B8B85]">{label}</label>
+      <label className="block text-xs font-semibold uppercase tracking-wide text-[#6B5B55]">{label}</label>
       <input
         type="file"
         accept={ALLOWED_RTB_EVIDENCE_MIME_TYPES.join(',')}
@@ -92,7 +92,7 @@ export function RentToBuyEvidenceUpload({ agreementId, userId, evidenceType, lab
           const file = e.target.files?.[0]
           if (file) void handleFile(file)
         }}
-        className="text-xs text-[#1A0A0A] dark:text-[#F5F0ED]"
+        className="text-xs text-[#1A0A0A]"
       />
       {uploading && <p className="text-xs text-[#9B8B85]">{t('uploadEvidence')}…</p>}
       {error && <p role="alert" className="text-xs text-[#8B1A1A]">{error}</p>}

@@ -38,20 +38,20 @@ function asPaymentStatus(status: string | undefined): BarterPaymentStatus {
 function StatusPill({ status, labels }: { status: string; labels?: BarterFinancialStatusLabels }) {
   if (status && READY_STATUSES.has(status)) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400">
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
         <CheckCircle2 size={13} /> {labels?.paid ?? 'Paid'}
       </span>
     )
   }
   if (status === 'failed') {
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 dark:text-red-400">
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600">
         <XCircle size={13} /> {labels?.failed ?? 'Failed'}
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+    <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600">
       <Clock size={13} /> {labels?.pending ?? 'Pending'}
     </span>
   )
@@ -92,10 +92,10 @@ export function BarterFinancialStatus({ offer, payments, partyAId, partyBId, par
         <span
           className={`text-[10px] font-bold uppercase tracking-[0.06em] px-2 py-0.5 rounded-full ${
             readiness === 'financially_ready'
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+              ? 'bg-green-100 text-green-700'
               : readiness === 'payment_failed'
-                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                ? 'bg-red-100 text-red-700'
+                : 'bg-amber-100 text-amber-700'
           }`}
         >
           {readinessCopy.label}
@@ -103,20 +103,20 @@ export function BarterFinancialStatus({ offer, payments, partyAId, partyBId, par
       </div>
       <div className="space-y-2">
         {depositRequirements.some((d) => d.payer === 'party_a') && (
-          <div className="flex justify-between items-center px-4 py-2.5 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm">
-            <span className="text-[#6B5B55] dark:text-[#9B8B85]">{labels ? labels.depositOf(partyAName) : `${partyAName}’s deposit`}</span>
+          <div className="flex justify-between items-center px-4 py-2.5 bg-white rounded-xl border border-[#F2EDE8] text-sm">
+            <span className="text-[#6B5B55]">{labels ? labels.depositOf(partyAName) : `${partyAName}’s deposit`}</span>
             <StatusPill status={depositA?.status ?? 'pending'} labels={labels} />
           </div>
         )}
         {depositRequirements.some((d) => d.payer === 'party_b') && (
-          <div className="flex justify-between items-center px-4 py-2.5 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm">
-            <span className="text-[#6B5B55] dark:text-[#9B8B85]">{labels ? labels.depositOf(partyBName) : `${partyBName}’s deposit`}</span>
+          <div className="flex justify-between items-center px-4 py-2.5 bg-white rounded-xl border border-[#F2EDE8] text-sm">
+            <span className="text-[#6B5B55]">{labels ? labels.depositOf(partyBName) : `${partyBName}’s deposit`}</span>
             <StatusPill status={depositB?.status ?? 'pending'} labels={labels} />
           </div>
         )}
         {offer.cash_adjustment_amount > 0 && (
-          <div className="flex justify-between items-center px-4 py-2.5 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm">
-            <span className="text-[#6B5B55] dark:text-[#9B8B85]">{labels ? labels.cashAdjustmentOf(`R${offer.cash_adjustment_amount}`) : `Cash adjustment (R${offer.cash_adjustment_amount})`}</span>
+          <div className="flex justify-between items-center px-4 py-2.5 bg-white rounded-xl border border-[#F2EDE8] text-sm">
+            <span className="text-[#6B5B55]">{labels ? labels.cashAdjustmentOf(`R${offer.cash_adjustment_amount}`) : `Cash adjustment (R${offer.cash_adjustment_amount})`}</span>
             <StatusPill status={cashPayment?.status ?? 'pending'} labels={labels} />
           </div>
         )}

@@ -47,7 +47,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
-      <Link href="/admin/orders" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+      <Link href="/admin/orders" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
         <ArrowLeft size={13} /> Back to orders
       </Link>
 
@@ -59,17 +59,17 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
           <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-3">Order</h2>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
             <dt className="text-[#9B8B85]">Listing</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{order.listingTitle ?? '—'}</dd>
+            <dd className="text-[#1A0A0A]">{order.listingTitle ?? '—'}</dd>
             <dt className="text-[#9B8B85]">Status</dt>
             <dd><Pill value={order.status} styles={STATUS_STYLES} /></dd>
             <dt className="text-[#9B8B85]">Created</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{formatDateTime(order.createdAt)}</dd>
+            <dd className="text-[#1A0A0A]">{formatDateTime(order.createdAt)}</dd>
             <dt className="text-[#9B8B85]">Listing delivery capabilities</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{order.deliveryMethodHint}</dd>
+            <dd className="text-[#1A0A0A]">{order.deliveryMethodHint}</dd>
             <dt className="text-[#9B8B85]">Quantity</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{order.quantity}</dd>
+            <dd className="text-[#1A0A0A]">{order.quantity}</dd>
             <dt className="text-[#9B8B85]">Last event</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{order.lastLifecycleEvent ?? '—'}</dd>
+            <dd className="text-[#1A0A0A]">{order.lastLifecycleEvent ?? '—'}</dd>
           </dl>
         </section>
 
@@ -78,23 +78,23 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
           <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-3">Financials</h2>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
             <dt className="text-[#9B8B85]">Unit price</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{formatMoney(order.unitPrice, order.currency)}</dd>
+            <dd className="text-[#1A0A0A]">{formatMoney(order.unitPrice, order.currency)}</dd>
             <dt className="text-[#9B8B85]">Shipping fee</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{formatMoney(order.shippingFee, order.currency)}</dd>
+            <dd className="text-[#1A0A0A]">{formatMoney(order.shippingFee, order.currency)}</dd>
             <dt className="text-[#9B8B85]">Total</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED] font-semibold">{formatMoney(order.totalAmount, order.currency)}</dd>
+            <dd className="text-[#1A0A0A] font-semibold">{formatMoney(order.totalAmount, order.currency)}</dd>
             <dt className="text-[#9B8B85]">Payment status</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{payment?.status ?? 'not started'}</dd>
+            <dd className="text-[#1A0A0A]">{payment?.status ?? 'not started'}</dd>
             <dt className="text-[#9B8B85]">Payment type</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{payment?.payment_type ?? '—'}</dd>
+            <dd className="text-[#1A0A0A]">{payment?.payment_type ?? '—'}</dd>
             <dt className="text-[#9B8B85]">Provider</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{payment?.provider ?? '—'}</dd>
+            <dd className="text-[#1A0A0A]">{payment?.provider ?? '—'}</dd>
             <dt className="text-[#9B8B85]">Attempts</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{financial.attempts.length}</dd>
+            <dd className="text-[#1A0A0A]">{financial.attempts.length}</dd>
             <dt className="text-[#9B8B85]">Ledger entries</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">{financial.ledgerEntryCount}</dd>
+            <dd className="text-[#1A0A0A]">{financial.ledgerEntryCount}</dd>
             <dt className="text-[#9B8B85]">Payout status</dt>
-            <dd className="text-[#1A0A0A] dark:text-[#F5F0ED]">N/A</dd>
+            <dd className="text-[#1A0A0A]">N/A</dd>
           </dl>
           <p className="text-xs text-[#9B8B85] mt-2">
             Payout status is not applicable — order-linked merchant payouts are not tracked in the current schema.
@@ -110,7 +110,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
             <ul className="space-y-2">
               {history.map((h) => (
                 <li key={h.id} className="text-sm flex items-baseline justify-between gap-4">
-                  <span className="text-[#1A0A0A] dark:text-[#F5F0ED]">
+                  <span className="text-[#1A0A0A]">
                     {h.eventType.replace(/_/g, ' ')} {h.previousStatus ? `(${h.previousStatus} → ${h.newStatus})` : `(${h.newStatus})`}
                     {h.actorRole ? <span className="text-[#9B8B85]"> — {h.actorRole}</span> : null}
                   </span>
@@ -125,7 +125,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
         <section>
           <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-3">Dispute</h2>
           {dispute ? (
-            <p className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+            <p className="text-sm text-[#1A0A0A]">
               &ldquo;{dispute.title}&rdquo; — {dispute.status}.{' '}
               <Link href={`/admin/disputes/${dispute.id}`} className="text-[#8B1A1A] hover:underline">
                 View dispute
@@ -158,7 +158,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
             <ul className="space-y-2">
               {emailDeliveries.map((e) => (
                 <li key={e.id} className="text-sm flex items-baseline justify-between gap-4">
-                  <span className="text-[#1A0A0A] dark:text-[#F5F0ED]">{e.eventType}</span>
+                  <span className="text-[#1A0A0A]">{e.eventType}</span>
                   <span className="text-[#9B8B85] whitespace-nowrap">
                     {e.status} — {formatDate(e.createdAt)}
                   </span>
@@ -177,7 +177,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
           <div className="grid grid-cols-2 gap-6 text-sm">
             <div>
               <p className="text-[#9B8B85] mb-1">Buyer</p>
-              <p className="text-[#1A0A0A] dark:text-[#F5F0ED]">{buyer.name ?? buyer.id}</p>
+              <p className="text-[#1A0A0A]">{buyer.name ?? buyer.id}</p>
               <div className="mt-1 flex gap-2">
                 {buyer.accountStatus && <Pill value={buyer.accountStatus} styles={ACCOUNT_STATUS_STYLES} />}
                 <span className="text-xs text-[#9B8B85]">KYC: {buyer.kycStatus ?? 'unknown'}</span>
@@ -185,7 +185,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
             </div>
             <div>
               <p className="text-[#9B8B85] mb-1">Seller</p>
-              <p className="text-[#1A0A0A] dark:text-[#F5F0ED]">{seller.name ?? seller.id}</p>
+              <p className="text-[#1A0A0A]">{seller.name ?? seller.id}</p>
               <div className="mt-1 flex gap-2">
                 {seller.accountStatus && <Pill value={seller.accountStatus} styles={ACCOUNT_STATUS_STYLES} />}
                 <span className="text-xs text-[#9B8B85]">KYC: {seller.kycStatus ?? 'unknown'}</span>

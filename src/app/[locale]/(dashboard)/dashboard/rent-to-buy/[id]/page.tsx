@@ -75,63 +75,63 @@ export default async function RentToBuyAgreementPage({ params }: PageProps) {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <Link href="/dashboard/rent-to-buy" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+        <Link href="/dashboard/rent-to-buy" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
           <ArrowLeft size={13} /> {t('back')}
         </Link>
       </div>
 
       <div className="mb-8">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{t('label')}</p>
-        <h1 className="text-2xl lg:text-3xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight">{listing?.title ?? t('item')}</h1>
+        <h1 className="text-2xl lg:text-3xl font-extrabold uppercase text-[#1A0A0A] tracking-tight">{listing?.title ?? t('item')}</h1>
       </div>
 
       {/* Mandatory disclosure -- Rule P, never hidden in tiny text. */}
-      <div className="bg-[#FFF8E8] dark:bg-[#2A2010] border border-[#E8D8A8] dark:border-[#4A3A1A] rounded-xl p-5 mb-6 text-sm text-[#5A4A20] dark:text-[#D8C888] space-y-2">
+      <div className="bg-[#FFF8E8] border border-[#E8D8A8] rounded-xl p-5 mb-6 text-sm text-[#5A4A20] space-y-2">
         <p>{t.rich('disclosureFirst', { strong: (chunks) => <strong>{chunks}</strong> })}</p>
         <p>{t('disclosureDefault')}</p>
       </div>
 
-      <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-6 mb-6 space-y-4">
+      <div className="bg-white rounded-xl border border-[#F2EDE8] p-6 mb-6 space-y-4">
         <div className="flex justify-between text-sm">
-          <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('statusLabel')}</span>
-          <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t(`status.${STATUS_KEYS[agreement.status] ?? 'active'}`)}</span>
+          <span className="text-[#6B5B55]">{t('statusLabel')}</span>
+          <span className="font-semibold text-[#1A0A0A]">{t(`status.${STATUS_KEYS[agreement.status] ?? 'active'}`)}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('possessionLabel')}</span>
-          <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t(`possessionStatus.${POSSESSION_KEYS[agreement.possession_status] ?? 'notDelivered'}`)}</span>
+          <span className="text-[#6B5B55]">{t('possessionLabel')}</span>
+          <span className="font-semibold text-[#1A0A0A]">{t(`possessionStatus.${POSSESSION_KEYS[agreement.possession_status] ?? 'notDelivered'}`)}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('ownershipLabel')}</span>
-          <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t(agreement.ownership_status === 'merchant_owned' ? 'ownershipStatus.merchantOwned' : 'ownershipStatus.customerOwned')}</span>
+          <span className="text-[#6B5B55]">{t('ownershipLabel')}</span>
+          <span className="font-semibold text-[#1A0A0A]">{t(agreement.ownership_status === 'merchant_owned' ? 'ownershipStatus.merchantOwned' : 'ownershipStatus.customerOwned')}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('purchaseProgress')}</span>
-          <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <span className="text-[#6B5B55]">{t('purchaseProgress')}</span>
+          <span className="font-semibold text-[#1A0A0A]">
             {agreement.currency} {purchaseProgress.paidPrincipal.toLocaleString()} / {purchaseProgress.totalPurchasePrice.toLocaleString()} ({purchaseProgress.percentPaid.toFixed(0)}%)
           </span>
         </div>
         {agreement.security_deposit_amount ? (
           <div className="flex justify-between text-sm">
-            <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('securityDeposit')}</span>
-            <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{agreement.currency} {Number(agreement.security_deposit_amount).toLocaleString()}</span>
+            <span className="text-[#6B5B55]">{t('securityDeposit')}</span>
+            <span className="font-semibold text-[#1A0A0A]">{agreement.currency} {Number(agreement.security_deposit_amount).toLocaleString()}</span>
           </div>
         ) : null}
         {agreement.status === 'active' && agreement.fully_paid_at && agreement.ownership_status === 'merchant_owned' && (
-          <div className="pt-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A] text-sm">
-            <p className="font-semibold uppercase text-xs tracking-wide text-[#1A0A0A] dark:text-[#F5F0ED]">{t('fullyPaidAwaitingHandover')}</p>
-            <p className="mt-1 text-[#6B5B55] dark:text-[#9B8B85]">{t('completionWindowNotice')}</p>
+          <div className="pt-2 border-t border-[#F2EDE8] text-sm">
+            <p className="font-semibold uppercase text-xs tracking-wide text-[#1A0A0A]">{t('fullyPaidAwaitingHandover')}</p>
+            <p className="mt-1 text-[#6B5B55]">{t('completionWindowNotice')}</p>
           </div>
         )}
         {agreement.status === 'defaulted' && (
-          <div className="pt-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A] text-sm text-[#8B1A1A]">
+          <div className="pt-2 border-t border-[#F2EDE8] text-sm text-[#8B1A1A]">
             <p className="font-semibold uppercase text-xs tracking-wide">{t('terminated')}</p>
             <p className="mt-1">{t('returnRequiredNotice')}</p>
           </div>
         )}
         {pendingAmendment && (
-          <div className="pt-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A] text-sm">
-            <p className="font-semibold uppercase text-xs tracking-wide text-[#1A0A0A] dark:text-[#F5F0ED]">{t('amendmentsTitle')}</p>
-            <p className="mt-1 text-[#6B5B55] dark:text-[#9B8B85]">{t('amendmentPending')}</p>
+          <div className="pt-2 border-t border-[#F2EDE8] text-sm">
+            <p className="font-semibold uppercase text-xs tracking-wide text-[#1A0A0A]">{t('amendmentsTitle')}</p>
+            <p className="mt-1 text-[#6B5B55]">{t('amendmentPending')}</p>
             {pendingAmendment.proposed_by !== requester.userId && (
               <AmendmentRespondButtons agreementId={agreement.id} amendmentId={pendingAmendment.id} />
             )}
@@ -139,13 +139,13 @@ export default async function RentToBuyAgreementPage({ params }: PageProps) {
         )}
       </div>
 
-      <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-6 mb-6">
+      <div className="bg-white rounded-xl border border-[#F2EDE8] p-6 mb-6">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-4">{t('paymentSchedule')}</p>
         <div className="space-y-2">
           {installments.map((i) => (
             <div key={i.id} className="flex justify-between text-sm">
-              <span className="text-[#6B5B55] dark:text-[#9B8B85]">#{i.sequence} — {formatDate(i.due_date, locale)}</span>
-              <span className={i.status === 'paid' ? 'text-green-700 dark:text-green-500 font-semibold' : 'text-[#1A0A0A] dark:text-[#F5F0ED]'}>
+              <span className="text-[#6B5B55]">#{i.sequence} — {formatDate(i.due_date, locale)}</span>
+              <span className={i.status === 'paid' ? 'text-green-700 font-semibold' : 'text-[#1A0A0A]'}>
                 {agreement.currency} {Number(i.principal_amount).toLocaleString()} — {t(`installmentStatus.${INSTALLMENT_KEYS[i.status] ?? 'scheduled'}`)}
               </span>
             </div>
@@ -154,14 +154,14 @@ export default async function RentToBuyAgreementPage({ params }: PageProps) {
       </div>
 
       {(isMerchant || isCustomer) && (
-        <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-6 mb-6">
+        <div className="bg-white rounded-xl border border-[#F2EDE8] p-6 mb-6">
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-4">{t('submittedEvidence')}</p>
           {evidence.length === 0 ? (
-            <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85]">{t('noEvidenceSubmitted')}</p>
+            <p className="text-xs text-[#6B5B55]">{t('noEvidenceSubmitted')}</p>
           ) : (
             <ul className="space-y-2">
               {evidence.map((e: { id: string; evidence_type: string; file_type: string }) => (
-                <li key={e.id} className="flex items-center justify-between gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+                <li key={e.id} className="flex items-center justify-between gap-2 text-sm text-[#1A0A0A]">
                   <span className="truncate">{e.evidence_type} — {e.file_type}</span>
                   <EvidenceAccessButton accessUrl={`/api/rent-to-buy/agreements/${agreement.id}/evidence/${e.id}/access`} label={t('viewEvidence')} errorLabel={t('errors.couldNotAccessEvidence')} />
                 </li>
@@ -172,16 +172,16 @@ export default async function RentToBuyAgreementPage({ params }: PageProps) {
       )}
 
       {isMerchant && agreement.possession_status === 'possession_eligible' && !agreement.handed_over_at && (
-        <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-6 mb-6">
+        <div className="bg-white rounded-xl border border-[#F2EDE8] p-6 mb-6">
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-4">{t('preHandoverEvidence')}</p>
-          <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mb-3">{t('evidenceRequiredMerchant')}</p>
+          <p className="text-xs text-[#6B5B55] mb-3">{t('evidenceRequiredMerchant')}</p>
           <RentToBuyEvidenceUpload agreementId={agreement.id} userId={requester.userId} evidenceType="pre_handover" label={t('uploadEvidence')} />
         </div>
       )}
       {isCustomer && agreement.possession_status === 'possession_eligible' && agreement.handed_over_at && (
-        <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-6 mb-6">
+        <div className="bg-white rounded-xl border border-[#F2EDE8] p-6 mb-6">
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-4">{t('receiptEvidence')}</p>
-          <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mb-3">{t('evidenceRequiredCustomer')}</p>
+          <p className="text-xs text-[#6B5B55] mb-3">{t('evidenceRequiredCustomer')}</p>
           <RentToBuyEvidenceUpload agreementId={agreement.id} userId={requester.userId} evidenceType="post_handover_receipt" label={t('uploadEvidence')} />
         </div>
       )}

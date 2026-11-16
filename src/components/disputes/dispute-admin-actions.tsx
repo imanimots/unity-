@@ -87,9 +87,9 @@ export function DisputeAdminActions({ disputeId, status, currentAdminId, assigne
   const isTerminal = ['resolved', 'closed', 'cancelled'].includes(status)
 
   return (
-    <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-4 bg-[#FAF8F5] dark:bg-[#1A1010]">
+    <div className="border border-[#F2EDE8] rounded-xl p-5 space-y-4 bg-[#FAF8F5]">
       <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85]">Admin actions</h2>
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       {!isTerminal && (
         <div className="flex flex-wrap gap-2">
@@ -124,7 +124,7 @@ export function DisputeAdminActions({ disputeId, status, currentAdminId, assigne
 
       {(status === 'open' || status === 'under_review') && (
         <div>
-          <label htmlFor="admin-note" className="block text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1">
+          <label htmlFor="admin-note" className="block text-xs font-medium text-[#6B5B55] mb-1">
             Note (for &quot;request evidence&quot;)
           </label>
           <input id="admin-note" type="text" value={note} onChange={(e) => setNote(e.target.value)} className={`w-full ${inputClass}`} />
@@ -132,9 +132,9 @@ export function DisputeAdminActions({ disputeId, status, currentAdminId, assigne
       )}
 
       {status === 'under_review' && (
-        <div className="space-y-3 border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-4">
+        <div className="space-y-3 border-t border-[#F2EDE8] pt-4">
           <div>
-            <label htmlFor="admin-outcome" className="block text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1">
+            <label htmlFor="admin-outcome" className="block text-xs font-medium text-[#6B5B55] mb-1">
               Outcome
             </label>
             <select id="admin-outcome" value={outcome} onChange={(e) => setOutcome(e.target.value)} className={`w-full ${inputClass}`}>
@@ -144,19 +144,19 @@ export function DisputeAdminActions({ disputeId, status, currentAdminId, assigne
             </select>
           </div>
           <div>
-            <label htmlFor="admin-resolution-notes" className="block text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1">
+            <label htmlFor="admin-resolution-notes" className="block text-xs font-medium text-[#6B5B55] mb-1">
               Resolution notes
             </label>
             <textarea id="admin-resolution-notes" rows={3} value={resolutionNotes} onChange={(e) => setResolutionNotes(e.target.value)} className={`w-full ${inputClass}`} />
           </div>
 
           {bookingId !== null && (
-            <div className="space-y-3 border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-3">
-              <p className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85]">
+            <div className="space-y-3 border-t border-[#F2EDE8] pt-3">
+              <p className="text-xs font-medium text-[#6B5B55]">
                 Financial disposition (required) -- what money must happen because of this decision, separate from the outcome above.
               </p>
               <div>
-                <label htmlFor="admin-disposition-type" className="block text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1">
+                <label htmlFor="admin-disposition-type" className="block text-xs font-medium text-[#6B5B55] mb-1">
                   Disposition
                 </label>
                 <select id="admin-disposition-type" value={dispositionType} onChange={(e) => setDispositionType(e.target.value)} className={`w-full ${inputClass}`}>
@@ -167,7 +167,7 @@ export function DisputeAdminActions({ disputeId, status, currentAdminId, assigne
               </div>
               {dispositionType !== 'no_financial_adjustment' && (
                 <div>
-                  <label htmlFor="admin-disposition-amount" className="block text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1">
+                  <label htmlFor="admin-disposition-amount" className="block text-xs font-medium text-[#6B5B55] mb-1">
                     Amount (ZAR)
                   </label>
                   <input
@@ -182,7 +182,7 @@ export function DisputeAdminActions({ disputeId, status, currentAdminId, assigne
                 </div>
               )}
               <div>
-                <label htmlFor="admin-disposition-reason" className="block text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1">
+                <label htmlFor="admin-disposition-reason" className="block text-xs font-medium text-[#6B5B55] mb-1">
                   Disposition reason (required)
                 </label>
                 <textarea id="admin-disposition-reason" rows={2} value={dispositionReason} onChange={(e) => setDispositionReason(e.target.value)} className={`w-full ${inputClass}`} />
@@ -217,8 +217,8 @@ export function DisputeAdminActions({ disputeId, status, currentAdminId, assigne
       )}
 
       {bookingId !== null && financialDisposition && financialDisposition.status === 'pending' && (
-        <div className="space-y-3 border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-4">
-          <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+        <div className="space-y-3 border-t border-[#F2EDE8] pt-4">
+          <p className="text-xs font-medium text-amber-600">
             Financial disposition pending: {financialDisposition.disposition_type.replace(/_/g, ' ')}
             {financialDisposition.amount != null ? ` (R${financialDisposition.amount})` : ''} -- payout is blocked until this is resolved.
           </p>
@@ -239,7 +239,7 @@ export function DisputeAdminActions({ disputeId, status, currentAdminId, assigne
           ) : (
             <>
               <div>
-                <label htmlFor="admin-completion-notes" className="block text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1">
+                <label htmlFor="admin-completion-notes" className="block text-xs font-medium text-[#6B5B55] mb-1">
                   Completion notes (required -- confirm how this settlement was actually carried out)
                 </label>
                 <textarea id="admin-completion-notes" rows={2} value={completionNotes} onChange={(e) => setCompletionNotes(e.target.value)} className={`w-full ${inputClass}`} />
@@ -263,8 +263,8 @@ export function DisputeAdminActions({ disputeId, status, currentAdminId, assigne
       )}
 
       {!isTerminal && (
-        <div className="border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-4">
-          <label htmlFor="admin-cancel-reason" className="block text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1">
+        <div className="border-t border-[#F2EDE8] pt-4">
+          <label htmlFor="admin-cancel-reason" className="block text-xs font-medium text-[#6B5B55] mb-1">
             Cancellation reason (optional)
           </label>
           <input id="admin-cancel-reason" type="text" value={cancellationReason} onChange={(e) => setCancellationReason(e.target.value)} className={`w-full ${inputClass}`} />

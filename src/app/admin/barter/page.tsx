@@ -110,13 +110,13 @@ export default function AdminBarterPage() {
         </a>
       </div>
 
-      <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+      <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
                 {['Listing', 'Party A', 'Party B', 'Status', 'Hold', 'Created', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A] whitespace-nowrap">
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -131,13 +131,13 @@ export default function AdminBarterPage() {
                 <tr><td colSpan={7} className="px-4 py-16 text-center text-sm text-[#9B8B85]">No barter trades match your filters.</td></tr>
               ) : (
                 agreements.map((a) => (
-                  <tr key={a.id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors last:border-0">
-                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{a.anchorListingTitle ?? '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{a.partyAName ?? '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{a.partyBName ?? '—'}</td>
+                  <tr key={a.id} className="border-b border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors last:border-0">
+                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A]">{a.anchorListingTitle ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">{a.partyAName ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">{a.partyBName ?? '—'}</td>
                     <td className="px-4 py-3"><Pill value={a.status} styles={STATUS_STYLES} /></td>
-                    <td className="px-4 py-3 text-sm">{a.adminHold ? <span className="text-red-600 dark:text-red-400 font-medium">Held</span> : '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{formatDate(a.createdAt)}</td>
+                    <td className="px-4 py-3 text-sm">{a.adminHold ? <span className="text-red-600 font-medium">Held</span> : '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{formatDate(a.createdAt)}</td>
                     <td className="px-4 py-3">
                       <Link href={`/admin/barter/${a.id}`} className={secondaryButtonClass}>Inspect</Link>
                     </td>

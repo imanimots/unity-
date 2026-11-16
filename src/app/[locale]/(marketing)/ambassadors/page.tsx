@@ -45,7 +45,7 @@ export default async function AmbassadorsPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] dark:bg-[#0F0A0A]">
+    <div className="min-h-screen bg-[#FAF8F5]">
 
       {/* Hero */}
       <section className="bg-[#1A0A0A] text-white py-[120px] px-4">
@@ -72,16 +72,16 @@ export default async function AmbassadorsPage() {
       </section>
 
       {/* Stats bar */}
-      <section className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010]">
-        <div className="max-w-5xl mx-auto grid grid-cols-3 divide-x divide-[#F2EDE8] dark:divide-[#2A1A1A]">
+      <section className="border-b border-[#F2EDE8] bg-white">
+        <div className="max-w-5xl mx-auto grid grid-cols-3 divide-x divide-[#F2EDE8]">
           <div className="py-8 px-6 text-center">
-            <div className="text-3xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] mb-1">12%</div>
-            <div className="text-sm text-[#6B5B55] dark:text-[#9B8B85] uppercase tracking-[0.05em]">{t('stats.maxCommission')}</div>
+            <div className="text-3xl font-extrabold text-[#1A0A0A] mb-1">12%</div>
+            <div className="text-sm text-[#6B5B55] uppercase tracking-[0.05em]">{t('stats.maxCommission')}</div>
           </div>
           {stats.map(({ value, label }) => (
             <div key={label} className="py-8 px-6 text-center">
-              <div className="text-3xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] mb-1">{value}</div>
-              <div className="text-sm text-[#6B5B55] dark:text-[#9B8B85] uppercase tracking-[0.05em]">{label}</div>
+              <div className="text-3xl font-extrabold text-[#1A0A0A] mb-1">{value}</div>
+              <div className="text-sm text-[#6B5B55] uppercase tracking-[0.05em]">{label}</div>
             </div>
           ))}
         </div>
@@ -90,16 +90,16 @@ export default async function AmbassadorsPage() {
       {/* How it works */}
       <section className="max-w-5xl mx-auto px-4 py-24">
         <p className="section-label text-[#9B8B85] mb-4">{t('processLabel')}</p>
-        <h2 className="text-4xl font-extrabold uppercase tracking-[-0.02em] text-[#1A0A0A] dark:text-[#F5F0ED] mb-14">
+        <h2 className="text-4xl font-extrabold uppercase tracking-[-0.02em] text-[#1A0A0A] mb-14">
           {t('howItWorksHeading')}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {howItWorks.map(({ step, title, desc }) => (
-            <div key={step} className="flex gap-5 p-6 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010]">
+            <div key={step} className="flex gap-5 p-6 rounded-xl border border-[#F2EDE8] bg-white">
               <div className="text-[#8B1A1A] font-extrabold text-xs font-mono shrink-0 pt-1 tracking-[0.1em]">{step}</div>
               <div>
-                <div className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] mb-2 uppercase tracking-[0.03em] text-sm">{title}</div>
-                <div className="text-sm text-[#6B5B55] dark:text-[#9B8B85] leading-relaxed">{desc}</div>
+                <div className="font-semibold text-[#1A0A0A] mb-2 uppercase tracking-[0.03em] text-sm">{title}</div>
+                <div className="text-sm text-[#6B5B55] leading-relaxed">{desc}</div>
               </div>
             </div>
           ))}
@@ -159,12 +159,12 @@ export default async function AmbassadorsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-start">
           <div>
             <p className="section-label text-[#9B8B85] mb-4">{t('requirementsLabel')}</p>
-            <h2 className="text-3xl font-extrabold uppercase tracking-[-0.02em] text-[#1A0A0A] dark:text-[#F5F0ED] mb-8">
+            <h2 className="text-3xl font-extrabold uppercase tracking-[-0.02em] text-[#1A0A0A] mb-8">
               {t('eligibilityHeading')}
             </h2>
             <ul className="space-y-4">
               {eligibility.map((req) => (
-                <li key={req} className="flex items-start gap-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] leading-relaxed">
+                <li key={req} className="flex items-start gap-3 text-sm text-[#6B5B55] leading-relaxed">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#8B1A1A] mt-2 shrink-0" />
                   {req}
                 </li>
@@ -173,16 +173,16 @@ export default async function AmbassadorsPage() {
           </div>
           <div>
             <p className="section-label text-[#9B8B85] mb-4">{t('idealForLabel')}</p>
-            <h2 className="text-3xl font-extrabold uppercase tracking-[-0.02em] text-[#1A0A0A] dark:text-[#F5F0ED] mb-8">
+            <h2 className="text-3xl font-extrabold uppercase tracking-[-0.02em] text-[#1A0A0A] mb-8">
               {t('whoThrivesHeading')}
             </h2>
             <div className="space-y-4">
               {whoThrives.map(({ icon: Icon, title, desc }) => (
-                <div key={title} className="flex items-start gap-4 p-5 rounded-xl bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A]">
+                <div key={title} className="flex items-start gap-4 p-5 rounded-xl bg-white border border-[#F2EDE8]">
                   <Icon size={15} className="text-[#C4511F] shrink-0 mt-0.5" />
                   <div>
-                    <div className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] uppercase tracking-[0.03em] mb-1">{title}</div>
-                    <div className="text-xs text-[#6B5B55] dark:text-[#9B8B85] leading-relaxed">{desc}</div>
+                    <div className="text-sm font-semibold text-[#1A0A0A] uppercase tracking-[0.03em] mb-1">{title}</div>
+                    <div className="text-xs text-[#6B5B55] leading-relaxed">{desc}</div>
                   </div>
                 </div>
               ))}
@@ -192,14 +192,14 @@ export default async function AmbassadorsPage() {
       </section>
 
       {/* CTA */}
-      <section className="bg-[#FAF8F5] dark:bg-[#1A0A0A] border-t border-[#F2EDE8] dark:border-[#2A1A1A] py-24 px-4">
+      <section className="bg-[#FAF8F5] border-t border-[#F2EDE8] py-24 px-4">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-start md:items-end justify-between gap-10">
           <div>
             <p className="section-label text-[#9B8B85] mb-4">{t('getStartedLabel')}</p>
-            <h2 className="text-4xl font-extrabold uppercase tracking-[-0.02em] text-[#1A0A0A] dark:text-[#F5F0ED] mb-4 max-w-sm">
+            <h2 className="text-4xl font-extrabold uppercase tracking-[-0.02em] text-[#1A0A0A] mb-4 max-w-sm">
               {t('readyHeading')}
             </h2>
-            <p className="text-[#6B5B55] dark:text-[#9B8B85] text-sm max-w-md leading-relaxed">
+            <p className="text-[#6B5B55] text-sm max-w-md leading-relaxed">
               {t('readyDesc')}
             </p>
           </div>
@@ -212,7 +212,7 @@ export default async function AmbassadorsPage() {
             >
               {t('applyNowViaWarp')} <ArrowRight size={16} />
             </a>
-            <Link href="/dashboard/merchant/affiliates" className="text-xs text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors underline underline-offset-2">
+            <Link href="/dashboard/merchant/affiliates" className="text-xs text-[#9B8B85] hover:text-[#1A0A0A] transition-colors underline underline-offset-2">
               {t('alreadyAmbassador')}
             </Link>
           </div>

@@ -142,19 +142,19 @@ export default function AdminSupportPage() {
             <option key={c} value={c}>{SUPPORT_CASE_CATEGORY_LABELS[c]}</option>
           ))}
         </select>
-        <label className="flex items-center gap-1.5 text-xs text-[#6B5B55] dark:text-[#9B8B85]">
+        <label className="flex items-center gap-1.5 text-xs text-[#6B5B55]">
           <input type="checkbox" checked={unassignedOnly} onChange={(e) => setUnassignedOnly(e.target.checked)} />
           Unassigned only
         </label>
       </div>
 
-      <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+      <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
                 {['Case', 'Title', 'Category', 'Customer/Merchant', 'Priority', 'Status', 'Assigned', 'Updated', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A] whitespace-nowrap">
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -169,15 +169,15 @@ export default function AdminSupportPage() {
                 <tr><td colSpan={9} className="px-4 py-16 text-center text-sm text-[#9B8B85]">No support cases match your filters.</td></tr>
               ) : (
                 cases.map((c) => (
-                  <tr key={c.id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors last:border-0">
-                    <td className="px-4 py-3 text-sm font-mono text-xs text-[#1A0A0A] dark:text-[#F5F0ED] whitespace-nowrap">{c.caseNumber}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] max-w-xs truncate">{c.title}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{SUPPORT_CASE_CATEGORY_LABELS[c.category as keyof typeof SUPPORT_CASE_CATEGORY_LABELS] ?? c.category}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{c.customerName ?? c.merchantName ?? '—'}</td>
+                  <tr key={c.id} className="border-b border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors last:border-0">
+                    <td className="px-4 py-3 text-sm font-mono text-xs text-[#1A0A0A] whitespace-nowrap">{c.caseNumber}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] max-w-xs truncate">{c.title}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{SUPPORT_CASE_CATEGORY_LABELS[c.category as keyof typeof SUPPORT_CASE_CATEGORY_LABELS] ?? c.category}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">{c.customerName ?? c.merchantName ?? '—'}</td>
                     <td className="px-4 py-3"><Pill value={c.priority} styles={PRIORITY_STYLES} /></td>
                     <td className="px-4 py-3"><Pill value={c.status} styles={STATUS_STYLES} /></td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{c.assignedAdminName ?? 'Unassigned'}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{formatDateTime(c.updatedAt)}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">{c.assignedAdminName ?? 'Unassigned'}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{formatDateTime(c.updatedAt)}</td>
                     <td className="px-4 py-3">
                       <Link href={`/admin/support/${c.id}`} className={secondaryButtonClass}>Open</Link>
                     </td>

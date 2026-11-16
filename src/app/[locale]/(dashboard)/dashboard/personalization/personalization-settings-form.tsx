@@ -92,19 +92,19 @@ export function PersonalizationSettingsForm() {
   }
 
   if (loading) return <p className="text-sm text-[#9B8B85]">…</p>
-  if (!settings) return <p className="text-sm text-red-600 dark:text-red-400">{error ?? t('errors.couldNotLoad')}</p>
+  if (!settings) return <p className="text-sm text-red-600">{error ?? t('errors.couldNotLoad')}</p>
 
   return (
     <div className="space-y-8">
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="flex items-center justify-between p-4 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A]">
-        <span className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('enabledLabel')}</span>
+      <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-[#F2EDE8]">
+        <span className="text-sm font-semibold text-[#1A0A0A]">{t('enabledLabel')}</span>
         <button
           type="button"
           onClick={() => save({ ...settings, personalizationEnabled: !settings.personalizationEnabled })}
           className={`px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-[0.08em] transition-colors ${
-            settings.personalizationEnabled ? 'bg-[#8B1A1A] text-white' : 'bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]'
+            settings.personalizationEnabled ? 'bg-[#8B1A1A] text-white' : 'bg-[#F2EDE8] text-[#6B5B55]'
           }`}
         >
           {settings.personalizationEnabled ? t('enabledOn') : t('enabledOff')}
@@ -113,10 +113,10 @@ export function PersonalizationSettingsForm() {
       {!settings.personalizationEnabled && <p className="text-xs text-[#9B8B85]">{t('disabledNotice')}</p>}
 
       <div>
-        <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-[#1A0A0A] dark:text-[#F5F0ED] mb-4">{t('interestsHeading')}</h2>
+        <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-[#1A0A0A] mb-4">{t('interestsHeading')}</h2>
 
         <div className="mb-5">
-          <p className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-2">{t('modesLabel')}</p>
+          <p className="text-xs font-medium text-[#6B5B55] mb-2">{t('modesLabel')}</p>
           <div className="flex flex-wrap gap-2">
             {MODES.map((mode) => (
               <button
@@ -126,7 +126,7 @@ export function PersonalizationSettingsForm() {
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                   settings.preferredModes.includes(mode)
                     ? 'bg-[#8B1A1A] text-white'
-                    : 'bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]'
+                    : 'bg-[#F2EDE8] text-[#6B5B55]'
                 }`}
               >
                 {mode === 'buy' ? t('modeBuy') : mode === 'rent' ? t('modeRent') : t('modeBarter')}
@@ -136,7 +136,7 @@ export function PersonalizationSettingsForm() {
         </div>
 
         <div className="mb-5">
-          <p className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-2">{t('categoriesLabel')}</p>
+          <p className="text-xs font-medium text-[#6B5B55] mb-2">{t('categoriesLabel')}</p>
           <div className="flex flex-wrap gap-2">
             {CATEGORIES.map((category) => (
               <button
@@ -146,7 +146,7 @@ export function PersonalizationSettingsForm() {
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                   settings.preferredCategories.includes(category.id)
                     ? 'bg-[#8B1A1A] text-white'
-                    : 'bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]'
+                    : 'bg-[#F2EDE8] text-[#6B5B55]'
                 }`}
               >
                 {tCategories(category.id)}
@@ -156,7 +156,7 @@ export function PersonalizationSettingsForm() {
         </div>
 
         <div className="mb-5">
-          <p className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-2">{t('barterKindsLabel')}</p>
+          <p className="text-xs font-medium text-[#6B5B55] mb-2">{t('barterKindsLabel')}</p>
           <div className="flex flex-wrap gap-2">
             {KINDS.map((kind) => (
               <button
@@ -166,7 +166,7 @@ export function PersonalizationSettingsForm() {
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                   settings.preferredBarterKinds.includes(kind)
                     ? 'bg-[#8B1A1A] text-white'
-                    : 'bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]'
+                    : 'bg-[#F2EDE8] text-[#6B5B55]'
                 }`}
               >
                 {kind === 'item' ? t('kindItem') : kind === 'skill' ? t('kindSkill') : t('kindTask')}
@@ -175,7 +175,7 @@ export function PersonalizationSettingsForm() {
           </div>
         </div>
 
-        <label className="flex items-center gap-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] mb-2">
+        <label className="flex items-center gap-2.5 text-sm text-[#1A0A0A] mb-2">
           <input
             type="checkbox"
             checked={settings.interestedLookingFor}
@@ -183,54 +183,54 @@ export function PersonalizationSettingsForm() {
           />
           {t('lookingForLabel')}
         </label>
-        <label className="flex items-center gap-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+        <label className="flex items-center gap-2.5 text-sm text-[#1A0A0A]">
           <input type="checkbox" checked={settings.interestedRtb} onChange={(e) => save({ ...settings, interestedRtb: e.target.checked })} />
           {t('rtbLabel')}
         </label>
       </div>
 
       <div>
-        <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-[#1A0A0A] dark:text-[#F5F0ED] mb-4">{t('locationHeading')}</h2>
+        <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-[#1A0A0A] mb-4">{t('locationHeading')}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1.5">{t('provinceLabel')}</label>
+            <label className="block text-xs font-medium text-[#6B5B55] mb-1.5">{t('provinceLabel')}</label>
             <input
               defaultValue={settings.preferredProvince ?? ''}
               placeholder={t('provincePlaceholder')}
               onBlur={(e) => save({ ...settings, preferredProvince: e.target.value || null })}
-              className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] text-sm"
+              className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] bg-white text-[#1A0A0A] text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1.5">{t('cityLabel')}</label>
+            <label className="block text-xs font-medium text-[#6B5B55] mb-1.5">{t('cityLabel')}</label>
             <input
               defaultValue={settings.preferredCity ?? ''}
               placeholder={t('cityPlaceholder')}
               onBlur={(e) => save({ ...settings, preferredCity: e.target.value || null })}
-              className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] text-sm"
+              className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] bg-white text-[#1A0A0A] text-sm"
             />
           </div>
         </div>
       </div>
 
       {saving && <p className="text-xs text-[#9B8B85]">{t('saving')}</p>}
-      {!saving && savedAt && <p className="text-xs text-green-700 dark:text-green-400">{t('saved')}</p>}
+      {!saving && savedAt && <p className="text-xs text-green-700">{t('saved')}</p>}
 
-      <div className="pt-6 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
-        <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-[#1A0A0A] dark:text-[#F5F0ED] mb-2">{t('activityHeading')}</h2>
+      <div className="pt-6 border-t border-[#F2EDE8]">
+        <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-[#1A0A0A] mb-2">{t('activityHeading')}</h2>
         <p className="text-xs text-[#9B8B85] mb-3">{t('clearHistoryDesc')}</p>
 
         {!confirmingClear ? (
           <button
             type="button"
             onClick={() => setConfirmingClear(true)}
-            className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] border border-[#E8E0D8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors"
+            className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] border border-[#E8E0D8] text-[#6B5B55] hover:bg-[#F2EDE8] transition-colors"
           >
             {t('clearHistoryButton')}
           </button>
         ) : (
-          <div className="p-4 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A]">
-            <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] mb-1">{t('clearHistoryConfirmTitle')}</p>
+          <div className="p-4 rounded-lg border border-[#E8E0D8]">
+            <p className="text-sm font-semibold text-[#1A0A0A] mb-1">{t('clearHistoryConfirmTitle')}</p>
             <p className="text-xs text-[#9B8B85] mb-3">{t('clearHistoryConfirmDesc')}</p>
             <div className="flex gap-2">
               <button
@@ -244,14 +244,14 @@ export function PersonalizationSettingsForm() {
               <button
                 type="button"
                 onClick={() => setConfirmingClear(false)}
-                className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors"
+                className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] text-[#6B5B55] hover:bg-[#F2EDE8] transition-colors"
               >
                 {t('cancelButton')}
               </button>
             </div>
           </div>
         )}
-        {clearedMessage && <p className="text-xs text-green-700 dark:text-green-400 mt-2">{t('clearHistorySuccess')}</p>}
+        {clearedMessage && <p className="text-xs text-green-700 mt-2">{t('clearHistorySuccess')}</p>}
       </div>
     </div>
   )

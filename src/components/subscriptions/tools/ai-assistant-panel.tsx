@@ -58,7 +58,7 @@ export function AiAssistantPanel({ entitlements }: { entitlements: MerchantEntit
   }
 
   return (
-    <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-6">
+    <div className="bg-white border border-[#F2EDE8] rounded-xl p-6">
       {entitlements.listingAssistantEnabled && entitlements.analyticsAssistantEnabled && (
         <div className="flex gap-2 mb-4">
           <button onClick={() => setMode('listing')} className={`text-xs uppercase px-3 py-1.5 rounded-lg ${mode === 'listing' ? 'bg-[#8B1A1A] text-white' : 'text-[#9B8B85]'}`}>
@@ -73,7 +73,7 @@ export function AiAssistantPanel({ entitlements }: { entitlements: MerchantEntit
       {mode === 'listing' && entitlements.listingAssistantEnabled && (
         <div>
           <p className="text-xs text-[#9B8B85] mb-3">{t('listingIntro')}</p>
-          <textarea value={draftText} onChange={(e) => setDraftText(e.target.value)} placeholder={t('listingPlaceholder')} className="w-full px-3 py-2 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] bg-transparent text-sm min-h-[100px] mb-3" />
+          <textarea value={draftText} onChange={(e) => setDraftText(e.target.value)} placeholder={t('listingPlaceholder')} className="w-full px-3 py-2 rounded-lg border border-[#F2EDE8] bg-transparent text-sm min-h-[100px] mb-3" />
           <button onClick={askListing} disabled={loading || !draftText.trim()} className="px-5 py-2.5 rounded-xl font-semibold uppercase text-xs tracking-[0.1em] bg-[#8B1A1A] text-white hover:bg-[#7A1616] disabled:opacity-50 transition-colors">
             {loading ? t('working') : t('askAction')}
           </button>
@@ -83,18 +83,18 @@ export function AiAssistantPanel({ entitlements }: { entitlements: MerchantEntit
       {mode === 'analytics' && entitlements.analyticsAssistantEnabled && (
         <div>
           <p className="text-xs text-[#9B8B85] mb-3">{t('analyticsIntro')}</p>
-          <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={t('analyticsPlaceholder')} className="w-full px-3 py-2 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] bg-transparent text-sm mb-3" />
+          <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={t('analyticsPlaceholder')} className="w-full px-3 py-2 rounded-lg border border-[#F2EDE8] bg-transparent text-sm mb-3" />
           <button onClick={askAnalytics} disabled={loading || !question.trim()} className="px-5 py-2.5 rounded-xl font-semibold uppercase text-xs tracking-[0.1em] bg-[#8B1A1A] text-white hover:bg-[#7A1616] disabled:opacity-50 transition-colors">
             {loading ? t('working') : t('askAction')}
           </button>
         </div>
       )}
 
-      {error && <p className="text-xs text-red-600 dark:text-red-400 mt-3">{error}</p>}
+      {error && <p className="text-xs text-red-600 mt-3">{error}</p>}
       {response && (
-        <div className="mt-4 p-4 rounded-lg bg-[#F2EDE8] dark:bg-[#2A1A1A]">
+        <div className="mt-4 p-4 rounded-lg bg-[#F2EDE8]">
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#9B8B85] mb-2">{t('suggestionLabel')}</p>
-          <p className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED] whitespace-pre-wrap">{response}</p>
+          <p className="text-sm text-[#1A0A0A] whitespace-pre-wrap">{response}</p>
         </div>
       )}
     </div>

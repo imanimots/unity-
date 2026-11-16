@@ -52,7 +52,7 @@ export function ReportSkillTaskPostDialog({ postId }: { postId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center justify-center gap-2 px-4 py-2.5 border border-[#E8E0D8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] font-medium rounded-xl text-sm hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors"
+        className="flex items-center justify-center gap-2 px-4 py-2.5 border border-[#E8E0D8] text-[#6B5B55] font-medium rounded-xl text-sm hover:bg-[#F2EDE8] transition-colors"
       >
         <Flag size={14} /> Report
       </button>
@@ -65,11 +65,11 @@ export function ReportSkillTaskPostDialog({ postId }: { postId: string }) {
           </DialogHeader>
 
           {submitted ? (
-            <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] py-4">Thanks — your report has been submitted.</p>
+            <p className="text-sm text-[#6B5B55] py-4">Thanks — your report has been submitted.</p>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label htmlFor="post-report-reason" className="block text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] mb-1.5">
+                <label htmlFor="post-report-reason" className="block text-sm font-medium text-[#1A0A0A] mb-1.5">
                   Reason
                 </label>
                 <select
@@ -77,7 +77,7 @@ export function ReportSkillTaskPostDialog({ postId }: { postId: string }) {
                   required
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30"
+                  className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] bg-white text-[#1A0A0A] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30"
                 >
                   <option value="" disabled>Choose a reason</option>
                   {REASONS.map((r) => (
@@ -87,7 +87,7 @@ export function ReportSkillTaskPostDialog({ postId }: { postId: string }) {
               </div>
 
               <div>
-                <label htmlFor="post-report-description" className="block text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] mb-1.5">
+                <label htmlFor="post-report-description" className="block text-sm font-medium text-[#1A0A0A] mb-1.5">
                   Additional details (optional)
                 </label>
                 <textarea
@@ -96,11 +96,11 @@ export function ReportSkillTaskPostDialog({ postId }: { postId: string }) {
                   maxLength={1000}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30"
+                  className="w-full px-3 py-2.5 rounded-lg border border-[#E8E0D8] bg-white text-[#1A0A0A] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30"
                 />
               </div>
 
-              {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+              {error && <p className="text-sm text-red-600">{error}</p>}
 
               <button
                 type="submit"

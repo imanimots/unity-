@@ -69,13 +69,13 @@ export function LanguageSelector() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-[#6B5B55] hover:bg-[#F2EDE8] transition-colors"
         aria-label={t('language')}
         aria-expanded={open}
         aria-haspopup="listbox"
       >
         <Languages size={15} />
-        <span className="hidden sm:inline font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">
+        <span className="hidden sm:inline font-medium text-[#1A0A0A]">
           {LOCALE_DISPLAY_NAMES[locale]}
         </span>
         <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -84,7 +84,7 @@ export function LanguageSelector() {
       {open && (
         <div
           role="listbox"
-          className="absolute right-0 top-full mt-1.5 w-44 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] shadow-lg overflow-hidden z-50"
+          className="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-xl border border-[#F2EDE8] shadow-lg overflow-hidden z-50"
         >
           {LOCALES.map((l) => (
             <button
@@ -92,7 +92,7 @@ export function LanguageSelector() {
               role="option"
               aria-selected={locale === l}
               onClick={() => select(l)}
-              className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors text-left"
+              className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors text-left"
             >
               <span className="flex-1">{LOCALE_DISPLAY_NAMES[l]}</span>
               {locale === l && <Check size={14} className="text-[#8B1A1A]" />}

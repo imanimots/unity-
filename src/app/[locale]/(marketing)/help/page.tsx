@@ -30,12 +30,12 @@ export default async function HelpCenterPage() {
   const scoped = { help: { helpCenterPage: messages.help.helpCenterPage } }
 
   return (
-    <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen">
-      <section className="pt-24 pb-10 border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
+    <div className="bg-[#FAF8F5] min-h-screen">
+      <section className="pt-24 pb-10 border-b border-[#F2EDE8]">
         <div className="max-w-5xl mx-auto px-6 lg:px-12">
           <p className="section-label mb-4 text-[#9B8B85]">{t('eyebrow')}</p>
-          <h1 className="text-3xl sm:text-4xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight mb-4">{t('heading')}</h1>
-          <p className="text-[#6B5B55] dark:text-[#9B8B85] max-w-2xl">
+          <h1 className="text-3xl sm:text-4xl font-extrabold uppercase text-[#1A0A0A] tracking-tight mb-4">{t('heading')}</h1>
+          <p className="text-[#6B5B55] max-w-2xl">
             {t('introBeforeLink')} <Link href="/sitemap" className="text-[#8B1A1A] underline">{t('sitemapLinkText')}</Link>{t('introAfterLink')}
           </p>
         </div>

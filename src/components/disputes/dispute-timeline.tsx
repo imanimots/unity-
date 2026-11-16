@@ -49,7 +49,7 @@ export function DisputeTimeline({ history, labels }: { history: DisputeHistoryEn
           <li key={entry.id} className="flex gap-3">
             <div className="w-1.5 h-1.5 rounded-full bg-[#8B1A1A] mt-2 shrink-0" />
             <div>
-              <p className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">
+              <p className="text-sm font-medium text-[#1A0A0A]">
                 {labels?.events[entry.event_type] ?? EVENT_LABELS[entry.event_type] ?? entry.event_type}
               </p>
               <p className="text-xs text-[#9B8B85]">

@@ -119,10 +119,10 @@ export default function AdminPayoutsPage() {
             <option key={key} value={key}>{label}</option>
           ))}
         </select>
-        <label className="flex items-center gap-2 text-xs text-[#6B5B55] dark:text-[#9B8B85]">
+        <label className="flex items-center gap-2 text-xs text-[#6B5B55]">
           <input type="checkbox" checked={overdueOnly} onChange={(e) => setOverdueOnly(e.target.checked)} /> Overdue only
         </label>
-        <label className="flex items-center gap-2 text-xs text-[#6B5B55] dark:text-[#9B8B85]">
+        <label className="flex items-center gap-2 text-xs text-[#6B5B55]">
           <input type="checkbox" checked={disputeRelated} onChange={(e) => setDisputeRelated(e.target.checked)} /> Dispute-related
         </label>
         <a
@@ -133,13 +133,13 @@ export default function AdminPayoutsPage() {
         </a>
       </div>
 
-      <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+      <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
                 {['Merchant', 'Listing', 'Booking', 'Amount', 'Status', 'Attempts', 'Created', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A] whitespace-nowrap">
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -154,24 +154,24 @@ export default function AdminPayoutsPage() {
                 <tr><td colSpan={8} className="px-4 py-16 text-center text-sm text-[#9B8B85]">No payouts match your filters.</td></tr>
               ) : (
                 visiblePayouts.map((p) => (
-                  <tr key={p.id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors last:border-0">
-                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">
+                  <tr key={p.id} className="border-b border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors last:border-0">
+                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A]">
                       <Link href={`/admin/merchants/${p.merchantId}`} className="text-[#8B1A1A] underline">{p.merchantName ?? '—'}</Link>
                       {p.merchantRestricted && <span className="ml-2 text-[10px] uppercase text-red-600">Restricted</span>}
                     </td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{p.listingTitle ?? '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">{p.listingTitle ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">
                       {p.bookingReference ?? '—'}
                       {p.hasUnresolvedDispute && <span className="ml-2 text-[10px] uppercase text-red-600">Disputed</span>}
                     </td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55] dark:text-[#9B8B85]">{formatMoney(p.amount, p.currency)}</td>
+                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55]">{formatMoney(p.amount, p.currency)}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${PAYOUT_STATUS_LABELS[p.status]?.classes ?? ''}`}>
                         {PAYOUT_STATUS_LABELS[p.status]?.label ?? p.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{p.attemptCount}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{formatDate(p.createdAt)}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">{p.attemptCount}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{formatDate(p.createdAt)}</td>
                     <td className="px-4 py-3">
                       <Link href={`/admin/payouts/${p.id}`} className={secondaryButtonClass}>Inspect</Link>
                     </td>

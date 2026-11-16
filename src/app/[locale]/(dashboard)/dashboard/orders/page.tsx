@@ -58,7 +58,7 @@ export default async function MyPurchasesPage() {
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="mb-12">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{t('buying')}</p>
-        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight">{t('myPurchases')}</h1>
+        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] tracking-tight">{t('myPurchases')}</h1>
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mt-3">
           {t('orderCount', { count: orders.length })}
         </p>
@@ -67,10 +67,10 @@ export default async function MyPurchasesPage() {
       <TestModeBanner className="mb-8" text={tCommon('testMode')} />
 
       {orders.length === 0 ? (
-        <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-16 text-center">
+        <div className="bg-white rounded-xl border border-[#F2EDE8] p-16 text-center">
           <Package size={36} className="mx-auto text-[#9B8B85] mb-4" />
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{t('noPurchases')}</p>
-          <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-6">{t('noPurchasesDesc')}</p>
+          <p className="text-sm text-[#6B5B55] mb-6">{t('noPurchasesDesc')}</p>
           <Link href="/listings?mode=buy" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#8B1A1A] text-white font-semibold uppercase text-xs tracking-[0.1em] rounded-xl hover:bg-[#7A1616] transition-colors">
             {t('browseForSale')}
           </Link>
@@ -78,9 +78,9 @@ export default async function MyPurchasesPage() {
       ) : (
         <div className="space-y-4">
           {orders.map((order) => (
-            <div key={order.id} className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-5">
+            <div key={order.id} className="bg-white rounded-xl border border-[#F2EDE8] p-5">
               <div className="flex items-start justify-between gap-2 flex-wrap mb-2">
-                <Link href={`/listings/${order.listing_id}`} className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] hover:underline">
+                <Link href={`/listings/${order.listing_id}`} className="text-sm font-semibold text-[#1A0A0A] hover:underline">
                   {t('order')} {order.order_reference} — {titleById.get(order.listing_id) ?? 'Listing'}
                 </Link>
                 <OrderStatusBadge status={order.status} />
@@ -88,7 +88,7 @@ export default async function MyPurchasesPage() {
               <p className="text-xs text-[#9B8B85] flex items-center gap-1.5">
                 <Clock size={11} /> {t('placed', { date: fmt(order.created_at) })}
               </p>
-              <p className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mt-0.5">
+              <p className="text-xs font-medium text-[#6B5B55] mt-0.5">
                 {t('unitTotal', { quantity: order.quantity, unitPrice: `R${order.unit_price}`, total: `R${order.total_amount}` })}
               </p>
 

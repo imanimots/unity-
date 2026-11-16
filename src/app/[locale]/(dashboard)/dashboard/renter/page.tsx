@@ -38,7 +38,7 @@ export default async function RenterDashboard() {
       {/* Page heading */}
       <div className="mb-12">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{tCommon('dashboard.welcomeBack', { name: displayName })}</p>
-        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight">
+        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] tracking-tight">
           {tCommon('dashboard.yourDashboard')}
         </h1>
       </div>
@@ -46,27 +46,27 @@ export default async function RenterDashboard() {
       {/* Stats strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-12">
         {/* Unity Score */}
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{tCommon('dashboard.unityScore')}</p>
-          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">
+          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] leading-none">
             {profile?.unity_score?.toFixed(1) ?? '5.0'}
           </div>
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mt-2">{tCommon('dashboard.outOfFive')}</p>
         </div>
 
         {/* Active bookings */}
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{tCommon('dashboard.active')}</p>
-          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">
+          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] leading-none">
             {activeBookings.length}
           </div>
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mt-2">{tCommon('dashboard.rentalsLabel')}</p>
         </div>
 
         {/* Total bookings */}
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{tCommon('dashboard.total')}</p>
-          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">
+          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] leading-none">
             {myBookings.length}
           </div>
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mt-2">{tCommon('dashboard.bookingsLabel')}</p>
@@ -75,8 +75,8 @@ export default async function RenterDashboard() {
         {/* KYC status */}
         <div className={`rounded-xl p-5 ${
           profile?.kyc_status === 'approved'
-            ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-            : 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800'
+            ? 'bg-green-50 border border-green-200'
+            : 'bg-amber-50 border border-amber-200'
         }`}>
           <div className="flex items-center justify-between mb-3">
             <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">{tCommon('dashboard.identity')}</p>
@@ -84,13 +84,13 @@ export default async function RenterDashboard() {
           </div>
           {profile?.kyc_status === 'approved' ? (
             <>
-              <div className="text-4xl lg:text-5xl font-extrabold text-green-700 dark:text-green-400 leading-none">✓</div>
+              <div className="text-4xl lg:text-5xl font-extrabold text-green-700 leading-none">✓</div>
               <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mt-2">{tCommon('verified')}</p>
             </>
           ) : (
             <>
-              <div className="text-lg font-extrabold text-amber-700 dark:text-amber-400 leading-none mt-1">{tCommon('unverified')}</div>
-              <Link href="/verify" className="text-[11px] font-medium uppercase tracking-[0.15em] text-amber-600 dark:text-amber-500 underline hover:no-underline mt-2 block">
+              <div className="text-lg font-extrabold text-amber-700 leading-none mt-1">{tCommon('unverified')}</div>
+              <Link href="/verify" className="text-[11px] font-medium uppercase tracking-[0.15em] text-amber-600 underline hover:no-underline mt-2 block">
                 {tCommon('dashboard.completeKyc')}
               </Link>
             </>
@@ -103,31 +103,31 @@ export default async function RenterDashboard() {
         <div className="flex items-end justify-between mb-5">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-1">{tCommon('dashboard.yourBookingsLabel')}</p>
-            <h2 className="text-lg font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight">{tCommon('dashboard.activeApprovedHeading')}</h2>
+            <h2 className="text-lg font-extrabold uppercase text-[#1A0A0A] tracking-tight">{tCommon('dashboard.activeApprovedHeading')}</h2>
           </div>
-          <Link href="/dashboard/renter/bookings" className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] flex items-center gap-1.5 transition-colors">
+          <Link href="/dashboard/renter/bookings" className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] hover:text-[#1A0A0A] flex items-center gap-1.5 transition-colors">
             {tCommon('dashboard.viewAll')}
           </Link>
         </div>
 
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl">
           {activeBookings.length === 0 ? (
             <div className="text-center py-16 px-8">
               <Package size={36} className="mx-auto text-[#9B8B85] mb-4" />
               <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{tCommon('dashboard.emptyActiveTitle')}</p>
-              <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-6">{tCommon('dashboard.emptyActiveDesc')}</p>
+              <p className="text-sm text-[#6B5B55] mb-6">{tCommon('dashboard.emptyActiveDesc')}</p>
               <Link href="/listings" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#8B1A1A] text-white font-semibold uppercase text-xs tracking-[0.1em] rounded-xl hover:bg-[#7A1616] transition-colors">
                 {tCommon('dashboard.browseItemsCta')} <ArrowRight size={14} />
               </Link>
             </div>
           ) : (
-            <div className="divide-y divide-[#F2EDE8] dark:divide-[#2A1A1A]">
+            <div className="divide-y divide-[#F2EDE8]">
               {activeBookings.map((b) => {
                 const cover = b.listing?.media?.[0]?.url
                 const needsMedia = (b.status === 'approved' && !b.pre_rental_media_url) || (b.status === 'active' && !b.post_rental_media_url)
                 return (
                   <div key={b.id} className="flex items-center gap-4 px-5 py-4">
-                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-[#F2EDE8] dark:bg-[#2A1A1A] shrink-0">
+                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-[#F2EDE8] shrink-0">
                       {cover ? (
                         <Image src={cover} alt={b.listing.title} width={48} height={48} className="w-full h-full object-cover" />
                       ) : (
@@ -135,7 +135,7 @@ export default async function RenterDashboard() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] truncate mb-1">{b.listing.title}</p>
+                      <p className="text-sm font-semibold text-[#1A0A0A] truncate mb-1">{b.listing.title}</p>
                       <div className="flex items-center gap-1.5">
                         <div className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[b.status]}`} />
                         <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85]">{STATUS_LABEL[b.status]}</span>
@@ -146,7 +146,7 @@ export default async function RenterDashboard() {
                         <Camera size={11} /> {tCommon('dashboard.uploadCta')}
                       </Link>
                     )}
-                    <Link href="/dashboard/renter/bookings" className="shrink-0 text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+                    <Link href="/dashboard/renter/bookings" className="shrink-0 text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
                       <ArrowRight size={16} />
                     </Link>
                   </div>
@@ -177,12 +177,12 @@ export default async function RenterDashboard() {
             { href: '/chat', icon: MessageCircle, label: tCommon('dashboard.messages'), desc: tCommon('dashboard.quickActionDescMessages') },
           ].map(({ href, icon: Icon, label, desc }) => (
             <Link key={href} href={href}
-              className="flex flex-col items-center gap-3 p-5 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors text-center group">
-              <div className="w-10 h-10 rounded-xl bg-[#F2EDE8] dark:bg-[#2A1A1A] flex items-center justify-center">
+              className="flex flex-col items-center gap-3 p-5 bg-white rounded-xl border border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors text-center group">
+              <div className="w-10 h-10 rounded-xl bg-[#F2EDE8] flex items-center justify-center">
                 <Icon size={18} className="text-[#8B1A1A]" />
               </div>
               <div>
-                <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#1A0A0A] dark:text-[#F5F0ED]">{label}</div>
+                <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#1A0A0A]">{label}</div>
                 <div className="text-xs text-[#9B8B85] mt-0.5 hidden sm:block">{desc}</div>
               </div>
             </Link>

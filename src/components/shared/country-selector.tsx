@@ -68,23 +68,23 @@ export function CountrySelector() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-[#6B5B55] hover:bg-[#F2EDE8] transition-colors"
         aria-label="Select country"
         aria-expanded={open}
         aria-haspopup="listbox"
       >
         <span className="text-base leading-none">{selected.flag}</span>
-        <span className="hidden sm:inline font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{selected.id}</span>
+        <span className="hidden sm:inline font-medium text-[#1A0A0A]">{selected.id}</span>
         <ChevronDown
           size={14}
-          className={`text-[#6B5B55] dark:text-[#9B8B85] transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`text-[#6B5B55] transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </button>
 
       {open && (
         <div
           role="listbox"
-          className="absolute right-0 top-full mt-1.5 w-52 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] shadow-lg overflow-hidden z-50"
+          className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-xl border border-[#F2EDE8] shadow-lg overflow-hidden z-50"
         >
           {activeCountries.map((c) => (
             <button
@@ -92,7 +92,7 @@ export function CountrySelector() {
               role="option"
               aria-selected={selected.id === c.id}
               onClick={() => select(c)}
-              className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors text-left"
+              className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors text-left"
             >
               <span className="text-base">{c.flag}</span>
               <span className="flex-1">{c.name}</span>
@@ -102,7 +102,7 @@ export function CountrySelector() {
 
           {comingSoon.length > 0 && (
             <>
-              <div className="px-3 py-1.5 text-xs font-medium text-[#9B8B85] uppercase tracking-wide border-t border-[#F2EDE8] dark:border-[#2A1A1A] mt-0.5 pt-2">
+              <div className="px-3 py-1.5 text-xs font-medium text-[#9B8B85] uppercase tracking-wide border-t border-[#F2EDE8] mt-0.5 pt-2">
                 Coming soon
               </div>
               {comingSoon.map((c) => (

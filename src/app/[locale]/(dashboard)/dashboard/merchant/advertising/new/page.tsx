@@ -117,12 +117,12 @@ export default function NewAdCampaignPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-10">
-      <Link href="/dashboard/merchant/advertising" className="inline-flex items-center gap-1.5 text-sm text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#8B1A1A] mb-6">
+      <Link href="/dashboard/merchant/advertising" className="inline-flex items-center gap-1.5 text-sm text-[#6B5B55] hover:text-[#8B1A1A] mb-6">
         <ArrowLeft size={14} /> {t('backToAdvertising')}
       </Link>
 
-      <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] mb-2">{t('heading')}</h1>
-      <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-8">
+      <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] mb-2">{t('heading')}</h1>
+      <p className="text-sm text-[#6B5B55] mb-8">
         {t('description')}
       </p>
 
@@ -143,11 +143,11 @@ export default function NewAdCampaignPage() {
       ) : (
         <div className="space-y-6">
           <div>
-            <label className="block text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] mb-2">{t('listingLabel')}</label>
+            <label className="block text-sm font-semibold text-[#1A0A0A] mb-2">{t('listingLabel')}</label>
             <select
               value={listingId}
               onChange={(e) => setListingId(e.target.value)}
-              className="w-full rounded-xl border border-[#E8E0D8] dark:border-[#2A1A1A] bg-transparent px-4 py-2.5 text-sm"
+              className="w-full rounded-xl border border-[#E8E0D8] bg-transparent px-4 py-2.5 text-sm"
             >
               <option value="">{t('selectListingPlaceholder')}</option>
               {listings.map((l) => (
@@ -157,7 +157,7 @@ export default function NewAdCampaignPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] mb-2">{t('packageLabel')}</label>
+            <label className="block text-sm font-semibold text-[#1A0A0A] mb-2">{t('packageLabel')}</label>
             <div className="space-y-2">
               {packages.filter((p) => p.inventory_class === 'unity_marketplace').map((p) => (
                 <button
@@ -165,12 +165,12 @@ export default function NewAdCampaignPage() {
                   type="button"
                   onClick={() => setPackageId(p.id)}
                   className={`w-full text-left rounded-xl border px-4 py-3 transition-colors ${
-                    packageId === p.id ? 'border-[#8B1A1A] bg-[#8B1A1A]/5' : 'border-[#E8E0D8] dark:border-[#2A1A1A]'
+                    packageId === p.id ? 'border-[#8B1A1A] bg-[#8B1A1A]/5' : 'border-[#E8E0D8]'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{p.name}</p>
+                      <p className="text-sm font-semibold text-[#1A0A0A]">{p.name}</p>
                       <p className="text-xs text-[#9B8B85] mt-0.5">
                         {PLACEMENT_LABEL[p.placement_type] ?? p.placement_type} · {p.placement_tier} {t('tierSuffix')} · {p.impression_quota.toLocaleString(locale)} {t('impressionsSuffix')}
                       </p>
@@ -191,13 +191,13 @@ export default function NewAdCampaignPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] mb-2">{t('endDateLabel')}</label>
+            <label className="block text-sm font-semibold text-[#1A0A0A] mb-2">{t('endDateLabel')}</label>
             <input
               type="date"
               value={endAt}
               min={tomorrow}
               onChange={(e) => setEndAt(e.target.value)}
-              className="w-full rounded-xl border border-[#E8E0D8] dark:border-[#2A1A1A] bg-transparent px-4 py-2.5 text-sm"
+              className="w-full rounded-xl border border-[#E8E0D8] bg-transparent px-4 py-2.5 text-sm"
             />
           </div>
 

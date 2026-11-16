@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { Plus_Jakarta_Sans } from 'next/font/google'
-import { ThemeProvider } from 'next-themes'
 import { Toaster } from 'sonner'
 import { requireAdmin } from '@/lib/supabase/require-admin'
 import { AdminShell } from './admin-shell'
@@ -38,12 +37,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!admin) redirect('/')
 
   return (
-    <html lang="en-ZA" suppressHydrationWarning className={`${plusJakarta.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-[#FAF8F5] dark:bg-[#0F0A0A] text-[#1A0A0A] dark:text-[#F5F0ED]">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <Toaster position="top-center" richColors />
-          <AdminShell>{children}</AdminShell>
-        </ThemeProvider>
+    <html lang="en-ZA" className={`${plusJakarta.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col bg-[#FAF8F5] text-[#1A0A0A]">
+        <Toaster position="top-center" richColors />
+        <AdminShell>{children}</AdminShell>
       </body>
     </html>
   )

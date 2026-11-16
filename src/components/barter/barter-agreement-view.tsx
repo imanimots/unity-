@@ -67,14 +67,14 @@ function ItemGrid({ items, emptyLabel }: { items: (BarterOfferItem & { listing?:
         <Link
           key={item.id}
           href={`/listings/${item.listing_id}`}
-          className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-2 hover:border-[#8B1A1A]/50 transition-colors"
+          className="rounded-xl border border-[#F2EDE8] p-2 hover:border-[#8B1A1A]/50 transition-colors"
         >
-          <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-[#F2EDE8] dark:bg-[#2A1A1A] mb-1.5">
+          <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-[#F2EDE8] mb-1.5">
             {item.listing?.media?.[0]?.url ? (
               <Image src={item.listing.media[0].url} alt={item.listing.title} fill className="object-cover" sizes="120px" />
             ) : null}
           </div>
-          <p className="text-xs font-medium text-[#1A0A0A] dark:text-[#F5F0ED] line-clamp-2">{item.listing?.title ?? 'Listing'}</p>
+          <p className="text-xs font-medium text-[#1A0A0A] line-clamp-2">{item.listing?.title ?? 'Listing'}</p>
         </Link>
       ))}
     </div>
@@ -87,8 +87,8 @@ function ContributionSummaryList({ items, skillLabel, taskLabel, contributionFal
   return (
     <div className="mt-2.5 space-y-1.5">
       {items.map((item) => (
-        <div key={item.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] text-xs">
-          <span className="text-[#1A0A0A] dark:text-[#F5F0ED] truncate">
+        <div key={item.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-[#F2EDE8] text-xs">
+          <span className="text-[#1A0A0A] truncate">
             <span className="font-bold uppercase text-[#8B1A1A] mr-1.5">{item.kind === 'skill' ? skillLabel : taskLabel}</span>
             {item.contribution_details?.title ?? contributionFallback}
           </span>
@@ -223,7 +223,7 @@ export function BarterAgreementView({
     <div className="space-y-8">
       <div>
         <div className="flex items-center gap-3 flex-wrap mb-2">
-          <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A]">
             {t('tradeReference', { reference: agreement.agreement_reference })}
           </h1>
           <BarterStatusBadge status={agreement.status} label={t(`status.${agreement.status}`)} />
@@ -271,19 +271,19 @@ export function BarterAgreementView({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {currentOffer.cash_adjustment_amount > 0 && (
-              <div className="flex justify-between items-center px-4 py-3 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm">
-                <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('cashAdjustment')}</span>
-                <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">R{currentOffer.cash_adjustment_amount}</span>
+              <div className="flex justify-between items-center px-4 py-3 bg-white rounded-xl border border-[#F2EDE8] text-sm">
+                <span className="text-[#6B5B55]">{t('cashAdjustment')}</span>
+                <span className="font-medium text-[#1A0A0A]">R{currentOffer.cash_adjustment_amount}</span>
               </div>
             )}
-            <div className="flex justify-between items-center px-4 py-3 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm">
-              <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('view.delivery')}</span>
-              <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{deliveryMethodLabels[currentOffer.delivery_method] ?? currentOffer.delivery_method}</span>
+            <div className="flex justify-between items-center px-4 py-3 bg-white rounded-xl border border-[#F2EDE8] text-sm">
+              <span className="text-[#6B5B55]">{t('view.delivery')}</span>
+              <span className="font-medium text-[#1A0A0A]">{deliveryMethodLabels[currentOffer.delivery_method] ?? currentOffer.delivery_method}</span>
             </div>
             {currentOffer.deposit_required && (
-              <div className="flex justify-between items-center px-4 py-3 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm">
-                <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('view.deposit')}</span>
-                <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">R{currentOffer.deposit_amount} ({currentOffer.deposit_payer})</span>
+              <div className="flex justify-between items-center px-4 py-3 bg-white rounded-xl border border-[#F2EDE8] text-sm">
+                <span className="text-[#6B5B55]">{t('view.deposit')}</span>
+                <span className="font-medium text-[#1A0A0A]">R{currentOffer.deposit_amount} ({currentOffer.deposit_payer})</span>
               </div>
             )}
           </div>
@@ -291,7 +291,7 @@ export function BarterAgreementView({
           {currentOffer.message && (
             <div>
               <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-2">{t('view.message')}</h2>
-              <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">{currentOffer.message}</p>
+              <p className="text-sm text-[#6B5B55]">{currentOffer.message}</p>
             </div>
           )}
         </>
@@ -300,7 +300,7 @@ export function BarterAgreementView({
       {confirmations.length > 0 && (
         <div>
           <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-2">{t('view.confirmations')}</h2>
-          <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">{t('view.confirmationsCount', { count: confirmations.length })}</p>
+          <p className="text-sm text-[#6B5B55]">{t('view.confirmationsCount', { count: confirmations.length })}</p>
         </div>
       )}
 

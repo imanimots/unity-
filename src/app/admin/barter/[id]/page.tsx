@@ -46,7 +46,7 @@ export default async function AdminBarterDetailPage({ params }: PageProps) {
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
-      <Link href="/admin/barter" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+      <Link href="/admin/barter" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
         <ArrowLeft size={13} /> Back to barter trades
       </Link>
 
@@ -56,24 +56,24 @@ export default async function AdminBarterDetailPage({ params }: PageProps) {
         <div className="flex items-center gap-3 flex-wrap">
           <BarterStatusBadge status={agreement.status} />
           {agreement.admin_hold && (
-            <span className="text-[10px] font-bold uppercase tracking-[0.06em] px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+            <span className="text-[10px] font-bold uppercase tracking-[0.06em] px-2 py-0.5 rounded-full bg-red-100 text-red-700">
               Held{agreement.admin_hold_reason ? `: ${agreement.admin_hold_reason}` : ''}
             </span>
           )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-          <div className="px-4 py-3 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A]">
+          <div className="px-4 py-3 bg-white rounded-xl border border-[#F2EDE8]">
             <span className="text-[#9B8B85] block text-xs uppercase tracking-[0.08em] mb-1">Party A</span>
-            <span className="text-[#1A0A0A] dark:text-[#F5F0ED]">{nameById.get(agreement.party_a_id) ?? '—'}</span>
+            <span className="text-[#1A0A0A]">{nameById.get(agreement.party_a_id) ?? '—'}</span>
           </div>
-          <div className="px-4 py-3 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A]">
+          <div className="px-4 py-3 bg-white rounded-xl border border-[#F2EDE8]">
             <span className="text-[#9B8B85] block text-xs uppercase tracking-[0.08em] mb-1">Party B</span>
-            <span className="text-[#1A0A0A] dark:text-[#F5F0ED]">{nameById.get(agreement.party_b_id) ?? '—'}</span>
+            <span className="text-[#1A0A0A]">{nameById.get(agreement.party_b_id) ?? '—'}</span>
           </div>
-          <div className="px-4 py-3 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] sm:col-span-2">
+          <div className="px-4 py-3 bg-white rounded-xl border border-[#F2EDE8] sm:col-span-2">
             <span className="text-[#9B8B85] block text-xs uppercase tracking-[0.08em] mb-1">{anchorLabel}</span>
-            <span className="text-[#1A0A0A] dark:text-[#F5F0ED]">{anchorTitle}</span>
+            <span className="text-[#1A0A0A]">{anchorTitle}</span>
           </div>
         </div>
 
@@ -90,7 +90,7 @@ export default async function AdminBarterDetailPage({ params }: PageProps) {
 
         <div>
           <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-2">Completion confirmations</h2>
-          <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">{detail.confirmations.length} of 2 parties have confirmed completion.</p>
+          <p className="text-sm text-[#6B5B55]">{detail.confirmations.length} of 2 parties have confirmed completion.</p>
         </div>
 
         {detail.acceptedSkillTaskItems.length > 0 && (

@@ -45,9 +45,9 @@ export default async function PublicProfilePage({ params }: Props) {
 
   if (result.status === 'unavailable') {
     return (
-      <div className="min-h-screen bg-[#FAF8F5] dark:bg-[#0F0A0A] flex items-center justify-center px-4 pt-16">
+      <div className="min-h-screen bg-[#FAF8F5] flex items-center justify-center px-4 pt-16">
         <div className="text-center max-w-sm">
-          <p className="text-[#6B5B55] dark:text-[#9B8B85] mb-4">{tProfile('unavailableNotice')}</p>
+          <p className="text-[#6B5B55] mb-4">{tProfile('unavailableNotice')}</p>
           <Link href="/" className="text-sm text-[#8B1A1A] underline underline-offset-2 hover:text-[#7A1616] transition-colors">
             {tProfile('backToHome')}
           </Link>
@@ -112,12 +112,12 @@ export default async function PublicProfilePage({ params }: Props) {
   }
 
   return (
-    <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen pt-24 pb-24 px-4">
+    <div className="bg-[#FAF8F5] min-h-screen pt-24 pb-24 px-4">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="bg-white dark:bg-[#1A1010] rounded-2xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-6 sm:p-8 mb-8">
+        <div className="bg-white rounded-2xl border border-[#F2EDE8] p-6 sm:p-8 mb-8">
           <div className="flex flex-col sm:flex-row sm:items-start gap-6">
-            <div className="w-20 h-20 rounded-full bg-[#F2EDE8] dark:bg-[#2A1A1A] overflow-hidden shrink-0 flex items-center justify-center text-3xl font-extrabold text-[#6B5B55] dark:text-[#9B8B85]">
+            <div className="w-20 h-20 rounded-full bg-[#F2EDE8] overflow-hidden shrink-0 flex items-center justify-center text-3xl font-extrabold text-[#6B5B55]">
               {profile.avatarUrl ? (
                 <Image src={profile.avatarUrl} alt="" width={80} height={80} className="w-full h-full object-cover" />
               ) : (
@@ -127,12 +127,12 @@ export default async function PublicProfilePage({ params }: Props) {
 
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-[-0.02em] text-[#1A0A0A] dark:text-[#F5F0ED]">
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-[-0.02em] text-[#1A0A0A]">
                   {profile.displayName}
                 </h1>
                 {profile.isElite && <EliteBadge label={tProfile('eliteBadgeLabel')} size={18} />}
                 {profile.isVerified && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.08em] text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2.5 py-1 rounded-full">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.08em] text-green-700 bg-green-50 px-2.5 py-1 rounded-full">
                     <ShieldCheck size={12} aria-hidden="true" /> {t('verified')}
                   </span>
                 )}
@@ -159,7 +159,7 @@ export default async function PublicProfilePage({ params }: Props) {
               <div className="flex items-center gap-2">
                 {profile.publicRating !== null ? (
                   <>
-                    <span className="flex items-center gap-1 text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+                    <span className="flex items-center gap-1 text-sm font-semibold text-[#1A0A0A]">
                       <Star size={15} className="text-amber-400 fill-amber-400" aria-hidden="true" />
                       {profile.publicRating.toFixed(1)}
                     </span>
@@ -177,7 +177,7 @@ export default async function PublicProfilePage({ params }: Props) {
               {isSelf ? (
                 <Link
                   href="/dashboard"
-                  className="flex items-center justify-center px-5 py-2.5 border border-[#E8E0D8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] font-medium rounded-xl text-sm hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors"
+                  className="flex items-center justify-center px-5 py-2.5 border border-[#E8E0D8] text-[#6B5B55] font-medium rounded-xl text-sm hover:bg-[#F2EDE8] transition-colors"
                 >
                   {tProfile('editProfile')}
                 </Link>

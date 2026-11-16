@@ -28,12 +28,12 @@ function EntryBadges({ entry, labels }: { entry: SitemapEntry; labels: { loginRe
   return (
     <div className="flex flex-wrap gap-1.5 mt-2">
       {entry.requiresLogin && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-[#F2EDE8] dark:bg-[#2A1A1A] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.05em] text-[#6B5B55] dark:text-[#9B8B85]">
+        <span className="inline-flex items-center gap-1 rounded-full bg-[#F2EDE8] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.05em] text-[#6B5B55]">
           <LockKeyhole size={10} /> {labels.loginRequired}
         </span>
       )}
       {entry.requiresMerchant && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-[#F2EDE8] dark:bg-[#2A1A1A] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.05em] text-[#6B5B55] dark:text-[#9B8B85]">
+        <span className="inline-flex items-center gap-1 rounded-full bg-[#F2EDE8] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.05em] text-[#6B5B55]">
           <Store size={10} /> {labels.merchant}
         </span>
       )}
@@ -43,7 +43,7 @@ function EntryBadges({ entry, labels }: { entry: SitemapEntry; labels: { loginRe
         </span>
       )}
       {entry.providerDependency && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.05em] text-amber-700 dark:text-amber-400">
+        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.05em] text-amber-700">
           <Hourglass size={10} /> {labels.providerPending}
         </span>
       )}
@@ -73,12 +73,12 @@ export default async function SitemapPage() {
   }
 
   return (
-    <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen">
-      <section className="pt-24 pb-10 border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
+    <div className="bg-[#FAF8F5] min-h-screen">
+      <section className="pt-24 pb-10 border-b border-[#F2EDE8]">
         <div className="max-w-5xl mx-auto px-6 lg:px-12">
           <p className="section-label mb-4 text-[#9B8B85]">{t('eyebrow')}</p>
-          <h1 className="text-3xl sm:text-4xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight mb-4">{t('heading')}</h1>
-          <p className="text-[#6B5B55] dark:text-[#9B8B85] max-w-2xl">
+          <h1 className="text-3xl sm:text-4xl font-extrabold uppercase text-[#1A0A0A] tracking-tight mb-4">{t('heading')}</h1>
+          <p className="text-[#6B5B55] max-w-2xl">
             {t('introBeforeLink')} <Link href="/help" className="text-[#8B1A1A] underline">{t('helpLinkText')}</Link>{t('introAfterLink')}
           </p>
         </div>
@@ -89,7 +89,7 @@ export default async function SitemapPage() {
           const entries = SITEMAP_ENTRIES.filter((e) => e.section === section)
           return (
             <section key={section} aria-labelledby={`sitemap-${section}`}>
-              <h2 id={`sitemap-${section}`} className="text-xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight mb-1.5">
+              <h2 id={`sitemap-${section}`} className="text-xl font-extrabold uppercase text-[#1A0A0A] tracking-tight mb-1.5">
                 {sectionLabels[section]}
               </h2>
               <p className="text-sm text-[#9B8B85] mb-5">{sectionDescriptions[section]}</p>
@@ -98,9 +98,9 @@ export default async function SitemapPage() {
                 {entries.map((entry) => {
                   const isDynamic = entry.path.includes('[')
                   const content = (
-                    <div className="h-full rounded-2xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] p-4 hover:border-[#8B1A1A]/40 transition-colors">
-                      <p className="font-semibold text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">{entry.label}</p>
-                      <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-1 leading-relaxed">{entry.description}</p>
+                    <div className="h-full rounded-2xl border border-[#F2EDE8] bg-white p-4 hover:border-[#8B1A1A]/40 transition-colors">
+                      <p className="font-semibold text-sm text-[#1A0A0A]">{entry.label}</p>
+                      <p className="text-xs text-[#6B5B55] mt-1 leading-relaxed">{entry.description}</p>
                       <p className="text-[11px] font-mono text-[#9B8B85] mt-2 truncate">{entry.path}</p>
                       <EntryBadges entry={entry} labels={badgeLabels} />
                     </div>

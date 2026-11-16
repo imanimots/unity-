@@ -113,23 +113,23 @@ export default async function MerchantBookingsPage() {
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="mb-12">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{t('manageRentals')}</p>
-        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight">{t('bookingsTitle')}</h1>
+        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] tracking-tight">{t('bookingsTitle')}</h1>
       </div>
 
       <TestModeBanner className="mb-8" text={tCommon('testMode')} />
 
       <div className="grid grid-cols-3 gap-4 mb-12">
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{t('requested')}</p>
           <div className="text-4xl lg:text-5xl font-extrabold text-amber-500 leading-none">{pendingCount}</div>
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mt-2">{t('needReview')}</p>
         </div>
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{t('active')}</p>
           <div className="text-4xl lg:text-5xl font-extrabold text-green-500 leading-none">{activeCount}</div>
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mt-2">{t('outNow')}</p>
         </div>
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{t('earnedEstimate')}</p>
           <div className="text-4xl lg:text-5xl font-extrabold text-[#8B1A1A] leading-none">{formatMoneyFromRands(earnedTotal, 'ZAR', locale)}</div>
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mt-2">{t('completedNotPaidOut')}</p>
@@ -137,7 +137,7 @@ export default async function MerchantBookingsPage() {
       </div>
 
       {bookings.length === 0 ? (
-        <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-16 text-center">
+        <div className="bg-white rounded-xl border border-[#F2EDE8] p-16 text-center">
           <Package size={36} className="mx-auto text-[#9B8B85] mb-4" />
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">{t('noBookingRequests')}</p>
         </div>
@@ -147,9 +147,9 @@ export default async function MerchantBookingsPage() {
             const sc = BOOKING_STATUS_LABELS[booking.status]
             const readiness = readinessByBooking.get(booking.id)
             return (
-              <div key={booking.id} className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-5">
+              <div key={booking.id} className="bg-white rounded-xl border border-[#F2EDE8] p-5">
                 <div className="flex items-start justify-between gap-2 flex-wrap mb-2">
-                  <Link href={`/listings/${booking.listing_id}`} className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] hover:underline">
+                  <Link href={`/listings/${booking.listing_id}`} className="text-sm font-semibold text-[#1A0A0A] hover:underline">
                     {t('booking')} {booking.booking_reference}
                   </Link>
                   <span className={`shrink-0 px-2 py-0.5 rounded-full text-[11px] font-medium ${sc.classes}`}>{t(`status.${booking.status}`)}</span>
@@ -157,9 +157,9 @@ export default async function MerchantBookingsPage() {
                 <p className="text-xs text-[#9B8B85] flex items-center gap-1.5">
                   <Clock size={11} /> {fmt(booking.start_at)} – {fmt(booking.end_at)}
                 </p>
-                <p className="text-xs font-semibold text-[#6B5B55] dark:text-[#9B8B85] mt-0.5">R{booking.subtotal_amount ?? 0} {t('rentalLabel')}</p>
+                <p className="text-xs font-semibold text-[#6B5B55] mt-0.5">R{booking.subtotal_amount ?? 0} {t('rentalLabel')}</p>
                 {readiness && readiness !== 'not_prepared' && (
-                  <p className="text-xs font-semibold mt-1.5 text-[#1A0A0A] dark:text-[#F5F0ED]">{t(`financialReadiness.merchant.${READINESS_KEYS[readiness]}`)}</p>
+                  <p className="text-xs font-semibold mt-1.5 text-[#1A0A0A]">{t(`financialReadiness.merchant.${READINESS_KEYS[readiness]}`)}</p>
                 )}
                 {booking.status === 'accepted' && readiness !== 'financially_ready' && readiness !== 'no_payment_required' && booking.payment_due_at && (
                   <PaymentDeadlineNote label={t('payBy', { date: formatDateTime(booking.payment_due_at, locale) })} />

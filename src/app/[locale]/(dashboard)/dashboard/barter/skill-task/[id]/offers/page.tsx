@@ -65,15 +65,15 @@ export default async function SkillTaskPostOffersPage({ params }: PageProps) {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
       <div className="mb-8">
-        <Link href="/dashboard/barter/skill-task" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+        <Link href="/dashboard/barter/skill-task" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
           <ArrowLeft size={13} /> {t('offersInbox.backToSkillsTasks')}
         </Link>
-        <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] mt-4">{t('offersInbox.offersOn', { title: post.title })}</h1>
+        <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] mt-4">{t('offersInbox.offersOn', { title: post.title })}</h1>
       </div>
 
       {rows.length === 0 ? (
-        <div className="text-center py-24 rounded-2xl border border-dashed border-[#F2EDE8] dark:border-[#2A1A1A]">
-          <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85]">{t('offersInbox.noOffersYet')}</p>
+        <div className="text-center py-24 rounded-2xl border border-dashed border-[#F2EDE8]">
+          <p className="text-sm text-[#6B5B55]">{t('offersInbox.noOffersYet')}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -81,10 +81,10 @@ export default async function SkillTaskPostOffersPage({ params }: PageProps) {
             <Link
               key={o.id}
               href={`/dashboard/barter/${o.id}`}
-              className="flex items-center justify-between gap-3 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] p-4 hover:border-[#8B1A1A]/40 transition-colors"
+              className="flex items-center justify-between gap-3 rounded-xl border border-[#F2EDE8] bg-white p-4 hover:border-[#8B1A1A]/40 transition-colors"
             >
               <div className="min-w-0">
-                <p className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+                <p className="font-semibold text-[#1A0A0A]">
                   <ProfileLink userId={o.party_b_id} displayName={nameById.get(o.party_b_id) ?? 'Unity user'} currentUserId={requester.userId} />
                 </p>
                 <p className="text-xs text-[#9B8B85] mt-0.5">

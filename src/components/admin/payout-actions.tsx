@@ -118,7 +118,7 @@ export function PayoutActions({ payoutId, status }: Props) {
                 key={action}
                 onClick={() => run(action)}
                 disabled={pending !== null}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] rounded-lg border border-[#F2EDE8] text-[#1A0A0A] hover:bg-[#FAF8F5] transition-colors disabled:opacity-50"
               >
                 <Icon size={13} /> {pending === action ? 'Working…' : meta.label}
               </button>
@@ -129,7 +129,7 @@ export function PayoutActions({ payoutId, status }: Props) {
       {status === 'processing' && (
         <p className="text-[11px] text-[#9B8B85] mt-2">No automated payout provider is connected. Starting processing only records that Unity has begun processing this payout manually.</p>
       )}
-      {error && <p className="text-xs text-red-600 dark:text-red-400 mt-2">{error}</p>}
+      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
     </div>
   )
 }

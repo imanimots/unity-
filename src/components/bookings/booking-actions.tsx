@@ -29,8 +29,8 @@ type ActionKind = 'accept' | 'reject' | 'cancel' | 'start' | 'return' | 'confirm
 
 const ACTION_META: Record<ActionKind, { labelKey: string; icon: typeof Check; classes: string; promptReason?: boolean }> = {
   accept: { labelKey: 'accept', icon: Check, classes: 'bg-green-600 hover:bg-green-700 text-white' },
-  reject: { labelKey: 'decline', icon: X, classes: 'border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A]', promptReason: true },
-  cancel: { labelKey: 'cancelBooking', icon: Ban, classes: 'border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A]', promptReason: true },
+  reject: { labelKey: 'decline', icon: X, classes: 'border border-[#F2EDE8] text-[#1A0A0A] hover:bg-[#FAF8F5]', promptReason: true },
+  cancel: { labelKey: 'cancelBooking', icon: Ban, classes: 'border border-[#F2EDE8] text-[#1A0A0A] hover:bg-[#FAF8F5]', promptReason: true },
   start: { labelKey: 'startRental', icon: Play, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
   return: { labelKey: 'initiateReturn', icon: PackageCheck, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
   'confirm-return': { labelKey: 'confirmReturn', icon: Check, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
@@ -109,7 +109,7 @@ export function BookingActions({ bookingId, status, role, financiallyReady = fal
   }
 
   return (
-    <div className="mt-4 pt-4 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
+    <div className="mt-4 pt-4 border-t border-[#F2EDE8]">
       <div className="flex flex-wrap gap-2">
         {actions.map((action) => {
           const meta = ACTION_META[action]
@@ -140,11 +140,11 @@ export function BookingActions({ bookingId, status, role, financiallyReady = fal
           )
         })}
       </div>
-      {error && <p className="text-xs text-red-600 dark:text-red-400 mt-2">{error}</p>}
+      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
       <div className="mt-3 flex flex-wrap items-center gap-4">
         <Link
           href={`/chat?booking=${bookingId}`}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#6B5B55] dark:text-[#9B8B85] hover:underline"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#6B5B55] hover:underline"
         >
           <MessageCircle size={13} /> {t('actions.message')}
         </Link>

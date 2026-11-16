@@ -258,13 +258,13 @@ export default function AdminUsersPage() {
         </a>
       </div>
 
-      <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+      <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
                 {['Name', 'Role', 'KYC', 'Unity score', 'Account status', 'Joined', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A] whitespace-nowrap">
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -279,13 +279,13 @@ export default function AdminUsersPage() {
                 <tr><td colSpan={7} className="px-4 py-16 text-center text-sm text-[#9B8B85]">No users match your filters.</td></tr>
               ) : (
                 users.map((u) => (
-                  <tr key={u.id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors last:border-0">
-                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{u.fullName ?? u.displayName ?? u.id.slice(0, 8)}</td>
-                    <td className="px-4 py-3 text-sm capitalize text-[#6B5B55] dark:text-[#9B8B85]">{u.role}</td>
+                  <tr key={u.id} className="border-b border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors last:border-0">
+                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A]">{u.fullName ?? u.displayName ?? u.id.slice(0, 8)}</td>
+                    <td className="px-4 py-3 text-sm capitalize text-[#6B5B55]">{u.role}</td>
                     <td className="px-4 py-3"><Pill value={u.kycStatus} styles={KYC_STYLES} /></td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55] dark:text-[#9B8B85]">{u.unityScore.toFixed(1)}</td>
+                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55]">{u.unityScore.toFixed(1)}</td>
                     <td className="px-4 py-3"><Pill value={u.accountStatus} styles={ACCOUNT_STATUS_STYLES} /></td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{formatDate(u.createdAt)}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{formatDate(u.createdAt)}</td>
                     <td className="px-4 py-3">
                       <button onClick={() => { setCleanupNotice(null); setSelectedId(u.id) }} className={secondaryButtonClass}>View</button>
                     </td>
@@ -300,9 +300,9 @@ export default function AdminUsersPage() {
       {selectedId ? (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/40" onClick={() => setSelectedId(null)} />
-          <div className="relative w-full max-w-md bg-white dark:bg-[#0F0A0A] border-l border-[#F2EDE8] dark:border-[#2A1A1A] h-full overflow-y-auto p-6 space-y-5">
+          <div className="relative w-full max-w-md bg-white border-l border-[#F2EDE8] h-full overflow-y-auto p-6 space-y-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">User detail</h2>
+              <h2 className="text-lg font-bold text-[#1A0A0A]">User detail</h2>
               <button onClick={() => setSelectedId(null)} className="text-[#9B8B85] hover:text-[#1A0A0A]"><X size={18} /></button>
             </div>
             <Link href={`/admin/users/${selectedId}`} className="text-xs text-[#8B1A1A] underline">Open full profile (Customer 360) →</Link>
@@ -312,7 +312,7 @@ export default function AdminUsersPage() {
             ) : (
               <>
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{detail.profile.fullName ?? detail.profile.displayName}</p>
+                  <p className="text-sm font-semibold text-[#1A0A0A]">{detail.profile.fullName ?? detail.profile.displayName}</p>
                   <p className="text-xs text-[#9B8B85]">{detail.profile.phone ?? 'No phone on file'}</p>
                   <div className="flex gap-2 pt-1">
                     <Pill value={detail.profile.role} styles={{}} />
@@ -320,28 +320,28 @@ export default function AdminUsersPage() {
                     <Pill value={detail.profile.accountStatus} styles={ACCOUNT_STATUS_STYLES} />
                   </div>
                   {detail.profile.statusReason ? (
-                    <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] pt-1">Reason: {detail.profile.statusReason}</p>
+                    <p className="text-xs text-[#6B5B55] pt-1">Reason: {detail.profile.statusReason}</p>
                   ) : null}
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg py-2">
-                    <p className="text-lg font-bold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{detail.listingsCount}</p>
+                  <div className="bg-[#FAF8F5] rounded-lg py-2">
+                    <p className="text-lg font-bold text-[#1A0A0A] tabular-nums">{detail.listingsCount}</p>
                     <p className="text-[10px] uppercase text-[#9B8B85]">Listings</p>
                   </div>
-                  <div className="bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg py-2">
-                    <p className="text-lg font-bold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{detail.bookingsAsRenterCount}</p>
+                  <div className="bg-[#FAF8F5] rounded-lg py-2">
+                    <p className="text-lg font-bold text-[#1A0A0A] tabular-nums">{detail.bookingsAsRenterCount}</p>
                     <p className="text-[10px] uppercase text-[#9B8B85]">As renter</p>
                   </div>
-                  <div className="bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg py-2">
-                    <p className="text-lg font-bold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{detail.bookingsAsMerchantCount}</p>
+                  <div className="bg-[#FAF8F5] rounded-lg py-2">
+                    <p className="text-lg font-bold text-[#1A0A0A] tabular-nums">{detail.bookingsAsMerchantCount}</p>
                     <p className="text-[10px] uppercase text-[#9B8B85]">As merchant</p>
                   </div>
                 </div>
                 <p className="text-[11px] text-[#9B8B85]">Disputes involving this user: {detail.disputeCount}</p>
 
                 {actionError ? <p className="text-xs text-red-600">{actionError}</p> : null}
-                {cleanupNotice ? <p className="text-xs text-amber-700 dark:text-amber-400">{cleanupNotice}</p> : null}
+                {cleanupNotice ? <p className="text-xs text-amber-700">{cleanupNotice}</p> : null}
 
                 {detail.profile.accountStatus === 'erased' ? (
                   <button disabled={actionPending} onClick={performRetryCleanup} className={secondaryButtonClass}>
@@ -349,7 +349,7 @@ export default function AdminUsersPage() {
                   </button>
                 ) : null}
 
-                <div className="space-y-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-4">
+                <div className="space-y-2 border-t border-[#F2EDE8] pt-4">
                   <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85]">Account action</p>
                   <input
                     type="text"
@@ -376,14 +376,14 @@ export default function AdminUsersPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-4">
+                <div className="space-y-2 border-t border-[#F2EDE8] pt-4">
                   <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85]">Account history</p>
                   {detail.accountHistory.length === 0 ? (
                     <p className="text-xs text-[#9B8B85]">No status changes recorded.</p>
                   ) : (
                     <ul className="space-y-2">
                       {detail.accountHistory.map((h) => (
-                        <li key={h.id} className="text-xs text-[#6B5B55] dark:text-[#9B8B85]">
+                        <li key={h.id} className="text-xs text-[#6B5B55]">
                           <span className="font-medium capitalize">{h.actionType}</span> ({h.previousStatus} → {h.newStatus}) — {formatDateTime(h.createdAt)}
                           {h.userReason ? <div>Reason: {h.userReason}</div> : null}
                         </li>
@@ -392,10 +392,10 @@ export default function AdminUsersPage() {
                   )}
                 </div>
 
-                <div className="space-y-2 border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-4">
+                <div className="space-y-2 border-t border-[#F2EDE8] pt-4">
                   <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85]">Internal notes</p>
                   {detail.notes.map((n) => (
-                    <div key={n.id} className="text-xs text-[#6B5B55] dark:text-[#9B8B85] bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg px-3 py-2">
+                    <div key={n.id} className="text-xs text-[#6B5B55] bg-[#FAF8F5] rounded-lg px-3 py-2">
                       {n.note}
                       <div className="text-[10px] text-[#9B8B85] mt-1">{formatDateTime(n.createdAt)}</div>
                     </div>

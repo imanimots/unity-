@@ -120,10 +120,10 @@ export default function AdminPayoutProviderAttemptsPage() {
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {!loading && (
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[11px] uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
+              <tr className="text-left text-[11px] uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8]">
                 <th className="px-4 py-3">Domain</th>
                 <th className="px-4 py-3">Destination</th>
                 <th className="px-4 py-3">Amount</th>
@@ -135,7 +135,7 @@ export default function AdminPayoutProviderAttemptsPage() {
             </thead>
             <tbody>
               {attempts.map((a) => (
-                <tr key={a.id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] last:border-b-0">
+                <tr key={a.id} className="border-b border-[#F2EDE8] last:border-b-0">
                   <td className="px-4 py-3 text-xs">
                     {a.merchant_payout_id ? 'Merchant' : 'Affiliate'}
                     <div className="text-[#9B8B85]">{(a.merchant_payout_id ?? a.affiliate_commission_id)?.slice(0, 8)}</div>

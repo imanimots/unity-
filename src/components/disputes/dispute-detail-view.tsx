@@ -66,22 +66,22 @@ export function DisputeDetailView({ dispute, history, evidence, currentUserId, v
     <div className="space-y-8">
       <div>
         <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED]">{dispute.title}</h1>
+          <h1 className="text-xl font-extrabold text-[#1A0A0A]">{dispute.title}</h1>
           <DisputeStatusBadge status={dispute.status} label={labels?.statusLabel} />
         </div>
-        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-pre-wrap">{dispute.description}</p>
+        <p className="text-sm text-[#6B5B55] whitespace-pre-wrap">{dispute.description}</p>
       </div>
 
       <div>
         <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-2">{labels?.requestedResolution ?? 'Requested resolution'}</h2>
-        <p className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED] whitespace-pre-wrap">{dispute.requested_resolution}</p>
+        <p className="text-sm text-[#1A0A0A] whitespace-pre-wrap">{dispute.requested_resolution}</p>
       </div>
 
       {dispute.status === 'resolved' || dispute.status === 'closed' ? (
         <div>
           <h2 className="text-sm font-extrabold uppercase tracking-[0.1em] text-[#9B8B85] mb-2">{labels?.outcome ?? 'Outcome'}</h2>
-          <p className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">{dispute.outcome ? (labels?.outcomeLabel ?? getDisputeOutcomeLabel(dispute.outcome)) : '—'}</p>
-          {dispute.resolution_notes && <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mt-1 whitespace-pre-wrap">{dispute.resolution_notes}</p>}
+          <p className="text-sm text-[#1A0A0A]">{dispute.outcome ? (labels?.outcomeLabel ?? getDisputeOutcomeLabel(dispute.outcome)) : '—'}</p>
+          {dispute.resolution_notes && <p className="text-sm text-[#6B5B55] mt-1 whitespace-pre-wrap">{dispute.resolution_notes}</p>}
         </div>
       ) : null}
 

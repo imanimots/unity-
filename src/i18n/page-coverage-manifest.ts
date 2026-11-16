@@ -97,6 +97,10 @@ export const PAGE_COVERAGE_MANIFEST: PageCoverageEntry[] = [
   // useTranslations('privacy.erasure') throughout the form, getTranslations
   // the same way in the server page itself.
   { path: '(dashboard)/dashboard/privacy/page.tsx', status: 'wired' },
+  // E47: real authenticated account shell -- My Profile (Phase H) and
+  // Settings (Phase G, hosting the relocated language/country selectors).
+  { path: '(dashboard)/dashboard/profile/page.tsx', status: 'wired' },
+  { path: '(dashboard)/dashboard/settings/page.tsx', status: 'wired' },
 
   // ---------------- MARKETING (public) ----------------
   // Gap-closure pass: genuinely wired now (common.home dictionary section,

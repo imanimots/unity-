@@ -77,19 +77,19 @@ function ChatUIInner({ conversations, currentUserId, locale }: { conversations: 
   }
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex overflow-hidden bg-[#FAF8F5] dark:bg-[#0F0A0A]">
+    <div className="h-[calc(100vh-4rem)] flex overflow-hidden bg-[#FAF8F5]">
       <div
-        className={`w-full lg:w-72 lg:flex-shrink-0 lg:border-r border-[#F2EDE8] dark:border-[#2A1A1A] flex flex-col bg-white dark:bg-[#1A1010] ${
+        className={`w-full lg:w-72 lg:flex-shrink-0 lg:border-r border-[#F2EDE8] flex flex-col bg-white ${
           mobileShowThread ? 'hidden lg:flex' : 'flex'
         }`}
       >
-        <div className="px-5 py-4 border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
+        <div className="px-5 py-4 border-b border-[#F2EDE8]">
           <span className="text-xs font-medium uppercase tracking-[0.12em] text-[#9B8B85]">{t('messagesLabel')}</span>
         </div>
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-              <MessageCircle size={32} className="text-[#F2EDE8] dark:text-[#2A1A1A] mb-3" />
+              <MessageCircle size={32} className="text-[#F2EDE8] mb-3" />
               <p className="text-xs font-medium uppercase tracking-[0.08em] text-[#9B8B85]">{t('noConversationsYet')}</p>
               <p className="text-xs text-[#9B8B85] mt-1">{t('noConversationsDesc')}</p>
             </div>
@@ -113,14 +113,14 @@ function ChatUIInner({ conversations, currentUserId, locale }: { conversations: 
           <div className="flex-1 flex items-center justify-center text-sm text-[#9B8B85]">{t('loadingConversation')}</div>
         ) : active ? (
           <>
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] shrink-0">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-[#F2EDE8] bg-white shrink-0">
               <button
                 onClick={() => setMobileShowThread(false)}
-                className="lg:hidden p-1.5 rounded-lg hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors text-[#6B5B55] dark:text-[#9B8B85]"
+                className="lg:hidden p-1.5 rounded-lg hover:bg-[#F2EDE8] transition-colors text-[#6B5B55]"
               >
                 <ArrowLeft size={16} />
               </button>
-              <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] flex-1">{active.otherUserName}</p>
+              <p className="text-sm font-semibold text-[#1A0A0A] flex-1">{active.otherUserName}</p>
               <div className="flex items-center gap-1.5 text-[11px] text-[#9B8B85] uppercase tracking-[0.06em]">
                 <MessageCircle size={11} className="text-green-500" />
                 <span className="hidden sm:block">{t('filtered')}</span>
@@ -155,8 +155,8 @@ function ChatUIInner({ conversations, currentUserId, locale }: { conversations: 
             />
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-[#FAF8F5] dark:bg-[#0F0A0A]">
-            <MessageCircle size={36} className="text-[#F2EDE8] dark:text-[#2A1A1A] mb-4" />
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-[#FAF8F5]">
+            <MessageCircle size={36} className="text-[#F2EDE8] mb-4" />
             <p className="text-xs font-medium uppercase tracking-[0.08em] text-[#9B8B85]">{t('selectConversation')}</p>
           </div>
         )}

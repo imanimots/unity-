@@ -70,36 +70,36 @@ export default function MerchantAdvertisingPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-10">
-      <Link href="/dashboard/merchant" className="inline-flex items-center gap-1.5 text-sm text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#8B1A1A] mb-6">
+      <Link href="/dashboard/merchant" className="inline-flex items-center gap-1.5 text-sm text-[#6B5B55] hover:text-[#8B1A1A] mb-6">
         <ArrowLeft size={14} /> {tAd('dashboard.backToDashboard')}
       </Link>
 
-      <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] mb-2">{tAd('dashboard.title')}</h1>
-      <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-8">
+      <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] mb-2">{tAd('dashboard.title')}</h1>
+      <p className="text-sm text-[#6B5B55] mb-8">
         {tAd('dashboard.buySponsoredPlacement')}. {tAd('dashboard.fixedPrepaidNotice')}
       </p>
 
       {loading ? (
         <p className="text-sm text-[#9B8B85]">{tAd('dashboard.loading')}</p>
       ) : !advertisers || advertisers.length === 0 ? (
-        <div className="text-center py-16 border border-dashed border-[#E8E0D8] dark:border-[#2A1A1A] rounded-2xl">
+        <div className="text-center py-16 border border-dashed border-[#E8E0D8] rounded-2xl">
           {available ? (
             <>
-              <p className="text-[#6B5B55] dark:text-[#9B8B85] mb-4">{tAd('dashboard.setupNotice')}</p>
+              <p className="text-[#6B5B55] mb-4">{tAd('dashboard.setupNotice')}</p>
               <button onClick={createUnityAdvertiser} className="px-5 py-2.5 rounded-full text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors">
                 {tAd('dashboard.setupCta')}
               </button>
             </>
           ) : (
-            <p className="text-[#6B5B55] dark:text-[#9B8B85]">{tAd('dashboard.unavailableNotice')}</p>
+            <p className="text-[#6B5B55]">{tAd('dashboard.unavailableNotice')}</p>
           )}
         </div>
       ) : (
         <>
           {advertisers[0].balance && (
-            <div className="mb-8 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] px-5 py-4">
+            <div className="mb-8 rounded-xl border border-[#F2EDE8] px-5 py-4">
               <p className="text-xs text-[#9B8B85] mb-0.5">{tAd('dashboard.balance')}</p>
-              <p className="text-lg font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED]">
+              <p className="text-lg font-extrabold text-[#1A0A0A]">
                 {money(advertisers[0].balance.balance_cents, advertisers[0].balance.currency)}
               </p>
               <p className="text-xs text-[#9B8B85] mt-1">
@@ -109,7 +109,7 @@ export default function MerchantAdvertisingPage() {
           )}
 
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{tAd('dashboard.yourCampaigns')}</h2>
+            <h2 className="text-lg font-bold text-[#1A0A0A]">{tAd('dashboard.yourCampaigns')}</h2>
             {available ? (
               <Link href="/dashboard/merchant/advertising/new" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors">
                 <Plus size={14} /> {tAd('dashboard.newCampaign')}
@@ -127,18 +127,18 @@ export default function MerchantAdvertisingPage() {
                 <Link
                   key={c.id}
                   href={`/dashboard/merchant/advertising/${c.id}`}
-                  className="block border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl px-5 py-4 hover:border-[#8B1A1A] transition-colors"
+                  className="block border border-[#F2EDE8] rounded-xl px-5 py-4 hover:border-[#8B1A1A] transition-colors"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] text-sm">
+                      <p className="font-semibold text-[#1A0A0A] text-sm">
                         {c.snapshot_placement_type.replace(/_/g, ' ')} · {c.snapshot_placement_tier}
                       </p>
                       <p className="text-xs text-[#9B8B85] mt-0.5">
                         {c.delivered_impressions} / {c.snapshot_impression_quota} impressions delivered · {money(c.snapshot_price_cents, c.snapshot_currency)}
                       </p>
                     </div>
-                    <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]">
+                    <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-[#F2EDE8] text-[#6B5B55]">
                       {STATUS_LABEL[c.status] ?? c.status}
                     </span>
                   </div>

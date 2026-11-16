@@ -32,16 +32,16 @@ interface Props {
 export function TestPaymentScenarioSelector({ value, onChange, disabled }: Props) {
   const t = useTranslations('rent.testScenario')
   return (
-    <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-dashed border-amber-400/60 dark:border-amber-500/40 p-5">
+    <div className="bg-white rounded-xl border border-dashed border-amber-400/60 p-5">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-amber-600 dark:text-amber-400">{t('heading')}</p>
+        <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-amber-600">{t('heading')}</p>
         <span className="text-[10px] font-mono text-[#9B8B85]">{t('provider')}</span>
       </div>
       <div className="space-y-2">
         {CHECKOUT_TEST_SCENARIOS.map((scenario) => (
           <label
             key={scenario}
-            className="flex items-start gap-2.5 text-sm cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A]"
+            className="flex items-start gap-2.5 text-sm cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-[#FAF8F5]"
           >
             <input
               type="radio"
@@ -52,7 +52,7 @@ export function TestPaymentScenarioSelector({ value, onChange, disabled }: Props
               disabled={disabled}
               className="mt-0.5 accent-[#8B1A1A]"
             />
-            <span className="text-[#1A0A0A] dark:text-[#F5F0ED]">{t(SCENARIO_KEYS[scenario])}</span>
+            <span className="text-[#1A0A0A]">{t(SCENARIO_KEYS[scenario])}</span>
           </label>
         ))}
       </div>

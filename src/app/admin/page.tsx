@@ -231,11 +231,11 @@ export default async function AdminOverviewPage() {
       </div>
 
       {/* Homepage summary card -- reuses getIntelligenceInsights(), the exact same function /admin/intelligence itself calls (src/lib/admin/intelligence-service.ts), never a parallel implementation, and reads only the service's own pre-computed summary fields (never re-filtering/recomputing insight categorization here). E1-F1: Real Data and Operational (all-system) counts are shown as two visibly separate groups rather than one scope-blind total, so this card can never read as a single confirmed-real business KPI when part of it is actually an all-system workload count. */}
-      <Link href="/admin/intelligence" className="block bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 hover:border-[#8B1A1A] transition-colors">
+      <Link href="/admin/intelligence" className="block bg-white border border-[#F2EDE8] rounded-xl p-5 hover:border-[#8B1A1A] transition-colors">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-1">AI R&amp;D</p>
-            <h2 className="text-base font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">AI R&amp;D &amp; Intelligence</h2>
+            <h2 className="text-base font-bold text-[#1A0A0A]">AI R&amp;D &amp; Intelligence</h2>
           </div>
           <span className="text-xs font-medium uppercase tracking-[0.08em] text-[#8B1A1A] whitespace-nowrap">View Intelligence →</span>
         </div>
@@ -245,29 +245,29 @@ export default async function AdminOverviewPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.1em] text-[#9B8B85]">High priority</p>
-                <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{intelligence.summary.realData.highPriority}</p>
+                <p className="text-xl font-extrabold text-[#1A0A0A] tabular-nums">{intelligence.summary.realData.highPriority}</p>
               </div>
               <div>
                 <p className="text-[11px] uppercase tracking-[0.1em] text-[#9B8B85]">Opportunities</p>
-                <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{intelligence.summary.realData.opportunities}</p>
+                <p className="text-xl font-extrabold text-[#1A0A0A] tabular-nums">{intelligence.summary.realData.opportunities}</p>
               </div>
             </div>
           </div>
           <div className="border border-[#6B5B55]/20 rounded-lg p-3">
-            <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-[#6B5B55] dark:text-[#9B8B85] mb-2">Operational (all-system)</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-[#6B5B55] mb-2">Operational (all-system)</p>
             <div>
               <p className="text-[11px] uppercase tracking-[0.1em] text-[#9B8B85]">High priority</p>
-              <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{intelligence.summary.operational.highPriority}</p>
+              <p className="text-xl font-extrabold text-[#1A0A0A] tabular-nums">{intelligence.summary.operational.highPriority}</p>
             </div>
           </div>
         </div>
         <div className="mt-3">
           <p className="text-[11px] uppercase tracking-[0.1em] text-[#9B8B85]">Data limitations</p>
-          <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{intelligence.summary.dataQualityLimitations}</p>
+          <p className="text-xl font-extrabold text-[#1A0A0A] tabular-nums">{intelligence.summary.dataQualityLimitations}</p>
         </div>
         {/* E2: a concise, non-alarming degraded-source indicator -- only rendered when something is actually degraded; full Source Health detail lives on /admin/intelligence, not duplicated here. */}
         {degradedSourceCount > 0 && (
-          <p className="mt-3 text-xs text-amber-700 dark:text-amber-400">Data sources degraded: {degradedSourceCount}</p>
+          <p className="mt-3 text-xs text-amber-700">Data sources degraded: {degradedSourceCount}</p>
         )}
       </Link>
 

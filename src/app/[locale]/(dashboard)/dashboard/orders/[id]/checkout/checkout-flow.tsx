@@ -72,13 +72,13 @@ export function OrderCheckoutFlow({ orderId, initial }: { orderId: string; initi
   if (alreadyPaid || result === 'success') {
     return (
       <div className="space-y-4">
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900/40 rounded-xl p-5 text-center">
-          <p className="text-sm font-semibold text-green-800 dark:text-green-300">{t('paymentComplete')}</p>
-          <p className="text-xs text-green-700 dark:text-green-400 mt-1">{t('orderIsPaid', { reference: initial.orderReference })}</p>
+        <div className="bg-green-50 border border-green-200 rounded-xl p-5 text-center">
+          <p className="text-sm font-semibold text-green-800">{t('paymentComplete')}</p>
+          <p className="text-xs text-green-700 mt-1">{t('orderIsPaid', { reference: initial.orderReference })}</p>
         </div>
         <Link
           href="/dashboard/orders"
-          className="block text-center w-full py-3 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm font-semibold uppercase tracking-[0.08em] text-[#1A0A0A] dark:text-[#F5F0ED] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A]"
+          className="block text-center w-full py-3 rounded-lg border border-[#F2EDE8] text-sm font-semibold uppercase tracking-[0.08em] text-[#1A0A0A] hover:bg-[#FAF8F5]"
         >
           {t('backToPurchases')}
         </Link>
@@ -90,51 +90,51 @@ export function OrderCheckoutFlow({ orderId, initial }: { orderId: string; initi
     <div className="space-y-4">
       <TestModeBanner text={tCommon('testMode')} />
 
-      <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-5 space-y-3">
+      <div className="bg-white rounded-xl border border-[#F2EDE8] p-5 space-y-3">
         <div className="flex justify-between text-sm">
-          <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('order')}</span>
-          <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{initial.orderReference}</span>
+          <span className="text-[#6B5B55]">{t('order')}</span>
+          <span className="font-medium text-[#1A0A0A]">{initial.orderReference}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('item')}</span>
-          <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{initial.listingTitle}</span>
+          <span className="text-[#6B5B55]">{t('item')}</span>
+          <span className="font-medium text-[#1A0A0A]">{initial.listingTitle}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('seller')}</span>
-          <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{initial.sellerDisplayName}</span>
+          <span className="text-[#6B5B55]">{t('seller')}</span>
+          <span className="font-medium text-[#1A0A0A]">{initial.sellerDisplayName}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('quantity')}</span>
-          <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{initial.quantity}</span>
+          <span className="text-[#6B5B55]">{t('quantity')}</span>
+          <span className="font-medium text-[#1A0A0A]">{initial.quantity}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('unitPrice')}</span>
-          <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{money(initial.unitPrice)}</span>
+          <span className="text-[#6B5B55]">{t('unitPrice')}</span>
+          <span className="font-medium text-[#1A0A0A]">{money(initial.unitPrice)}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-[#6B5B55] dark:text-[#9B8B85]">{t('shipping')}</span>
-          <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{money(initial.shippingFee)}</span>
+          <span className="text-[#6B5B55]">{t('shipping')}</span>
+          <span className="font-medium text-[#1A0A0A]">{money(initial.shippingFee)}</span>
         </div>
-        <div className="flex justify-between text-base pt-3 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
-          <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('total')}</span>
-          <span className="font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{money(initial.totalAmount)}</span>
+        <div className="flex justify-between text-base pt-3 border-t border-[#F2EDE8]">
+          <span className="font-semibold text-[#1A0A0A]">{t('total')}</span>
+          <span className="font-bold text-[#1A0A0A]">{money(initial.totalAmount)}</span>
         </div>
       </div>
 
       {result === 'failed_terminal' && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 rounded-xl p-4">
-          <p className="text-xs text-red-800 dark:text-red-300">{error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+          <p className="text-xs text-red-800">{error}</p>
         </div>
       )}
 
       {initial.testModeAvailable && (
         <div>
-          <label className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1 block">{t('testScenarioLabel')}</label>
+          <label className="text-xs font-medium text-[#6B5B55] mb-1 block">{t('testScenarioLabel')}</label>
           <select
             value={scenario}
             onChange={(e) => setScenario(e.target.value as typeof scenario)}
             disabled={submitting}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-sm text-[#1A0A0A] dark:text-[#F5F0ED] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-[#F2EDE8] bg-white text-sm text-[#1A0A0A] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20"
           >
             {TEST_SCENARIO_VALUES.map((s) => (
               <option key={s} value={s}>{t(`testScenarios.${s}`)}</option>
@@ -143,7 +143,7 @@ export function OrderCheckoutFlow({ orderId, initial }: { orderId: string; initi
         </div>
       )}
 
-      <label className="flex items-start gap-2.5 text-xs text-[#6B5B55] dark:text-[#9B8B85] cursor-pointer">
+      <label className="flex items-start gap-2.5 text-xs text-[#6B5B55] cursor-pointer">
         <input
           type="checkbox"
           checked={agreed}
@@ -166,7 +166,7 @@ export function OrderCheckoutFlow({ orderId, initial }: { orderId: string; initi
         {submitting ? <><Loader2 size={14} className="animate-spin" /> {t('processing')}</> : t('payAmount', { amount: money(initial.totalAmount) })}
       </button>
 
-      {error && result !== 'failed_terminal' && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && result !== 'failed_terminal' && <p className="text-xs text-red-600">{error}</p>}
     </div>
   )
 }

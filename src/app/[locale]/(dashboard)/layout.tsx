@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages, getLocale } from 'next-intl/server'
 import { Navbar } from '@/components/shared/navbar'
+import { AccountShell } from '@/components/account/account-shell'
 import { redirect } from '@/i18n/navigation'
 import { requireAuth } from '@/lib/supabase/require-admin'
 import { PERMANENT_NOINDEX } from '@/lib/seo/config'
@@ -27,6 +28,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!auth) {
     const locale = await getLocale()
     redirect({ href: '/login', locale })
+    return null
   }
 
   // Full message set, nested here rather than at the public root (same
@@ -36,12 +38,24 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // concern, since nothing under (dashboard) is reachable anonymously or
   // indexed.
   const messages = await getMessages()
+  const displayName = auth.profile.display_name ?? auth.profile.full_name ?? 'Unity member'
   return (
     <NextIntlClientProvider messages={messages}>
       <Navbar personalizationEnabled={isPersonalizationEnabled()} rentToBuyEnabled={isRentToBuyEnabled()} />
-      <main className="pt-16 min-h-screen bg-[#FAF8F5] dark:bg-[#0F0A0A]">
-        <div className="pt-8 pb-16">
-          {children}
+      <main className="pt-16 min-h-screen bg-[#FAF8F5]">
+        <div className="pt-8">
+          <AccountShell
+            profile={{
+              displayName,
+              createdAt: auth.profile.created_at,
+              initial: displayName[0]?.toUpperCase() ?? 'U',
+            }}
+            rentToBuyEnabled={isRentToBuyEnabled()}
+            personalizationEnabled={isPersonalizationEnabled()}
+            ambassadorUrl={process.env.NEXT_PUBLIC_WARP_AFFILIATE_URL}
+          >
+            {children}
+          </AccountShell>
         </div>
       </main>
     </NextIntlClientProvider>

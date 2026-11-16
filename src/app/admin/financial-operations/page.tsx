@@ -135,13 +135,13 @@ export default function AdminFinancialOperationsPage() {
         </a>
       </div>
 
-      <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+      <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
                 {['Reference', 'Type', 'Status', 'Amount', 'Workflow', 'Failure', 'Ledger entries', 'Payout'].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A] whitespace-nowrap">
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -156,15 +156,15 @@ export default function AdminFinancialOperationsPage() {
                 <tr><td colSpan={8} className="px-4 py-16 text-center text-sm text-[#9B8B85]">No payment records match your filters.</td></tr>
               ) : (
                 rows.map((r) => (
-                  <tr key={r.paymentId} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors last:border-0">
-                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] whitespace-nowrap">{r.bookingReference ?? r.orderReference ?? r.barterAgreementReference ?? r.rentToBuyReference ?? '—'}</td>
-                    <td className="px-4 py-3 text-sm capitalize text-[#6B5B55] dark:text-[#9B8B85]">{r.paymentType.replace(/_/g, ' ')}</td>
+                  <tr key={r.paymentId} className="border-b border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors last:border-0">
+                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] whitespace-nowrap">{r.bookingReference ?? r.orderReference ?? r.barterAgreementReference ?? r.rentToBuyReference ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm capitalize text-[#6B5B55]">{r.paymentType.replace(/_/g, ' ')}</td>
                     <td className="px-4 py-3"><Pill value={r.status} styles={STATUS_STYLES} /></td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55] dark:text-[#9B8B85]">{formatMoney(r.amount, r.currency)}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{r.workflowStatus ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55]">{formatMoney(r.amount, r.currency)}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">{r.workflowStatus ?? '—'}</td>
                     <td className="px-4 py-3">{r.failureCategory ? <Pill value={r.failureCategory} styles={FAILURE_STYLES} /> : '—'}</td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55] dark:text-[#9B8B85]">{r.ledgerEntryCount}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{r.payoutStatus === 'not_applicable' ? 'N/A' : (r.payoutStatus ?? '—')}</td>
+                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55]">{r.ledgerEntryCount}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">{r.payoutStatus === 'not_applicable' ? 'N/A' : (r.payoutStatus ?? '—')}</td>
                   </tr>
                 ))
               )}
@@ -172,7 +172,7 @@ export default function AdminFinancialOperationsPage() {
           </table>
         </div>
         {hasMore && (
-          <div className="flex justify-center py-4 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
+          <div className="flex justify-center py-4 border-t border-[#F2EDE8]">
             <button type="button" onClick={loadMore} disabled={loadingMore} className={secondaryButtonClass}>
               {loadingMore ? 'Loading…' : 'Load more'}
             </button>

@@ -69,12 +69,12 @@ export function ResolveFrozenBanner({ publicationLimit, onResolved }: ResolveFro
   }
 
   return (
-    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 rounded-xl p-6 mb-6">
+    <div className="bg-amber-50 border border-amber-300 rounded-xl p-6 mb-6">
       <div className="flex items-start gap-3 mb-4">
-        <AlertTriangle size={18} className="text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
+        <AlertTriangle size={18} className="text-amber-700 shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">{t('title')}</p>
-          <p className="text-xs text-amber-800 dark:text-amber-300 mt-1">{t('description', { limit: publicationLimit ?? 0 })}</p>
+          <p className="text-sm font-semibold text-amber-900">{t('title')}</p>
+          <p className="text-xs text-amber-800 mt-1">{t('description', { limit: publicationLimit ?? 0 })}</p>
         </div>
       </div>
 
@@ -84,14 +84,14 @@ export function ResolveFrozenBanner({ publicationLimit, onResolved }: ResolveFro
             {publications.map((pub) => (
               <li key={pub.entityId} className="flex items-start gap-2">
                 <input type="checkbox" id={`resolve-keep-${pub.entityId}`} checked={selected.has(pub.entityId)} onChange={() => toggle(pub.entityId)} className="mt-1" />
-                <label htmlFor={`resolve-keep-${pub.entityId}`} className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+                <label htmlFor={`resolve-keep-${pub.entityId}`} className="text-sm text-[#1A0A0A]">
                   {pub.title}
                 </label>
               </li>
             ))}
           </ul>
-          <p className="text-xs text-amber-800 dark:text-amber-300 mb-3">{t('selected', { selected: selected.size, limit: publicationLimit ?? 0 })}</p>
-          {error && <p className="text-xs text-red-600 dark:text-red-400 mb-3">{error}</p>}
+          <p className="text-xs text-amber-800 mb-3">{t('selected', { selected: selected.size, limit: publicationLimit ?? 0 })}</p>
+          {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
           <button
             onClick={submit}
             disabled={submitting || (publicationLimit !== null && selected.size > publicationLimit)}

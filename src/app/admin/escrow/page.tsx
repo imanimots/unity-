@@ -6,13 +6,13 @@ import { Search, Download } from 'lucide-react'
 import { StatCard, AdminPageHeader, inputClass, secondaryButtonClass, formatDate, formatMoney } from '@/components/admin/ui'
 
 const ESCROW_STATUS_LABELS: Record<string, { label: string; classes: string }> = {
-  pending: { label: 'Pending', classes: 'bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]' },
-  funded: { label: 'Funded', classes: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' },
-  released: { label: 'Released', classes: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' },
-  refunded: { label: 'Refunded', classes: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' },
-  partially_refunded: { label: 'Partially refunded', classes: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' },
-  cancelled: { label: 'Cancelled', classes: 'bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#9B8B85]' },
-  failed: { label: 'Failed', classes: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' },
+  pending: { label: 'Pending', classes: 'bg-[#F2EDE8] text-[#6B5B55]' },
+  funded: { label: 'Funded', classes: 'bg-blue-100 text-blue-700' },
+  released: { label: 'Released', classes: 'bg-green-100 text-green-700' },
+  refunded: { label: 'Refunded', classes: 'bg-amber-100 text-amber-700' },
+  partially_refunded: { label: 'Partially refunded', classes: 'bg-amber-100 text-amber-700' },
+  cancelled: { label: 'Cancelled', classes: 'bg-[#F2EDE8] text-[#9B8B85]' },
+  failed: { label: 'Failed', classes: 'bg-red-100 text-red-700' },
 }
 
 interface AdminEscrowRow {
@@ -94,13 +94,13 @@ export default function AdminEscrowPage() {
         </a>
       </div>
 
-      <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+      <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
                 {['Type', 'Reference', 'Amount', 'Provider', 'Status', 'Created', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A] whitespace-nowrap">
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -115,20 +115,20 @@ export default function AdminEscrowPage() {
                 <tr><td colSpan={7} className="px-4 py-16 text-center text-sm text-[#9B8B85]">No escrow transactions match your filters.</td></tr>
               ) : (
                 rows.map((r) => (
-                  <tr key={r.id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors last:border-0">
-                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] capitalize">{r.transactionType}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">
+                  <tr key={r.id} className="border-b border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors last:border-0">
+                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] capitalize">{r.transactionType}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">
                       {r.transactionReference ?? '—'}
                       {r.hasUnresolvedDispute && <span className="ml-2 text-[10px] uppercase text-red-600">Disputed</span>}
                     </td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55] dark:text-[#9B8B85]">{formatMoney(r.principalAmount, r.currency)}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{r.provider}</td>
+                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55]">{formatMoney(r.principalAmount, r.currency)}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">{r.provider}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${ESCROW_STATUS_LABELS[r.status]?.classes ?? ''}`}>
                         {ESCROW_STATUS_LABELS[r.status]?.label ?? r.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{formatDate(r.createdAt)}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{formatDate(r.createdAt)}</td>
                     <td className="px-4 py-3">
                       <Link href={`/admin/escrow/${r.id}`} className={secondaryButtonClass}>Inspect</Link>
                     </td>

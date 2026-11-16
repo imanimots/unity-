@@ -45,12 +45,12 @@ function SkillTaskPostGrid({ posts, emptyLabel }: { posts: PublicProfileSkillTas
         <Link
           key={post.id}
           href={`/barter/skill-task/${post.id}`}
-          className="p-4 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors"
+          className="p-4 bg-white rounded-xl border border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors"
         >
           <div className="text-xs uppercase tracking-[0.08em] text-[#9B8B85] mb-1">
             {post.kind === 'skill' ? tSkills('label') : tTasks('label')} · {deliveryLabel(post.delivery_mode)}
           </div>
-          <div className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] truncate mb-1">{post.title}</div>
+          <div className="text-sm font-medium text-[#1A0A0A] truncate mb-1">{post.title}</div>
           {post.description && <p className="text-xs text-[#9B8B85] line-clamp-2">{post.description}</p>}
         </Link>
       ))}
@@ -65,14 +65,14 @@ function SubDirectionToggle({ value, onChange, availableCount, lookingForCount }
     { key: 'looking_for', label: t('lookingFor'), count: lookingForCount },
   ]
   return (
-    <div className="inline-flex rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] p-0.5 mb-4">
+    <div className="inline-flex rounded-lg border border-[#F2EDE8] p-0.5 mb-4">
       {options.map((o) => (
         <button
           key={o.key}
           type="button"
           onClick={() => onChange(o.key)}
           className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-            value === o.key ? 'bg-[#8B1A1A] text-white' : 'text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A]'
+            value === o.key ? 'bg-[#8B1A1A] text-white' : 'text-[#6B5B55] hover:bg-[#F2EDE8]'
           }`}
         >
           {o.label} ({o.count})
@@ -153,7 +153,7 @@ export function ProfileTabs({
 
   return (
     <div>
-      <div role="tablist" aria-label={t('tabs.ariaLabel')} className="flex gap-1 border-b border-[#F2EDE8] dark:border-[#2A1A1A] mb-6">
+      <div role="tablist" aria-label={t('tabs.ariaLabel')} className="flex gap-1 border-b border-[#F2EDE8] mb-6">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -169,8 +169,8 @@ export function ProfileTabs({
             }}
             className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors -mb-px ${
               tab === t.key
-                ? 'border-[#8B1A1A] text-[#1A0A0A] dark:text-[#F5F0ED]'
-                : 'border-transparent text-[#9B8B85] hover:text-[#6B5B55] dark:hover:text-[#F5F0ED]'
+                ? 'border-[#8B1A1A] text-[#1A0A0A]'
+                : 'border-transparent text-[#9B8B85] hover:text-[#6B5B55]'
             }`}
           >
             {t.label} <span className="text-[#9B8B85]">({t.count})</span>
@@ -188,9 +188,9 @@ export function ProfileTabs({
                 <Link
                   key={listing.id}
                   href={`/listings/${listing.id}`}
-                  className="flex items-center gap-3 p-3 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors"
+                  className="flex items-center gap-3 p-3 bg-white rounded-xl border border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors"
                 >
-                  <div className="w-14 h-14 rounded-lg overflow-hidden bg-[#F2EDE8] dark:bg-[#2A1A1A] shrink-0 flex items-center justify-center text-lg">
+                  <div className="w-14 h-14 rounded-lg overflow-hidden bg-[#F2EDE8] shrink-0 flex items-center justify-center text-lg">
                     {listing.media?.[0]?.url ? (
                       <Image src={listing.media[0].url} alt={listing.title} width={56} height={56} className="w-full h-full object-cover" />
                     ) : (
@@ -198,7 +198,7 @@ export function ProfileTabs({
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] truncate">{listing.title}</div>
+                    <div className="text-sm font-medium text-[#1A0A0A] truncate">{listing.title}</div>
                     <div className="text-xs text-[#9B8B85]">{normalizedListingPrice(listing)}</div>
                   </div>
                 </Link>
@@ -218,10 +218,10 @@ export function ProfileTabs({
                 <Link
                   key={req.id}
                   href={`/looking-for/${req.id}`}
-                  className="p-4 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A] transition-colors"
+                  className="p-4 bg-white rounded-xl border border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors"
                 >
                   <div className="text-xs uppercase tracking-[0.08em] text-[#9B8B85] mb-1">{transactionModeLabel(tMode, req.transaction_type)}</div>
-                  <div className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] truncate">{req.title}</div>
+                  <div className="text-sm font-medium text-[#1A0A0A] truncate">{req.title}</div>
                 </Link>
               ))}
             </div>
@@ -256,10 +256,10 @@ export function ProfileTabs({
           ) : (
             <div className="space-y-4">
               {reviews.map((r) => (
-                <div key={r.id} className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-5">
+                <div key={r.id} className="bg-white rounded-xl border border-[#F2EDE8] p-5">
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-full bg-[#F2EDE8] dark:bg-[#2A1A1A] overflow-hidden flex items-center justify-center text-sm font-bold text-[#6B5B55] dark:text-[#9B8B85] shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-[#F2EDE8] overflow-hidden flex items-center justify-center text-sm font-bold text-[#6B5B55] shrink-0">
                         {r.reviewer?.avatarUrl ? (
                           <Image src={r.reviewer.avatarUrl} alt="" width={36} height={36} className="w-full h-full object-cover" />
                         ) : (
@@ -271,14 +271,14 @@ export function ProfileTabs({
                           userId={r.reviewer?.id}
                           displayName={r.reviewer?.displayName ?? t('reviewerFallbackName')}
                           currentUserId={currentUserId}
-                          className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]"
+                          className="text-sm font-semibold text-[#1A0A0A]"
                         />
                         <div className="text-xs text-[#9B8B85]">{new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'short' }).format(new Date(r.created_at))}</div>
                       </div>
                     </div>
                     <div className="flex gap-0.5 shrink-0" aria-label={t('starsAriaLabel', { rating: r.rating })}>
                       {[1, 2, 3, 4, 5].map((s) => (
-                        <Star key={s} size={13} className={s <= r.rating ? 'text-amber-400 fill-amber-400' : 'text-[#F2EDE8] dark:text-[#2A1A1A]'} fill="currentColor" />
+                        <Star key={s} size={13} className={s <= r.rating ? 'text-amber-400 fill-amber-400' : 'text-[#F2EDE8]'} fill="currentColor" />
                       ))}
                     </div>
                   </div>
@@ -290,12 +290,12 @@ export function ProfileTabs({
                   {r.textHidden ? (
                     <p className="text-sm italic text-[#9B8B85]">{t('textRemovedForPolicy')}</p>
                   ) : (
-                    r.comment && <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] leading-relaxed">{r.comment}</p>
+                    r.comment && <p className="text-sm text-[#6B5B55] leading-relaxed">{r.comment}</p>
                   )}
                   {r.reply && !r.reply.hidden && r.reply.text && (
-                    <div className="mt-3 pl-3 border-l-2 border-[#F2EDE8] dark:border-[#2A1A1A]">
+                    <div className="mt-3 pl-3 border-l-2 border-[#F2EDE8]">
                       <p className="text-xs font-semibold text-[#9B8B85] mb-1">{t('replyLabel')}</p>
-                      <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] leading-relaxed">{r.reply.text}</p>
+                      <p className="text-sm text-[#6B5B55] leading-relaxed">{r.reply.text}</p>
                     </div>
                   )}
                 </div>
@@ -305,7 +305,7 @@ export function ProfileTabs({
                   type="button"
                   onClick={loadMoreReviews}
                   disabled={loadingMore}
-                  className="w-full py-2.5 border border-[#E8E0D8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] font-medium rounded-xl text-sm hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors disabled:opacity-50"
+                  className="w-full py-2.5 border border-[#E8E0D8] text-[#6B5B55] font-medium rounded-xl text-sm hover:bg-[#F2EDE8] transition-colors disabled:opacity-50"
                 >
                   {loadingMore ? t('loadingMore') : t('loadMoreReviews')}
                 </button>
@@ -320,7 +320,7 @@ export function ProfileTabs({
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-10 text-center">
+    <div className="bg-white rounded-xl border border-[#F2EDE8] p-10 text-center">
       <p className="text-sm text-[#9B8B85]">{message}</p>
     </div>
   )

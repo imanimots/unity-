@@ -119,18 +119,18 @@ export function DowngradeConsentModal({ currentPlan, targetPlan, onClose, onConf
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label={t('title')}>
-      <div className="bg-white dark:bg-[#1A1010] rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 sm:p-8">
-        <h2 className="text-lg font-extrabold uppercase tracking-tight text-[#1A0A0A] dark:text-[#F5F0ED] mb-1">{t('title')}</h2>
+      <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 sm:p-8">
+        <h2 className="text-lg font-extrabold uppercase tracking-tight text-[#1A0A0A] mb-1">{t('title')}</h2>
         <p className="text-xs text-[#9B8B85] mb-6">{t('stepLabel', { current: step === 'compare' ? 1 : step === 'keepset' ? 2 : step === 'reason' ? 3 : 4, total: needsKeepSet ? 4 : 3 })}</p>
 
         {step === 'compare' && (
           <div>
-            <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-4">{t('compareIntro', { from: currentPlan.display_name, to: targetPlan.display_name })}</p>
+            <p className="text-sm text-[#6B5B55] mb-4">{t('compareIntro', { from: currentPlan.display_name, to: targetPlan.display_name })}</p>
             <ul className="space-y-2 mb-6">
               {changeKeys.map((key) => (
                 <li key={key} className="flex items-start gap-2">
                   <input type="checkbox" id={`ack-${key}`} checked={acknowledged.has(key)} onChange={() => toggleAck(key)} className="mt-1" />
-                  <label htmlFor={`ack-${key}`} className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+                  <label htmlFor={`ack-${key}`} className="text-sm text-[#1A0A0A]">
                     {t(`changes.${key}`)}
                   </label>
                 </li>
@@ -141,14 +141,14 @@ export function DowngradeConsentModal({ currentPlan, targetPlan, onClose, onConf
 
         {step === 'keepset' && publications && (
           <div>
-            <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mb-4">
+            <p className="text-sm text-[#6B5B55] mb-4">
               {t('keepSetIntro', { limit: targetPlan.active_publication_limit ?? 0, count: publications.length })}
             </p>
             <ul className="space-y-2 mb-4 max-h-64 overflow-y-auto">
               {publications.map((pub) => (
                 <li key={pub.entityId} className="flex items-start gap-2">
                   <input type="checkbox" id={`keep-${pub.entityId}`} checked={selectedKeepIds.has(pub.entityId)} onChange={() => toggleKeep(pub.entityId)} className="mt-1" />
-                  <label htmlFor={`keep-${pub.entityId}`} className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+                  <label htmlFor={`keep-${pub.entityId}`} className="text-sm text-[#1A0A0A]">
                     {pub.title}
                   </label>
                 </li>
@@ -161,7 +161,7 @@ export function DowngradeConsentModal({ currentPlan, targetPlan, onClose, onConf
         {step === 'reason' && (
           <div>
             <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-[#9B8B85] mb-2">{t('reasonLabel')}</label>
-            <select value={reasonCategory} onChange={(e) => setReasonCategory(e.target.value as DowngradeReasonCategory)} className="w-full mb-4 px-3 py-2 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] bg-transparent text-sm">
+            <select value={reasonCategory} onChange={(e) => setReasonCategory(e.target.value as DowngradeReasonCategory)} className="w-full mb-4 px-3 py-2 rounded-lg border border-[#F2EDE8] bg-transparent text-sm">
               {DOWNGRADE_REASON_CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>
                   {t(`reasonCategories.${cat}`)}
@@ -172,7 +172,7 @@ export function DowngradeConsentModal({ currentPlan, targetPlan, onClose, onConf
               value={reasonText}
               onChange={(e) => setReasonText(e.target.value)}
               placeholder={t('reasonTextPlaceholder')}
-              className="w-full px-3 py-2 rounded-lg border border-[#F2EDE8] dark:border-[#2A1A1A] bg-transparent text-sm min-h-[80px]"
+              className="w-full px-3 py-2 rounded-lg border border-[#F2EDE8] bg-transparent text-sm min-h-[80px]"
               maxLength={1000}
             />
           </div>
@@ -180,16 +180,16 @@ export function DowngradeConsentModal({ currentPlan, targetPlan, onClose, onConf
 
         {step === 'confirm' && (
           <div>
-            <p className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED] mb-2 font-semibold">{t('confirmSummary', { plan: targetPlan.display_name })}</p>
+            <p className="text-sm text-[#1A0A0A] mb-2 font-semibold">{t('confirmSummary', { plan: targetPlan.display_name })}</p>
             <p className="text-xs text-[#9B8B85] mb-4">{t('confirmEffective')}</p>
             {needsKeepSet && <p className="text-xs text-[#9B8B85] mb-4">{t('confirmKeepSet', { count: selectedKeepIds.size })}</p>}
           </div>
         )}
 
-        {error && <p className="text-xs text-red-600 dark:text-red-400 mb-4">{error}</p>}
+        {error && <p className="text-xs text-red-600 mb-4">{error}</p>}
 
         <div className="flex items-center justify-between gap-3 mt-4">
-          <button onClick={step === 'compare' ? onClose : goBack} className="text-xs font-semibold uppercase tracking-[0.08em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED]">
+          <button onClick={step === 'compare' ? onClose : goBack} className="text-xs font-semibold uppercase tracking-[0.08em] text-[#9B8B85] hover:text-[#1A0A0A]">
             {step === 'compare' ? t('cancelAction') : t('backAction')}
           </button>
           {step !== 'confirm' ? (

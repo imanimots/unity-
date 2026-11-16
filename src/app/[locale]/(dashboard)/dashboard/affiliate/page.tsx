@@ -38,14 +38,14 @@ function BecomeAffiliateCard({ onActivate, loading }: { onActivate: () => void; 
   const tBecome = useTranslations('merchant.affiliateProgram.becomeAffiliate')
   return (
     <div className="max-w-lg mx-auto text-center py-8">
-      <div className="w-20 h-20 rounded-full bg-[#F2EDE8] dark:bg-[#2A1A1A] flex items-center justify-center mx-auto mb-8">
+      <div className="w-20 h-20 rounded-full bg-[#F2EDE8] flex items-center justify-center mx-auto mb-8">
         <Zap size={36} className="text-[#C4511F]" />
       </div>
       <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{t('sectionLabel')}</p>
-      <h2 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight mb-6">
+      <h2 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] tracking-tight mb-6">
         {tBecome('heading')}
       </h2>
-      <p className="text-[#6B5B55] dark:text-[#9B8B85] mb-2 leading-relaxed">
+      <p className="text-[#6B5B55] mb-2 leading-relaxed">
         {tBecome('description')}
       </p>
       <p className="text-sm text-[#9B8B85] mb-10">
@@ -58,9 +58,9 @@ function BecomeAffiliateCard({ onActivate, loading }: { onActivate: () => void; 
           { icon: <Star size={20} className="text-[#C4511F]" />, label: tBecome('earnCommission'), desc: tBecome('earnCommissionDesc') },
           { icon: <TrendingUp size={20} className="text-[#C4511F]" />, label: tBecome('trackEarnings'), desc: tBecome('trackEarningsDesc') },
         ].map(({ icon, label, desc }) => (
-          <div key={label} className="p-4 rounded-xl bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A]">
+          <div key={label} className="p-4 rounded-xl bg-white border border-[#F2EDE8]">
             <div className="flex justify-center mb-2">{icon}</div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">{label}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#1A0A0A]">{label}</p>
             <p className="text-[11px] text-[#9B8B85] mt-1 leading-tight">{desc}</p>
           </div>
         ))}
@@ -147,7 +147,7 @@ export default function AffiliateDashboardPage() {
     return (
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <Link href="/dashboard/renter" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+          <Link href="/dashboard/renter" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
             <ArrowLeft size={13} /> {t('back')}
           </Link>
         </div>
@@ -176,19 +176,19 @@ export default function AffiliateDashboardPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <Link href="/dashboard/renter" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+        <Link href="/dashboard/renter" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
           <ArrowLeft size={13} /> {t('back')}
         </Link>
       </div>
 
       <div className="mb-12">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{t('sectionLabel')}</p>
-        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight">
+        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] tracking-tight">
           {t('heading')}
         </h1>
       </div>
 
-      <div className="bg-[#1A0A0A] dark:bg-[#0F0A0A] rounded-xl p-8 mb-12 border border-[#2A1A1A]">
+      <div className="bg-[#1A0A0A] rounded-xl p-8 mb-12 border border-[#2A1A1A]">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-4">{t('yourCode')}</p>
         <div className="text-5xl lg:text-6xl font-extrabold tracking-widest text-white leading-none mb-6">{affiliateCode}</div>
         <div className="flex items-center gap-3">
@@ -208,35 +208,35 @@ export default function AffiliateDashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12">
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">{t('totalPaid')}</p>
             <TrendingUp size={14} className="text-green-500" />
           </div>
-          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">{formatMoneyFromRands(totalPaid, 'ZAR', locale)}</div>
+          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] leading-none">{formatMoneyFromRands(totalPaid, 'ZAR', locale)}</div>
         </div>
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">{t('inProgress')}</p>
             <Clock size={14} className="text-amber-400" />
           </div>
-          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">{formatMoneyFromRands(totalPending, 'ZAR', locale)}</div>
+          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] leading-none">{formatMoneyFromRands(totalPending, 'ZAR', locale)}</div>
         </div>
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">{t('commissionsCount')}</p>
             <Users size={14} className="text-[#9B8B85]" />
           </div>
-          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">{commissions.length}</div>
+          <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] leading-none">{commissions.length}</div>
         </div>
       </div>
 
       <Link
         href="/dashboard/payout-settings"
-        className="flex items-center justify-between gap-3 p-4 mb-12 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] hover:border-[#8B1A1A] transition-colors"
+        className="flex items-center justify-between gap-3 p-4 mb-12 bg-white rounded-xl border border-[#F2EDE8] hover:border-[#8B1A1A] transition-colors"
       >
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">{t('payoutAccountLink.title')}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#1A0A0A]">{t('payoutAccountLink.title')}</p>
           <p className="text-xs text-[#9B8B85] mt-0.5">{t('payoutAccountLink.description')}</p>
         </div>
         <ArrowLeft size={14} className="rotate-180 text-[#9B8B85] shrink-0" />
@@ -260,13 +260,13 @@ export default function AffiliateDashboardPage() {
       <div className="mb-12">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{t('commissionHistory')}</p>
 
-        <div className="flex gap-0 mb-6 border-b border-[#F2EDE8] dark:border-[#2A1A1A] overflow-x-auto">
+        <div className="flex gap-0 mb-6 border-b border-[#F2EDE8] overflow-x-auto">
           {(['all', 'pending', 'held', 'approved', 'payout_queued', 'paid', 'failed', 'voided'] as const).map((key) => (
             <button
               key={key}
               onClick={() => setTab(key)}
               className={`px-4 py-3 text-[11px] font-medium uppercase tracking-[0.12em] border-b-2 -mb-px transition-colors whitespace-nowrap ${
-                tab === key ? 'border-[#8B1A1A] text-[#8B1A1A]' : 'border-transparent text-[#6B5B55] dark:text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED]'
+                tab === key ? 'border-[#8B1A1A] text-[#8B1A1A]' : 'border-transparent text-[#6B5B55] hover:text-[#1A0A0A]'
               }`}
             >
               {key === 'all' ? t('all') : t(`commissionStatus.${key}`)}
@@ -280,8 +280,8 @@ export default function AffiliateDashboardPage() {
             <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">{t('noCommissionsInCategory')}</p>
           </div>
         ) : (
-          <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] overflow-hidden">
-            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-5 py-3 border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
+          <div className="bg-white rounded-xl border border-[#F2EDE8] overflow-hidden">
+            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-5 py-3 border-b border-[#F2EDE8]">
               <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85]">{t('table.listing')}</span>
               <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] text-right">{t('table.type')}</span>
               <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] text-right">{t('table.commission')}</span>
@@ -289,13 +289,13 @@ export default function AffiliateDashboardPage() {
             </div>
             <div>
               {filtered.map((c) => (
-                <div key={c.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 items-center px-5 py-4 border-b border-[#F2EDE8] dark:border-[#2A1A1A] last:border-b-0 hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors">
+                <div key={c.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 items-center px-5 py-4 border-b border-[#F2EDE8] last:border-b-0 hover:bg-[#FAF8F5] transition-colors">
                   <div>
-                    <div className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] truncate pr-2">{c.listingTitle ?? '—'}</div>
+                    <div className="text-sm font-medium text-[#1A0A0A] truncate pr-2">{c.listingTitle ?? '—'}</div>
                     <div className="text-xs text-[#9B8B85]">{formatDate(c.createdAt, locale)}</div>
                   </div>
-                  <div className="text-sm text-[#6B5B55] dark:text-[#9B8B85] text-right capitalize">{c.transactionType}</div>
-                  <div className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] text-right">{formatMoneyFromRands(c.commissionAmount, 'ZAR', locale)}</div>
+                  <div className="text-sm text-[#6B5B55] text-right capitalize">{c.transactionType}</div>
+                  <div className="text-sm font-semibold text-[#1A0A0A] text-right">{formatMoneyFromRands(c.commissionAmount, 'ZAR', locale)}</div>
                   <div className="flex justify-end">
                     <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${AFFILIATE_COMMISSION_STATUS_LABELS[c.status].classes}`}>
                       {t(`commissionStatus.${c.status}`)}
@@ -310,7 +310,7 @@ export default function AffiliateDashboardPage() {
 
       <p className="text-xs text-[#9B8B85] text-center">
         {t('footerNotice')}{' '}
-        <Link href="/chat" className="underline hover:text-[#6B5B55] dark:hover:text-[#9B8B85]">{t('contactSupport')}</Link>
+        <Link href="/chat" className="underline hover:text-[#6B5B55]">{t('contactSupport')}</Link>
       </p>
     </div>
   )
@@ -333,16 +333,16 @@ function AffiliateListingCard({ listing, affiliateCode }: { listing: AffiliateLi
   }
 
   return (
-    <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-4">
+    <div className="bg-white border border-[#F2EDE8] rounded-xl p-4">
       <div className="flex items-center gap-3 mb-3">
         {listing.thumbnail_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={listing.thumbnail_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
         ) : (
-          <div className="w-12 h-12 rounded-lg bg-[#F2EDE8] dark:bg-[#2A1A1A] shrink-0" />
+          <div className="w-12 h-12 rounded-lg bg-[#F2EDE8] shrink-0" />
         )}
         <div className="min-w-0">
-          <p className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] truncate">{listing.title}</p>
+          <p className="text-sm font-medium text-[#1A0A0A] truncate">{listing.title}</p>
           <p className="text-xs text-[#9B8B85]">{t('commissionRatePct', { rate: listing.commission_rate })}</p>
         </div>
       </div>

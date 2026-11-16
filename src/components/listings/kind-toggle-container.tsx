@@ -33,7 +33,7 @@ function KindToggleInner() {
   )
 
   return (
-    <div role="radiogroup" aria-label="Items, Skills, or Tasks" className="inline-flex rounded-full border border-[#E8E0D8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] p-1">
+    <div role="radiogroup" aria-label="Items, Skills, or Tasks" className="inline-flex rounded-full border border-[#E8E0D8] bg-white p-1">
       {(['item', 'skill', 'task'] as const).map((id) => {
         const selected = kind === id
         return (
@@ -47,7 +47,7 @@ function KindToggleInner() {
               'px-4 py-2 rounded-full text-sm font-semibold transition-colors',
               selected
                 ? 'bg-[#8B1A1A] text-white'
-                : 'text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#FAF8F5] dark:hover:bg-[#2A1A1A]'
+                : 'text-[#6B5B55] hover:bg-[#FAF8F5]'
             )}
           >
             {id === 'item' ? 'Items' : id === 'skill' ? 'Skills' : 'Tasks'}

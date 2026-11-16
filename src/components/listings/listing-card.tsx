@@ -68,7 +68,7 @@ export function ListingCard({ listing, priority = false, verifiedLabel }: Listin
   return (
     <Link href={`/listings/${listing.id}`} className="group block" onClick={handleSponsoredClick}>
       {/* Image */}
-      <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-[#F2EDE8] dark:bg-[#2A1A1A] mb-3">
+      <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-[#F2EDE8] mb-3">
         {coverImage ? (
           <Image
             src={coverImage}
@@ -89,17 +89,17 @@ export function ListingCard({ listing, priority = false, verifiedLabel }: Listin
         {/* Badges */}
         <div className="absolute top-3 left-3 flex gap-1.5">
           {listing.sponsored && (
-            <span className="inline-flex items-center bg-[#1A0A0A]/90 dark:bg-white/90 backdrop-blur-sm rounded-full px-2 py-0.5 text-[11px] font-semibold text-white dark:text-[#1A0A0A] shadow-sm">
+            <span className="inline-flex items-center bg-[#1A0A0A]/90 backdrop-blur-sm rounded-full px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm">
               {tAdvertising('sponsoredLabel')}
             </span>
           )}
           {listing.ownership_verified && verifiedLabel && (
-            <span className="inline-flex items-center gap-1 bg-white/95 dark:bg-[#1A1010]/95 backdrop-blur-sm rounded-full px-2 py-0.5 text-[11px] font-medium text-[#1A0A0A] dark:text-[#F5F0ED] shadow-sm">
+            <span className="inline-flex items-center gap-1 bg-white/95 backdrop-blur-sm rounded-full px-2 py-0.5 text-[11px] font-medium text-[#1A0A0A] shadow-sm">
               <ShieldCheck size={10} className="text-green-500" /> {verifiedLabel}
             </span>
           )}
           {listing.condition && (
-            <span className="inline-flex items-center bg-white/95 dark:bg-[#1A1010]/95 backdrop-blur-sm rounded-full px-2 py-0.5 text-[11px] font-medium text-[#6B5B55] dark:text-[#9B8B85] shadow-sm">
+            <span className="inline-flex items-center bg-white/95 backdrop-blur-sm rounded-full px-2 py-0.5 text-[11px] font-medium text-[#6B5B55] shadow-sm">
               {CONDITION_LABEL[listing.condition]}
             </span>
           )}
@@ -108,7 +108,7 @@ export function ListingCard({ listing, priority = false, verifiedLabel }: Listin
         {/* Wishlist */}
         <button
           onClick={(e) => e.preventDefault()}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/95 dark:bg-[#1A1010]/95 backdrop-blur-sm flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
+          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/95 backdrop-blur-sm flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
           aria-label="Save to wishlist"
         >
           <Heart size={14} className="text-[#9B8B85] hover:text-red-500 transition-colors" />
@@ -118,7 +118,7 @@ export function ListingCard({ listing, priority = false, verifiedLabel }: Listin
       {/* Info */}
       <div className="space-y-1.5">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] text-sm leading-snug line-clamp-2 group-hover:text-[#8B1A1A] transition-colors">
+          <h3 className="font-extrabold text-[#1A0A0A] text-sm leading-snug line-clamp-2 group-hover:text-[#8B1A1A] transition-colors">
             {listing.title}
           </h3>
         </div>
@@ -127,7 +127,7 @@ export function ListingCard({ listing, priority = false, verifiedLabel }: Listin
           <span className="flex items-center gap-1">
             <MapPin size={10} /> {city}
           </span>
-          <span className="text-[#F2EDE8] dark:text-[#2A1A1A]">·</span>
+          <span className="text-[#F2EDE8]">·</span>
           <span>{categoryLabel}</span>
         </div>
 
@@ -135,7 +135,7 @@ export function ListingCard({ listing, priority = false, verifiedLabel }: Listin
           {rating.show ? (
             <div className="flex items-center gap-1 text-xs text-[#9B8B85]">
               <Star size={11} className="text-amber-400 fill-amber-400" />
-              <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{rating.score.toFixed(1)}</span>
+              <span className="font-medium text-[#1A0A0A]">{rating.score.toFixed(1)}</span>
               <span>({rating.reviewCount})</span>
             </div>
           ) : (

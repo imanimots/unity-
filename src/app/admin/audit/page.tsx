@@ -50,13 +50,13 @@ export default function AdminAuditPage() {
         </a>
       </div>
 
-      <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+      <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
                 {['Actor', 'Action', 'Entity', 'Result', 'Reason', 'When'].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A] whitespace-nowrap">
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -71,13 +71,13 @@ export default function AdminAuditPage() {
                 <tr><td colSpan={6} className="px-4 py-16 text-center text-sm text-[#9B8B85]">No admin actions recorded yet.</td></tr>
               ) : (
                 entries.map((e) => (
-                  <tr key={`${e.entityType}-${e.id}`} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors last:border-0">
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{e.actorId ? e.actorId.slice(0, 8) : 'system'}</td>
-                    <td className="px-4 py-3 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] capitalize whitespace-nowrap">{e.actionType.replace(/_/g, ' ')}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{e.entityType} {e.entityId.slice(0, 8)}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{e.result}</td>
-                    <td className="px-4 py-3 text-xs text-[#6B5B55] dark:text-[#9B8B85] max-w-xs">{e.safeReason ?? '—'}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85] whitespace-nowrap">{formatDateTime(e.createdAt)}</td>
+                  <tr key={`${e.entityType}-${e.id}`} className="border-b border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors last:border-0">
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{e.actorId ? e.actorId.slice(0, 8) : 'system'}</td>
+                    <td className="px-4 py-3 text-sm text-[#1A0A0A] capitalize whitespace-nowrap">{e.actionType.replace(/_/g, ' ')}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{e.entityType} {e.entityId.slice(0, 8)}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{e.result}</td>
+                    <td className="px-4 py-3 text-xs text-[#6B5B55] max-w-xs">{e.safeReason ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55] whitespace-nowrap">{formatDateTime(e.createdAt)}</td>
                   </tr>
                 ))
               )}

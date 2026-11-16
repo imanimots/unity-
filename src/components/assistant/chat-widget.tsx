@@ -71,7 +71,7 @@ function MessageBubble({ message }: { message: Message }) {
           className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
             isUser
               ? 'bg-[#8B1A1A] text-white rounded-br-sm'
-              : 'bg-white dark:bg-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-bl-sm'
+              : 'bg-white text-[#1A0A0A] border border-[#F2EDE8] rounded-bl-sm'
           }`}
         >
           {message.content}
@@ -286,7 +286,7 @@ export function ChatWidget() {
         aria-label={isOpen ? 'Close assistant' : 'Open Unity Assistant'}
         className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 ${
           isOpen
-            ? 'bg-[#1A0A0A] dark:bg-[#2A1A1A] text-white rotate-0'
+            ? 'bg-[#1A0A0A] text-white rotate-0'
             : 'bg-[#8B1A1A] text-white hover:bg-[#7A1616] hover:scale-105'
         }`}
       >
@@ -312,8 +312,8 @@ export function ChatWidget() {
           inset-x-0 sm:inset-x-auto sm:w-[420px]
           h-[90vh] sm:h-[600px]
           sm:bottom-24 sm:rounded-2xl
-          bg-[#FAF8F5] dark:bg-[#0F0A0A]
-          border border-[#F2EDE8] dark:border-[#2A1A1A]
+          bg-[#FAF8F5]
+          border border-[#F2EDE8]
           shadow-2xl overflow-hidden
           transition-all duration-300 ease-out
           ${isOpen
@@ -322,7 +322,7 @@ export function ChatWidget() {
           }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-[#1A0A0A] dark:bg-[#0F0A0A] shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 bg-[#1A0A0A] shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full bg-[#8B1A1A] flex items-center justify-center text-white text-xs font-bold">
               U
@@ -374,7 +374,7 @@ export function ChatWidget() {
               <div className="w-7 h-7 rounded-full bg-[#8B1A1A] flex items-center justify-center text-white text-[10px] font-bold shrink-0 mr-2 mt-1">
                 U
               </div>
-              <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-white dark:bg-[#2A1A1A] border border-[#F2EDE8] dark:border-[#2A1A1A]">
+              <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-white border border-[#F2EDE8]">
                 <TypingDots />
               </div>
             </div>
@@ -386,7 +386,7 @@ export function ChatWidget() {
         </div>
 
         {/* Input bar */}
-        <div className="px-3 py-3 border-t border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] shrink-0">
+        <div className="px-3 py-3 border-t border-[#F2EDE8] bg-white shrink-0">
           {!voiceSupported && isListening === false && (
             <p className="text-[10px] text-[#9B8B85] mb-1.5 px-1">
               Voice input not supported in this browser.
@@ -400,7 +400,7 @@ export function ChatWidget() {
               onKeyDown={handleKeyDown}
               placeholder="Ask anything about Unity…"
               rows={1}
-              className="flex-1 resize-none bg-[#FAF8F5] dark:bg-[#0F0A0A] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl px-3.5 py-2.5 text-sm text-[#1A0A0A] dark:text-[#F5F0ED] placeholder:text-[#9B8B85] focus:outline-none focus:border-[#8B1A1A] focus:ring-1 focus:ring-[#8B1A1A]/20 max-h-28 overflow-y-auto leading-relaxed"
+              className="flex-1 resize-none bg-[#FAF8F5] border border-[#F2EDE8] rounded-xl px-3.5 py-2.5 text-sm text-[#1A0A0A] placeholder:text-[#9B8B85] focus:outline-none focus:border-[#8B1A1A] focus:ring-1 focus:ring-[#8B1A1A]/20 max-h-28 overflow-y-auto leading-relaxed"
               style={{ minHeight: '42px' }}
             />
             {/* Voice input */}
@@ -410,7 +410,7 @@ export function ChatWidget() {
                 className={`p-2.5 rounded-xl transition-colors shrink-0 ${
                   isListening
                     ? 'bg-[#E03D2F] text-white animate-pulse'
-                    : 'bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#8B1A1A] hover:text-white'
+                    : 'bg-[#F2EDE8] text-[#6B5B55] hover:bg-[#8B1A1A] hover:text-white'
                 }`}
                 aria-label={isListening ? 'Stop listening' : 'Start voice input'}
               >

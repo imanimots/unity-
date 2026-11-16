@@ -7,7 +7,7 @@ import type { Listing, BarterDeliveryMethod, BarterDeliveryResponsibility, Barte
 import { ContributionListEditor, contributionsValid, type ContributionInput } from './contribution-builder'
 
 const inputClass =
-  'w-full px-3.5 py-2.5 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-sm text-[#1A0A0A] dark:text-[#F5F0ED] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20'
+  'w-full px-3.5 py-2.5 rounded-xl border border-[#F2EDE8] bg-white text-sm text-[#1A0A0A] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20'
 
 const DELIVERY_METHODS: { value: BarterDeliveryMethod; label: string }[] = [
   { value: 'meet_in_person', label: 'Meet in person' },
@@ -102,8 +102,8 @@ function ListingPickerGrid({
             aria-pressed={isSelected}
             className={`relative text-left rounded-xl border p-2 transition-colors ${
               isSelected
-                ? 'border-[#8B1A1A] bg-[#F2EDE8] dark:bg-[#2A1A1A]'
-                : 'border-[#F2EDE8] dark:border-[#2A1A1A] hover:border-[#8B1A1A]/50'
+                ? 'border-[#8B1A1A] bg-[#F2EDE8]'
+                : 'border-[#F2EDE8] hover:border-[#8B1A1A]/50'
             }`}
           >
             {isSelected && (
@@ -111,12 +111,12 @@ function ListingPickerGrid({
                 <Check size={12} strokeWidth={3} />
               </span>
             )}
-            <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-[#F2EDE8] dark:bg-[#2A1A1A] mb-1.5">
+            <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-[#F2EDE8] mb-1.5">
               {listing.media?.[0]?.url ? (
                 <Image src={listing.media[0].url} alt={listing.title} fill className="object-cover" sizes="120px" />
               ) : null}
             </div>
-            <p className="text-xs font-medium text-[#1A0A0A] dark:text-[#F5F0ED] line-clamp-2">{listing.title}</p>
+            <p className="text-xs font-medium text-[#1A0A0A] line-clamp-2">{listing.title}</p>
           </button>
         )
       })}
@@ -270,7 +270,7 @@ export function OfferBuilderForm({
     <form onSubmit={handleSubmit} className="space-y-5">
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">You&apos;re offering</label>
+          <label className="text-sm font-semibold text-[#1A0A0A]">You&apos;re offering</label>
           <button
             type="button"
             onClick={() => onCreateNewListing(Array.from(selectedMine), Array.from(selectedTheirs))}
@@ -288,7 +288,7 @@ export function OfferBuilderForm({
       </div>
 
       <div>
-        <label className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] mb-2 block">You&apos;re requesting</label>
+        <label className="text-sm font-semibold text-[#1A0A0A] mb-2 block">You&apos;re requesting</label>
         <ListingPickerGrid
           listings={theirListings}
           selected={selectedTheirs}
@@ -313,7 +313,7 @@ export function OfferBuilderForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1 block">Cash adjustment (optional)</label>
+          <label className="text-xs font-medium text-[#6B5B55] mb-1 block">Cash adjustment (optional)</label>
           <input
             type="number"
             min={0}
@@ -326,7 +326,7 @@ export function OfferBuilderForm({
         </div>
         {cashAmount > 0 && (
           <div>
-            <label className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1 block">Who pays?</label>
+            <label className="text-xs font-medium text-[#6B5B55] mb-1 block">Who pays?</label>
             <select value={cashPayer} onChange={(e) => setCashPayer(e.target.value as typeof cashPayer)} className={inputClass}>
               <option value="">Select…</option>
               <option value="me">I pay</option>
@@ -338,7 +338,7 @@ export function OfferBuilderForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1 block">Delivery method</label>
+          <label className="text-xs font-medium text-[#6B5B55] mb-1 block">Delivery method</label>
           <select value={deliveryMethod} onChange={(e) => setDeliveryMethod(e.target.value as BarterDeliveryMethod)} className={inputClass}>
             {DELIVERY_METHODS.map((d) => (
               <option key={d.value} value={d.value}>{d.label}</option>
@@ -346,7 +346,7 @@ export function OfferBuilderForm({
           </select>
         </div>
         <div>
-          <label className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1 block">Who arranges it?</label>
+          <label className="text-xs font-medium text-[#6B5B55] mb-1 block">Who arranges it?</label>
           <select
             value={deliveryResponsibility}
             onChange={(e) => setDeliveryResponsibility(e.target.value as BarterDeliveryResponsibility)}
@@ -361,7 +361,7 @@ export function OfferBuilderForm({
       </div>
 
       <div>
-        <label className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1 block">Delivery notes (optional)</label>
+        <label className="text-xs font-medium text-[#6B5B55] mb-1 block">Delivery notes (optional)</label>
         <textarea
           value={deliveryNotes}
           onChange={(e) => setDeliveryNotes(e.target.value)}
@@ -372,7 +372,7 @@ export function OfferBuilderForm({
       </div>
 
       {hasAnyContribution && (
-        <label className="flex items-center gap-2 text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">
+        <label className="flex items-center gap-2 text-sm font-medium text-[#1A0A0A]">
           <input
             type="checkbox"
             checked={useAdvancedDeposits}
@@ -387,15 +387,15 @@ export function OfferBuilderForm({
       )}
 
       {!useAdvancedDeposits && (
-        <div className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-3.5 space-y-3">
-          <label className="flex items-center gap-2 text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+        <div className="rounded-xl border border-[#F2EDE8] p-3.5 space-y-3">
+          <label className="flex items-center gap-2 text-sm font-semibold text-[#1A0A0A]">
             <input type="checkbox" checked={depositRequired} onChange={(e) => setDepositRequired(e.target.checked)} className="accent-[#8B1A1A]" />
             Require a deposit
           </label>
           {depositRequired && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1 block">Amount</label>
+                <label className="text-xs font-medium text-[#6B5B55] mb-1 block">Amount</label>
                 <input
                   type="number"
                   min={0}
@@ -407,7 +407,7 @@ export function OfferBuilderForm({
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1 block">Who pays?</label>
+                <label className="text-xs font-medium text-[#6B5B55] mb-1 block">Who pays?</label>
                 <select value={depositPayer} onChange={(e) => setDepositPayer(e.target.value as typeof depositPayer)} className={inputClass}>
                   <option value="">Select…</option>
                   <option value="me">I pay</option>
@@ -421,7 +421,7 @@ export function OfferBuilderForm({
       )}
 
       {useAdvancedDeposits && (
-        <div className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="rounded-xl border border-[#F2EDE8] p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#9B8B85]">Your deposit</p>
             <input type="number" min={0} step="0.01" value={myDepositAmount || ''} onChange={(e) => setMyDepositAmount(Number(e.target.value) || 0)} placeholder="R 0.00" className={inputClass} />
@@ -442,7 +442,7 @@ export function OfferBuilderForm({
       )}
 
       <div>
-        <label className="text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1 block">Message (optional)</label>
+        <label className="text-xs font-medium text-[#6B5B55] mb-1 block">Message (optional)</label>
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}

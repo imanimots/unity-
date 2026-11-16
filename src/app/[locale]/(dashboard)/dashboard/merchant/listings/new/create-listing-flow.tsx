@@ -156,17 +156,17 @@ function FieldError({ message }: { message?: string }) {
 
 function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <label className="block text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] mb-1.5">
+    <label className="block text-sm font-semibold text-[#1A0A0A] mb-1.5">
       {children}{required && <span className="text-[#E03D2F] ml-0.5">*</span>}
     </label>
   )
 }
 
 function inputCls(hasError?: boolean) {
-  return `w-full px-3.5 py-2.5 rounded-xl border text-sm bg-white dark:bg-[#1A1010] text-[#1A0A0A] dark:text-[#F5F0ED] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 transition-colors ${
+  return `w-full px-3.5 py-2.5 rounded-xl border text-sm bg-white text-[#1A0A0A] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 transition-colors ${
     hasError
-      ? 'border-[#E03D2F]/50 dark:border-[#E03D2F]/40 focus:border-[#E03D2F] focus:ring-[#E03D2F]/20'
-      : 'border-[#F2EDE8] dark:border-[#2A1A1A] focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20'
+      ? 'border-[#E03D2F]/50 focus:border-[#E03D2F] focus:ring-[#E03D2F]/20'
+      : 'border-[#F2EDE8] focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20'
   }`
 }
 
@@ -174,7 +174,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   return (
     <label className="relative inline-flex items-center cursor-pointer">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="sr-only peer" />
-      <div className="w-11 h-6 bg-[#F2EDE8] dark:bg-[#2A1A1A] rounded-full peer peer-checked:bg-[#8B1A1A] transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5" />
+      <div className="w-11 h-6 bg-[#F2EDE8] rounded-full peer peer-checked:bg-[#8B1A1A] transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5" />
     </label>
   )
 }
@@ -214,7 +214,7 @@ function CategoryFieldsSection({ category, register }: {
   if (!set) return null
 
   return (
-    <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-4">
+    <div className="border border-[#F2EDE8] rounded-2xl p-4 space-y-4">
       <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">
         {t('basics.categoryDetailsHeading', { category: tCategories(category) })}
       </p>
@@ -267,8 +267,8 @@ function TypeStep({ onNext, defaults }: { onNext: (t: ListingType) => void; defa
             onClick={() => setSelected(value)}
             className={`relative flex flex-col items-start gap-2 p-5 rounded-xl border-2 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B1A1A] focus-visible:ring-offset-2 ${
               selected === value
-                ? 'border-[#8B1A1A] bg-[#FAF8F5] dark:bg-[#1A1010]'
-                : 'border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] hover:border-[#8B1A1A]/40'
+                ? 'border-[#8B1A1A] bg-[#FAF8F5]'
+                : 'border-[#F2EDE8] bg-white hover:border-[#8B1A1A]/40'
             }`}
           >
             {selected === value && (
@@ -277,8 +277,8 @@ function TypeStep({ onNext, defaults }: { onNext: (t: ListingType) => void; defa
               </span>
             )}
             <div className="text-[#8B1A1A]">{icon}</div>
-            <span className="text-sm font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tracking-wide">{labelFor(value)}</span>
-            <span className="text-xs text-[#6B5B55] dark:text-[#9B8B85] leading-relaxed">{descFor(value)}</span>
+            <span className="text-sm font-extrabold text-[#1A0A0A] tracking-wide">{labelFor(value)}</span>
+            <span className="text-xs text-[#6B5B55] leading-relaxed">{descFor(value)}</span>
           </button>
         ))}
       </div>
@@ -367,7 +367,7 @@ function BasicsStep({ onNext, defaults }: { onNext: (d: BasicsData) => void; def
             return (
               <label key={cond} className="cursor-pointer">
                 <input type="radio" value={cond} {...register('condition')} className="sr-only peer" />
-                <div className="text-center py-2.5 px-2 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm font-medium text-[#6B5B55] dark:text-[#9B8B85] peer-checked:border-[#8B1A1A] peer-checked:bg-[#8B1A1A] peer-checked:text-white transition-colors hover:border-[#8B1A1A]/50">
+                <div className="text-center py-2.5 px-2 rounded-xl border border-[#F2EDE8] text-sm font-medium text-[#6B5B55] peer-checked:border-[#8B1A1A] peer-checked:bg-[#8B1A1A] peer-checked:text-white transition-colors hover:border-[#8B1A1A]/50">
                   {labels[cond]}
                 </div>
               </label>
@@ -387,7 +387,7 @@ function BasicsStep({ onNext, defaults }: { onNext: (d: BasicsData) => void; def
         />
         <div className="flex items-center justify-between mt-1">
           <FieldError message={errors.description?.message} />
-          <span className={`text-xs ml-auto ${description.length < 50 ? 'text-[#F2EDE8] dark:text-[#2A1A1A]' : 'text-[#9B8B85]'}`}>
+          <span className={`text-xs ml-auto ${description.length < 50 ? 'text-[#F2EDE8]' : 'text-[#9B8B85]'}`}>
             {t('basics.charCount', { count: description.length })}
           </span>
         </div>
@@ -503,13 +503,13 @@ function PhotosStep({
         <p className="text-xs text-[#9B8B85] mb-3">{t('photos.desc')}</p>
 
         <div
-          className="border-2 border-dashed border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-8 text-center cursor-pointer hover:border-[#8B1A1A] dark:hover:border-[#8B1A1A] transition-colors"
+          className="border-2 border-dashed border-[#F2EDE8] rounded-2xl p-8 text-center cursor-pointer hover:border-[#8B1A1A] transition-colors"
           onClick={() => inputRef.current?.click()}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => { e.preventDefault(); addFiles(e.dataTransfer.files) }}
         >
           <ImagePlus size={28} className="mx-auto text-[#9B8B85] mb-2" />
-          <p className="text-sm font-medium text-[#6B5B55] dark:text-[#9B8B85]">{t('photos.dropzoneTitle')}</p>
+          <p className="text-sm font-medium text-[#6B5B55]">{t('photos.dropzoneTitle')}</p>
           <p className="text-xs text-[#9B8B85] mt-1">{t('photos.dropzoneHint')}</p>
           <input
             ref={inputRef}
@@ -527,7 +527,7 @@ function PhotosStep({
       {(existingPhotos.length > 0 || previews.length > 0) && (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
           {existingPhotos.map((m, i) => (
-            <div key={m.id} className="relative aspect-square rounded-xl overflow-hidden bg-[#FAF8F5] dark:bg-[#1A1010] group">
+            <div key={m.id} className="relative aspect-square rounded-xl overflow-hidden bg-[#FAF8F5] group">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={m.url} alt={t('photos.existingPhotoAlt', { index: i + 1 })} className="w-full h-full object-cover" />
               {i === 0 && (
@@ -556,7 +556,7 @@ function PhotosStep({
             </div>
           ))}
           {previews.map((src, i) => (
-            <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-[#FAF8F5] dark:bg-[#1A1010] group">
+            <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-[#FAF8F5] group">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={src} alt={t('photos.newPhotoAlt', { index: i + 1 })} className="w-full h-full object-cover" />
               {!primaryIsExisting && i === 0 && (
@@ -572,7 +572,7 @@ function PhotosStep({
           ))}
           <button
             onClick={() => inputRef.current?.click()}
-            className="aspect-square rounded-xl border-2 border-dashed border-[#F2EDE8] dark:border-[#2A1A1A] flex flex-col items-center justify-center text-[#9B8B85] hover:border-[#8B1A1A] transition-colors text-xs gap-1"
+            className="aspect-square rounded-xl border-2 border-dashed border-[#F2EDE8] flex flex-col items-center justify-center text-[#9B8B85] hover:border-[#8B1A1A] transition-colors text-xs gap-1"
           >
             <Plus size={18} />
             {t('photos.addMore')}
@@ -581,21 +581,21 @@ function PhotosStep({
       )}
 
       {hasDeclaredDefects && (
-        <label className="flex items-start gap-3 p-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 cursor-pointer">
+        <label className="flex items-start gap-3 p-4 rounded-xl border border-amber-200 bg-amber-50 cursor-pointer">
           <input
             type="checkbox"
             checked={hasDamagePhoto}
             onChange={(e) => setHasDamagePhoto(e.target.checked)}
             className="mt-0.5"
           />
-          <span className="text-xs text-amber-700 dark:text-amber-300">
+          <span className="text-xs text-amber-700">
             {t('photos.damagePhotoNotice')}
           </span>
         </label>
       )}
 
       <div className="flex gap-3 pt-2">
-        <button onClick={onBack} className="flex-1 py-3 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] font-semibold rounded-xl hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors flex items-center justify-center gap-2">
+        <button onClick={onBack} className="flex-1 py-3 border border-[#F2EDE8] text-[#6B5B55] font-semibold rounded-xl hover:bg-[#F2EDE8] transition-colors flex items-center justify-center gap-2">
           <ChevronLeft size={16} /> {t('back')}
         </button>
         <button onClick={handleNext} className="flex-1 py-3 bg-[#8B1A1A] text-white font-semibold rounded-xl hover:bg-[#7A1616] transition-colors flex items-center justify-center gap-2">
@@ -634,11 +634,11 @@ function OwnershipStep({
 
   return (
     <div className="space-y-5">
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-4 flex gap-3">
+      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">
         <Info size={16} className="text-blue-500 shrink-0 mt-0.5" />
-        <div className="text-sm text-blue-700 dark:text-blue-300">
+        <div className="text-sm text-blue-700">
           <p className="font-medium mb-1">{t('ownership.whyHeading')}</p>
-          <p className="text-xs leading-relaxed text-blue-600 dark:text-blue-400">
+          <p className="text-xs leading-relaxed text-blue-600">
             {t('ownership.whyBody')}
           </p>
         </div>
@@ -647,21 +647,21 @@ function OwnershipStep({
       <div>
         <Label required>{t('ownership.proofLabel')}</Label>
         {ownershipFile ? (
-          <div className="flex items-center gap-3 p-4 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-xl">
+          <div className="flex items-center gap-3 p-4 border border-green-200 bg-green-50 rounded-xl">
             <FileText size={20} className="text-green-500 shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-green-700 dark:text-green-400 truncate">{ownershipFile.name}</p>
-              <p className="text-xs text-green-600 dark:text-green-500">{(ownershipFile.size / 1024 / 1024).toFixed(1)} MB</p>
+              <p className="text-sm font-medium text-green-700 truncate">{ownershipFile.name}</p>
+              <p className="text-xs text-green-600">{(ownershipFile.size / 1024 / 1024).toFixed(1)} MB</p>
             </div>
-            <button onClick={() => setOwnershipFile(null)} className="p-1.5 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 transition-colors">
+            <button onClick={() => setOwnershipFile(null)} className="p-1.5 rounded-lg hover:bg-green-100 text-green-600 transition-colors">
               <X size={14} />
             </button>
           </div>
         ) : hasExistingOwnershipProof ? (
-          <div className="flex items-center gap-3 p-4 border border-[#F2EDE8] dark:border-[#2A1A1A] bg-[#FAF8F5] dark:bg-[#1A1010] rounded-xl">
+          <div className="flex items-center gap-3 p-4 border border-[#F2EDE8] bg-[#FAF8F5] rounded-xl">
             <FileText size={20} className="text-[#9B8B85] shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{t('ownership.existingProofTitle')}</p>
+              <p className="text-sm font-medium text-[#1A0A0A]">{t('ownership.existingProofTitle')}</p>
               <p className="text-xs text-[#9B8B85]">{t('ownership.existingProofDesc')}</p>
             </div>
             <button onClick={() => inputRef.current?.click()} className="text-xs font-semibold uppercase tracking-[0.08em] text-[#8B1A1A] hover:underline">
@@ -683,11 +683,11 @@ function OwnershipStep({
           </div>
         ) : (
           <div
-            className="border-2 border-dashed border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-8 text-center cursor-pointer hover:border-[#8B1A1A] dark:hover:border-[#8B1A1A] transition-colors"
+            className="border-2 border-dashed border-[#F2EDE8] rounded-2xl p-8 text-center cursor-pointer hover:border-[#8B1A1A] transition-colors"
             onClick={() => inputRef.current?.click()}
           >
             <Upload size={28} className="mx-auto text-[#9B8B85] mb-2" />
-            <p className="text-sm font-medium text-[#6B5B55] dark:text-[#9B8B85]">{t('ownership.dropzoneTitle')}</p>
+            <p className="text-sm font-medium text-[#6B5B55]">{t('ownership.dropzoneTitle')}</p>
             <p className="text-xs text-[#9B8B85] mt-1">{t('ownership.dropzoneHint')}</p>
             <input
               ref={inputRef}
@@ -719,20 +719,20 @@ function OwnershipStep({
         <p className="text-xs text-[#9B8B85] mt-1">{t('ownership.knownDefectsNotice')}</p>
       </div>
 
-      <label className="flex items-start gap-3 p-4 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] cursor-pointer">
+      <label className="flex items-start gap-3 p-4 rounded-xl border border-[#F2EDE8] cursor-pointer">
         <input
           type="checkbox"
           checked={conditionConfirmed}
           onChange={(e) => setConditionConfirmed(e.target.checked)}
           className="mt-0.5"
         />
-        <span className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+        <span className="text-sm text-[#1A0A0A]">
           {t('ownership.confirmLabel')}
         </span>
       </label>
 
       <div className="flex gap-3 pt-2">
-        <button onClick={onBack} className="flex-1 py-3 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] font-semibold rounded-xl hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors flex items-center justify-center gap-2">
+        <button onClick={onBack} className="flex-1 py-3 border border-[#F2EDE8] text-[#6B5B55] font-semibold rounded-xl hover:bg-[#F2EDE8] transition-colors flex items-center justify-center gap-2">
           <ChevronLeft size={16} /> {t('back')}
         </button>
         <button onClick={handleNext} className="flex-1 py-3 bg-[#8B1A1A] text-white font-semibold rounded-xl hover:bg-[#7A1616] transition-colors flex items-center justify-center gap-2">
@@ -762,13 +762,13 @@ function BlockedDatesWidget({ ranges, setRanges }: { ranges: BlockedDateRange[];
   }
 
   return (
-    <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-3">
-      <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('pricing.blockedDates.heading')}</p>
+    <div className="border border-[#F2EDE8] rounded-2xl p-4 space-y-3">
+      <p className="text-sm font-semibold text-[#1A0A0A]">{t('pricing.blockedDates.heading')}</p>
       <p className="text-xs text-[#9B8B85]">{t('pricing.blockedDates.desc')}</p>
       {ranges.length > 0 && (
         <div className="space-y-1.5">
           {ranges.map((r, i) => (
-            <div key={`${r.start_date}-${r.end_date}`} className="flex items-center justify-between text-xs bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg px-3 py-2">
+            <div key={`${r.start_date}-${r.end_date}`} className="flex items-center justify-between text-xs bg-[#FAF8F5] rounded-lg px-3 py-2">
               <span>{r.start_date} → {r.end_date}{r.reason ? ` · ${r.reason}` : ''}</span>
               <button type="button" onClick={() => setRanges(ranges.filter((_, idx) => idx !== i))} className="text-[#9B8B85] hover:text-[#E03D2F]">
                 <X size={13} />
@@ -874,7 +874,7 @@ function PricingStep({
           ] as [ShippingPayer, string][]).map(([val, label]) => (
             <label key={val} className="cursor-pointer">
               <input type="radio" value={val} {...register('shipping_payer')} className="sr-only peer" />
-              <div className="py-2.5 px-3 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-sm text-[#6B5B55] dark:text-[#9B8B85] peer-checked:border-[#8B1A1A] peer-checked:bg-[#8B1A1A] peer-checked:text-white transition-colors hover:border-[#8B1A1A]/50 text-center">
+              <div className="py-2.5 px-3 rounded-xl border border-[#F2EDE8] text-sm text-[#6B5B55] peer-checked:border-[#8B1A1A] peer-checked:bg-[#8B1A1A] peer-checked:text-white transition-colors hover:border-[#8B1A1A]/50 text-center">
                 {label}
               </div>
             </label>
@@ -884,8 +884,8 @@ function PricingStep({
 
       {rentable && (
         <>
-          <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-4">
-            <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('pricing.availabilityHeading')}</p>
+          <div className="border border-[#F2EDE8] rounded-2xl p-4 space-y-4">
+            <p className="text-sm font-semibold text-[#1A0A0A]">{t('pricing.availabilityHeading')}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label required>{t('pricing.availableFrom')}</Label>
@@ -915,7 +915,7 @@ function PricingStep({
       )}
 
       <div className="flex gap-3 pt-2">
-        <button type="button" onClick={onBack} className="flex-1 py-3 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] font-semibold rounded-xl hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors flex items-center justify-center gap-2">
+        <button type="button" onClick={onBack} className="flex-1 py-3 border border-[#F2EDE8] text-[#6B5B55] font-semibold rounded-xl hover:bg-[#F2EDE8] transition-colors flex items-center justify-center gap-2">
           <ChevronLeft size={16} /> {t('back')}
         </button>
         <button type="submit" className="flex-1 py-3 bg-[#8B1A1A] text-white font-semibold rounded-xl hover:bg-[#7A1616] transition-colors flex items-center justify-center gap-2">
@@ -964,19 +964,19 @@ function RequirementsStep({
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-5">
-      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-xl p-4 flex gap-3">
+      <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-3">
         <Info size={16} className="text-amber-500 shrink-0 mt-0.5" />
-        <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+        <p className="text-xs leading-relaxed text-amber-700">
           {t('requirements.infoNotice')}
         </p>
       </div>
 
       {/* Unity Score */}
-      <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-3">
+      <div className="border border-[#F2EDE8] rounded-2xl p-4 space-y-3">
         <div className="flex items-start gap-3">
           <Star size={16} className="text-amber-400 fill-amber-400 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('requirements.unityScoreHeading')}</p>
+            <p className="text-sm font-semibold text-[#1A0A0A]">{t('requirements.unityScoreHeading')}</p>
             <p className="text-xs text-[#9B8B85] mt-0.5">{t('requirements.unityScoreDesc')}</p>
           </div>
         </div>
@@ -990,12 +990,12 @@ function RequirementsStep({
       </div>
 
       {/* Security deposit */}
-      <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-3">
+      <div className="border border-[#F2EDE8] rounded-2xl p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-start gap-3">
             <ShieldCheck size={16} className="text-[#9B8B85] shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('requirements.depositHeading')}</p>
+              <p className="text-sm font-semibold text-[#1A0A0A]">{t('requirements.depositHeading')}</p>
               <p className="text-xs text-[#9B8B85] mt-0.5">{t('requirements.depositDesc')}</p>
             </div>
           </div>
@@ -1013,13 +1013,13 @@ function RequirementsStep({
       </div>
 
       {/* Renter requirements */}
-      <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-3">
-        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('requirements.renterRequirementsHeading')}</p>
+      <div className="border border-[#F2EDE8] rounded-2xl p-4 space-y-3">
+        <p className="text-sm font-semibold text-[#1A0A0A]">{t('requirements.renterRequirementsHeading')}</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <label className="flex items-center gap-2 text-sm text-[#1A0A0A]">
             <input type="checkbox" {...register('verified_identity_required')} /> {t('requirements.verifiedIdentityRequired')}
           </label>
-          <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <label className="flex items-center gap-2 text-sm text-[#1A0A0A]">
             <input type="checkbox" {...register('kyc_approved_required')} /> {t('requirements.kycApprovedRequired')}
           </label>
           <div>
@@ -1027,7 +1027,7 @@ function RequirementsStep({
             <input type="number" min={0} max={120} {...register('min_age', { valueAsNumber: true })} className={inputCls()} />
           </div>
           <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+            <label className="flex items-center gap-2 text-sm text-[#1A0A0A]">
               <input type="checkbox" {...register('driving_licence_required')} /> {t('requirements.drivingLicenceRequired')}
             </label>
             {drivingLicenceRequired && (
@@ -1045,8 +1045,8 @@ function RequirementsStep({
       </div>
 
       {/* Usage rules */}
-      <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-3">
-        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('requirements.usageRulesHeading')}</p>
+      <div className="border border-[#F2EDE8] rounded-2xl p-4 space-y-3">
+        <p className="text-sm font-semibold text-[#1A0A0A]">{t('requirements.usageRulesHeading')}</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label>{t('requirements.permittedUse')} <span className="text-[#9B8B85] font-normal text-xs">{t('optional')}</span></Label>
@@ -1062,10 +1062,10 @@ function RequirementsStep({
           <input {...register('geographic_restriction')} placeholder={t('requirements.geographicRestrictionPlaceholder')} className={inputCls()} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <label className="flex items-center gap-2 text-sm text-[#1A0A0A]">
             <input type="checkbox" {...register('commercial_use_allowed')} /> {t('requirements.commercialUseAllowed')}
           </label>
-          <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <label className="flex items-center gap-2 text-sm text-[#1A0A0A]">
             <input type="checkbox" {...register('sub_rental_allowed')} /> {t('requirements.subRentalAllowed')}
           </label>
         </div>
@@ -1084,17 +1084,17 @@ function RequirementsStep({
       </div>
 
       {/* Damage & inspection */}
-      <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-3">
-        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('requirements.damageInspectionHeading')}</p>
+      <div className="border border-[#F2EDE8] rounded-2xl p-4 space-y-3">
+        <p className="text-sm font-semibold text-[#1A0A0A]">{t('requirements.damageInspectionHeading')}</p>
         <div>
           <Label>{t('requirements.existingDamageDescription')} <span className="text-[#9B8B85] font-normal text-xs">{t('optional')}</span></Label>
           <textarea {...register('existing_damage_description')} rows={2} className={inputCls()} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <label className="flex items-center gap-2 text-sm text-[#1A0A0A]">
             <input type="checkbox" {...register('inspection_required_before_handover')} /> {t('requirements.inspectionBeforeHandover')}
           </label>
-          <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <label className="flex items-center gap-2 text-sm text-[#1A0A0A]">
             <input type="checkbox" {...register('inspection_required_on_return')} /> {t('requirements.inspectionOnReturn')}
           </label>
         </div>
@@ -1111,17 +1111,17 @@ function RequirementsStep({
       </div>
 
       {/* Risk tier — automatic, not merchant-configurable */}
-      <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4">
+      <div className="border border-[#F2EDE8] rounded-2xl p-4">
         <div className="flex items-start gap-3">
           <UserCheck size={16} className="text-[#9B8B85] shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">
+            <p className="text-sm font-semibold text-[#1A0A0A]">
               {t('requirements.riskTierHeading', { tier: riskTierLabel })}
             </p>
             <p className="text-xs text-[#9B8B85] mt-0.5">
               {t('requirements.riskTierDesc')}
             </p>
-            <ul className="mt-3 space-y-1 text-xs text-[#6B5B55] dark:text-[#9B8B85]">
+            <ul className="mt-3 space-y-1 text-xs text-[#6B5B55]">
               {riskRequirements.ownershipVerificationRequired && <li>• {t('requirements.riskOwnershipVerification')}</li>}
               {riskRequirements.inspectionVideoRequired && <li>• {t('requirements.riskInspectionVideo')}</li>}
               {riskRequirements.depositRequired && <li>• {t('requirements.riskDepositMandatory')}</li>}
@@ -1137,7 +1137,7 @@ function RequirementsStep({
       </div>
 
       <div className="flex gap-3 pt-2">
-        <button type="button" onClick={onBack} className="flex-1 py-3 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] font-semibold rounded-xl hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors flex items-center justify-center gap-2">
+        <button type="button" onClick={onBack} className="flex-1 py-3 border border-[#F2EDE8] text-[#6B5B55] font-semibold rounded-xl hover:bg-[#F2EDE8] transition-colors flex items-center justify-center gap-2">
           <ChevronLeft size={16} /> {t('back')}
         </button>
         <button type="submit" className="flex-1 py-3 bg-[#8B1A1A] text-white font-semibold rounded-xl hover:bg-[#7A1616] transition-colors flex items-center justify-center gap-2">
@@ -1166,24 +1166,24 @@ function AffiliatesStep({ onNext, onBack, defaults, affiliateEnabled }: { onNext
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-5">
-      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-xl p-4 flex gap-3">
+      <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-3">
         <Info size={16} className="text-amber-500 shrink-0 mt-0.5" />
-        <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+        <p className="text-xs leading-relaxed text-amber-700">
           {t('affiliates.infoNotice')}
         </p>
       </div>
 
       {!affiliateEnabled && !wasAlreadyEnabled && (
-        <div className="bg-[#F2EDE8] dark:bg-[#2A1A1A] border border-[#E8E0D8] dark:border-[#3A2A2A] rounded-xl p-4">
-          <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('affiliates.requiresUpgrade')}</p>
-          <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] mt-1">{t('affiliates.requiresUpgradeDesc')}</p>
+        <div className="bg-[#F2EDE8] border border-[#E8E0D8] rounded-xl p-4">
+          <p className="text-sm font-semibold text-[#1A0A0A]">{t('affiliates.requiresUpgrade')}</p>
+          <p className="text-xs text-[#6B5B55] mt-1">{t('affiliates.requiresUpgradeDesc')}</p>
         </div>
       )}
 
-      <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl p-4 space-y-4">
+      <div className="border border-[#F2EDE8] rounded-2xl p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className={`text-sm font-semibold ${affiliateEnabled || wasAlreadyEnabled ? 'text-[#1A0A0A] dark:text-[#F5F0ED]' : 'text-[#9B8B85]'}`}>{t('affiliates.acceptAffiliates')}</p>
+            <p className={`text-sm font-semibold ${affiliateEnabled || wasAlreadyEnabled ? 'text-[#1A0A0A]' : 'text-[#9B8B85]'}`}>{t('affiliates.acceptAffiliates')}</p>
             <p className="text-xs text-[#9B8B85] mt-0.5">{t('affiliates.acceptAffiliatesDesc')}</p>
           </div>
           <label className={`relative inline-flex items-center ${affiliateEnabled || wasAlreadyEnabled ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
@@ -1193,7 +1193,7 @@ function AffiliatesStep({ onNext, onBack, defaults, affiliateEnabled }: { onNext
               disabled={!affiliateEnabled && !wasAlreadyEnabled}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-[#F2EDE8] dark:bg-[#2A1A1A] rounded-full peer peer-checked:bg-[#8B1A1A] transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5" />
+            <div className="w-11 h-6 bg-[#F2EDE8] rounded-full peer peer-checked:bg-[#8B1A1A] transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5" />
           </label>
         </div>
 
@@ -1217,7 +1217,7 @@ function AffiliatesStep({ onNext, onBack, defaults, affiliateEnabled }: { onNext
       </div>
 
       <div className="flex gap-3 pt-2">
-        <button type="button" onClick={onBack} className="flex-1 py-3 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] font-semibold rounded-xl hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] transition-colors flex items-center justify-center gap-2">
+        <button type="button" onClick={onBack} className="flex-1 py-3 border border-[#F2EDE8] text-[#6B5B55] font-semibold rounded-xl hover:bg-[#F2EDE8] transition-colors flex items-center justify-center gap-2">
           <ChevronLeft size={16} /> {t('back')}
         </button>
         <button type="submit" className="flex-1 py-3 bg-[#8B1A1A] text-white font-semibold rounded-xl hover:bg-[#7A1616] transition-colors flex items-center justify-center gap-2">
@@ -1295,18 +1295,18 @@ function ReviewStep({
 
   return (
     <div className="space-y-5">
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-4 flex gap-3">
+      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">
         <ShieldCheck size={16} className="text-blue-500 shrink-0 mt-0.5" />
-        <p className="text-sm text-blue-700 dark:text-blue-300">
+        <p className="text-sm text-blue-700">
           {t('review.submitNotice')}
         </p>
       </div>
 
-      <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-2xl divide-y divide-[#F2EDE8] dark:divide-[#2A1A1A] overflow-hidden">
+      <div className="border border-[#F2EDE8] rounded-2xl divide-y divide-[#F2EDE8] overflow-hidden">
         {rows.map(([label, value]) => (
-          <div key={label} className="flex items-center justify-between px-4 py-3 text-sm border-b border-[#F2EDE8] dark:border-[#2A1A1A] last:border-b-0">
-            <span className="text-[#6B5B55] dark:text-[#9B8B85]">{label}</span>
-            <span className="font-medium text-[#1A0A0A] dark:text-[#F5F0ED] text-right max-w-[55%] truncate">{value}</span>
+          <div key={label} className="flex items-center justify-between px-4 py-3 text-sm border-b border-[#F2EDE8] last:border-b-0">
+            <span className="text-[#6B5B55]">{label}</span>
+            <span className="font-medium text-[#1A0A0A] text-right max-w-[55%] truncate">{value}</span>
           </div>
         ))}
       </div>
@@ -1314,14 +1314,14 @@ function ReviewStep({
       <div className="space-y-2">
         <Label required>{t('review.declarationsLabel')}</Label>
         {DECLARATION_CATALOGUE.map((d) => (
-          <label key={d.type} className="flex items-start gap-3 p-3 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] cursor-pointer">
+          <label key={d.type} className="flex items-start gap-3 p-3 rounded-xl border border-[#F2EDE8] cursor-pointer">
             <input
               type="checkbox"
               checked={acceptedDeclarations.has(d.type)}
               onChange={() => onToggleDeclaration(d.type)}
               className="mt-0.5"
             />
-            <span className="text-xs text-[#6B5B55] dark:text-[#9B8B85]">{d.wording}</span>
+            <span className="text-xs text-[#6B5B55]">{d.wording}</span>
           </label>
         ))}
         <p className="text-[11px] text-[#9B8B85]">
@@ -1337,7 +1337,7 @@ function ReviewStep({
       )}
 
       <div className="flex flex-col sm:flex-row gap-3 pt-2">
-        <button onClick={onBack} disabled={busy} className="py-3 px-5 border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85] font-semibold rounded-xl hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A] disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
+        <button onClick={onBack} disabled={busy} className="py-3 px-5 border border-[#F2EDE8] text-[#6B5B55] font-semibold rounded-xl hover:bg-[#F2EDE8] disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
           <ChevronLeft size={16} /> {t('back')}
         </button>
         <button
@@ -1690,8 +1690,8 @@ export function CreateListingFlow({ draft, affiliateEnabled = false }: { draft?:
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('heading')}</h1>
-        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mt-1">
+        <h1 className="text-2xl font-extrabold text-[#1A0A0A]">{t('heading')}</h1>
+        <p className="text-sm text-[#6B5B55] mt-1">
           {t('stepProgress', { current: stepIdx + 1, total: steps.length, desc: t(`steps.${currentStep.id}.desc`) })}
         </p>
       </div>
@@ -1702,23 +1702,23 @@ export function CreateListingFlow({ draft, affiliateEnabled = false }: { draft?:
           <div key={step.id} className="flex items-center gap-1 shrink-0">
             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
               i < stepIdx  ? 'bg-[#8B1A1A] text-white' :
-              i === stepIdx ? 'bg-[#1A0A0A] dark:bg-[#F5F0ED] text-white dark:text-[#1A0A0A]' :
-              'bg-[#F2EDE8] dark:bg-[#2A1A1A] text-[#9B8B85]'
+              i === stepIdx ? 'bg-[#1A0A0A] text-white' :
+              'bg-[#F2EDE8] text-[#9B8B85]'
             }`}>
               {i < stepIdx ? <Check size={13} /> : i + 1}
             </div>
             <span className={`text-xs font-medium hidden sm:block ${
-              i === stepIdx ? 'text-[#1A0A0A] dark:text-[#F5F0ED]' : 'text-[#9B8B85]'
+              i === stepIdx ? 'text-[#1A0A0A]' : 'text-[#9B8B85]'
             }`}>{t(`steps.${step.id}.title`)}</span>
             {i < steps.length - 1 && (
-              <div className={`h-px w-4 sm:w-6 transition-colors ${i < stepIdx ? 'bg-[#8B1A1A]' : 'bg-[#F2EDE8] dark:bg-[#2A1A1A]'}`} />
+              <div className={`h-px w-4 sm:w-6 transition-colors ${i < stepIdx ? 'bg-[#8B1A1A]' : 'bg-[#F2EDE8]'}`} />
             )}
           </div>
         ))}
       </div>
 
       <div className="mb-6">
-        <h2 className="text-lg font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED]">{t(`steps.${currentStep.id}.title`)}</h2>
+        <h2 className="text-lg font-extrabold text-[#1A0A0A]">{t(`steps.${currentStep.id}.title`)}</h2>
       </div>
 
       {currentStep.id === 'type' && (

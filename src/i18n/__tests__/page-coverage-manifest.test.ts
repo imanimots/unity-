@@ -49,11 +49,13 @@ describe('page coverage manifest', () => {
     // E46 added three genuinely new, fully wired pages: the real public
     // sitemap ((marketing)/sitemap/page.tsx) and the task-based Help
     // Center ((marketing)/help/page.tsx, (marketing)/help/[slug]/page.tsx).
+    // E47 added two more genuinely new, fully wired pages: the real
+    // authenticated account shell's My Profile and Settings pages.
     const s = summarizePageCoverage()
-    expect(s.total).toBe(74)
-    expect(s.wired).toBe(62)
+    expect(s.total).toBe(76)
+    expect(s.wired).toBe(64)
     expect(s.sharedLayout).toBe(12)
-    expect(s.localizedTotal).toBe(74)
+    expect(s.localizedTotal).toBe(76)
   })
 
   it('5. page localization is genuinely, truthfully complete: zero unwired entries remain', () => {

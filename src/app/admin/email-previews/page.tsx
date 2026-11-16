@@ -39,21 +39,21 @@ export default function EmailPreviewsPage() {
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="mb-8">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">Development Tool</p>
-        <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-white tracking-tight">Email Previews</h1>
-        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mt-2">
+        <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] tracking-tight">Email Previews</h1>
+        <p className="text-sm text-[#6B5B55] mt-2">
           {rendered.length} templates. Rendered with synthetic example data — never sent, never real user data.
         </p>
       </div>
 
       <div className="space-y-6">
         {rendered.map(({ def, result, error }) => (
-          <div key={def.id} className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
-            <div className="px-4 py-3 bg-[#FAF8F5] dark:bg-[#1A1010] border-b border-[#F2EDE8] dark:border-[#2A1A1A] flex flex-wrap items-center justify-between gap-2">
+          <div key={def.id} className="border border-[#F2EDE8] rounded-xl overflow-hidden">
+            <div className="px-4 py-3 bg-[#FAF8F5] border-b border-[#F2EDE8] flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-sm font-semibold text-[#1A0A0A] dark:text-white">{def.id}</p>
+                <p className="text-sm font-semibold text-[#1A0A0A]">{def.id}</p>
                 <p className="text-xs text-[#9B8B85]">event: {def.event} · version {def.version} · requires: {def.requiredVars.join(', ')}</p>
               </div>
-              {result && <p className="text-xs text-[#6B5B55] dark:text-[#9B8B85] max-w-sm text-right">{result.subject}</p>}
+              {result && <p className="text-xs text-[#6B5B55] max-w-sm text-right">{result.subject}</p>}
             </div>
             {error ? (
               <p className="p-4 text-xs text-red-600">Render error: {error}</p>

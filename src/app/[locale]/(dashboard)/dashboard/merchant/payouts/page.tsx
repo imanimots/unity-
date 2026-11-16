@@ -24,10 +24,10 @@ interface MerchantPayout {
 }
 
 const STATUS_BADGE_CLASSES: Record<MerchantPayout['status'], string> = {
-  pending: 'bg-[#F2EDE8] text-[#6B5B55] dark:bg-[#2A1A1A] dark:text-[#9B8B85]',
-  processing: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-  paid: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  pending: 'bg-[#F2EDE8] text-[#6B5B55]',
+  processing: 'bg-amber-100 text-amber-800',
+  paid: 'bg-green-100 text-green-800',
+  failed: 'bg-red-100 text-red-800',
 }
 
 const STATUS_ICON: Record<MerchantPayout['status'], React.ReactNode> = {
@@ -66,14 +66,14 @@ export default function PayoutsPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <Link href="/dashboard/merchant" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+        <Link href="/dashboard/merchant" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
           <ArrowLeft size={13} /> {t('back')}
         </Link>
       </div>
 
       <div className="mb-12">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{t('sectionLabel')}</p>
-        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight">
+        <h1 className="text-3xl lg:text-4xl font-extrabold uppercase text-[#1A0A0A] tracking-tight">
           {t('heading')}
         </h1>
       </div>
@@ -82,10 +82,10 @@ export default function PayoutsPage() {
 
       <Link
         href="/dashboard/payout-settings"
-        className="flex items-center justify-between gap-3 p-4 mb-8 bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] hover:border-[#8B1A1A] transition-colors"
+        className="flex items-center justify-between gap-3 p-4 mb-8 bg-white rounded-xl border border-[#F2EDE8] hover:border-[#8B1A1A] transition-colors"
       >
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#1A0A0A] dark:text-[#F5F0ED]">{t('payoutAccountLink.title')}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#1A0A0A]">{t('payoutAccountLink.title')}</p>
           <p className="text-xs text-[#9B8B85] mt-0.5">{t('payoutAccountLink.description')}</p>
         </div>
         <ArrowLeft size={14} className="rotate-180 text-[#9B8B85] shrink-0" />
@@ -100,17 +100,17 @@ export default function PayoutsPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12">
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{t('pending')}</p>
-          <div className="text-3xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">{formatMoneyFromRands(totals.pending, 'ZAR', locale)}</div>
+          <div className="text-3xl font-extrabold text-[#1A0A0A] leading-none">{formatMoneyFromRands(totals.pending, 'ZAR', locale)}</div>
         </div>
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{t('processing')}</p>
-          <div className="text-3xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">{formatMoneyFromRands(totals.processing, 'ZAR', locale)}</div>
+          <div className="text-3xl font-extrabold text-[#1A0A0A] leading-none">{formatMoneyFromRands(totals.processing, 'ZAR', locale)}</div>
         </div>
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{t('failed')}</p>
-          <div className="text-3xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] leading-none">{formatMoneyFromRands(totals.failed, 'ZAR', locale)}</div>
+          <div className="text-3xl font-extrabold text-[#1A0A0A] leading-none">{formatMoneyFromRands(totals.failed, 'ZAR', locale)}</div>
         </div>
       </div>
 
@@ -126,16 +126,16 @@ export default function PayoutsPage() {
             <p className="text-xs text-[#9B8B85] mt-2">{t('emptyDesc')}</p>
           </div>
         ) : (
-          <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] overflow-hidden">
+          <div className="bg-white rounded-xl border border-[#F2EDE8] overflow-hidden">
             {payouts.map((p) => (
-              <div key={p.id} className="px-5 py-4 border-b border-[#F2EDE8] dark:border-[#2A1A1A] last:border-b-0">
+              <div key={p.id} className="px-5 py-4 border-b border-[#F2EDE8] last:border-b-0">
                 <div className="flex items-center justify-between gap-4 mb-1.5">
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] truncate">{p.listingTitle ?? p.bookingReference ?? t('defaultTitle')}</div>
+                    <div className="text-sm font-medium text-[#1A0A0A] truncate">{p.listingTitle ?? p.bookingReference ?? t('defaultTitle')}</div>
                     <div className="text-xs text-[#9B8B85]">{formatDate(p.createdAt, locale)}{p.bookingReference ? ` · ${p.bookingReference}` : ''}</div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{formatMoneyFromRands(Number(p.amount), 'ZAR', locale)}</span>
+                    <span className="text-sm font-semibold text-[#1A0A0A]">{formatMoneyFromRands(Number(p.amount), 'ZAR', locale)}</span>
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${STATUS_BADGE_CLASSES[p.status]}`}>
                       {STATUS_ICON[p.status]} {t(`status.${p.status}`)}
                     </span>
@@ -155,7 +155,7 @@ export default function PayoutsPage() {
 
       <p className="text-xs text-[#9B8B85] text-center">
         {t('footerNotice')}{' '}
-        <Link href="/chat" className="underline hover:text-[#6B5B55] dark:hover:text-[#9B8B85]">{t('contactSupport')}</Link>
+        <Link href="/chat" className="underline hover:text-[#6B5B55]">{t('contactSupport')}</Link>
       </p>
     </div>
   )

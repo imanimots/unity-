@@ -44,8 +44,8 @@ export function SkillTaskAdminActions({ postId, status }: SkillTaskAdminActionsP
   }
 
   return (
-    <div className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-4 space-y-3 bg-[#FAF8F5] dark:bg-[#1A1010]">
-      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+    <div className="border border-[#F2EDE8] rounded-xl p-4 space-y-3 bg-[#FAF8F5]">
+      {error && <p className="text-xs text-red-600">{error}</p>}
       <input
         type="text"
         placeholder="Reason (required)"

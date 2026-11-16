@@ -89,7 +89,7 @@ export default function AdminVerificationsPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-1">Identity Verification</p>
-          <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED]">Verification Queue</h1>
+          <h1 className="text-2xl font-extrabold uppercase text-[#1A0A0A]">Verification Queue</h1>
         </div>
         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200">
           <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
@@ -98,13 +98,13 @@ export default function AdminVerificationsPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl px-5 py-4">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl px-5 py-4">
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Pending / under review</p>
-          <p className="text-2xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{pendingCount}</p>
+          <p className="text-2xl font-extrabold text-[#1A0A0A] tabular-nums">{pendingCount}</p>
         </div>
-        <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl px-5 py-4">
+        <div className="bg-white border border-[#F2EDE8] rounded-xl px-5 py-4">
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Info required</p>
-          <p className="text-2xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{infoRequiredCount}</p>
+          <p className="text-2xl font-extrabold text-[#1A0A0A] tabular-nums">{infoRequiredCount}</p>
         </div>
       </div>
 
@@ -116,11 +116,11 @@ export default function AdminVerificationsPage() {
             placeholder="Search name or user id…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg text-sm px-3 py-2 text-[#1A0A0A] dark:text-[#F5F0ED] placeholder:text-[#9B8B85] focus:outline-none focus:ring-1 focus:ring-[#8B1A1A] w-64"
+            className="pl-8 bg-white border border-[#F2EDE8] rounded-lg text-sm px-3 py-2 text-[#1A0A0A] placeholder:text-[#9B8B85] focus:outline-none focus:ring-1 focus:ring-[#8B1A1A] w-64"
           />
         </div>
 
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg text-sm px-3 py-2 text-[#1A0A0A] dark:text-[#F5F0ED] focus:outline-none focus:ring-1 focus:ring-[#8B1A1A]">
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-white border border-[#F2EDE8] rounded-lg text-sm px-3 py-2 text-[#1A0A0A] focus:outline-none focus:ring-1 focus:ring-[#8B1A1A]">
           <option value="all">All statuses</option>
           <option value="pending">Pending</option>
           <option value="under_review">Under review</option>
@@ -129,7 +129,7 @@ export default function AdminVerificationsPage() {
           <option value="rejected">Rejected</option>
         </select>
 
-        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg text-sm px-3 py-2 text-[#1A0A0A] dark:text-[#F5F0ED] focus:outline-none focus:ring-1 focus:ring-[#8B1A1A]">
+        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="bg-white border border-[#F2EDE8] rounded-lg text-sm px-3 py-2 text-[#1A0A0A] focus:outline-none focus:ring-1 focus:ring-[#8B1A1A]">
           <option value="all">All roles</option>
           <option value="renter">Renter</option>
           <option value="merchant">Merchant</option>
@@ -137,13 +137,13 @@ export default function AdminVerificationsPage() {
         </select>
       </div>
 
-      <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+      <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
                 {['User', 'Role', 'Status', 'Country', 'Unity Score', 'Submitted', 'Account age', 'Attempts', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A] whitespace-nowrap">
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -170,17 +170,17 @@ export default function AdminVerificationsPage() {
                 </tr>
               ) : (
                 filtered.map((row) => (
-                  <tr key={row.userId} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] hover:bg-[#FAF8F5] dark:hover:bg-[#1A1010] transition-colors last:border-0">
-                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{row.userName ?? row.userId.slice(0, 8)}</td>
-                    <td className="px-4 py-3 capitalize text-sm text-[#6B5B55] dark:text-[#9B8B85]">{row.role ?? '—'}</td>
+                  <tr key={row.userId} className="border-b border-[#F2EDE8] hover:bg-[#FAF8F5] transition-colors last:border-0">
+                    <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A]">{row.userName ?? row.userId.slice(0, 8)}</td>
+                    <td className="px-4 py-3 capitalize text-sm text-[#6B5B55]">{row.role ?? '—'}</td>
                     <td className="px-4 py-3">
                       <Pill value={row.status} />
                     </td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{row.countryOfResidence ?? row.accountCountry ?? '—'}</td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55] dark:text-[#9B8B85]">{row.unityScore ?? '—'}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-[#6B5B55] dark:text-[#9B8B85]">{formatDate(row.submittedAt)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm tabular-nums text-[#6B5B55] dark:text-[#9B8B85]">{row.accountAgeDays ?? '—'}d</td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55] dark:text-[#9B8B85]">{row.reviewCount}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">{row.countryOfResidence ?? row.accountCountry ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55]">{row.unityScore ?? '—'}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-[#6B5B55]">{formatDate(row.submittedAt)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm tabular-nums text-[#6B5B55]">{row.accountAgeDays ?? '—'}d</td>
+                    <td className="px-4 py-3 text-sm tabular-nums text-[#6B5B55]">{row.reviewCount}</td>
                     <td className="px-4 py-3">
                       <Link
                         href={`/admin/verifications/${row.userId}`}
@@ -197,7 +197,7 @@ export default function AdminVerificationsPage() {
           </table>
         </div>
 
-        <div className="px-4 py-3 border-t border-[#F2EDE8] dark:border-[#2A1A1A] bg-[#FAF8F5] dark:bg-[#0F0A0A]">
+        <div className="px-4 py-3 border-t border-[#F2EDE8] bg-[#FAF8F5]">
           <p className="text-xs text-[#9B8B85]">
             Showing <span className="font-medium text-[#6B5B55]">{filtered.length}</span> of <span className="font-medium text-[#6B5B55]">{rows.length}</span> submissions
           </p>

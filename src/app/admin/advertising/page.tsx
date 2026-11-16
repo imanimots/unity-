@@ -151,13 +151,13 @@ export default function AdminAdvertisingPage() {
 
       {error && <p className="text-sm text-red-500">{error}</p>}
 
-      <div className="flex gap-2 border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
+      <div className="flex gap-2 border-b border-[#F2EDE8]">
         {(['advertisers', 'campaigns', 'creatives', 'packages'] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-2.5 text-sm font-medium capitalize border-b-2 -mb-px transition-colors ${
-              tab === t ? 'border-[#8B1A1A] text-[#8B1A1A]' : 'border-transparent text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED]'
+              tab === t ? 'border-[#8B1A1A] text-[#8B1A1A]' : 'border-transparent text-[#9B8B85] hover:text-[#1A0A0A]'
             }`}
           >
             {t}
@@ -170,10 +170,10 @@ export default function AdminAdvertisingPage() {
       ) : (
         <>
           {tab === 'advertisers' && (
-            <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+            <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
+                  <tr className="text-left text-[11px] uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8]">
                     <th className="px-4 py-3">Name</th>
                     <th className="px-4 py-3">Type</th>
                     <th className="px-4 py-3">Status</th>
@@ -183,11 +183,11 @@ export default function AdminAdvertisingPage() {
                 </thead>
                 <tbody>
                   {advertisers.map((a) => (
-                    <tr key={a.id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] last:border-0">
-                      <td className="px-4 py-3 font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{a.display_name}</td>
-                      <td className="px-4 py-3 capitalize text-[#6B5B55] dark:text-[#9B8B85]">{a.advertiser_type}</td>
+                    <tr key={a.id} className="border-b border-[#F2EDE8] last:border-0">
+                      <td className="px-4 py-3 font-medium text-[#1A0A0A]">{a.display_name}</td>
+                      <td className="px-4 py-3 capitalize text-[#6B5B55]">{a.advertiser_type}</td>
                       <td className="px-4 py-3"><Pill value={a.status} styles={ADVERTISER_STATUS_STYLES} /></td>
-                      <td className="px-4 py-3 text-[#6B5B55] dark:text-[#9B8B85]">{formatDateTime(a.created_at)}</td>
+                      <td className="px-4 py-3 text-[#6B5B55]">{formatDateTime(a.created_at)}</td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1.5">
                           {a.status === 'pending_review' && (
@@ -218,10 +218,10 @@ export default function AdminAdvertisingPage() {
           )}
 
           {tab === 'campaigns' && (
-            <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+            <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
+                  <tr className="text-left text-[11px] uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8]">
                     <th className="px-4 py-3">Placement</th>
                     <th className="px-4 py-3">Tier</th>
                     <th className="px-4 py-3">Status</th>
@@ -232,12 +232,12 @@ export default function AdminAdvertisingPage() {
                 </thead>
                 <tbody>
                   {campaigns.map((c) => (
-                    <tr key={c.id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] last:border-0">
-                      <td className="px-4 py-3 font-medium text-[#1A0A0A] dark:text-[#F5F0ED] capitalize">{c.snapshot_placement_type.replace(/_/g, ' ')}</td>
-                      <td className="px-4 py-3 capitalize text-[#6B5B55] dark:text-[#9B8B85]">{c.snapshot_placement_tier}</td>
+                    <tr key={c.id} className="border-b border-[#F2EDE8] last:border-0">
+                      <td className="px-4 py-3 font-medium text-[#1A0A0A] capitalize">{c.snapshot_placement_type.replace(/_/g, ' ')}</td>
+                      <td className="px-4 py-3 capitalize text-[#6B5B55]">{c.snapshot_placement_tier}</td>
                       <td className="px-4 py-3"><Pill value={c.status} styles={CAMPAIGN_STATUS_STYLES} /></td>
-                      <td className="px-4 py-3 text-[#6B5B55] dark:text-[#9B8B85]">{c.delivered_impressions} / {c.snapshot_impression_quota}</td>
-                      <td className="px-4 py-3 text-[#6B5B55] dark:text-[#9B8B85]">{formatMoney(c.snapshot_price_cents / 100, c.snapshot_currency)}</td>
+                      <td className="px-4 py-3 text-[#6B5B55]">{c.delivered_impressions} / {c.snapshot_impression_quota}</td>
+                      <td className="px-4 py-3 text-[#6B5B55]">{formatMoney(c.snapshot_price_cents / 100, c.snapshot_currency)}</td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1.5">
                           {c.status === 'pending_review' && (
@@ -273,10 +273,10 @@ export default function AdminAdvertisingPage() {
           )}
 
           {tab === 'creatives' && (
-            <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+            <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
+                  <tr className="text-left text-[11px] uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8]">
                     <th className="px-4 py-3">Headline</th>
                     <th className="px-4 py-3">Destination</th>
                     <th className="px-4 py-3">Status</th>
@@ -285,9 +285,9 @@ export default function AdminAdvertisingPage() {
                 </thead>
                 <tbody>
                   {creatives.map((c) => (
-                    <tr key={c.campaign_id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] last:border-0">
-                      <td className="px-4 py-3 font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{c.headline}</td>
-                      <td className="px-4 py-3 text-[#6B5B55] dark:text-[#9B8B85] truncate max-w-xs">{c.destination_url}</td>
+                    <tr key={c.campaign_id} className="border-b border-[#F2EDE8] last:border-0">
+                      <td className="px-4 py-3 font-medium text-[#1A0A0A]">{c.headline}</td>
+                      <td className="px-4 py-3 text-[#6B5B55] truncate max-w-xs">{c.destination_url}</td>
                       <td className="px-4 py-3"><Pill value={c.moderation_status} styles={ADVERTISER_STATUS_STYLES} /></td>
                       <td className="px-4 py-3">
                         {c.moderation_status === 'pending_review' && (
@@ -363,30 +363,30 @@ function PackagesTab({ packages, onCreated }: { packages: AdPackage[]; onCreated
 
   return (
     <div className="space-y-6">
-      <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
-        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">New package</p>
+      <div className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
+        <p className="text-sm font-semibold text-[#1A0A0A]">New package</p>
         <p className="text-xs text-[#9B8B85]">No production Rand amounts are pre-filled — every commercial value is supplied explicitly here.</p>
         <div className="grid grid-cols-2 gap-3">
-          <input className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg px-3 py-2 text-sm bg-transparent" placeholder="Name (e.g. [QA] Standard Search)" value={name} onChange={(e) => setName(e.target.value)} />
-          <select className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg px-3 py-2 text-sm bg-transparent" value={inventoryClass} onChange={(e) => setInventoryClass(e.target.value as 'unity_marketplace' | 'external')}>
+          <input className="border border-[#F2EDE8] rounded-lg px-3 py-2 text-sm bg-transparent" placeholder="Name (e.g. [QA] Standard Search)" value={name} onChange={(e) => setName(e.target.value)} />
+          <select className="border border-[#F2EDE8] rounded-lg px-3 py-2 text-sm bg-transparent" value={inventoryClass} onChange={(e) => setInventoryClass(e.target.value as 'unity_marketplace' | 'external')}>
             <option value="unity_marketplace">Unity marketplace</option>
             <option value="external">External</option>
           </select>
-          <select className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg px-3 py-2 text-sm bg-transparent" value={placementType} onChange={(e) => setPlacementType(e.target.value)}>
+          <select className="border border-[#F2EDE8] rounded-lg px-3 py-2 text-sm bg-transparent" value={placementType} onChange={(e) => setPlacementType(e.target.value)}>
             <option value="homepage_banner">Homepage banner</option>
             <option value="search_loading_popup">Search loading popup</option>
             <option value="search_result">Sponsored search result</option>
             <option value="promoted_deals">Promoted deals</option>
           </select>
-          <select className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg px-3 py-2 text-sm bg-transparent" value={placementTier} onChange={(e) => setPlacementTier(e.target.value)}>
+          <select className="border border-[#F2EDE8] rounded-lg px-3 py-2 text-sm bg-transparent" value={placementTier} onChange={(e) => setPlacementTier(e.target.value)}>
             <option value="value">Value</option>
             <option value="standard">Standard</option>
             <option value="premium">Premium</option>
           </select>
-          <input className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg px-3 py-2 text-sm bg-transparent" placeholder="Position band (e.g. slot-3)" value={positionBand} onChange={(e) => setPositionBand(e.target.value)} />
-          <input className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg px-3 py-2 text-sm bg-transparent" placeholder="Price (cents)" value={priceCents} onChange={(e) => setPriceCents(e.target.value)} />
-          <input className="border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg px-3 py-2 text-sm bg-transparent" placeholder="Impression quota" value={impressionQuota} onChange={(e) => setImpressionQuota(e.target.value)} />
-          <div className="flex items-center gap-4 text-sm text-[#6B5B55] dark:text-[#9B8B85]">
+          <input className="border border-[#F2EDE8] rounded-lg px-3 py-2 text-sm bg-transparent" placeholder="Position band (e.g. slot-3)" value={positionBand} onChange={(e) => setPositionBand(e.target.value)} />
+          <input className="border border-[#F2EDE8] rounded-lg px-3 py-2 text-sm bg-transparent" placeholder="Price (cents)" value={priceCents} onChange={(e) => setPriceCents(e.target.value)} />
+          <input className="border border-[#F2EDE8] rounded-lg px-3 py-2 text-sm bg-transparent" placeholder="Impression quota" value={impressionQuota} onChange={(e) => setImpressionQuota(e.target.value)} />
+          <div className="flex items-center gap-4 text-sm text-[#6B5B55]">
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} /> Active</label>
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={isTest} onChange={(e) => setIsTest(e.target.checked)} /> QA/test only</label>
           </div>
@@ -395,10 +395,10 @@ function PackagesTab({ packages, onCreated }: { packages: AdPackage[]; onCreated
         <button disabled={submitting} onClick={submit} className={primaryButtonClass}>Create package</button>
       </div>
 
-      <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+      <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-[11px] uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
+            <tr className="text-left text-[11px] uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8]">
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Placement</th>
               <th className="px-4 py-3">Tier</th>
@@ -409,12 +409,12 @@ function PackagesTab({ packages, onCreated }: { packages: AdPackage[]; onCreated
           </thead>
           <tbody>
             {packages.map((p) => (
-              <tr key={p.id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] last:border-0">
-                <td className="px-4 py-3 font-medium text-[#1A0A0A] dark:text-[#F5F0ED]">{p.name}{p.is_test ? ' (QA)' : ''}</td>
-                <td className="px-4 py-3 capitalize text-[#6B5B55] dark:text-[#9B8B85]">{p.placement_type.replace(/_/g, ' ')}</td>
-                <td className="px-4 py-3 capitalize text-[#6B5B55] dark:text-[#9B8B85]">{p.placement_tier}</td>
-                <td className="px-4 py-3 text-[#6B5B55] dark:text-[#9B8B85]">{formatMoney(p.price_cents / 100, p.currency)}</td>
-                <td className="px-4 py-3 text-[#6B5B55] dark:text-[#9B8B85]">{p.impression_quota.toLocaleString()}</td>
+              <tr key={p.id} className="border-b border-[#F2EDE8] last:border-0">
+                <td className="px-4 py-3 font-medium text-[#1A0A0A]">{p.name}{p.is_test ? ' (QA)' : ''}</td>
+                <td className="px-4 py-3 capitalize text-[#6B5B55]">{p.placement_type.replace(/_/g, ' ')}</td>
+                <td className="px-4 py-3 capitalize text-[#6B5B55]">{p.placement_tier}</td>
+                <td className="px-4 py-3 text-[#6B5B55]">{formatMoney(p.price_cents / 100, p.currency)}</td>
+                <td className="px-4 py-3 text-[#6B5B55]">{p.impression_quota.toLocaleString()}</td>
                 <td className="px-4 py-3">{p.is_active ? 'Yes' : 'No'}</td>
               </tr>
             ))}

@@ -53,27 +53,27 @@ export default async function HelpTaskPage({ params }: PageProps) {
     .filter((t): t is NonNullable<typeof t> => Boolean(t))
 
   return (
-    <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen">
-      <section className="pt-24 pb-10 border-b border-[#F2EDE8] dark:border-[#2A1A1A]">
+    <div className="bg-[#FAF8F5] min-h-screen">
+      <section className="pt-24 pb-10 border-b border-[#F2EDE8]">
         <div className="max-w-3xl mx-auto px-6 lg:px-12">
           <nav aria-label="Breadcrumb" className="text-xs text-[#9B8B85] mb-4">
             <Link href="/help" className="hover:text-[#8B1A1A]">{t('breadcrumbHelpCenter')}</Link>
             <span className="mx-1.5">/</span>
             <span>{CATEGORY_LABELS[task.category]}</span>
           </nav>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight mb-4">{task.iWantTo}</h1>
-          <p className="text-[#6B5B55] dark:text-[#9B8B85]">{task.summary}</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1A0A0A] tracking-tight mb-4">{task.iWantTo}</h1>
+          <p className="text-[#6B5B55]">{task.summary}</p>
 
           <div className="flex flex-wrap gap-1.5 mt-4">
             {task.role.map((r) => (
-              <span key={r} className="inline-flex items-center gap-1 rounded-full bg-[#F2EDE8] dark:bg-[#2A1A1A] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.04em] text-[#6B5B55] dark:text-[#9B8B85]">
+              <span key={r} className="inline-flex items-center gap-1 rounded-full bg-[#F2EDE8] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.04em] text-[#6B5B55]">
                 {r === 'admin' && <ShieldCheck size={11} />}
                 {r === 'merchant' && <Store size={11} />}
                 {ROLE_LABELS[r]}
               </span>
             ))}
             {task.providerDependency && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/30 px-2.5 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-700">
                 <Hourglass size={11} /> {task.status === 'pending-provider' ? t('providerPendingBadge') : t('partialProviderBadge')}
               </span>
             )}
@@ -83,7 +83,7 @@ export default async function HelpTaskPage({ params }: PageProps) {
 
       <div className="max-w-3xl mx-auto px-6 lg:px-12 py-12 space-y-10">
         {task.providerDependency && (
-          <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-900/10 p-4 text-sm text-amber-800 dark:text-amber-300">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
             {PROVIDER_LABELS[task.providerDependency]}. {t('providerBannerSuffix')}
           </div>
         )}
@@ -93,7 +93,7 @@ export default async function HelpTaskPage({ params }: PageProps) {
             <h2 className="text-sm font-extrabold uppercase tracking-[0.05em] text-[#9B8B85] mb-3">{t('beforeYouStart')}</h2>
             <ul className="space-y-1.5">
               {task.prerequisites.map((p, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+                <li key={i} className="flex items-start gap-2 text-sm text-[#1A0A0A]">
                   <LockKeyhole size={14} className="mt-0.5 text-[#9B8B85] shrink-0" /> {p}
                 </li>
               ))}
@@ -105,7 +105,7 @@ export default async function HelpTaskPage({ params }: PageProps) {
           <h2 className="text-sm font-extrabold uppercase tracking-[0.05em] text-[#9B8B85] mb-3">{t('steps')}</h2>
           <ol className="space-y-3">
             {task.steps.map((step, i) => (
-              <li key={i} className="flex items-start gap-3 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+              <li key={i} className="flex items-start gap-3 text-sm text-[#1A0A0A]">
                 <span className="shrink-0 w-6 h-6 rounded-full bg-[#8B1A1A] text-white text-xs font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
                 <span className="leading-relaxed">{step}</span>
               </li>
@@ -118,7 +118,7 @@ export default async function HelpTaskPage({ params }: PageProps) {
           <div className="flex flex-wrap gap-2">
             {task.routes.map((r) =>
               r.path.includes('[') ? (
-                <span key={r.path} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold border border-[#E8E0D8] dark:border-[#2A1A1A] text-[#6B5B55] dark:text-[#9B8B85]">
+                <span key={r.path} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold border border-[#E8E0D8] text-[#6B5B55]">
                   {r.label}
                 </span>
               ) : (
@@ -136,7 +136,7 @@ export default async function HelpTaskPage({ params }: PageProps) {
 
         <section>
           <h2 className="text-sm font-extrabold uppercase tracking-[0.05em] text-[#9B8B85] mb-3">{t('whatHappensNext')}</h2>
-          <p className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED] leading-relaxed">{task.whatHappensNext}</p>
+          <p className="text-sm text-[#1A0A0A] leading-relaxed">{task.whatHappensNext}</p>
         </section>
 
         {task.commonIssues.length > 0 && (
@@ -144,7 +144,7 @@ export default async function HelpTaskPage({ params }: PageProps) {
             <h2 className="text-sm font-extrabold uppercase tracking-[0.05em] text-[#9B8B85] mb-3">{t('commonIssues')}</h2>
             <ul className="list-disc pl-5 space-y-1.5">
               {task.commonIssues.map((issue, i) => (
-                <li key={i} className="text-sm text-[#6B5B55] dark:text-[#9B8B85] leading-relaxed">{issue}</li>
+                <li key={i} className="text-sm text-[#6B5B55] leading-relaxed">{issue}</li>
               ))}
             </ul>
           </section>
@@ -158,16 +158,16 @@ export default async function HelpTaskPage({ params }: PageProps) {
                 <Link
                   key={r.id}
                   href={`/help/${r.slug}`}
-                  className="block rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] p-4 hover:border-[#8B1A1A]/40 transition-colors"
+                  className="block rounded-xl border border-[#F2EDE8] bg-white p-4 hover:border-[#8B1A1A]/40 transition-colors"
                 >
-                  <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{r.iWantTo}</p>
+                  <p className="text-sm font-semibold text-[#1A0A0A]">{r.iWantTo}</p>
                 </Link>
               ))}
             </div>
           </section>
         )}
 
-        <div className="pt-4 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
+        <div className="pt-4 border-t border-[#F2EDE8]">
           <Link href="/help" className="text-sm text-[#8B1A1A] underline">{t('backToHelpCenter')}</Link>
         </div>
       </div>

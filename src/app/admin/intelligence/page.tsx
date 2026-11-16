@@ -65,17 +65,17 @@ function SourceHealthSection({ sourceHealth }: { sourceHealth: IntelligenceSourc
           return (
             <div
               key={s.source}
-              className={`rounded-lg border p-3 ${degraded ? 'border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-[#2A1A05]' : 'border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010]'}`}
+              className={`rounded-lg border p-3 ${degraded ? 'border-amber-300 bg-amber-50' : 'border-[#F2EDE8] bg-white'}`}
             >
               <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{s.label}</p>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-[0.08em] whitespace-nowrap ${degraded ? 'bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200' : 'bg-green-100 text-green-700'}`}>
+                <p className="text-sm font-semibold text-[#1A0A0A]">{s.label}</p>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-[0.08em] whitespace-nowrap ${degraded ? 'bg-amber-200 text-amber-900' : 'bg-green-100 text-green-700'}`}>
                   {degraded ? 'Degraded' : 'Available'}
                 </span>
               </div>
               <p className="text-[11px] uppercase tracking-[0.08em] text-[#9B8B85] mt-1">{SCOPE_LABEL[s.scope]}</p>
               {degraded && s.usedBy.length > 0 && (
-                <p className="text-xs text-amber-800 dark:text-amber-300 mt-2">
+                <p className="text-xs text-amber-800 mt-2">
                   May be incomplete: <span className="font-mono">{s.usedBy.join(', ')}</span>
                 </p>
               )}
@@ -90,7 +90,7 @@ function SourceHealthSection({ sourceHealth }: { sourceHealth: IntelligenceSourc
 
 function InsightCard({ insight, currentEvaluation }: { insight: IntelligenceInsight; currentEvaluation: IntelligenceEvaluationValue | null }) {
   return (
-    <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-3">
+    <div className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-3">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <Pill value={insight.priority} styles={PRIORITY_STYLES} />
@@ -103,8 +103,8 @@ function InsightCard({ insight, currentEvaluation }: { insight: IntelligenceInsi
       </div>
 
       <div>
-        <h3 className="text-sm font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{insight.title}</h3>
-        <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mt-1">{insight.summary}</p>
+        <h3 className="text-sm font-bold text-[#1A0A0A]">{insight.title}</h3>
+        <p className="text-sm text-[#6B5B55] mt-1">{insight.summary}</p>
       </div>
 
       <p className="text-xs text-[#9B8B85] italic">{insight.rationale}</p>
@@ -112,16 +112,16 @@ function InsightCard({ insight, currentEvaluation }: { insight: IntelligenceInsi
       {insight.evidence.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {insight.evidence.map((e) => (
-            <div key={e.label} className="bg-[#FAF8F5] dark:bg-[#0F0808] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-lg px-3 py-1.5">
+            <div key={e.label} className="bg-[#FAF8F5] border border-[#F2EDE8] rounded-lg px-3 py-1.5">
               <p className="text-[10px] uppercase tracking-[0.08em] text-[#9B8B85]">{e.label}</p>
-              <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{e.value}</p>
+              <p className="text-sm font-semibold text-[#1A0A0A] tabular-nums">{e.value}</p>
             </div>
           ))}
         </div>
       )}
 
-      <div className="bg-amber-50 dark:bg-[#2A1A05] border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2">
-        <p className="text-xs text-amber-900 dark:text-amber-200"><span className="font-semibold">Recommendation: </span>{insight.recommendation}</p>
+      <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+        <p className="text-xs text-amber-900"><span className="font-semibold">Recommendation: </span>{insight.recommendation}</p>
       </div>
 
       <div className="flex items-center justify-between gap-3 flex-wrap pt-1">
@@ -137,15 +137,15 @@ function InsightCard({ insight, currentEvaluation }: { insight: IntelligenceInsi
       </div>
 
       {/* E2: expandable explainability -- rule id, trigger/threshold detail, limitations, and freshness. Purely informational, read-only; no mutation control anywhere in this element. */}
-      <details className="pt-1 border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
-        <summary className="cursor-pointer text-xs font-medium uppercase tracking-[0.08em] text-[#6B5B55] dark:text-[#9B8B85] pt-2">
+      <details className="pt-1 border-t border-[#F2EDE8]">
+        <summary className="cursor-pointer text-xs font-medium uppercase tracking-[0.08em] text-[#6B5B55] pt-2">
           Why did this appear?
         </summary>
-        <div className="mt-2 space-y-2 text-xs text-[#6B5B55] dark:text-[#9B8B85]">
-          <p><span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Rule ID: </span><span className="font-mono">{insight.ruleId}</span></p>
+        <div className="mt-2 space-y-2 text-xs text-[#6B5B55]">
+          <p><span className="font-semibold text-[#1A0A0A]">Rule ID: </span><span className="font-mono">{insight.ruleId}</span></p>
           {insight.trigger && (
             <p>
-              <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Trigger: </span>
+              <span className="font-semibold text-[#1A0A0A]">Trigger: </span>
               {insight.trigger.metric}
               {insight.trigger.operator && insight.trigger.observedValue !== undefined && (
                 <span className="font-mono">
@@ -158,14 +158,14 @@ function InsightCard({ insight, currentEvaluation }: { insight: IntelligenceInsi
           )}
           {insight.limitations.length > 0 && (
             <div>
-              <p className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Limitations:</p>
+              <p className="font-semibold text-[#1A0A0A]">Limitations:</p>
               <ul className="list-disc pl-4 space-y-0.5">
                 {insight.limitations.map((l) => <li key={l}>{l}</li>)}
               </ul>
             </div>
           )}
           {/* E2-F1: "Generated" means when this Intelligence result was computed, never when the underlying source data was refreshed. "Evidence" names this rule's own honest basis (EVIDENCE_BASIS_LABEL, from RULE_REGISTRY) -- "Last 30 days" only for genuinely period-based rules; "Current snapshot" or "Structural diagnostic" otherwise, never a fabricated window. */}
-          <p><span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Generated: </span>{formatDateTime(insight.freshness.generatedAt)} · <span className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">Evidence: </span>{EVIDENCE_BASIS_LABEL[insight.freshness.evidenceBasis]}</p>
+          <p><span className="font-semibold text-[#1A0A0A]">Generated: </span>{formatDateTime(insight.freshness.generatedAt)} · <span className="font-semibold text-[#1A0A0A]">Evidence: </span>{EVIDENCE_BASIS_LABEL[insight.freshness.evidenceBasis]}</p>
         </div>
       </details>
 
@@ -216,9 +216,9 @@ function RuleQualitySection({ rows }: { rows: Awaited<ReturnType<typeof getRuleQ
   return (
     <section className="space-y-3">
       <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Rule quality (evaluation counts by rule -- not an automatic judgment)</p>
-      <div className="overflow-x-auto rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A]">
+      <div className="overflow-x-auto rounded-xl border border-[#F2EDE8]">
         <table className="w-full text-xs">
-          <thead className="bg-[#FAF8F5] dark:bg-[#0F0808] text-[#9B8B85] uppercase tracking-[0.08em]">
+          <thead className="bg-[#FAF8F5] text-[#9B8B85] uppercase tracking-[0.08em]">
             <tr>
               <th className="text-left px-3 py-2 font-medium">Rule</th>
               <th className="text-right px-3 py-2 font-medium">Evaluations</th>
@@ -229,8 +229,8 @@ function RuleQualitySection({ rows }: { rows: Awaited<ReturnType<typeof getRuleQ
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.ruleId} className="border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
-                <td className="px-3 py-2 font-mono text-[#1A0A0A] dark:text-[#F5F0ED]">{row.ruleId}</td>
+              <tr key={row.ruleId} className="border-t border-[#F2EDE8]">
+                <td className="px-3 py-2 font-mono text-[#1A0A0A]">{row.ruleId}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{row.total}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{row.useful}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{row.incorrect}</td>
@@ -280,7 +280,7 @@ export default async function AdminIntelligencePage() {
         <p className="text-xs text-[#9B8B85]">Generated {formatDateTime(result.generatedAt)}</p>
       </div>
 
-      <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] max-w-3xl">
+      <p className="text-sm text-[#6B5B55] max-w-3xl">
         Evidence-based marketplace intelligence and recommendations derived from Unity&apos;s verified analytics and operational signals.
         Every recommendation is advisory -- nothing here performs an action, changes a record, or contacts a user.
       </p>
@@ -324,9 +324,9 @@ export default async function AdminIntelligencePage() {
         </div>
       </section>
 
-      <section className="bg-[#FAF8F5] dark:bg-[#0F0808] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-2">
+      <section className="bg-[#FAF8F5] border border-[#F2EDE8] rounded-xl p-5 space-y-2">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">Methodology &amp; safety</p>
-        <ul className="text-xs text-[#6B5B55] dark:text-[#9B8B85] space-y-1 list-disc pl-4">
+        <ul className="text-xs text-[#6B5B55] space-y-1 list-disc pl-4">
           <li>Recommendations are advisory only -- no Intelligence insight performs, triggers, or links to an automated admin action.</li>
           <li>Every insight is generated deterministically from Unity&apos;s own already-verified Admin analytics and operational data -- no external AI provider, model, or data source is used in this phase.</li>
           <li>&quot;Real Data&quot; insights use only confirmed-real records (profiles.data_classification = &apos;real&apos;, or an entity&apos;s own equivalent positive-proof rule) -- test and unresolved/unknown records are excluded, never guessed at.</li>

@@ -48,14 +48,14 @@ export default async function OrderCheckoutPage({ params }: PageProps) {
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
       <Link
         href="/dashboard/orders"
-        className="inline-flex items-center gap-1.5 text-xs font-medium text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] mb-6"
+        className="inline-flex items-center gap-1.5 text-xs font-medium text-[#9B8B85] hover:text-[#1A0A0A] mb-6"
       >
         <ArrowLeft size={13} /> {t('backToPurchases')}
       </Link>
 
       <div className="mb-8">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{t('secureCheckout')}</p>
-        <h1 className="text-3xl font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight">{t('completePayment')}</h1>
+        <h1 className="text-3xl font-extrabold uppercase text-[#1A0A0A] tracking-tight">{t('completePayment')}</h1>
       </div>
 
       <OrderCheckoutFlow

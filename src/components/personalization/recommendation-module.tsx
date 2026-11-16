@@ -95,7 +95,7 @@ export function RecommendationModule({ module, isSignedIn }: { module: ModuleNam
   return (
     <section className="py-12">
       <div className="max-w-[1400px] mx-auto px-6 lg:px-16">
-        <h2 className="section-heading text-[#1A0A0A] dark:text-[#F5F0ED] mb-6">{t(MODULE_HEADING_KEY[module])}</h2>
+        <h2 className="section-heading text-[#1A0A0A] mb-6">{t(MODULE_HEADING_KEY[module])}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {items.map((item) => {
             const translatedContext: Record<string, string> = {}

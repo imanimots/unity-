@@ -39,14 +39,14 @@ export function RentToBuyAdminActions({ agreementId, status, possessionStatus, p
   const base = `/api/admin/rent-to-buy/${agreementId}`
   const btn = 'px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-[0.08em] transition-colors disabled:opacity-50'
   const primary = `${btn} bg-[#8B1A1A] text-white hover:bg-[#7A1616]`
-  const secondary = `${btn} border border-[#E8E0D8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED] hover:border-[#8B1A1A]/40`
+  const secondary = `${btn} border border-[#E8E0D8] text-[#1A0A0A] hover:border-[#8B1A1A]/40`
 
   return (
     <div className="space-y-3">
       {error && <p className="text-sm text-[#8B1A1A]">{error}</p>}
       {status === 'active' && (
         <div className="flex gap-2 items-center">
-          <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason for default (required)" className="flex-1 px-3 py-2 rounded-lg border border-[#E8E0D8] dark:border-[#2A1A1A] text-sm bg-white dark:bg-[#1A1010]" />
+          <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason for default (required)" className="flex-1 px-3 py-2 rounded-lg border border-[#E8E0D8] text-sm bg-white" />
           <button className={primary} disabled={busy !== null || !reason.trim()} onClick={() => run('default', `${base}/default`, { reason })}>Mark defaulted</button>
         </div>
       )}

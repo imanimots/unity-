@@ -59,13 +59,13 @@ export default function AdminMarketplaceRequestsPage() {
           ))}
         </select>
       </div>
-      <div className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl overflow-hidden">
+      <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
                 {['Title', 'Type', 'Requester', 'Offers', 'Status', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] dark:border-[#2A1A1A]">{h}</th>
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8]">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -76,10 +76,10 @@ export default function AdminMarketplaceRequestsPage() {
                 <tr><td colSpan={6} className="px-4 py-16 text-center text-sm text-[#9B8B85]">No requests match your filters.</td></tr>
               ) : (
                 rows.map((r) => (
-                  <tr key={r.id} className="border-b border-[#F2EDE8] dark:border-[#2A1A1A] last:border-0">
+                  <tr key={r.id} className="border-b border-[#F2EDE8] last:border-0">
                     <td className="px-4 py-3 text-sm font-medium">{r.title}</td>
                     <td className="px-4 py-3 text-sm capitalize">{r.transactionType}</td>
-                    <td className="px-4 py-3 text-sm text-[#6B5B55] dark:text-[#9B8B85]">{r.requesterName ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">{r.requesterName ?? '—'}</td>
                     <td className="px-4 py-3 text-sm">{r.offerCount}</td>
                     <td className="px-4 py-3 text-sm">{r.status}</td>
                     <td className="px-4 py-3"><Link href={`/admin/marketplace-requests/${r.id}`} className={secondaryButtonClass}>Inspect</Link></td>

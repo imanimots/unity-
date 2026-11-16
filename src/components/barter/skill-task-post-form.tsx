@@ -8,8 +8,8 @@ import { CATEGORIES } from '@/types'
 import type { BarterSkillTaskPost, BarterSkillTaskPostMilestoneTemplate, SkillTaskKind, SkillTaskDirection, SkillTaskDeliveryMode } from '@/types'
 
 const inputClass =
-  'w-full px-3.5 py-2.5 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-sm text-[#1A0A0A] dark:text-[#F5F0ED] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20'
-const labelClass = 'text-xs font-medium text-[#6B5B55] dark:text-[#9B8B85] mb-1 block'
+  'w-full px-3.5 py-2.5 rounded-xl border border-[#F2EDE8] bg-white text-sm text-[#1A0A0A] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20'
+const labelClass = 'text-xs font-medium text-[#6B5B55] mb-1 block'
 
 interface MilestoneTemplateRow {
   title: string
@@ -236,7 +236,7 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
                 disabled={locked}
                 onClick={() => setKind(k)}
                 className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                  kind === k ? 'bg-[#8B1A1A] text-white border-[#8B1A1A]' : 'border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED]'
+                  kind === k ? 'bg-[#8B1A1A] text-white border-[#8B1A1A]' : 'border-[#F2EDE8] text-[#1A0A0A]'
                 }`}
               >
                 {k === 'skill' ? tSkills('label') : tTasks('label')}
@@ -254,7 +254,7 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
                 disabled={locked}
                 onClick={() => setDirection(d)}
                 className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                  direction === d ? 'bg-[#8B1A1A] text-white border-[#8B1A1A]' : 'border-[#F2EDE8] dark:border-[#2A1A1A] text-[#1A0A0A] dark:text-[#F5F0ED]'
+                  direction === d ? 'bg-[#8B1A1A] text-white border-[#8B1A1A]' : 'border-[#F2EDE8] text-[#1A0A0A]'
                 }`}
               >
                 {d === 'available' ? tMarketplace('available') : tMarketplace('lookingFor')}
@@ -324,19 +324,19 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
         <textarea value={desiredExchangeNotes} onChange={(e) => setDesiredExchangeNotes(e.target.value)} rows={2} placeholder={t('desiredExchangePlaceholder')} className={`${inputClass} resize-none`} />
       </div>
 
-      <div className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-3.5 space-y-2">
-        <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('matchingSignalsHeading')}</p>
+      <div className="rounded-xl border border-[#F2EDE8] p-3.5 space-y-2">
+        <p className="text-sm font-semibold text-[#1A0A0A]">{t('matchingSignalsHeading')}</p>
         <div className="grid grid-cols-2 gap-2">
-          <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <label className="flex items-center gap-2 text-sm text-[#1A0A0A]">
             <input type="checkbox" checked={wantsItem} disabled={locked} onChange={(e) => setWantsItem(e.target.checked)} className="accent-[#8B1A1A]" /> {t('wantsItem')}
           </label>
-          <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <label className="flex items-center gap-2 text-sm text-[#1A0A0A]">
             <input type="checkbox" checked={wantsSkill} disabled={locked} onChange={(e) => setWantsSkill(e.target.checked)} className="accent-[#8B1A1A]" /> {t('wantsSkill')}
           </label>
-          <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <label className="flex items-center gap-2 text-sm text-[#1A0A0A]">
             <input type="checkbox" checked={wantsTask} disabled={locked} onChange={(e) => setWantsTask(e.target.checked)} className="accent-[#8B1A1A]" /> {t('wantsTask')}
           </label>
-          <label className="flex items-center gap-2 text-sm text-[#1A0A0A] dark:text-[#F5F0ED]">
+          <label className="flex items-center gap-2 text-sm text-[#1A0A0A]">
             <input type="checkbox" checked={wantsCashAdjustment} disabled={locked} onChange={(e) => setWantsCashAdjustment(e.target.checked)} className="accent-[#8B1A1A]" /> {t('wantsCash')}
           </label>
         </div>
@@ -366,10 +366,10 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
         <textarea value={availabilityNotes} onChange={(e) => setAvailabilityNotes(e.target.value)} rows={2} className={`${inputClass} resize-none`} />
       </div>
 
-      <div className="rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-3.5 space-y-3">
+      <div className="rounded-xl border border-[#F2EDE8] p-3.5 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{t('milestonesHeading')}</p>
+            <p className="text-sm font-semibold text-[#1A0A0A]">{t('milestonesHeading')}</p>
             <p className="text-xs text-[#9B8B85]">{t('milestonesDesc')}</p>
           </div>
           {!locked && (
@@ -408,7 +408,7 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
               className={`${inputClass} disabled:opacity-50`}
             />
             {!locked && (
-              <button type="button" onClick={() => removeMilestone(i)} className="p-2.5 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] text-[#9B8B85] hover:text-red-600">
+              <button type="button" onClick={() => removeMilestone(i)} className="p-2.5 rounded-xl border border-[#F2EDE8] text-[#9B8B85] hover:text-red-600">
                 <Trash2 size={14} />
               </button>
             )}
@@ -416,14 +416,14 @@ export function SkillTaskPostForm({ initialPost, initialMilestoneTemplates, init
         ))}
 
         {milestones.length > 0 && (
-          <p className={`text-xs font-medium ${milestonesValid ? 'text-[#6B5B55] dark:text-[#9B8B85]' : 'text-red-600'}`}>
+          <p className={`text-xs font-medium ${milestonesValid ? 'text-[#6B5B55]' : 'text-red-600'}`}>
             {t('milestoneWeightSum', { sum: milestoneWeightSum })}
           </p>
         )}
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {saved && !error && <p className="text-sm text-green-600 dark:text-green-400">{t('saved')}</p>}
+      {saved && !error && <p className="text-sm text-green-600">{t('saved')}</p>}
 
       <div className="flex flex-wrap gap-3">
         <button

@@ -38,7 +38,7 @@ export default async function ChatPage() {
   const scoped = { common: { chat: messages.common.chat } }
 
   return (
-    <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A]">
+    <div className="bg-[#FAF8F5]">
       <NextIntlClientProvider messages={scoped}>
         <ChatUI conversations={conversations} currentUserId={requester.userId} locale={locale} />
       </NextIntlClientProvider>

@@ -38,7 +38,7 @@ export default async function AdminDisputeDetailPage({ params }: PageProps) {
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
-      <Link href="/admin/disputes" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] dark:hover:text-[#F5F0ED] transition-colors">
+      <Link href="/admin/disputes" className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
         <ArrowLeft size={13} /> Back to disputes
       </Link>
 
@@ -64,7 +64,7 @@ export default async function AdminDisputeDetailPage({ params }: PageProps) {
         />
 
         {detail.bookingConditionEvidence.length > 0 && (
-          <div className="mt-8 border-t border-[#F2EDE8] dark:border-[#2A1A1A] pt-6">
+          <div className="mt-8 border-t border-[#F2EDE8] pt-6">
             <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-[#9B8B85] mb-3">
               Booking condition evidence
             </h2>
@@ -74,8 +74,8 @@ export default async function AdminDisputeDetailPage({ params }: PageProps) {
             </p>
             <ul className="space-y-2">
               {(detail.bookingConditionEvidence as unknown as Array<{ id: string; evidence_stage: string; file_type: string; created_at: string }>).map((e) => (
-                <li key={e.id} className="flex items-center justify-between gap-3 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] px-4 py-3">
-                  <span className="text-sm text-[#1A0A0A] dark:text-[#F5F0ED] truncate">
+                <li key={e.id} className="flex items-center justify-between gap-3 rounded-xl border border-[#F2EDE8] px-4 py-3">
+                  <span className="text-sm text-[#1A0A0A] truncate">
                     [{e.evidence_stage === 'pre_handover' ? 'Pre-handover' : 'Post-return'}] {e.file_type} — {new Date(e.created_at).toLocaleString()}
                   </span>
                   <EvidenceAccessButton

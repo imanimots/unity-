@@ -39,10 +39,10 @@ export function ReviewForm({ bookingId, listingTitle, revieweeLabel, backHref, e
 
   return (
     <form onSubmit={handleSubmit} className="max-w-lg mx-auto font-['Plus_Jakarta_Sans']">
-      <div className="bg-white dark:bg-[#1A1010] rounded-2xl border border-[#F2EDE8] dark:border-[#2A1A1A] p-6 space-y-6">
+      <div className="bg-white rounded-2xl border border-[#F2EDE8] p-6 space-y-6">
         <div>
           <p className="text-sm text-[#9B8B85] mb-0.5">{t('reviewingBookingFor')}</p>
-          <p className="font-semibold text-[#1A0A0A] dark:text-[#F5F0ED]">{listingTitle}</p>
+          <p className="font-semibold text-[#1A0A0A]">{listingTitle}</p>
         </div>
 
         {hasExisting ? (
@@ -52,18 +52,18 @@ export function ReviewForm({ bookingId, listingTitle, revieweeLabel, backHref, e
                 <Star
                   key={s}
                   size={28}
-                  className={s <= rating ? 'text-amber-400' : 'text-[#F2EDE8] dark:text-[#2A1A1A]'}
+                  className={s <= rating ? 'text-amber-400' : 'text-[#F2EDE8]'}
                   fill="currentColor"
                 />
               ))}
             </div>
             <p className="text-sm text-[#9B8B85]">{t('alreadyReviewed')}</p>
-            <p className="text-sm text-[#6B5B55] dark:text-[#9B8B85] mt-2 italic">&ldquo;{comment}&rdquo;</p>
+            <p className="text-sm text-[#6B5B55] mt-2 italic">&ldquo;{comment}&rdquo;</p>
           </div>
         ) : (
           <>
             <div>
-              <label className="block text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] mb-2">
+              <label className="block text-sm font-medium text-[#1A0A0A] mb-2">
                 {t('rate', { reviewee: revieweeLabel })}
               </label>
               <div className="flex gap-2">
@@ -78,7 +78,7 @@ export function ReviewForm({ bookingId, listingTitle, revieweeLabel, backHref, e
                   >
                     <Star
                       size={32}
-                      className={s <= (hovered || rating) ? 'text-amber-400' : 'text-[#F2EDE8] dark:text-[#2A1A1A]'}
+                      className={s <= (hovered || rating) ? 'text-amber-400' : 'text-[#F2EDE8]'}
                       fill="currentColor"
                     />
                   </button>
@@ -92,7 +92,7 @@ export function ReviewForm({ bookingId, listingTitle, revieweeLabel, backHref, e
             </div>
 
             <div>
-              <label htmlFor={`comment-${bookingId}`} className="block text-sm font-medium text-[#1A0A0A] dark:text-[#F5F0ED] mb-2">
+              <label htmlFor={`comment-${bookingId}`} className="block text-sm font-medium text-[#1A0A0A] mb-2">
                 {t('writeReview')}
               </label>
               <textarea
@@ -101,7 +101,7 @@ export function ReviewForm({ bookingId, listingTitle, revieweeLabel, backHref, e
                 onChange={(e) => setComment(e.target.value)}
                 placeholder={t('sharePlaceholder', { reviewee: revieweeLabel })}
                 rows={4}
-                className="w-full px-3 py-2.5 rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010] text-sm text-[#1A0A0A] dark:text-[#F5F0ED] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20 resize-none"
+                className="w-full px-3 py-2.5 rounded-xl border border-[#F2EDE8] bg-white text-sm text-[#1A0A0A] placeholder:text-[#9B8B85] focus:outline-none focus:ring-2 focus:border-[#8B1A1A] focus:ring-[#8B1A1A]/20 resize-none"
               />
               <div className="flex justify-between mt-1">
                 <span className="text-xs text-[#9B8B85]">{t('minChars')}</span>

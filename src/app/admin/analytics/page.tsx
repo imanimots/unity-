@@ -33,10 +33,10 @@ const PERIODS: { value: AnalyticsPeriod; label: string }[] = [
 
 function Section({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
   return (
-    <section className="bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-5 space-y-4">
+    <section className="bg-white border border-[#F2EDE8] rounded-xl p-5 space-y-4">
       <div>
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-1">{eyebrow}</p>
-        <h2 className="text-base font-bold text-[#1A0A0A] dark:text-[#F5F0ED]">{title}</h2>
+        <h2 className="text-base font-bold text-[#1A0A0A]">{title}</h2>
       </div>
       {children}
     </section>
@@ -58,9 +58,9 @@ function BreakdownTable({ rows, labelHeader = 'Label', emptyLabel = 'No data for
       </thead>
       <tbody>
         {rows.map((r) => (
-          <tr key={r.label} className="border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
-            <td className="py-2 text-[#1A0A0A] dark:text-[#F5F0ED] capitalize">{r.label.replace(/_/g, ' ')}</td>
-            <td className="py-2 text-right tabular-nums text-[#1A0A0A] dark:text-[#F5F0ED]">{r.count}</td>
+          <tr key={r.label} className="border-t border-[#F2EDE8]">
+            <td className="py-2 text-[#1A0A0A] capitalize">{r.label.replace(/_/g, ' ')}</td>
+            <td className="py-2 text-right tabular-nums text-[#1A0A0A]">{r.count}</td>
             <td className="py-2 text-right tabular-nums text-[#9B8B85]">{total > 0 ? `${Math.round((r.count / total) * 100)}%` : '—'}</td>
           </tr>
         ))}
@@ -73,9 +73,9 @@ function BreakdownTable({ rows, labelHeader = 'Label', emptyLabel = 'No data for
 function TrendStat({ label, trend, helper }: { label: string; trend: PeriodComparison; helper?: string }) {
   const delta = trend.previous !== null ? trend.current - trend.previous : null
   return (
-    <div className="bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg px-4 py-3">
+    <div className="bg-[#FAF8F5] rounded-lg px-4 py-3">
       <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">{label}</p>
-      <p className="text-2xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">{trend.current}</p>
+      <p className="text-2xl font-extrabold text-[#1A0A0A] tabular-nums">{trend.current}</p>
       {delta !== null ? (
         <p className={`text-xs mt-1 ${delta >= 0 ? 'text-green-700' : 'text-red-600'}`}>
           {delta >= 0 ? '+' : ''}{delta} vs previous period ({trend.previous})
@@ -91,9 +91,9 @@ function TrendStat({ label, trend, helper }: { label: string; trend: PeriodCompa
 /** A simple aggregate started/completed ratio -- deliberately labeled as an event-count rate, never a per-user cohort conversion (Section 28). Shows "—" rather than 0%/NaN/Infinity when there is nothing to divide by. */
 function FunnelStat({ label, funnel }: { label: string; funnel: FunnelMetric }) {
   return (
-    <div className="bg-[#FAF8F5] dark:bg-[#1A1010] rounded-lg px-4 py-3">
+    <div className="bg-[#FAF8F5] rounded-lg px-4 py-3">
       <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85]">{label}</p>
-      <p className="text-xl font-extrabold text-[#1A0A0A] dark:text-[#F5F0ED] tabular-nums">
+      <p className="text-xl font-extrabold text-[#1A0A0A] tabular-nums">
         {funnel.started} → {funnel.completed}
       </p>
       <p className="text-xs text-[#9B8B85] mt-1">
@@ -135,13 +135,13 @@ export default function AdminAnalyticsPage() {
     <div className="p-6 lg:p-8 max-w-[1400px] space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <AdminPageHeader eyebrow="Real marketplace data" title="Analytics" />
-        <div className="flex items-center gap-1 bg-white dark:bg-[#1A1010] border border-[#F2EDE8] dark:border-[#2A1A1A] rounded-xl p-1">
+        <div className="flex items-center gap-1 bg-white border border-[#F2EDE8] rounded-xl p-1">
           {PERIODS.map((p) => (
             <button
               key={p.value}
               onClick={() => setPeriod(p.value)}
               className={`px-4 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-[0.08em] transition-colors ${
-                period === p.value ? 'bg-[#8B1A1A] text-white' : 'text-[#6B5B55] dark:text-[#9B8B85] hover:bg-[#F2EDE8] dark:hover:bg-[#2A1A1A]'
+                period === p.value ? 'bg-[#8B1A1A] text-white' : 'text-[#6B5B55] hover:bg-[#F2EDE8]'
               }`}
             >
               {p.label}
@@ -235,9 +235,9 @@ export default function AdminAnalyticsPage() {
                   </thead>
                   <tbody>
                     {data.demand.searchDemand.trends.map((t) => (
-                      <tr key={`${t.mode}-${t.category}`} className="border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
-                        <td className="py-2 text-[#1A0A0A] dark:text-[#F5F0ED]">{t.category ?? '—'}</td>
-                        <td className="py-2 text-[#6B5B55] dark:text-[#9B8B85] capitalize">{t.mode ?? '—'}</td>
+                      <tr key={`${t.mode}-${t.category}`} className="border-t border-[#F2EDE8]">
+                        <td className="py-2 text-[#1A0A0A]">{t.category ?? '—'}</td>
+                        <td className="py-2 text-[#6B5B55] capitalize">{t.mode ?? '—'}</td>
                         <td className="py-2 tabular-nums">{t.searchCount}</td>
                         <td className="py-2 tabular-nums">{Math.round(t.zeroResultShare * 100)}%</td>
                       </tr>

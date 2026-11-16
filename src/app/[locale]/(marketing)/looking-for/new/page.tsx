@@ -32,10 +32,10 @@ export default async function NewLookingForRequestPage() {
   const scoped = { lookingFor: { newRequestPage: messages.lookingFor.newRequestPage }, marketplace: { mode: messages.marketplace.mode } }
 
   return (
-    <div className="bg-[#FAF8F5] dark:bg-[#0F0A0A] min-h-screen pt-24 pb-24 px-6 lg:px-12">
+    <div className="bg-[#FAF8F5] min-h-screen pt-24 pb-24 px-6 lg:px-12">
       <div className="max-w-[1400px] mx-auto">
         <p className="section-label mb-4">{t('sectionLabel')}</p>
-        <h1 className="section-heading font-extrabold uppercase text-[#1A0A0A] dark:text-[#F5F0ED] tracking-tight mb-10">
+        <h1 className="section-heading font-extrabold uppercase text-[#1A0A0A] tracking-tight mb-10">
           {t('headingLine1')}<br className="hidden sm:block" /> {t('headingLine2')}
         </h1>
         <NextIntlClientProvider messages={scoped}>

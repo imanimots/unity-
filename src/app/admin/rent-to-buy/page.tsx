@@ -66,9 +66,9 @@ export default function AdminRentToBuyPage() {
       {loading ? (
         <p className="text-sm text-[#9B8B85]">Loading…</p>
       ) : (
-        <div className="bg-white dark:bg-[#1A1010] rounded-xl border border-[#F2EDE8] dark:border-[#2A1A1A] overflow-hidden">
+        <div className="bg-white rounded-xl border border-[#F2EDE8] overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-[#FAF8F5] dark:bg-[#0F0A0A] text-[10px] uppercase tracking-wide text-[#9B8B85]">
+            <thead className="bg-[#FAF8F5] text-[10px] uppercase tracking-wide text-[#9B8B85]">
               <tr>
                 <th className="text-left px-4 py-3">Item</th>
                 <th className="text-left px-4 py-3">Merchant</th>
@@ -81,7 +81,7 @@ export default function AdminRentToBuyPage() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-t border-[#F2EDE8] dark:border-[#2A1A1A]">
+                <tr key={r.id} className="border-t border-[#F2EDE8]">
                   <td className="px-4 py-3">{r.listing?.title ?? '—'}</td>
                   <td className="px-4 py-3">{r.merchant?.full_name ?? r.merchant?.display_name ?? '—'}</td>
                   <td className="px-4 py-3">{r.customer?.full_name ?? r.customer?.display_name ?? '—'}</td>
