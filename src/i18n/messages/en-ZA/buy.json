@@ -64,8 +64,18 @@
     "buyNowTitle": "Buy Now",
     "each": "{amount} each",
     "available": "{count} available",
+    "seller": "Seller",
+    "shipping": "Shipping",
+    "shippingLabels": {
+      "renter": "Paid by buyer",
+      "merchant": "Free — seller covers shipping",
+      "split": "Split 50/50 between buyer and seller",
+      "negotiate": "Negotiate with seller"
+    },
     "quantity": "Quantity",
     "total": "Total",
+    "agreeToTerms": "I agree to Unity's <terms>Terms of Use</terms> and <payments>Payment and Deposit Policy</payments>.",
+    "termsRequired": "You must agree to the terms to continue",
     "placingOrder": "Placing order…",
     "continueToPayment": "Continue to payment — {amount}",
     "couldNotPlaceOrder": "Could not place your order",

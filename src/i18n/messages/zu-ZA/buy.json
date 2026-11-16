@@ -64,8 +64,18 @@
     "buyNowTitle": "Thenga Manje",
     "each": "{amount} ngayinye",
     "available": "{count} kuyatholakala",
+    "seller": "Umthengisi",
+    "shipping": "Ukulethwa",
+    "shippingLabels": {
+      "renter": "Kukhokhwa ngumthengi",
+      "merchant": "Mahhala — umthengisi uhlawula ukulethwa",
+      "split": "Kuhlukaniswe ngo-50/50 phakathi komthengi nomthengisi",
+      "negotiate": "Xoxisana nomthengisi"
+    },
     "quantity": "Inani",
     "total": "Isamba",
+    "agreeToTerms": "Ngiyavuma <terms>Imigomo Yokusebenzisa</terms> ye-Unity kanye <payments>Nenqubomgomo Yezinkokhelo Nediphozithi</payments>.",
+    "termsRequired": "Kufanele uvume imigomo ukuze uqhubeke",
     "placingOrder": "Kufakwa i-oda…",
     "continueToPayment": "Qhubeka ekukhokheni — {amount}",
     "couldNotPlaceOrder": "Asikwazanga ukufaka i-oda lakho",

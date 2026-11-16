@@ -10,6 +10,7 @@
     "titlePlaceholder": "e.g. Looking for a pressure washer",
     "description": "Description",
     "category": "Category",
+    "selectCategory": "Select a category",
     "city": "City",
     "budgetMin": "Budget min (ZAR)",
     "budgetMax": "Budget max (ZAR)",
@@ -36,6 +37,8 @@
     "archived": "Archived"
   },
   "detail": {
+    "backToRequests": "Back to Looking For",
+    "detailsHeading": "Details",
     "lookingToTransact": "Looking to {type} · {status}",
     "postedByPrefix": "Posted by",
     "verified": "· Verified",

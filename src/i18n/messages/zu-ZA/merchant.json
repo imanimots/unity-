@@ -284,13 +284,14 @@
     "headingLine2": "I-AMBASSADOR.",
     "heroDescription": "Dlulisela abathengisi kuplatifomu ye-Unity futhi uzuze ikhomishini kukho konke ukuqashiswa abakuqedayo — inqobo nje uma belokhu behlala nathi.",
     "joinViaWarp": "Joyina nge-Warp",
-    "noCostNotice": "Akukho zindleko zokujoyina · Izinkokhelo njalo ngenyanga nge-Warp",
+    "noCostNotice": "Akukho zindleko zokujoyina · Ikhomishini nezinkokhelo ziphathwa yi-Warp ngokuqondile",
     "stats": {
-      "maxCommission": "Izinga eliphezulu lekhomishini",
-      "payoutSchedule": "Ishejuli yenkokhelo",
-      "payoutScheduleValue": "Njalo ngenyanga",
-      "trackingLabel": "Ukulandelela ezintweni ezidlulisiwe ohlwini",
-      "trackingValue": "Impilo yonke"
+      "costLabel": "Izindleko zokujoyina",
+      "costValue": "Mahhala",
+      "linkLabel": "Isixhumanisi sokudlulisela",
+      "linkValue": "Esiyingqayizivele kuwe",
+      "managedByLabel": "Ikhomishini & izinkokhelo",
+      "managedByValue": "Kuphathwa yi-Warp"
     },
     "processLabel": "INQUBO",
     "howItWorksHeading": "Kusebenza kanjani",
@@ -313,45 +314,13 @@
       }
     },
     "commissionStructureLabel": "ISAKHIWO SEKHOMISHINI",
-    "earnMoreHeading": "Zuza kakhulu njengoba ukhula.",
-    "tierBasisNotice": "Izinga lakho lisekelwe kunani labathengisi abasebenzayo obadlulisele. Ukunyuswa kwezinga kwenzeka ngokuzenzakalela.",
-    "mostPopular": "Okuthandwa kakhulu",
-    "activeReferrals": "abadluliseli abasebenzayo",
-    "commissionSuffix": "ikhomishini",
-    "tiers": {
-      "starter": {
-        "name": "Isiqalo",
-        "referrals": "1–4",
-        "commission": "5%",
-        "perks": [
-          "Isixhumanisi sakho siqu sokudlulisela",
-          "Izinkokhelo zekhomishini njalo ngenyanga",
-          "Uphawu lwe-Ambassador kuphrofayela"
-        ]
-      },
-      "growth": {
-        "name": "Ukukhula",
-        "referrals": "5–19",
-        "commission": "8%",
-        "perks": [
-          "Konke okuku-Isiqalo",
-          "Ukusekelwa okuqala kuqala",
-          "Ukufinyelela kusengaphambili ezicini ezintsha",
-          "Isikhwama sebhonasi sekota"
-        ]
-      },
-      "elite": {
-        "name": "I-Elite",
-        "referrals": "20+",
-        "commission": "12%",
-        "perks": [
-          "Konke okuku-Ukukhula",
-          "Umphathi wakho we-akhawunti",
-          "Amathuba okumaketha ndawonye",
-          "Isimemo somhlangano wonyaka"
-        ]
-      }
-    },
+    "earnMoreHeading": "Kubekwa futhi kukhokhwe yi-Warp.",
+    "commissionExplainer": "I-Unity ayibeki noma ilawule amazinga ekhomishini, amazinga, noma ishejuli yenkokhelo yoHlelo Lwezithunywa — i-Warp yenza lokho, njengomsebenzisi wangaphandle wohlelo. Nansi okuyiqiniso mayelana nendlela esebenza ngayo:",
+    "commissionFacts": [
+      "Ikhomishini ibalwa yi-Warp kukho konke ukuqashiswa okuqediwe kwabathengisi obadlulisele.",
+      "Izinga lakho lamanje nebanga lakho kukhonjiswa ngqo kwideshibhodi yakho ye-Warp, hhayi ku-Unity.",
+      "Izinkokhelo zikhishwa yi-Warp, hhayi yi-Unity."
+    ],
     "requirementsLabel": "IZIDINGO",
     "eligibilityHeading": "Ukufaneleka",
     "eligibility": [

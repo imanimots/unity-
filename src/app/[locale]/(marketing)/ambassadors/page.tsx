@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
-import { CheckCircle, Users, TrendingUp, Globe, ArrowRight, Star } from 'lucide-react'
+import { CheckCircle, Users, TrendingUp, Globe, ArrowRight, Wallet, Link2, ExternalLink } from 'lucide-react'
 import { absoluteUrl, isIndexingEnabled } from '@/lib/seo/config'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -23,8 +23,9 @@ export default async function AmbassadorsPage() {
   const t = await getTranslations('merchant.ambassadors')
 
   const stats = [
-    { value: t('stats.payoutScheduleValue'), label: t('stats.payoutSchedule') },
-    { value: t('stats.trackingValue'), label: t('stats.trackingLabel') },
+    { value: t('stats.costValue'), label: t('stats.costLabel') },
+    { value: t('stats.linkValue'), label: t('stats.linkLabel') },
+    { value: t('stats.managedByValue'), label: t('stats.managedByLabel') },
   ]
   const howItWorks = [
     { step: '01', title: t('steps.apply.title'), desc: t('steps.apply.desc') },
@@ -32,11 +33,7 @@ export default async function AmbassadorsPage() {
     { step: '03', title: t('steps.refer.title'), desc: t('steps.refer.desc') },
     { step: '04', title: t('steps.earn.title'), desc: t('steps.earn.desc') },
   ]
-  const tiers = [
-    { key: 'starter', highlight: false },
-    { key: 'growth', highlight: true },
-    { key: 'elite', highlight: false },
-  ] as const
+  const commissionFacts = t.raw('commissionFacts') as string[]
   const eligibility = t.raw('eligibility') as string[]
   const whoThrives = [
     { icon: Users, title: t('whoThrives.communityBuilders.title'), desc: t('whoThrives.communityBuilders.desc') },
@@ -73,11 +70,7 @@ export default async function AmbassadorsPage() {
 
       {/* Stats bar */}
       <section className="border-b border-[#F2EDE8] bg-white">
-        <div className="max-w-5xl mx-auto grid grid-cols-3 divide-x divide-[#F2EDE8]">
-          <div className="py-8 px-6 text-center">
-            <div className="text-3xl font-extrabold text-[#1A0A0A] mb-1">12%</div>
-            <div className="text-sm text-[#6B5B55] uppercase tracking-[0.05em]">{t('stats.maxCommission')}</div>
-          </div>
+        <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#F2EDE8]">
           {stats.map(({ value, label }) => (
             <div key={label} className="py-8 px-6 text-center">
               <div className="text-3xl font-extrabold text-[#1A0A0A] mb-1">{value}</div>
@@ -106,47 +99,26 @@ export default async function AmbassadorsPage() {
         </div>
       </section>
 
-      {/* Tiers */}
+      {/* Commission — honest framing: Warp owns this program's actual
+          commission tiers/rates/payout schedule, not Unity, so this
+          section states what's actually true rather than inventing
+          specific numbers Unity doesn't set or control. */}
       <section className="bg-[#1A0A0A] py-24 px-4">
         <div className="max-w-5xl mx-auto">
           <p className="section-label text-[#C4511F] mb-4">{t('commissionStructureLabel')}</p>
-          <h2 className="text-4xl font-extrabold uppercase tracking-[-0.02em] text-white mb-4">
+          <h2 className="text-4xl font-extrabold uppercase tracking-[-0.02em] text-white mb-6">
             {t('earnMoreHeading')}
           </h2>
-          <p className="text-[#6B5B55] mb-14 text-sm max-w-md">
-            {t('tierBasisNotice')}
+          <p className="text-[#9B8B85] mb-10 text-sm max-w-xl leading-relaxed">
+            {t('commissionExplainer')}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            {tiers.map(({ key, highlight }) => {
-              const perks = t.raw(`tiers.${key}.perks`) as string[]
+            {commissionFacts.map((fact, i) => {
+              const Icon = [Wallet, Link2, ExternalLink][i] ?? CheckCircle
               return (
-                <div
-                  key={key}
-                  className={`rounded-xl p-7 bg-[#2A1A1A] border ${
-                    highlight
-                      ? 'border-[#8B1A1A] ring-1 ring-[#8B1A1A]/40'
-                      : 'border-[#2A1A1A]'
-                  }`}
-                >
-                  {highlight && (
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#8B1A1A]/20 text-[#C4511F] text-[11px] font-medium uppercase tracking-[0.08em] mb-4">
-                      <Star size={10} fill="currentColor" /> {t('mostPopular')}
-                    </div>
-                  )}
-                  <div className="text-base font-extrabold text-white uppercase tracking-[0.05em] mb-1">{t(`tiers.${key}.name`)}</div>
-                  <div className="text-xs text-[#6B5B55] uppercase tracking-[0.08em] mb-6">{t(`tiers.${key}.referrals`)} {t('activeReferrals')}</div>
-                  <div className="text-4xl font-extrabold text-white mb-1">
-                    {t(`tiers.${key}.commission`)}
-                  </div>
-                  <div className="text-xs text-[#9B8B85] uppercase tracking-[0.08em] mb-7">{t('commissionSuffix')}</div>
-                  <ul className="space-y-3">
-                    {perks.map((perk) => (
-                      <li key={perk} className="flex items-start gap-2.5 text-sm text-[#9B8B85]">
-                        <CheckCircle size={14} className="text-[#8B1A1A] shrink-0 mt-0.5" />
-                        {perk}
-                      </li>
-                    ))}
-                  </ul>
+                <div key={fact} className="rounded-xl p-6 bg-[#2A1A1A] border border-[#2A1A1A]">
+                  <Icon size={18} className="text-[#C4511F] mb-4" />
+                  <p className="text-sm text-[#9B8B85] leading-relaxed">{fact}</p>
                 </div>
               )
             })}

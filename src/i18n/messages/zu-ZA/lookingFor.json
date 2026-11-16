@@ -10,6 +10,7 @@
     "titlePlaceholder": "isb. Ngifuna umshini wokugeza ngamandla",
     "description": "Incazelo",
     "category": "Isigaba",
+    "selectCategory": "Khetha isigaba",
     "city": "Idolobha",
     "budgetMin": "Isabelomali esincane (ZAR)",
     "budgetMax": "Isabelomali esikhulu (ZAR)",
@@ -36,6 +37,8 @@
     "archived": "Kubekiwe"
   },
   "detail": {
+    "backToRequests": "Buyela Kokufuna",
+    "detailsHeading": "Imininingwane",
     "lookingToTransact": "Ufuna uku-{type} · {status}",
     "postedByPrefix": "Kuthunyelwe ngu",
     "verified": "· Kuqinisekisiwe",

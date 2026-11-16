@@ -156,6 +156,7 @@
     "noOffersYet": "Nog geen aanbiedinge nie."
   },
   "postDetail": {
+    "backToBrowse": "Terug na Blaai (Ruilhandel)",
     "byPrefix": "Deur",
     "deliveryModes": {
       "remote": "Afgeleë",

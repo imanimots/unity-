@@ -284,13 +284,14 @@
     "headingLine2": "AMBASSADOR.",
     "heroDescription": "Refer merchants to the Unity platform and earn commission on every rental they complete — for as long as they list with us.",
     "joinViaWarp": "Join via Warp",
-    "noCostNotice": "No cost to join · Payouts monthly via Warp",
+    "noCostNotice": "No cost to join · Commission and payouts are managed directly by Warp",
     "stats": {
-      "maxCommission": "Max commission rate",
-      "payoutSchedule": "Payout schedule",
-      "payoutScheduleValue": "Monthly",
-      "trackingLabel": "Tracking on referred listings",
-      "trackingValue": "Lifetime"
+      "costLabel": "Cost to join",
+      "costValue": "Free",
+      "linkLabel": "Referral link",
+      "linkValue": "Unique to you",
+      "managedByLabel": "Commission & payouts",
+      "managedByValue": "Managed by Warp"
     },
     "processLabel": "THE PROCESS",
     "howItWorksHeading": "How it works",
@@ -313,45 +314,13 @@
       }
     },
     "commissionStructureLabel": "COMMISSION STRUCTURE",
-    "earnMoreHeading": "Earn more as you grow.",
-    "tierBasisNotice": "Your tier is based on total active merchants you've referred. Upgrades happen automatically.",
-    "mostPopular": "Most popular",
-    "activeReferrals": "active referrals",
-    "commissionSuffix": "commission",
-    "tiers": {
-      "starter": {
-        "name": "Starter",
-        "referrals": "1–4",
-        "commission": "5%",
-        "perks": [
-          "Personal referral link",
-          "Monthly commission payouts",
-          "Ambassador badge on profile"
-        ]
-      },
-      "growth": {
-        "name": "Growth",
-        "referrals": "5–19",
-        "commission": "8%",
-        "perks": [
-          "Everything in Starter",
-          "Priority support",
-          "Early access to new features",
-          "Quarterly bonus pool"
-        ]
-      },
-      "elite": {
-        "name": "Elite",
-        "referrals": "20+",
-        "commission": "12%",
-        "perks": [
-          "Everything in Growth",
-          "Dedicated account manager",
-          "Co-marketing opportunities",
-          "Annual retreat invite"
-        ]
-      }
-    },
+    "earnMoreHeading": "Set and paid by Warp.",
+    "commissionExplainer": "Unity doesn't set or control the Ambassador Program's commission tiers, rates, or payout schedule — Warp does, as the program's external operator. Here's what's actually true about how it works:",
+    "commissionFacts": [
+      "Commission is calculated by Warp on completed rentals from the merchants you refer.",
+      "Your current rate and tier are shown directly in your own Warp dashboard, not on Unity.",
+      "Payouts are issued by Warp, not by Unity."
+    ],
     "requirementsLabel": "REQUIREMENTS",
     "eligibilityHeading": "Eligibility",
     "eligibility": [

@@ -1,6 +1,6 @@
 import { getTranslations, getLocale } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
-import { MapPin, Wifi, Users, Pencil } from 'lucide-react'
+import { ArrowLeft, MapPin, Wifi, Users, Pencil } from 'lucide-react'
 import { ProposeTradeButton } from './propose-trade-button'
 import { ReportSkillTaskPostDialog } from './report-skill-task-post-dialog'
 import { SkillTaskPostActions } from './skill-task-post-actions'
@@ -45,6 +45,10 @@ export async function SkillTaskPostDetailClient({
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-8">
+      <Link href="/listings?mode=barter" className="inline-flex items-center gap-1.5 text-sm text-[#6B5B55] hover:text-[#1A0A0A] transition-colors">
+        <ArrowLeft size={14} /> {t('backToBrowse')}
+      </Link>
+
       <div>
         <div className="flex items-center gap-2 flex-wrap mb-3">
           <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-[#F2EDE8] text-[#6B5B55]">
@@ -54,7 +58,7 @@ export async function SkillTaskPostDetailClient({
             {post.direction === 'available' ? tDirection('available') : tDirection('lookingFor')}
           </span>
         </div>
-        <h1 className="text-3xl font-extrabold uppercase text-[#1A0A0A] tracking-tight mb-2">{post.title}</h1>
+        <h1 className="text-3xl lg:text-4xl font-extrabold text-[#1A0A0A] tracking-tight leading-tight mb-3">{post.title}</h1>
         <p className="text-sm text-[#6B5B55]">
           {t('byPrefix')} <ProfileLink userId={post.owner_id} displayName={ownerName} currentUserId={currentUserId} className="font-medium" />
         </p>
@@ -93,20 +97,20 @@ export async function SkillTaskPostDetailClient({
       {(post.exclusions || post.materials_arrangement || post.evidence_expectations) && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {post.exclusions && (
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-[#9B8B85] mb-1">{t('exclusions')}</h3>
+            <div className="p-4 rounded-xl border border-[#F2EDE8] bg-white">
+              <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-[#9B8B85] mb-1.5">{t('exclusions')}</h3>
               <p className="text-sm text-[#6B5B55]">{post.exclusions}</p>
             </div>
           )}
           {post.materials_arrangement && (
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-[#9B8B85] mb-1">{t('materials')}</h3>
+            <div className="p-4 rounded-xl border border-[#F2EDE8] bg-white">
+              <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-[#9B8B85] mb-1.5">{t('materials')}</h3>
               <p className="text-sm text-[#6B5B55]">{post.materials_arrangement}</p>
             </div>
           )}
           {post.evidence_expectations && (
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-[#9B8B85] mb-1">{t('evidenceExpectations')}</h3>
+            <div className="p-4 rounded-xl border border-[#F2EDE8] bg-white">
+              <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-[#9B8B85] mb-1.5">{t('evidenceExpectations')}</h3>
               <p className="text-sm text-[#6B5B55]">{post.evidence_expectations}</p>
             </div>
           )}
@@ -136,9 +140,9 @@ export async function SkillTaskPostDetailClient({
               .slice()
               .sort((a, b) => a.sequence - b.sequence)
               .map((m) => (
-                <div key={m.id} className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-lg border border-[#F2EDE8] text-sm">
+                <div key={m.id} className="flex items-center justify-between gap-2 px-4 py-3 rounded-xl border border-[#F2EDE8] bg-white text-sm">
                   <span className="text-[#1A0A0A]">{m.sequence}. {m.title}</span>
-                  <span className="text-[#9B8B85] shrink-0">{m.weight_percent}%</span>
+                  <span className="text-[#9B8B85] shrink-0 font-medium">{m.weight_percent}%</span>
                 </div>
               ))}
           </div>

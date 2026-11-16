@@ -10,6 +10,7 @@
     "titlePlaceholder": "bv. Op soek na 'n drukspuit",
     "description": "Beskrywing",
     "category": "Kategorie",
+    "selectCategory": "Kies 'n kategorie",
     "city": "Stad",
     "budgetMin": "Minimum begroting (ZAR)",
     "budgetMax": "Maksimum begroting (ZAR)",
@@ -36,6 +37,8 @@
     "archived": "Geargiveer"
   },
   "detail": {
+    "backToRequests": "Terug na Op Soek Na",
+    "detailsHeading": "Besonderhede",
     "lookingToTransact": "Soek om te {type} · {status}",
     "postedByPrefix": "Geplaas deur",
     "verified": "· Geverifieer",

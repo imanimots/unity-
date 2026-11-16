@@ -284,13 +284,14 @@
     "headingLine2": "AMBASSADEUR.",
     "heroDescription": "Verwys handelaars na die Unity-platform en verdien kommissie op elke verhuring wat hulle voltooi — solank hulle by ons lys.",
     "joinViaWarp": "Sluit aan via Warp",
-    "noCostNotice": "Geen koste om aan te sluit nie · Maandelikse uitbetalings via Warp",
+    "noCostNotice": "Geen koste om aan te sluit nie · Kommissie en uitbetalings word direk deur Warp bestuur",
     "stats": {
-      "maxCommission": "Maksimum kommissiekoers",
-      "payoutSchedule": "Uitbetalingskedule",
-      "payoutScheduleValue": "Maandeliks",
-      "trackingLabel": "Opsporing op verwysde lysings",
-      "trackingValue": "Leeftyd"
+      "costLabel": "Koste om aan te sluit",
+      "costValue": "Gratis",
+      "linkLabel": "Verwysingskakel",
+      "linkValue": "Uniek aan jou",
+      "managedByLabel": "Kommissie & uitbetalings",
+      "managedByValue": "Bestuur deur Warp"
     },
     "processLabel": "DIE PROSES",
     "howItWorksHeading": "Hoe dit werk",
@@ -313,45 +314,13 @@
       }
     },
     "commissionStructureLabel": "KOMMISSIESTRUKTUUR",
-    "earnMoreHeading": "Verdien meer soos jy groei.",
-    "tierBasisNotice": "Jou vlak is gebaseer op die totale aktiewe handelaars wat jy verwys het. Opgraderings gebeur outomaties.",
-    "mostPopular": "Mees gewild",
-    "activeReferrals": "aktiewe verwysings",
-    "commissionSuffix": "kommissie",
-    "tiers": {
-      "starter": {
-        "name": "Beginner",
-        "referrals": "1–4",
-        "commission": "5%",
-        "perks": [
-          "Persoonlike verwysingskakel",
-          "Maandelikse kommissie-uitbetalings",
-          "Ambassadeur-kenteken op profiel"
-        ]
-      },
-      "growth": {
-        "name": "Groei",
-        "referrals": "5–19",
-        "commission": "8%",
-        "perks": [
-          "Alles in Beginner",
-          "Prioriteitsondersteuning",
-          "Vroeë toegang tot nuwe funksies",
-          "Kwartaallikse bonuspoel"
-        ]
-      },
-      "elite": {
-        "name": "Elite",
-        "referrals": "20+",
-        "commission": "12%",
-        "perks": [
-          "Alles in Groei",
-          "Toegewyde rekeningbestuurder",
-          "Gesamentlike bemarkingsgeleenthede",
-          "Uitnodiging na jaarlikse aftrek"
-        ]
-      }
-    },
+    "earnMoreHeading": "Bepaal en betaal deur Warp.",
+    "commissionExplainer": "Unity bepaal of beheer nie die Ambassadeurprogram se kommissievlakke, koerse, of uitbetalingskedule nie — Warp doen dit, as die program se eksterne operateur. Hier is wat werklik waar is oor hoe dit werk:",
+    "commissionFacts": [
+      "Kommissie word deur Warp bereken op voltooide verhurings van die handelaars wat jy verwys.",
+      "Jou huidige koers en vlak word direk in jou eie Warp-paneelbord gewys, nie op Unity nie.",
+      "Uitbetalings word deur Warp uitgereik, nie deur Unity nie."
+    ],
     "requirementsLabel": "VEREISTES",
     "eligibilityHeading": "Kwalifikasie",
     "eligibility": [

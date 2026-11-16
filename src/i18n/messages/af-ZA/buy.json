@@ -64,8 +64,18 @@
     "buyNowTitle": "Koop Nou",
     "each": "{amount} elk",
     "available": "{count} beskikbaar",
+    "seller": "Verkoper",
+    "shipping": "Aflewering",
+    "shippingLabels": {
+      "renter": "Betaal deur koper",
+      "merchant": "Gratis — verkoper dra aflewering",
+      "split": "50/50 verdeel tussen koper en verkoper",
+      "negotiate": "Onderhandel met verkoper"
+    },
     "quantity": "Hoeveelheid",
     "total": "Totaal",
+    "agreeToTerms": "Ek stem in tot Unity se <terms>Gebruiksbepalings</terms> en <payments>Betaling- en Depositobeleid</payments>.",
+    "termsRequired": "Jy moet met die bepalings instem om voort te gaan",
     "placingOrder": "Plaas bestelling…",
     "continueToPayment": "Gaan voort na betaling — {amount}",
     "couldNotPlaceOrder": "Kon nie jou bestelling plaas nie",
