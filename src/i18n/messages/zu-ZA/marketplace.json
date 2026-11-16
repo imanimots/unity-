@@ -51,6 +51,9 @@
   "postRequestInstead": "Kunalokho, thumela isicelo \"Esifunwayo\"",
   "tryAdjusting": "Zama ukulungisa izihlungi zakho noma amagama okusesha.",
   "noListingsFound": "Azikho izinhlu ezitholakele",
+  "browseSection": {
+    "seeAllListings": "Bona zonke izinhlu ze-{category}"
+  },
   "beFirstSkillTask": {
     "available": "Yiba ngowokuqala ukuthumela lokho ongakunikela.",
     "lookingFor": "Yiba ngowokuqala ukuthumela lokho odinga usizo ngakho."

@@ -51,6 +51,9 @@
   "postRequestInstead": "Post a \"Looking For\" request instead",
   "tryAdjusting": "Try adjusting your filters or search terms.",
   "noListingsFound": "No listings found",
+  "browseSection": {
+    "seeAllListings": "See all {category} listings"
+  },
   "beFirstSkillTask": {
     "available": "Be the first to post what you can offer.",
     "lookingFor": "Be the first to post what you need help with."

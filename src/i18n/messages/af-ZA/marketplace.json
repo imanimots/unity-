@@ -51,6 +51,9 @@
   "postRequestInstead": "Plaas eerder 'n \"Op Soek Na\"-versoek",
   "tryAdjusting": "Probeer jou filters of soekterme aanpas.",
   "noListingsFound": "Geen noterings gevind nie",
+  "browseSection": {
+    "seeAllListings": "Sien alle {category} noterings"
+  },
   "beFirstSkillTask": {
     "available": "Wees die eerste om te plaas wat jy kan aanbied.",
     "lookingFor": "Wees die eerste om te plaas waarmee jy hulp nodig het."

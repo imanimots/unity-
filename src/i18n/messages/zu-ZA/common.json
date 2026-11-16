@@ -253,19 +253,16 @@
       "headlineLine1": "QASHA",
       "headlineLine2": "NOMA YINI.",
       "description": "I-Unity ixhumanisa abantu baseNingizimu Afrika ukuze baqashe futhi bakweleke ngokuphepha — abasebenzisi abaqinisekisiwe, ukukhokha okuphephile.",
-      "getStarted": "Qala Manje",
-      "browseItems": "Phequlula Izinto"
+      "exploreCta": "Hlola Izinto",
+      "listItemCta": "Faka into ohlwini"
     },
-    "marquee": "AMAKHAMERA • UKUKHEMPA • AMATHULUZI KAGESI • AMADRONE • AMABHASIKELI • IZINSIZA ZOMSINDO • UKUKHANYISA • AMAPHROJEKHTHA • EZEMIDLALO • ENSIMINI • IMICIMBI • IZIMOTO • ",
     "browseSection": {
-      "stepLabel": "[02]",
-      "sectionLabel": "PHEQULULA",
+      "eyebrow": "Okuthandwayo Eduze Kwakho",
       "heading": "OKUTHOLAKALAYO.",
       "browseAllListings": "Phequlula zonke izinhlu"
     },
     "howItWorks": {
-      "stepLabel": "[03]",
-      "sectionLabel": "INDLELA OKUSEBENZA NGAYO",
+      "eyebrow": "Kusebenza Kanjani",
       "heading": "IZINYATHELO EZINTATHU.",
       "browseBookTitle": "PHEQULULA & BHUKHA",
       "browseBookDesc": "Thola okudingayo, khetha izinsuku zakho, bese ukhokha ngokuphepha ngokusebenzisa ukukhokha kwe-Unity.",
@@ -275,31 +272,30 @@
       "returnReviewDesc": "Yibuyisele isimweni esihle, uthole idiphozithi yakho ikhishwe, bese ushiya ukubuyekeza okuqotho."
     },
     "platformFeatures": {
-      "stepLabel": "[04]",
-      "sectionLabel": "OKUHLINZEKWA I-UNITY",
+      "eyebrow": "Ezinye Izindlela Zokuzuza",
       "heading": "IZINDLELA EZINE ZOKUSEBENZISA I-UNITY.",
       "comingSoon": "Kuyeza maduze",
       "rentalLabel": "IMAKETHE YOKUQASHA",
       "rentalHeading": "PHEQULULA UBHUKHE IZINTO EZISEDUZE NAWE.",
       "rentalDesc": "Qasha amakhamera, amathuluzi, izinto zokukhempa nokunye kubanikazi bendawo abaqinisekisiwe — khetha izinsuku zakho bese ukhokha ngokuphepha.",
       "rentalImageAlt": "Isithombe sesikrini sekhasi lokuphequlula uhlu lokuqasha lwe-Unity",
-      "rentalCta": "Phequlula Okuqashwayo",
+      "rentalCta": "Phequlula Izinto",
       "buySellLabel": "IMAKETHE YOKUTHENGA NOKUTHENGISA",
       "buySellHeading": "THENGA NOTHENGISA IZINTO NGOKUPHELELE.",
       "buySellDesc": "Thenga futhi uthengise izinto ngokuphelele, ndawonye nokuqasha — usebenzisa umphakathi ofanayo owethembekile, oqinisekisiwe ngobunikazi kanye nokukhokha okuphephile ngemodi yokuhlola.",
-      "buySellCta": "Phequlula Okuthengiswayo",
+      "buySellCta": "Thenga Manje",
       "barterLabel": "UKUSHINTSHANISA",
       "barterHeading": "SHINTSHANISA IZINTO NGQO.",
-      "barterDesc": "Shintshanisa onakho ngalokho okudingayo — akudingeki imali. Imininingwane engeziwe mayelana nendlela ukushintshanisa okuzosebenza ngayo kuyeza maduze.",
+      "barterDesc": "Shintshanisa onakho ngalokho okudingayo — akudingeki imali.",
+      "barterCta": "Phakamisa Ukushintshanisa",
       "ambassadorLabel": "UHLELO LWEZITHUNYWA / OKUXHUMANISAYO",
       "ambassadorHeading": "ZUZA NGOKUDLULISELA AMALUNGU AMASHA.",
       "ambassadorDesc": "Yabelana ngesixhumanisi sakho sokudlulisela bese uzuza ikhomishini njalo lapho umuntu omdluliselayo eqeda ukuqasha.",
       "ambassadorImageAlt": "Isithombe sesikrini sekhasi Lohlelo Lwezithunywa lwe-Unity",
-      "ambassadorCta": "Funda Kabanzi"
+      "ambassadorCta": "Thola Isixhumanisi Sami"
     },
     "trust": {
-      "stepLabel": "[05]",
-      "sectionLabel": "UKWETHEMBEKA",
+      "eyebrow": "Isithembiso Sethu",
       "headingLine1": "KUQINISEKISIWE.",
       "headingLine2": "KUVIKELIWE.",
       "headingLine3": "KUYETHENJWA.",
@@ -314,7 +310,7 @@
       "heading": "QALA UKUZUZA NAMUHLA.",
       "description": "Faka into yakho yokuqala ohlwini ngaphansi kwemizuzu emi-5.",
       "listItem": "Faka into ohlwini",
-      "howItWorks": "Indlela okusebenza ngayo"
+      "exploreItems": "Hlola izinto"
     }
   },
   "payoutDestination": {

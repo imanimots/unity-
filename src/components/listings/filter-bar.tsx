@@ -37,7 +37,7 @@ const SORT_OPTIONS_BY_ENTITY: Record<FilterBarEntity, { value: string; label: st
   ],
 }
 
-function FilterBarInner({ entity }: { entity: FilterBarEntity }) {
+function FilterBarInner({ entity, trailingSlot }: { entity: FilterBarEntity; trailingSlot?: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -76,56 +76,46 @@ function FilterBarInner({ entity }: { entity: FilterBarEntity }) {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Sort row -- the query text itself is entered via the page's own
-          hero search field (one search input, not two competing ones);
-          this row only carries sort, which is entity-specific. */}
-      <div className="flex justify-end">
-        <select
-          value={sort}
-          onChange={(e) => router.push(createURL('sort', e.target.value), { scroll: false })}
-          className="px-3 py-2.5 rounded-xl border border-[#F2EDE8] bg-white text-[#1A0A0A] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A] transition-colors"
-        >
-          {sortOptions.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Category pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-        <button
-          onClick={() => refineAndNavigate(createURL('category', null), '', maxPrice)}
-          className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-            !category
-              ? 'bg-[#8B1A1A] text-white border-[#8B1A1A]'
-              : 'border-[#F2EDE8] text-[#6B5B55] hover:border-[#8B1A1A] hover:text-[#8B1A1A]'
-          }`}
-        >
-          All
-        </button>
-        {CATEGORIES.map((cat) => (
+    <div className="space-y-4 w-full">
+      {/* Category pills + trailing slot (Available/Looking For toggle,
+          Kind toggle, post-a-request CTA) on one row -- matches the
+          Browse reference's top filter row exactly. */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
           <button
-            key={cat.id}
-            onClick={() => {
-              const nextCategory = category === cat.id ? '' : cat.id
-              refineAndNavigate(createURL('category', nextCategory || null), nextCategory, maxPrice)
-            }}
-            className={`shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-              category === cat.id
+            onClick={() => refineAndNavigate(createURL('category', null), '', maxPrice)}
+            className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+              !category
                 ? 'bg-[#8B1A1A] text-white border-[#8B1A1A]'
                 : 'border-[#F2EDE8] text-[#6B5B55] hover:border-[#8B1A1A] hover:text-[#8B1A1A]'
             }`}
           >
-            <span>{cat.icon}</span>
-            {cat.label.split(' ')[0]}
+            All
           </button>
-        ))}
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => {
+                const nextCategory = category === cat.id ? '' : cat.id
+                refineAndNavigate(createURL('category', nextCategory || null), nextCategory, maxPrice)
+              }}
+              className={`shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                category === cat.id
+                  ? 'bg-[#8B1A1A] text-white border-[#8B1A1A]'
+                  : 'border-[#F2EDE8] text-[#6B5B55] hover:border-[#8B1A1A] hover:text-[#8B1A1A]'
+              }`}
+            >
+              <span>{cat.icon}</span>
+              {cat.label.split(' ')[0]}
+            </button>
+          ))}
+        </div>
+        {trailingSlot}
       </div>
 
-      {/* Price + active filters row */}
-      <div className="flex items-center gap-3 flex-wrap">
-        {entity === 'listings' && (
+      {/* Max price + Sort row */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        {entity === 'listings' ? (
           <div className="flex items-center gap-2">
             <SlidersHorizontal size={14} className="text-[#9B8B85]" />
             <span className="text-sm text-[#6B5B55]">Max price:</span>
@@ -141,25 +131,39 @@ function FilterBarInner({ entity }: { entity: FilterBarEntity }) {
               <option value="500">Under R500/day</option>
             </select>
           </div>
-        )}
+        ) : <div />}
 
-        {activeFiltersCount > 0 && (
-          <button
-            onClick={() => refineAndNavigate(pathname, '', '')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#6B5B55] hover:text-[#8B1A1A] border border-[#F2EDE8] hover:border-[#8B1A1A] transition-colors"
-          >
-            <X size={12} /> Clear filters ({activeFiltersCount})
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {activeFiltersCount > 0 && (
+            <button
+              onClick={() => refineAndNavigate(pathname, '', '')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[#6B5B55] hover:text-[#8B1A1A] border border-[#F2EDE8] hover:border-[#8B1A1A] transition-colors"
+            >
+              <X size={12} /> Clear filters ({activeFiltersCount})
+            </button>
+          )}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-[#6B5B55]">Sort by:</span>
+            <select
+              value={sort}
+              onChange={(e) => router.push(createURL('sort', e.target.value), { scroll: false })}
+              className="px-3 py-2.5 rounded-xl border border-[#F2EDE8] bg-white text-[#1A0A0A] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A] transition-colors"
+            >
+              {sortOptions.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
     </div>
   )
 }
 
-export function FilterBar({ entity = 'listings' }: { entity?: FilterBarEntity }) {
+export function FilterBar({ entity = 'listings', trailingSlot }: { entity?: FilterBarEntity; trailingSlot?: React.ReactNode }) {
   return (
     <Suspense fallback={<div className="h-32 rounded-2xl bg-[#F2EDE8] animate-pulse" />}>
-      <FilterBarInner entity={entity} />
+      <FilterBarInner entity={entity} trailingSlot={trailingSlot} />
     </Suspense>
   )
 }

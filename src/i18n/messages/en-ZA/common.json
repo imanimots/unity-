@@ -253,19 +253,16 @@
       "headlineLine1": "RENT",
       "headlineLine2": "ANYTHING.",
       "description": "Unity connects South Africans to rent and lend safely — reviewed users, secure checkout.",
-      "getStarted": "Get Started",
-      "browseItems": "Browse Items"
+      "exploreCta": "Explore Items",
+      "listItemCta": "List an item"
     },
-    "marquee": "CAMERAS • CAMPING • POWER TOOLS • DRONES • BICYCLES • AUDIO GEAR • LIGHTING • PROJECTORS • SPORTS • GARDEN • EVENTS • VEHICLES • ",
     "browseSection": {
-      "stepLabel": "[02]",
-      "sectionLabel": "BROWSE",
+      "eyebrow": "Popular Near You",
       "heading": "WHAT'S AVAILABLE.",
       "browseAllListings": "Browse all listings"
     },
     "howItWorks": {
-      "stepLabel": "[03]",
-      "sectionLabel": "HOW IT WORKS",
+      "eyebrow": "How It Works",
       "heading": "THREE STEPS.",
       "browseBookTitle": "BROWSE & BOOK",
       "browseBookDesc": "Find what you need, pick your dates, and pay securely through Unity's checkout.",
@@ -275,31 +272,30 @@
       "returnReviewDesc": "Hand it back in good shape, get your deposit released, and leave an honest review."
     },
     "platformFeatures": {
-      "stepLabel": "[04]",
-      "sectionLabel": "WHAT UNITY OFFERS",
+      "eyebrow": "More Ways To Get Value",
       "heading": "FOUR WAYS TO USE UNITY.",
       "comingSoon": "Coming soon",
       "rentalLabel": "RENTAL MARKETPLACE",
       "rentalHeading": "BROWSE AND BOOK ITEMS NEAR YOU.",
       "rentalDesc": "Rent cameras, tools, camping gear and more from reviewed local owners — pick your dates and check out securely.",
       "rentalImageAlt": "Screenshot of the Unity rental listings browse page",
-      "rentalCta": "Browse Rentals",
+      "rentalCta": "Browse Items",
       "buySellLabel": "BUYING & SELLING MARKETPLACE",
       "buySellHeading": "BUY AND SELL ITEMS OUTRIGHT.",
       "buySellDesc": "Buy and sell items outright, alongside renting — using the same trusted, identity-reviewed community and secure test-mode checkout.",
-      "buySellCta": "Browse For Sale",
+      "buySellCta": "Buy Now",
       "barterLabel": "BARTERING",
       "barterHeading": "TRADE ITEMS DIRECTLY.",
-      "barterDesc": "Swap what you have for what you need — no cash required. More details on how bartering will work are coming soon.",
+      "barterDesc": "Swap what you have for what you need — no cash required.",
+      "barterCta": "Propose Trade",
       "ambassadorLabel": "AMBASSADOR / AFFILIATE PROGRAM",
       "ambassadorHeading": "EARN BY REFERRING NEW MEMBERS.",
       "ambassadorDesc": "Share your referral link and earn commission every time someone you refer completes a rental.",
       "ambassadorImageAlt": "Screenshot of the Unity Ambassador Program page",
-      "ambassadorCta": "Learn More"
+      "ambassadorCta": "Get My Link"
     },
     "trust": {
-      "stepLabel": "[05]",
-      "sectionLabel": "TRUST",
+      "eyebrow": "Our Commitment",
       "headingLine1": "VERIFIED.",
       "headingLine2": "PROTECTED.",
       "headingLine3": "TRUSTED.",
@@ -314,7 +310,7 @@
       "heading": "START EARNING TODAY.",
       "description": "List your first item in under 5 minutes.",
       "listItem": "List an item",
-      "howItWorks": "How it works"
+      "exploreItems": "Explore items"
     }
   },
   "payoutDestination": {

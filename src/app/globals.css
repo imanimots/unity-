@@ -140,6 +140,18 @@
 
 /* ─── Silentlab layout utilities ─────────────────────────────── */
 @layer utilities {
+  /* Hides the scrollbar on horizontally-scrolling rows (category pill
+     bar, category carousels) while keeping them fully scrollable by
+     touch/drag/wheel -- referenced by filter-bar.tsx and
+     category-carousel.tsx. */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Section label: "BROWSE", "HOW IT WORKS" */
   .section-label {
     font-size: 11px;

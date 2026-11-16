@@ -7,6 +7,7 @@ import { ArrowRight, ShieldCheck, Star, CheckCircle, ShoppingBag, ArrowLeftRight
 import { getListings } from '@/lib/data/listings'
 import { resolveEffectiveCountry } from '@/lib/resolve-effective-country'
 import { ListingCard } from '@/components/listings/listing-card'
+import { HeroImageCarousel } from '@/components/listings/hero-image-carousel'
 import { absoluteUrl, isIndexingEnabled } from '@/lib/seo/config'
 import type { Locale } from '@/i18n/locales'
 import { getRequestProfile } from '@/lib/supabase/require-admin'
@@ -31,12 +32,16 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function HomePage() {
   const { countryId } = await resolveEffectiveCountry()
   const featured = await getListings({ sort: 'rating', countryId })
-  const topListings = featured.slice(0, 6)
+  const topListings = featured.slice(0, 4)
   const tCommon = await getTranslations('common')
   const t = await getTranslations('common.home')
   const verifiedLabel = tCommon('verified')
   const personalizationEnabled = isPersonalizationEnabled()
-  const viewer = personalizationEnabled ? await getRequestProfile() : null
+  // Resolved unconditionally (not just when personalization is on) --
+  // the "List an item" CTA needs to know whether to send an anonymous
+  // visitor through sign-up or straight into the real listing-creation
+  // flow a signed-in member already has.
+  const viewer = await getRequestProfile()
 
   // Narrow scoped provider (same public-dictionary-leak-prevention
   // principle used throughout this codebase) -- only what
@@ -51,7 +56,15 @@ export default async function HomePage() {
       }
     : null
 
-  const marqueeText = t('marquee')
+  const listItemHref = viewer ? '/dashboard/merchant/listings/new' : '/register?role=merchant'
+
+  // Real listing photography for the hero carousel (E47 Phase AO) --
+  // never stock/illustrative imagery. Falls back to nothing (the
+  // carousel renders null) if no listing has a photo yet.
+  const heroImages = topListings
+    .map((l) => ({ url: l.media?.[0]?.url, alt: l.title }))
+    .filter((img): img is { url: string; alt: string } => Boolean(img.url))
+    .slice(0, 3)
 
   const steps = [
     { num: '01', title: t('howItWorks.browseBookTitle'), desc: t('howItWorks.browseBookDesc') },
@@ -60,13 +73,12 @@ export default async function HomePage() {
   ]
 
   // Rental and Ambassador are real, working experiences — screenshotted
-  // directly from the live pages. Buying & Selling browsing and listing
-  // creation are real too, but use an illustrative icon panel rather than a
-  // screenshot since no dedicated marketing screenshot exists yet — see
-  // docs/BUYING_SELLING.md. Purchasing itself (checkout/orders) isn't live,
-  // so its CTA goes straight to the real Buy-filtered browse view rather
-  // than claiming a purchase flow exists. Bartering has no backing feature
-  // at all yet, so it stays "Coming soon".
+  // directly from the live pages. Buying & Selling and Bartering are
+  // both real and live too (confirmed: /listings?mode=buy and
+  // /listings?mode=barter are unconditionally reachable, no feature
+  // flag gates either) -- this section previously mislabelled Barter
+  // "Coming soon", which was stale copy from before Barter shipped;
+  // corrected here rather than carried forward into the redesign.
   const platformFeatures = [
     {
       key: 'rental',
@@ -77,7 +89,6 @@ export default async function HomePage() {
       imageAlt: t('platformFeatures.rentalImageAlt'),
       icon: null,
       cta: { label: t('platformFeatures.rentalCta'), href: '/listings' },
-      comingSoon: false,
     },
     {
       key: 'buy-sell',
@@ -86,9 +97,8 @@ export default async function HomePage() {
       desc: t('platformFeatures.buySellDesc'),
       image: null,
       imageAlt: null,
-      icon: <ShoppingBag size={40} strokeWidth={1.5} />,
+      icon: <ShoppingBag size={32} strokeWidth={1.5} />,
       cta: { label: t('platformFeatures.buySellCta'), href: '/listings?mode=buy' },
-      comingSoon: false,
     },
     {
       key: 'barter',
@@ -97,9 +107,8 @@ export default async function HomePage() {
       desc: t('platformFeatures.barterDesc'),
       image: null,
       imageAlt: null,
-      icon: <ArrowLeftRight size={40} strokeWidth={1.5} />,
-      cta: null,
-      comingSoon: true,
+      icon: <ArrowLeftRight size={32} strokeWidth={1.5} />,
+      cta: { label: t('platformFeatures.barterCta'), href: '/listings?mode=barter' },
     },
     {
       key: 'ambassador',
@@ -110,7 +119,6 @@ export default async function HomePage() {
       imageAlt: t('platformFeatures.ambassadorImageAlt'),
       icon: null,
       cta: { label: t('platformFeatures.ambassadorCta'), href: '/ambassadors' },
-      comingSoon: false,
     },
   ]
 
@@ -125,12 +133,12 @@ export default async function HomePage() {
 
       {/* ─── 1. HERO ──────────────────────────────────────────────── */}
       <section className="bg-[#FAF8F5] overflow-hidden">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-16 py-[120px] max-lg:py-20">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:gap-16">
+        <div className="max-w-[1400px] mx-auto px-6 lg:px-16 py-20 lg:py-28">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:gap-16">
 
             {/* Left column */}
             <div className="flex-1 min-w-0">
-              <p className="section-label mb-8">{t('hero.eyebrow')}</p>
+              <p className="section-label mb-6">{t('hero.eyebrow')}</p>
 
               <h1 className="mb-6">
                 <span className="display-heading block text-[#1A0A0A]">{t('hero.headlineLine1')}</span>
@@ -143,65 +151,65 @@ export default async function HomePage() {
 
               <div className="flex flex-wrap gap-3">
                 <Link
-                  href="/register"
+                  href="/listings"
                   className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#8B1A1A] text-white text-sm font-semibold rounded-full hover:bg-[#7A1616] transition-colors"
                 >
-                  {t('hero.getStarted')} <ArrowRight size={15} />
+                  {t('hero.exploreCta')} <ArrowRight size={15} />
                 </Link>
                 <Link
-                  href="/listings"
+                  href={listItemHref}
                   className="inline-flex items-center gap-2 px-7 py-3.5 border border-[#1A0A0A] text-[#1A0A0A] text-sm font-semibold rounded-full hover:bg-[#F2EDE8] transition-colors"
                 >
-                  {t('hero.browseItems')}
+                  {t('hero.listItemCta')}
                 </Link>
               </div>
             </div>
 
-            {/* Right column — asymmetric image grid */}
-            <div className="hidden lg:block relative flex-shrink-0 w-[560px] h-[420px]">
-              {/* Large square — bottom-left anchor */}
-              <div className="absolute left-0 bottom-0 bg-[#F2EDE8] h-[400px] w-[320px]" />
-              {/* Small square — lower-right offset */}
-              <div className="absolute left-[340px] bottom-0 bg-[#E8E0D8] h-[200px] w-[200px]" />
-              {/* Tall rectangle — top-right overlapping */}
-              <div className="absolute left-[300px] top-0 bg-[#EDE8E0] h-[300px] w-[240px]" />
-            </div>
+            {/* Right column — real listing photography carousel */}
+            {heroImages.length > 0 && (
+              <div className="hidden lg:block relative flex-shrink-0 w-[480px] h-[420px]">
+                <HeroImageCarousel images={heroImages} />
+              </div>
+            )}
           </div>
         </div>
       </section>
 
-      {/* ─── 2. MARQUEE TICKER ───────────────────────────────────── */}
-      <section className="bg-[#1A0A0A] py-5 overflow-hidden">
-        <div
-          className="animate-marquee flex whitespace-nowrap"
-          style={{ width: 'max-content' }}
-        >
-          {[marqueeText, marqueeText].map((text, i) => (
-            <span
-              key={i}
-              className="text-white text-sm font-medium uppercase tracking-[0.1em] pr-0"
-            >
-              {text}
-            </span>
-          ))}
-        </div>
-      </section>
-
-      {/* ─── 3. FEATURED LISTINGS ────────────────────────────────── */}
-      <section className="bg-[#FAF8F5] py-[120px] max-lg:py-20">
+      {/* ─── 2. THREE STEPS ──────────────────────────────────────── */}
+      <section id="how-it-works" className="bg-[#1A0A0A] py-20 lg:py-24 scroll-mt-16">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-16">
+          <p className="section-label mb-4 text-[#9B8B85]">{t('howItWorks.eyebrow')}</p>
+          <h2 className="section-heading text-white mb-14 max-lg:mb-10">{t('howItWorks.heading')}</h2>
 
-          {/* Section header */}
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div className="flex items-center gap-3">
-              <span className="section-label">{t('browseSection.stepLabel')}</span>
-              <span className="section-label">{t('browseSection.sectionLabel')}</span>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+            {steps.map(({ num, title, desc }) => (
+              <div key={num}>
+                <div className="w-12 h-12 rounded-full bg-[#2A1A1A] text-[#9B8B85] flex items-center justify-center font-bold text-sm mb-5">
+                  {num}
+                </div>
+                <h3 className="text-lg font-extrabold uppercase text-white mb-2">{title}</h3>
+                <p className="text-sm text-[#9B8B85] leading-relaxed max-w-xs">{desc}</p>
+              </div>
+            ))}
           </div>
-          <h2 className="section-heading text-[#1A0A0A]">{t('browseSection.heading')}</h2>
+        </div>
+      </section>
 
-          {/* Listings grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-12">
+      {/* ─── 3. POPULAR NEAR YOU ─────────────────────────────────── */}
+      <section className="bg-[#FAF8F5] py-20 lg:py-24">
+        <div className="max-w-[1400px] mx-auto px-6 lg:px-16">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <p className="section-label">{t('browseSection.eyebrow')}</p>
+            <Link
+              href="/listings"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-[#1A0A0A] border-b border-[#1A0A0A] pb-0.5 hover:text-[#8B1A1A] hover:border-[#8B1A1A] transition-colors"
+            >
+              {t('browseSection.browseAllListings')} <ArrowRight size={14} />
+            </Link>
+          </div>
+          <h2 className="section-heading text-[#1A0A0A] mb-10">{t('browseSection.heading')}</h2>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
             {topListings.map((listing, i) => (
               <ListingCard
                 key={listing.id}
@@ -211,23 +219,13 @@ export default async function HomePage() {
               />
             ))}
           </div>
-
-          <div className="flex justify-end mt-10">
-            <Link
-              href="/listings"
-              className="inline-flex items-center gap-2 text-sm font-semibold text-[#1A0A0A] border-b border-[#1A0A0A] pb-0.5 hover:text-[#8B1A1A] hover:border-[#8B1A1A] transition-colors"
-            >
-              {t('browseSection.browseAllListings')} <ArrowRight size={14} />
-            </Link>
-          </div>
         </div>
       </section>
 
       {/* ─── PERSONALIZATION MODULES (Section 30/31) ────────────────
           Client-only islands -- render nothing when there's no
           meaningful signal (cold start / feature disabled / no
-          history), never a fabricated "Recommended for you". Continue
-          Browsing first per the documented module-ordering rule. */}
+          history), never a fabricated "Recommended for you". */}
       {personalizationEnabled && personalizationScoped && (
         <NextIntlClientProvider messages={personalizationScoped}>
           <RecommendationModule module="continue_browsing" isSignedIn={Boolean(viewer)} />
@@ -235,110 +233,44 @@ export default async function HomePage() {
         </NextIntlClientProvider>
       )}
 
-      {/* ─── 4. HOW IT WORKS ─────────────────────────────────────── */}
-      <section id="how-it-works" className="bg-white py-[120px] max-lg:py-20 scroll-mt-16">
+      {/* ─── 4. FOUR WAYS TO USE UNITY ───────────────────────────── */}
+      <section className="bg-white py-20 lg:py-24">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-16">
+          <p className="section-label mb-4">{t('platformFeatures.eyebrow')}</p>
+          <h2 className="section-heading text-[#1A0A0A] mb-14 max-lg:mb-10">{t('platformFeatures.heading')}</h2>
 
-          <div className="flex items-center gap-3 mb-4">
-            <span className="section-label">{t('howItWorks.stepLabel')}</span>
-            <span className="section-label">{t('howItWorks.sectionLabel')}</span>
-          </div>
-          <h2 className="section-heading text-[#1A0A0A] mb-16 max-lg:mb-12">{t('howItWorks.heading')}</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-[#F2EDE8]">
-            {steps.map(({ num, title, desc }) => (
-              <div key={num} className="relative px-8 py-10 max-md:px-0 first:pl-0 last:pr-0 max-md:first:pt-0">
-                {/* Ghost number */}
-                <div className="text-[80px] font-extrabold text-[#F2EDE8] leading-none select-none mb-4">
-                  {num}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {platformFeatures.map((feature) => (
+              <div key={feature.key} className="flex gap-5 p-5 rounded-2xl border border-[#F2EDE8] bg-[#FAF8F5]">
+                <div className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden bg-[#F2EDE8] flex items-center justify-center">
+                  {feature.image ? (
+                    <Image src={feature.image} alt={feature.imageAlt ?? ''} fill className="object-cover" sizes="96px" />
+                  ) : (
+                    <div className="text-[#9B8B85]">{feature.icon}</div>
+                  )}
                 </div>
-                <h3 className="text-xl font-extrabold uppercase text-[#1A0A0A] mb-2">{title}</h3>
-                <p className="text-sm text-[#6B5B55] leading-relaxed max-w-xs">{desc}</p>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-extrabold text-[#1A0A0A] leading-tight mb-1.5">{feature.heading}</h3>
+                  <p className="text-sm text-[#6B5B55] leading-relaxed mb-3">{feature.desc}</p>
+                  <Link
+                    href={feature.cta.href}
+                    className="inline-flex items-center justify-center px-4 py-2 rounded-full bg-[#8B1A1A] text-white text-xs font-semibold hover:bg-[#7A1616] transition-colors"
+                  >
+                    {feature.cta.label}
+                  </Link>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ─── 5. PLATFORM FEATURES ────────────────────────────────── */}
-      <section className="bg-[#FAF8F5] py-[120px] max-lg:py-20">
+      {/* ─── 5. TRUST SECTION ────────────────────────────────────── */}
+      <section className="bg-[#1A0A0A] py-20 lg:py-24 text-white">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-16">
-
-          <div className="flex items-center gap-3 mb-4">
-            <span className="section-label">{t('platformFeatures.stepLabel')}</span>
-            <span className="section-label">{t('platformFeatures.sectionLabel')}</span>
-          </div>
-          <h2 className="section-heading text-[#1A0A0A] mb-16 max-lg:mb-12">{t('platformFeatures.heading')}</h2>
-
-          <div className="flex flex-col gap-20 max-lg:gap-14">
-            {platformFeatures.map((feature, i) => {
-              const imageFirst = i % 2 === 0
-              const media = (
-                <div className={`flex-1 min-w-0 ${imageFirst ? 'lg:order-1' : 'lg:order-2'}`}>
-                  {feature.image ? (
-                    <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-[#F2EDE8] border border-[#F2EDE8]">
-                      <Image
-                        src={feature.image}
-                        alt={feature.imageAlt ?? ''}
-                        fill
-                        className="object-cover object-top"
-                        sizes="(max-width: 1024px) 100vw, 50vw"
-                      />
-                    </div>
-                  ) : (
-                    <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-[#F2EDE8] border border-[#F2EDE8] flex items-center justify-center">
-                      <div className="text-[#9B8B85]">{feature.icon}</div>
-                    </div>
-                  )}
-                </div>
-              )
-              const text = (
-                <div className={`flex-1 min-w-0 flex flex-col justify-center ${imageFirst ? 'lg:order-2' : 'lg:order-1'}`}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <span className="section-label">{feature.label}</span>
-                    {feature.comingSoon && (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#E8E0D8] text-[#6B5B55] text-[10px] font-bold uppercase tracking-[0.1em]">
-                        {t('platformFeatures.comingSoon')}
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="text-2xl lg:text-3xl font-extrabold uppercase text-[#1A0A0A] mb-4 leading-tight">
-                    {feature.heading}
-                  </h3>
-                  <p className="text-base text-[#6B5B55] leading-relaxed mb-6 max-w-md">
-                    {feature.desc}
-                  </p>
-                  {feature.cta && (
-                    <Link
-                      href={feature.cta.href}
-                      className="inline-flex items-center gap-2 w-fit text-sm font-semibold text-[#1A0A0A] border-b border-[#1A0A0A] pb-0.5 hover:text-[#8B1A1A] hover:border-[#8B1A1A] transition-colors"
-                    >
-                      {feature.cta.label} <ArrowRight size={14} />
-                    </Link>
-                  )}
-                </div>
-              )
-              return (
-                <div key={feature.key} className="flex flex-col lg:flex-row lg:items-center gap-10 lg:gap-16">
-                  {media}
-                  {text}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── 6. TRUST SECTION ────────────────────────────────────── */}
-      <section className="bg-[#1A0A0A] py-[120px] max-lg:py-20 text-white">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-16">
-
-          <div className="flex items-center gap-3 mb-4">
-            <span className="section-label">{t('trust.stepLabel')}</span>
-            <span className="section-label" style={{ color: '#6B5B55' }}>{t('trust.sectionLabel')}</span>
-          </div>
-          <h2 className="section-heading text-white mb-16 max-lg:mb-12">
-            {t('trust.headingLine1')}<br />{t('trust.headingLine2')}<br className="sm:hidden" /> {t('trust.headingLine3')}
+          <p className="section-label mb-4" style={{ color: '#6B5B55' }}>{t('trust.eyebrow')}</p>
+          <h2 className="section-heading text-white mb-14 max-lg:mb-10">
+            {t('trust.headingLine1')} {t('trust.headingLine2')} {t('trust.headingLine3')}
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-[#2A1A1A]">
@@ -353,8 +285,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ─── 6. FINAL CTA ────────────────────────────────────────── */}
-      <section className="bg-[#8B1A1A] py-[120px] max-lg:py-20">
+      {/* ─── 6. START EARNING TODAY ──────────────────────────────── */}
+      <section className="bg-[#8B1A1A] py-20 lg:py-24">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-16">
           <h2 className="section-heading text-white mb-4">{t('finalCta.heading')}</h2>
           <p className="text-white/70 text-base mb-10">
@@ -362,16 +294,16 @@ export default async function HomePage() {
           </p>
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/register?role=merchant"
+              href={listItemHref}
               className="inline-flex items-center gap-2 px-7 py-3.5 bg-white text-[#1A0A0A] text-sm font-semibold rounded-full hover:bg-[#F5F0ED] transition-colors"
             >
               {t('finalCta.listItem')} <ArrowRight size={15} />
             </Link>
             <Link
-              href="/#how-it-works"
+              href="/listings"
               className="inline-flex items-center gap-2 px-7 py-3.5 border border-white/40 text-white text-sm font-semibold rounded-full hover:border-white/80 transition-colors"
             >
-              {t('finalCta.howItWorks')}
+              {t('finalCta.exploreItems')}
             </Link>
           </div>
         </div>

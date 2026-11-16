@@ -4,10 +4,12 @@ import { Link } from '@/i18n/navigation'
 import { getListingsPage } from '@/lib/data/listings'
 import { getMarketplaceRequestsPage } from '@/lib/data/marketplace-requests'
 import { getSkillTaskPublicPostsPage } from '@/lib/data/skill-task-posts'
+import { getCategorySections } from '@/lib/listings/category-sections'
 import { resolveEffectiveCountry } from '@/lib/resolve-effective-country'
 import { ListingCard } from '@/components/listings/listing-card'
 import { RequestCard } from '@/components/listings/request-card'
 import { SkillTaskPostCard } from '@/components/listings/skill-task-post-card'
+import { CategoryCarousel } from '@/components/listings/category-carousel'
 import { FilterBar } from '@/components/listings/filter-bar'
 import { MarketplaceModeSelectorContainer } from '@/components/listings/marketplace-mode-selector-container'
 import { DirectionToggleContainer } from '@/components/listings/direction-toggle-container'
@@ -72,6 +74,16 @@ export default async function ListingsPage({ searchParams }: PageProps) {
   const kind = isBarter && (params.kind === 'skill' || params.kind === 'task') ? params.kind : 'item'
   const isSkillTask = isBarter && kind !== 'item'
 
+  // The unfiltered, default Rent/Available landing state renders as
+  // magazine-style category rows (Browse reference), matching real
+  // category data -- never a fabricated "trending" grouping. The
+  // instant a visitor searches, filters, switches mode/direction, or
+  // pages, this reverts to the flat results grid, which is what
+  // actually makes search/filter/sort/pagination legible. Both states
+  // are real; neither replaces the other's functionality.
+  const isDefaultView = !isLookingFor && !isSkillTask && !isBarter && mode === 'rent'
+    && !params.q && !params.category && !params.maxPrice && !params.cursor
+
   const { countryId } = await resolveEffectiveCountry()
 
   const filters: ListingFilters = {
@@ -86,7 +98,9 @@ export default async function ListingsPage({ searchParams }: PageProps) {
     countryId,
   }
 
-  const listingsPage = isLookingFor || isSkillTask
+  const categorySections = isDefaultView ? await getCategorySections(countryId) : []
+
+  const listingsPage = isLookingFor || isSkillTask || isDefaultView
     ? { items: [], nextCursor: null }
     : await getListingsPage({ ...filters, cursor: params.cursor })
   const requestsPage = isLookingFor && !isSkillTask
@@ -104,7 +118,9 @@ export default async function ListingsPage({ searchParams }: PageProps) {
   // Aggregate demand telemetry (Section 24-27) -- fire-and-forget,
   // never awaited by the response, never touches Search Ranking's own
   // result computation above (this reads its already-final output).
-  const isZeroResult = listings.length === 0 && requests.length === 0 && skillTaskPosts.length === 0
+  const isZeroResult = isDefaultView
+    ? categorySections.length === 0
+    : listings.length === 0 && requests.length === 0 && skillTaskPosts.length === 0
   void recordSearchDemandEvent({
     mode: isBarter ? 'barter' : mode,
     category: params.category ?? null,
@@ -187,35 +203,43 @@ export default async function ListingsPage({ searchParams }: PageProps) {
             </form>
           </div>
 
-          {/* Result count */}
-          <p className="text-[#9B8B85] text-sm mt-4">
-            {isSkillTask
-              ? `${skillTaskPosts.length} ${kind}${skillTaskPosts.length !== 1 ? 's' : ''} ${isLookingFor ? 'looking for help' : 'available'}`
-              : isLookingFor
-              ? `${requests.length} request${requests.length !== 1 ? 's' : ''} looking to ${mode}${params.category ? ` in ${params.category}` : ''}`
-              : `${listings.length} item${listings.length !== 1 ? 's' : ''} ${MODE_LABELS[mode]}${params.category ? ` in ${params.category}` : ''}`}
-          </p>
+          {/* Result count -- omitted in the default, unfiltered landing
+              state (rendered as category rows below instead of one flat
+              count). */}
+          {!isDefaultView && (
+            <p className="text-[#9B8B85] text-sm mt-4">
+              {isSkillTask
+                ? `${skillTaskPosts.length} ${kind}${skillTaskPosts.length !== 1 ? 's' : ''} ${isLookingFor ? 'looking for help' : 'available'}`
+                : isLookingFor
+                ? `${requests.length} request${requests.length !== 1 ? 's' : ''} looking to ${mode}${params.category ? ` in ${params.category}` : ''}`
+                : `${listings.length} item${listings.length !== 1 ? 's' : ''} ${MODE_LABELS[mode]}${params.category ? ` in ${params.category}` : ''}`}
+            </p>
+          )}
         </div>
       </section>
 
       {/* ── FILTER ROW ── */}
       <div className="border-b border-[#F2EDE8] bg-[#FAF8F5]">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-4 flex flex-wrap items-center justify-between gap-4">
-          <FilterBar entity={isSkillTask ? 'skill_task' : isLookingFor ? 'requests' : 'listings'} />
-          <div className="flex items-center gap-3">
-            {isBarter && <KindToggleContainer />}
-            <DirectionToggleContainer />
-            {isLookingFor && !isSkillTask && (
-              <Link href="/looking-for/new" className="px-4 py-2 rounded-full text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors">
-                {tLookingFor('postRequest')}
-              </Link>
-            )}
-            {isSkillTask && (
-              <Link href="/dashboard/barter/skill-task/new" className="px-4 py-2 rounded-full text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors">
-                {t('postKind', { kind: kind === 'skill' ? tSkills('label') : tTasks('label') })}
-              </Link>
-            )}
-          </div>
+        <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-4">
+          <FilterBar
+            entity={isSkillTask ? 'skill_task' : isLookingFor ? 'requests' : 'listings'}
+            trailingSlot={
+              <div className="flex items-center gap-3 shrink-0">
+                {isBarter && <KindToggleContainer />}
+                <DirectionToggleContainer />
+                {isLookingFor && !isSkillTask && (
+                  <Link href="/looking-for/new" className="px-4 py-2 rounded-full text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors">
+                    {tLookingFor('postRequest')}
+                  </Link>
+                )}
+                {isSkillTask && (
+                  <Link href="/dashboard/barter/skill-task/new" className="px-4 py-2 rounded-full text-sm font-semibold bg-[#8B1A1A] text-white hover:bg-[#6B1414] transition-colors">
+                    {t('postKind', { kind: kind === 'skill' ? tSkills('label') : tTasks('label') })}
+                  </Link>
+                )}
+              </div>
+            }
+          />
         </div>
       </div>
 
@@ -224,7 +248,27 @@ export default async function ListingsPage({ searchParams }: PageProps) {
 
       {/* ── RESULTS GRID ── */}
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-10 lg:py-14 pb-32">
-        {isSkillTask ? (
+        {isDefaultView ? (
+          categorySections.length === 0 ? (
+            <div className="text-center py-24">
+              <p className="text-5xl mb-5">🔍</p>
+              <h2 className="text-2xl font-extrabold uppercase text-[#1A0A0A] mb-3">{t('noListingsFound')}</h2>
+              <p className="text-[#6B5B55]">{t('tryAdjusting')}</p>
+            </div>
+          ) : (
+            categorySections.map(({ category, listings: categoryListings }, i) => (
+              <CategoryCarousel
+                key={category.id}
+                heading={category.label}
+                seeAllLabel={t('browseSection.seeAllListings', { category: category.label })}
+                seeAllHref={`/listings?category=${category.id}`}
+                listings={categoryListings}
+                verifiedLabel={tCommon('verified')}
+                priority={i === 0}
+              />
+            ))
+          )
+        ) : isSkillTask ? (
           skillTaskPosts.length === 0 ? (
             <div className="text-center py-24">
               <p className="text-5xl mb-5">🤝</p>

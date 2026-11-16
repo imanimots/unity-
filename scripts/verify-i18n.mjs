@@ -808,7 +808,10 @@ console.log('\n--- GAP-CLOSURE PASS: 61/61 PAGE COMPLETION ---')
   check("80a. homepage calls getTranslations('common.home') in both generateMetadata and the page body", (homeSrc.match(/getTranslations\('common\.home'\)/g) ?? []).length >= 2)
   check('80b. homepage no longer has any of the old raw English hero/section string literals in JSX', !/>RENT<|WHAT&apos;S AVAILABLE\.<|THREE STEPS\.<|FOUR WAYS TO USE UNITY\.<|START EARNING TODAY\.</.test(homeSrc))
   const homeEn = loadMessages('en-ZA', 'common').home
-  check('80c. common.home dictionary section exists with hero/marquee/howItWorks/platformFeatures/trust/finalCta', !!homeEn && !!homeEn.hero && !!homeEn.marquee && !!homeEn.howItWorks && !!homeEn.platformFeatures && !!homeEn.trust && !!homeEn.finalCta)
+  // E47: the marquee ticker section was removed from the homepage
+  // redesign (not present in the approved reference screenshot) --
+  // common.home.marquee no longer exists by design, not by omission.
+  check('80c. common.home dictionary section exists with hero/howItWorks/platformFeatures/trust/finalCta', !!homeEn && !!homeEn.hero && !!homeEn.howItWorks && !!homeEn.platformFeatures && !!homeEn.trust && !!homeEn.finalCta)
   check('80d. homepage still uses the leak-safe server-resolved Verified label prop (unchanged mechanism)', /verifiedLabel=\{listing\.ownership_verified \? verifiedLabel : undefined\}/.test(homeSrc))
   const rootLayoutSrc2 = readFileSync(join(REPO_ROOT, 'src/app/[locale]/layout.tsx'), 'utf8')
   check(

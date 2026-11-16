@@ -253,19 +253,16 @@
       "headlineLine1": "HUUR",
       "headlineLine2": "ENIGIETS.",
       "description": "Unity verbind Suid-Afrikaners om veilig te huur en uit te leen — nagesiene gebruikers, veilige afhandeling.",
-      "getStarted": "Begin Nou",
-      "browseItems": "Blaai Deur Items"
+      "exploreCta": "Verken Items",
+      "listItemCta": "Lys 'n item"
     },
-    "marquee": "KAMERAS • KAMPEER • KRAGGEREEDSKAP • DRONE • FIETSE • OUDIOTOERUSTING • BELIGTING • PROJEKTORS • SPORT • TUIN • GELEENTHEDE • VOERTUIE • ",
     "browseSection": {
-      "stepLabel": "[02]",
-      "sectionLabel": "BLAAI",
+      "eyebrow": "Gewild Naby Jou",
       "heading": "WAT BESKIKBAAR IS.",
       "browseAllListings": "Blaai deur alle lyste"
     },
     "howItWorks": {
-      "stepLabel": "[03]",
-      "sectionLabel": "HOE DIT WERK",
+      "eyebrow": "Hoe Dit Werk",
       "heading": "DRIE STAPPE.",
       "browseBookTitle": "BLAAI & BESPREEK",
       "browseBookDesc": "Vind wat jy nodig het, kies jou datums, en betaal veilig deur Unity se afhandeling.",
@@ -275,31 +272,30 @@
       "returnReviewDesc": "Gee dit in goeie toestand terug, kry jou deposito vrygestel, en laat 'n eerlike resensie."
     },
     "platformFeatures": {
-      "stepLabel": "[04]",
-      "sectionLabel": "WAT UNITY BIED",
+      "eyebrow": "Meer Maniere Om Waarde Te Kry",
       "heading": "VIER MANIERE OM UNITY TE GEBRUIK.",
       "comingSoon": "Binnekort beskikbaar",
       "rentalLabel": "HUURMARK",
       "rentalHeading": "BLAAI EN BESPREEK ITEMS NABY JOU.",
       "rentalDesc": "Huur kameras, gereedskap, kampeertoerusting en meer van nagesiene plaaslike eienaars — kies jou datums en betaal veilig.",
       "rentalImageAlt": "Skermgreep van Unity se huurlys-blaaibladsy",
-      "rentalCta": "Blaai Deur Huuritems",
+      "rentalCta": "Blaai Deur Items",
       "buySellLabel": "KOOP- EN VERKOOPMARK",
       "buySellHeading": "KOOP EN VERKOOP ITEMS UITREGLIK.",
       "buySellDesc": "Koop en verkoop items uitreglik, saam met huur — met dieselfde vertroude, identiteit-nagesiene gemeenskap en veilige toetsmodus-afhandeling.",
-      "buySellCta": "Blaai Deur Te Koop",
+      "buySellCta": "Koop Nou",
       "barterLabel": "RUILHANDEL",
       "barterHeading": "RUIL ITEMS DIREK.",
-      "barterDesc": "Ruil wat jy het vir wat jy nodig het — geen kontant nodig nie. Meer besonderhede oor hoe ruilhandel sal werk is binnekort beskikbaar.",
+      "barterDesc": "Ruil wat jy het vir wat jy nodig het — geen kontant nodig nie.",
+      "barterCta": "Stel Ruil Voor",
       "ambassadorLabel": "AMBASSADEUR- / VERWYSINGSPROGRAM",
       "ambassadorHeading": "VERDIEN DEUR NUWE LEDE TE VERWYS.",
       "ambassadorDesc": "Deel jou verwysingskakel en verdien kommissie elke keer wanneer iemand wat jy verwys 'n huur voltooi.",
       "ambassadorImageAlt": "Skermgreep van Unity se Ambassadeurprogram-bladsy",
-      "ambassadorCta": "Leer Meer"
+      "ambassadorCta": "Kry My Skakel"
     },
     "trust": {
-      "stepLabel": "[05]",
-      "sectionLabel": "VERTROUE",
+      "eyebrow": "Ons Belofte",
       "headingLine1": "GEVERIFIEER.",
       "headingLine2": "BESKERM.",
       "headingLine3": "VERTROU.",
@@ -314,7 +310,7 @@
       "heading": "BEGIN VANDAG VERDIEN.",
       "description": "Lys jou eerste item in minder as 5 minute.",
       "listItem": "Lys 'n item",
-      "howItWorks": "Hoe dit werk"
+      "exploreItems": "Verken items"
     }
   },
   "payoutDestination": {
