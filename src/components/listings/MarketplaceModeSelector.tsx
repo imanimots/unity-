@@ -63,7 +63,12 @@ export function MarketplaceModeSelector({ selectedMode, onChange, className }: M
       role="radiogroup"
       aria-label="Marketplace mode"
       className={cn(
-        'fixed bottom-6 left-1/2 z-40 hidden -translate-x-1/2 min-[380px]:flex',
+        // E45: bottom-20 on mobile clears the fixed bottom-nav bar
+        // (src/components/shared/navbar.tsx, 0-64px, md:hidden) -- at
+        // bottom-6 this selector's own 24-100px band overlapped it on
+        // every viewport from 380px up to the md breakpoint. md:bottom-6
+        // restores the original position once the bottom nav is gone.
+        'fixed bottom-20 md:bottom-6 left-1/2 z-40 hidden -translate-x-1/2 min-[380px]:flex',
         'h-[76px] w-[92vw] max-w-[620px] items-center gap-1 rounded-full px-2.5',
         'border border-[#ECECEC] dark:border-[#2A1A1A] bg-white dark:bg-[#1A1010]',
         'shadow-[0_12px_32px_-8px_rgba(26,10,10,0.18)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)]',
