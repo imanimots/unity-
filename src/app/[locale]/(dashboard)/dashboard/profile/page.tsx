@@ -55,7 +55,7 @@ export default async function ProfilePage() {
   const scoped = { account: { profilePage: messages.account.profilePage } }
 
   return (
-    <div>
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
       <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-extrabold text-[#1A0A0A] tracking-tight">{t('heading')}</h1>

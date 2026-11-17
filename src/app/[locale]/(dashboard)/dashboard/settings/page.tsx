@@ -35,7 +35,7 @@ export default async function SettingsPage() {
   const authUser = supabase ? (await supabase.auth.getUser()).data.user : null
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
       <h1 className="text-3xl font-extrabold text-[#1A0A0A] tracking-tight">{t('heading')}</h1>
       <p className="text-[#6B5B55] mt-1 mb-8">{t('subheading')}</p>
 
