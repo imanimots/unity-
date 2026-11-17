@@ -19,6 +19,7 @@ interface MerchantAffiliateListing {
   pendingCommissionCost: number
   paidCommissionCost: number
   heldOrExceptionCount: number
+  referrerNames: string[]
 }
 
 /** Real merchant affiliate view, scoped to the caller's own listings only (Step 11 Phase 7). */
@@ -134,7 +135,7 @@ export default function MerchantAffiliatesPage() {
             <table className="w-full">
               <thead>
                 <tr>
-                  {(['listing', 'rate', 'attributed', 'sales', 'rentals', 'costPaid', 'costPending', 'enabled'] as const).map((h) => (
+                  {(['listing', 'referredBy', 'rate', 'attributed', 'sales', 'rentals', 'costPaid', 'costPending', 'enabled'] as const).map((h) => (
                     <th key={h} className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85] border-b border-[#F2EDE8] whitespace-nowrap">
                       {t(`table.${h}`)}
                     </th>
@@ -145,6 +146,9 @@ export default function MerchantAffiliatesPage() {
                 {listings.map((l) => (
                   <tr key={l.id} className="border-b border-[#F2EDE8] last:border-0">
                     <td className="px-4 py-3 text-sm font-medium text-[#1A0A0A]">{l.title}</td>
+                    <td className="px-4 py-3 text-sm text-[#6B5B55]">
+                      {l.referrerNames.length > 0 ? l.referrerNames.join(', ') : '—'}
+                    </td>
                     <td className="px-4 py-3 text-sm text-[#6B5B55]">{l.commissionRate}%</td>
                     <td className="px-4 py-3 text-sm text-[#6B5B55]">{l.attributedCustomerCount}</td>
                     <td className="px-4 py-3 text-sm text-[#6B5B55]">{l.eligibleSales}</td>

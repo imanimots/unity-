@@ -184,6 +184,7 @@
     "noListings": "You have no listings yet.",
     "table": {
       "listing": "Listing",
+      "referredBy": "Referred by",
       "rate": "Rate",
       "attributed": "Attributed",
       "sales": "Sales",

@@ -184,6 +184,7 @@
     "noListings": "Jy het nog geen lysings nie.",
     "table": {
       "listing": "Lysing",
+      "referredBy": "Verwys deur",
       "rate": "Koers",
       "attributed": "Toegeskryf",
       "sales": "Verkope",
