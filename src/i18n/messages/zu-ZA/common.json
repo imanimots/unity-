@@ -66,7 +66,7 @@
     "viewAll": "Buka konke →",
     "quickActions": "Izenzo Ezisheshayo",
     "browse": "Phequlula",
-    "wishlist": "Uhlu Lwezifiso",
+    "lookingFor": "Ukufuna",
     "messages": "Imilayezo",
     "back": "Emuva",
     "renterFallbackName": "lapho",
@@ -77,9 +77,8 @@
     "emptyActiveTitle": "Azikho izinto eziqashwayo ezisebenzayo okwamanje",
     "emptyActiveDesc": "Phequlula izinto eziseduze nawe bese wenza ukubhukha kwakho kokuqala.",
     "browseItemsCta": "Phequlula Izinto",
-    "uploadCta": "Layisha",
     "quickActionDescBrowse": "Thola izinto ozoziqasha",
-    "quickActionDescWishlist": "Izinto ezilondoloziwe",
+    "quickActionDescLookingFor": "Thumela odinga khona",
     "quickActionDescMessages": "Xoxa nabathengisi"
   },
   "disputes": {

@@ -7,6 +7,7 @@ import { getListingsByMerchant } from '@/lib/data/listings'
 import { IS_MOCK_MODE, MOCK_MY_LISTINGS, MOCK_MERCHANT_BOOKINGS } from '@/lib/mock/data'
 import { getAdminServiceClient } from '@/lib/admin/route-helpers'
 import { getEffectiveMerchantPlan } from '@/lib/subscriptions/effective-plan'
+import { BOOKING_STATUS_LABELS, type BookingLifecycleStatus } from '@/lib/bookings/status-labels'
 import { formatDate } from '@/lib/i18n/format'
 import type { Locale } from '@/i18n/locales'
 import type { BookingStatus, ListingStatus } from '@/types'
@@ -22,6 +23,16 @@ const BOOKING_STATUS_CLASSES: Record<BookingStatus, string> = {
   cancelled: 'bg-[#F2EDE8] text-[#9B8B85]',
 }
 
+interface MerchantDashboardBookingRow {
+  id: string
+  title: string
+  cover: string | null
+  subtitle: string
+  statusLabel: string
+  statusClasses: string
+  href: string
+}
+
 const LISTING_STATUS_CLASSES: Record<ListingStatus, string> = {
   active: 'bg-green-100 text-green-700',
   paused: 'bg-amber-100 text-amber-700',
@@ -34,19 +45,67 @@ const LISTING_STATUS_CLASSES: Record<ListingStatus, string> = {
 export default async function MerchantDashboard() {
   const locale = (await getLocale()) as Locale
   const t = await getTranslations('merchant.home')
+  const tRent = await getTranslations('rent')
   const tListingStatus = await getTranslations('marketplace.listingStatus')
+  const fmt = (iso: string | null) => (iso ? formatDate(iso, locale) : '—')
   const { profile: serverProfile } = await getServerUser()
   const profile = serverProfile ?? (IS_MOCK_MODE ? MOCK_CURRENT_PROFILE : null)
   const displayName = profile?.display_name ?? 'there'
 
-  const myListings      = IS_MOCK_MODE ? MOCK_MY_LISTINGS : profile ? await getListingsByMerchant(profile.id, { includeTest: true }) : []
-  const myBookings      = IS_MOCK_MODE ? MOCK_MERCHANT_BOOKINGS : []
-  const activeListings  = myListings.filter((l) => l.status === 'active').length
-  const pendingBookings = myBookings.filter((b) => b.status === 'pending').length
-  const monthlyEarned   = myBookings.filter((b) => b.status === 'returned').reduce((s, b) => s + b.rental_fee, 0)
-
-  const recentBookings = myBookings.slice(0, 3)
+  const myListings = IS_MOCK_MODE ? MOCK_MY_LISTINGS : profile ? await getListingsByMerchant(profile.id, { includeTest: true }) : []
+  const activeListings = myListings.filter((l) => l.status === 'active').length
   const recentListings = myListings.slice(0, 3)
+
+  let pendingBookings = 0
+  let monthlyEarned = 0
+  let recentBookingRows: MerchantDashboardBookingRow[] = []
+
+  if (IS_MOCK_MODE) {
+    pendingBookings = MOCK_MERCHANT_BOOKINGS.filter((b) => b.status === 'pending').length
+    monthlyEarned = MOCK_MERCHANT_BOOKINGS.filter((b) => b.status === 'returned').reduce((s, b) => s + b.rental_fee, 0)
+    recentBookingRows = MOCK_MERCHANT_BOOKINGS.slice(0, 3).map((booking) => ({
+      id: booking.id,
+      title: booking.listing.title,
+      cover: booking.listing.media?.[0]?.url ?? null,
+      subtitle: `${booking.renter.display_name} · ${formatDate(booking.start_date, locale)}–${formatDate(booking.end_date, locale)}`,
+      statusLabel: t(`recentBookings.legacyStatus.${booking.status}`),
+      statusClasses: BOOKING_STATUS_CLASSES[booking.status],
+      href: '/dashboard/merchant/bookings',
+    }))
+  } else if (profile) {
+    interface RealMerchantBookingRow {
+      id: string
+      booking_reference: string | null
+      status: BookingLifecycleStatus
+      start_at: string | null
+      end_at: string | null
+      merchant_proceeds_estimate: number | null
+    }
+    const { createClient } = await import('@/lib/supabase/server')
+    const supabase = await createClient()
+    const { data } = supabase
+      ? await supabase
+          .from('bookings')
+          .select('id, booking_reference, status, start_at, end_at, merchant_proceeds_estimate')
+          .eq('merchant_id', profile.id)
+          .order('created_at', { ascending: false })
+      : { data: [] as RealMerchantBookingRow[] }
+
+    const bookings = (data ?? []) as RealMerchantBookingRow[]
+    pendingBookings = bookings.filter((b) => b.status === 'requested').length
+    monthlyEarned = bookings
+      .filter((b) => b.status === 'completed')
+      .reduce((s, b) => s + (b.merchant_proceeds_estimate ?? 0), 0)
+    recentBookingRows = bookings.slice(0, 3).map((booking) => ({
+      id: booking.id,
+      title: `${tRent('booking')} ${booking.booking_reference ?? booking.id.slice(-6).toUpperCase()}`,
+      cover: null,
+      subtitle: `${fmt(booking.start_at)} – ${fmt(booking.end_at)}`,
+      statusLabel: BOOKING_STATUS_LABELS[booking.status].label,
+      statusClasses: BOOKING_STATUS_LABELS[booking.status].classes,
+      href: '/dashboard/merchant/bookings',
+    }))
+  }
 
   let planLabel = t('planStarter')
   if (!IS_MOCK_MODE && profile) {
@@ -146,7 +205,7 @@ export default async function MerchantDashboard() {
         </div>
 
         <div className="bg-white border border-[#F2EDE8] rounded-xl">
-          {recentBookings.length === 0 ? (
+          {recentBookingRows.length === 0 ? (
             <div className="text-center py-16 px-8">
               <CheckCircle size={36} className="mx-auto text-[#9B8B85] mb-4" />
               <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{t('recentBookings.emptyTitle')}</p>
@@ -157,34 +216,29 @@ export default async function MerchantDashboard() {
             </div>
           ) : (
             <div className="divide-y divide-[#F2EDE8]">
-              {recentBookings.map((booking) => {
-                const cover = booking.listing?.media?.[0]?.url
-                return (
-                  <div key={booking.id} className="flex items-center gap-4 px-5 py-4 hover:bg-[#FAF8F5] transition-colors">
-                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-[#F2EDE8] shrink-0">
-                      {cover ? (
-                        <Image src={cover} alt={booking.listing.title} width={48} height={48} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-sm">📦</div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[#1A0A0A] truncate">{booking.listing.title}</p>
-                      <p className="text-xs text-[#9B8B85] mt-0.5">
-                        {booking.renter.display_name} · {formatDate(booking.start_date, locale)}–{formatDate(booking.end_date, locale)}
-                      </p>
-                    </div>
-                    <div className="shrink-0 flex items-center gap-2">
-                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${BOOKING_STATUS_CLASSES[booking.status]}`}>
-                        {t(`recentBookings.legacyStatus.${booking.status}`)}
-                      </span>
-                      <Link href="/dashboard/merchant/bookings" className="text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
-                        <ArrowRight size={16} />
-                      </Link>
-                    </div>
+              {recentBookingRows.map((booking) => (
+                <div key={booking.id} className="flex items-center gap-4 px-5 py-4 hover:bg-[#FAF8F5] transition-colors">
+                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-[#F2EDE8] shrink-0">
+                    {booking.cover ? (
+                      <Image src={booking.cover} alt={booking.title} width={48} height={48} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-sm">📦</div>
+                    )}
                   </div>
-                )
-              })}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[#1A0A0A] truncate">{booking.title}</p>
+                    <p className="text-xs text-[#9B8B85] mt-0.5">{booking.subtitle}</p>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${booking.statusClasses}`}>
+                      {booking.statusLabel}
+                    </span>
+                    <Link href={booking.href} className="text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
+                      <ArrowRight size={16} />
+                    </Link>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

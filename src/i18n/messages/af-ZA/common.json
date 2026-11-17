@@ -66,7 +66,7 @@
     "viewAll": "Bekyk alles →",
     "quickActions": "Vinnige Aksies",
     "browse": "Blaai",
-    "wishlist": "Verlanglys",
+    "lookingFor": "Op Soek Na",
     "messages": "Boodskappe",
     "back": "Terug",
     "renterFallbackName": "daar",
@@ -77,9 +77,8 @@
     "emptyActiveTitle": "Nog geen aktiewe huurgoedere nie",
     "emptyActiveDesc": "Blaai deur items naby jou en maak jou eerste bespreking.",
     "browseItemsCta": "Blaai Deur Items",
-    "uploadCta": "Laai op",
     "quickActionDescBrowse": "Vind items om te huur",
-    "quickActionDescWishlist": "Gestoorde items",
+    "quickActionDescLookingFor": "Plaas wat jy nodig het",
     "quickActionDescMessages": "Gesels met handelaars"
   },
   "disputes": {

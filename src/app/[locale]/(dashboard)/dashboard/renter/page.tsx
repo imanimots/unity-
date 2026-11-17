@@ -1,14 +1,15 @@
 import Image from 'next/image'
 import { getTranslations } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
-import { Search, Heart, MessageCircle, Star, ShieldCheck, ArrowRight, Package, Camera } from 'lucide-react'
+import { Search, ListPlus, MessageCircle, ShieldCheck, ArrowRight, Package } from 'lucide-react'
 import { getServerUser, MOCK_CURRENT_PROFILE } from '@/lib/data/profiles'
 import { IS_MOCK_MODE, MOCK_RENTER_BOOKINGS } from '@/lib/mock/data'
 import type { BookingStatus } from '@/types'
+import { BOOKING_STATUS_LABELS, type BookingLifecycleStatus } from '@/lib/bookings/status-labels'
 import { isPersonalizationEnabled } from '@/lib/personalization/config'
 import { RecommendationModule } from '@/components/personalization/recommendation-module'
 
-const STATUS_DOT: Record<BookingStatus, string> = {
+const MOCK_STATUS_DOT: Record<BookingStatus, string> = {
   pending:   'bg-amber-400',
   approved:  'bg-blue-400',
   active:    'bg-green-400',
@@ -17,20 +18,90 @@ const STATUS_DOT: Record<BookingStatus, string> = {
   cancelled: 'bg-[#9B8B85]',
 }
 
+// Real `bookings.status` uses the finer-grained lifecycle from
+// lib/bookings/status-labels.ts, not the legacy mock-era BookingStatus
+// union -- see the real bookings list page for the same mapping.
+const REAL_STATUS_DOT: Record<BookingLifecycleStatus, string> = {
+  requested: 'bg-amber-400',
+  accepted: 'bg-blue-400',
+  rejected: 'bg-[#9B8B85]',
+  expired: 'bg-[#9B8B85]',
+  cancelled_by_renter: 'bg-[#9B8B85]',
+  cancelled_by_merchant: 'bg-[#9B8B85]',
+  active: 'bg-green-400',
+  return_pending: 'bg-amber-400',
+  returned: 'bg-blue-400',
+  completed: 'bg-[#9B8B85]',
+  cancelled: 'bg-[#9B8B85]',
+  disputed: 'bg-red-400',
+}
+
+const REAL_ACTIVE_STATUSES: BookingLifecycleStatus[] = ['accepted', 'active', 'return_pending']
+
+interface DashboardBookingRow {
+  id: string
+  title: string
+  cover: string | null
+  statusDot: string
+  statusLabel: string
+}
+
 export const metadata = { title: 'Renter Dashboard — Unity' }
 
 export default async function RenterDashboard() {
   const t = await getTranslations('rent')
   const tCommon = await getTranslations('common')
-  const STATUS_LABEL: Record<BookingStatus, string> = {
+  const MOCK_STATUS_LABEL: Record<BookingStatus, string> = {
     pending: t('status.pending'), approved: t('status.approved'), active: t('status.active'),
     returned: t('status.returned'), disputed: t('status.disputed'), cancelled: t('status.cancelled'),
   }
   const { profile: serverProfile } = await getServerUser()
   const profile = serverProfile ?? (IS_MOCK_MODE ? MOCK_CURRENT_PROFILE : null)
   const displayName = profile?.display_name ?? tCommon('dashboard.renterFallbackName')
-  const myBookings = IS_MOCK_MODE ? MOCK_RENTER_BOOKINGS : []
-  const activeBookings = myBookings.filter((b) => b.status === 'active' || b.status === 'approved')
+
+  let totalBookingsCount = 0
+  let activeBookingsCount = 0
+  let activeRows: DashboardBookingRow[] = []
+
+  if (IS_MOCK_MODE) {
+    totalBookingsCount = MOCK_RENTER_BOOKINGS.length
+    const active = MOCK_RENTER_BOOKINGS.filter((b) => b.status === 'active' || b.status === 'approved')
+    activeBookingsCount = active.length
+    activeRows = active.map((b) => ({
+      id: b.id,
+      title: b.listing.title,
+      cover: b.listing.media?.[0]?.url ?? null,
+      statusDot: MOCK_STATUS_DOT[b.status],
+      statusLabel: MOCK_STATUS_LABEL[b.status],
+    }))
+  } else if (profile) {
+    interface DashboardBookingQueryRow {
+      id: string
+      booking_reference: string | null
+      status: BookingLifecycleStatus
+    }
+    const { createClient } = await import('@/lib/supabase/server')
+    const supabase = await createClient()
+    const { data } = supabase
+      ? await supabase
+          .from('bookings')
+          .select('id, booking_reference, status')
+          .eq('renter_id', profile.id)
+          .order('created_at', { ascending: false })
+      : { data: [] as DashboardBookingQueryRow[] }
+
+    const bookings = (data ?? []) as DashboardBookingQueryRow[]
+    totalBookingsCount = bookings.length
+    const active = bookings.filter((b) => REAL_ACTIVE_STATUSES.includes(b.status))
+    activeBookingsCount = active.length
+    activeRows = active.slice(0, 5).map((b) => ({
+      id: b.id,
+      title: `${t('booking')} ${b.booking_reference ?? b.id.slice(-6).toUpperCase()}`,
+      cover: null,
+      statusDot: REAL_STATUS_DOT[b.status],
+      statusLabel: BOOKING_STATUS_LABELS[b.status].label,
+    }))
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -58,7 +129,7 @@ export default async function RenterDashboard() {
         <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{tCommon('dashboard.active')}</p>
           <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] leading-none">
-            {activeBookings.length}
+            {activeBookingsCount}
           </div>
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mt-2">{tCommon('dashboard.rentalsLabel')}</p>
         </div>
@@ -67,7 +138,7 @@ export default async function RenterDashboard() {
         <div className="bg-white border border-[#F2EDE8] rounded-xl p-5">
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-3">{tCommon('dashboard.total')}</p>
           <div className="text-4xl lg:text-5xl font-extrabold text-[#1A0A0A] leading-none">
-            {myBookings.length}
+            {totalBookingsCount}
           </div>
           <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mt-2">{tCommon('dashboard.bookingsLabel')}</p>
         </div>
@@ -111,7 +182,7 @@ export default async function RenterDashboard() {
         </div>
 
         <div className="bg-white border border-[#F2EDE8] rounded-xl">
-          {activeBookings.length === 0 ? (
+          {activeRows.length === 0 ? (
             <div className="text-center py-16 px-8">
               <Package size={36} className="mx-auto text-[#9B8B85] mb-4" />
               <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-[#9B8B85] mb-2">{tCommon('dashboard.emptyActiveTitle')}</p>
@@ -122,36 +193,27 @@ export default async function RenterDashboard() {
             </div>
           ) : (
             <div className="divide-y divide-[#F2EDE8]">
-              {activeBookings.map((b) => {
-                const cover = b.listing?.media?.[0]?.url
-                const needsMedia = (b.status === 'approved' && !b.pre_rental_media_url) || (b.status === 'active' && !b.post_rental_media_url)
-                return (
-                  <div key={b.id} className="flex items-center gap-4 px-5 py-4">
-                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-[#F2EDE8] shrink-0">
-                      {cover ? (
-                        <Image src={cover} alt={b.listing.title} width={48} height={48} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-sm">📦</div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#1A0A0A] truncate mb-1">{b.listing.title}</p>
-                      <div className="flex items-center gap-1.5">
-                        <div className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[b.status]}`} />
-                        <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85]">{STATUS_LABEL[b.status]}</span>
-                      </div>
-                    </div>
-                    {needsMedia && (
-                      <Link href={`/dashboard/renter/bookings/${b.id}/media`} className="shrink-0 flex items-center gap-1.5 text-xs uppercase tracking-[0.08em] font-semibold px-3 py-1.5 bg-[#8B1A1A] text-white rounded-lg hover:bg-[#7A1616] transition-colors">
-                        <Camera size={11} /> {tCommon('dashboard.uploadCta')}
-                      </Link>
+              {activeRows.map((b) => (
+                <div key={b.id} className="flex items-center gap-4 px-5 py-4">
+                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-[#F2EDE8] shrink-0">
+                    {b.cover ? (
+                      <Image src={b.cover} alt={b.title} width={48} height={48} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-sm">📦</div>
                     )}
-                    <Link href="/dashboard/renter/bookings" className="shrink-0 text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
-                      <ArrowRight size={16} />
-                    </Link>
                   </div>
-                )
-              })}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[#1A0A0A] truncate mb-1">{b.title}</p>
+                    <div className="flex items-center gap-1.5">
+                      <div className={`w-1.5 h-1.5 rounded-full ${b.statusDot}`} />
+                      <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#9B8B85]">{b.statusLabel}</span>
+                    </div>
+                  </div>
+                  <Link href="/dashboard/renter/bookings" className="shrink-0 text-[#9B8B85] hover:text-[#1A0A0A] transition-colors">
+                    <ArrowRight size={16} />
+                  </Link>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -173,7 +235,7 @@ export default async function RenterDashboard() {
         <div className="grid grid-cols-3 gap-3">
           {[
             { href: '/listings', icon: Search, label: tCommon('dashboard.browse'), desc: tCommon('dashboard.quickActionDescBrowse') },
-            { href: '/dashboard/renter/wishlist', icon: Heart, label: tCommon('dashboard.wishlist'), desc: tCommon('dashboard.quickActionDescWishlist') },
+            { href: '/looking-for/new', icon: ListPlus, label: tCommon('dashboard.lookingFor'), desc: tCommon('dashboard.quickActionDescLookingFor') },
             { href: '/chat', icon: MessageCircle, label: tCommon('dashboard.messages'), desc: tCommon('dashboard.quickActionDescMessages') },
           ].map(({ href, icon: Icon, label, desc }) => (
             <Link key={href} href={href}

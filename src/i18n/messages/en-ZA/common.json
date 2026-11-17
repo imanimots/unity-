@@ -66,7 +66,7 @@
     "viewAll": "View all →",
     "quickActions": "Quick Actions",
     "browse": "Browse",
-    "wishlist": "Wishlist",
+    "lookingFor": "Looking For",
     "messages": "Messages",
     "back": "Back",
     "renterFallbackName": "there",
@@ -77,9 +77,8 @@
     "emptyActiveTitle": "No active rentals yet",
     "emptyActiveDesc": "Browse items near you and make your first booking.",
     "browseItemsCta": "Browse Items",
-    "uploadCta": "Upload",
     "quickActionDescBrowse": "Find items to rent",
-    "quickActionDescWishlist": "Saved items",
+    "quickActionDescLookingFor": "Post what you need",
     "quickActionDescMessages": "Chat with merchants"
   },
   "disputes": {

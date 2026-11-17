@@ -106,13 +106,43 @@ async function getModerationSummaries(listingIds: string[]): Promise<{ moderatio
   return { moderation: moderation ?? [], ownership: ownership ?? [] }
 }
 
+/**
+ * Real per-listing booking counts, derived from the actual bookings table
+ * -- no per-listing view-count equivalent exists outside the admin-only
+ * analytics pipeline (lib/admin/analytics-service.ts), so that figure is
+ * only ever shown in mock mode and is never fabricated here.
+ */
+async function getRealBookingCounts(merchantId: string, listingIds: string[]): Promise<Map<string, number>> {
+  if (IS_MOCK_MODE || listingIds.length === 0) return new Map()
+  const { createClient } = await import('@/lib/supabase/server')
+  const supabase = await createClient()
+  if (!supabase) return new Map()
+
+  const { data } = await supabase
+    .from('bookings')
+    .select('listing_id')
+    .eq('merchant_id', merchantId)
+    .in('listing_id', listingIds)
+
+  const counts = new Map<string, number>()
+  for (const row of data ?? []) {
+    counts.set(row.listing_id, (counts.get(row.listing_id) ?? 0) + 1)
+  }
+  return counts
+}
+
 export default async function MyListingsPage() {
   const t = await getTranslations('marketplace')
   const tPage = await getTranslations('merchant.listingsPage')
   const tMerchant = await getTranslations('merchant')
   const rentToBuyEnabled = isRentToBuyEnabled()
+  const { profile } = await getServerUser()
   const listings = await getMyListings()
-  const { moderation, ownership } = await getModerationSummaries(listings.map((l) => l.id))
+  const listingIds = listings.map((l) => l.id)
+  const [{ moderation, ownership }, realBookingCounts] = await Promise.all([
+    getModerationSummaries(listingIds),
+    profile ? getRealBookingCounts(profile.id, listingIds) : Promise.resolve(new Map<string, number>()),
+  ])
 
   const active = listings.filter((l) => l.status === 'active').length
   const paused = listings.filter((l) => l.status === 'paused').length
@@ -179,8 +209,8 @@ export default async function MyListingsPage() {
         <div className="bg-white rounded-xl border border-[#F2EDE8] overflow-hidden">
           {listings.map((listing) => {
             const cover = listing.media?.[0]?.url
-            const views = getMockViewCount(listing.id)
-            const bookings = getMockBookingCount(listing.id)
+            const views = IS_MOCK_MODE ? getMockViewCount(listing.id) : null
+            const bookings = IS_MOCK_MODE ? getMockBookingCount(listing.id) : (realBookingCounts.get(listing.id) ?? 0)
             const modSummary = moderation.find((m) => m.listing_id === listing.id)
             const ownSummary = ownership.find((o) => o.listing_id === listing.id)
             const derived = deriveMerchantStatus(listing, modSummary, ownSummary, t)
@@ -206,8 +236,12 @@ export default async function MyListingsPage() {
                   </div>
                   <div className="text-xs text-[#9B8B85] flex items-center gap-3">
                     <span>R{listing.daily_rate}{tPage('perDay')}</span>
-                    <span className="text-[#F2EDE8]">·</span>
-                    <span>{tPage('viewsCount', { count: views })}</span>
+                    {views !== null && (
+                      <>
+                        <span className="text-[#F2EDE8]">·</span>
+                        <span>{tPage('viewsCount', { count: views })}</span>
+                      </>
+                    )}
                     <span className="text-[#F2EDE8]">·</span>
                     <span>{tPage('bookingsCount', { count: bookings })}</span>
                   </div>
