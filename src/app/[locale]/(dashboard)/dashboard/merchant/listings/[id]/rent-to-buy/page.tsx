@@ -204,7 +204,7 @@ export default function MerchantRentToBuyTermsPage({ params }: PageProps) {
         </div>
 
         <label className="flex items-center gap-2 text-sm text-[#1A0A0A]">
-          <input type="checkbox" checked={earlyPayoffAllowed} onChange={(e) => setEarlyPayoffAllowed(e.target.checked)} />
+          <input type="checkbox" checked={earlyPayoffAllowed} onChange={(e) => setEarlyPayoffAllowed(e.target.checked)} className="rounded border-[#E8E0D8] accent-[#8B1A1A]" />
           {t('allowEarlyPayoff')}
         </label>
         <p className="text-xs text-[#9B8B85]">{t('escrowNotice')}</p>
