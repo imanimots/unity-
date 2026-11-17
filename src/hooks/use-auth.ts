@@ -19,6 +19,7 @@ export function useAuth(): AuthState {
 
   useEffect(() => {
     if (IS_MOCK_MODE) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false)
       return
     }

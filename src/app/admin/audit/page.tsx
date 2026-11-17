@@ -45,6 +45,7 @@ export default function AdminAuditPage() {
       </div>
 
       <div className="flex justify-end">
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- this downloads a CSV file, it is not a page navigation */}
         <a href="/api/admin/audit?format=csv" className={secondaryButtonClass}>
           <Download size={11} /> CSV
         </a>

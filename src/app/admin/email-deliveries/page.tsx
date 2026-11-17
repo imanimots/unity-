@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { Download, RotateCw } from 'lucide-react'
 import { Pill, StatCard, AdminPageHeader, inputClass, secondaryButtonClass, formatDateTime } from '@/components/admin/ui'
 
@@ -96,11 +97,12 @@ export default function AdminEmailDeliveriesPage() {
           <option value="failed_retryable">Failed (retryable)</option>
           <option value="failed_terminal">Failed (terminal)</option>
         </select>
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- this downloads a CSV file, it is not a page navigation */}
         <a href={`/api/admin/email-deliveries?format=csv${statusFilter !== 'all' ? `&status=${statusFilter}` : ''}`} className={secondaryButtonClass}>
           <Download size={11} /> CSV
         </a>
         {retryMessage ? <p className="text-xs text-[#6B5B55]">{retryMessage}</p> : null}
-        <a href="/admin/email-previews" className={secondaryButtonClass}>Template previews</a>
+        <Link href="/admin/email-previews" className={secondaryButtonClass}>Template previews</Link>
       </div>
 
       <div className="bg-white border border-[#F2EDE8] rounded-xl overflow-hidden">

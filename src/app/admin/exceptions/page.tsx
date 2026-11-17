@@ -92,6 +92,7 @@ export default function AdminExceptionsPage() {
           <input type="checkbox" checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} />
           Show resolved
         </label>
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- this downloads a CSV file, it is not a page navigation */}
         <a href="/api/admin/exceptions?format=csv" className={secondaryButtonClass}>
           <Download size={11} /> CSV
         </a>

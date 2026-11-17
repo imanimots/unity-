@@ -108,6 +108,7 @@ export function ChatWidget() {
     const supported =
       typeof window !== 'undefined' &&
       ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setVoiceSupported(supported)
   }, [])
 
@@ -125,6 +126,7 @@ export function ChatWidget() {
   useEffect(() => {
     if (!isOpen) {
       recognitionRef.current?.stop()
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsListening(false)
       if (typeof window !== 'undefined') window.speechSynthesis?.cancel()
     }
