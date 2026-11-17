@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useRouter } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
 
+type RtbTestScenario = 'success' | 'declined'
+
 interface Props {
   agreementId: string
   isMerchant: boolean
@@ -17,6 +19,13 @@ interface Props {
   handedOverAt: string | null
   hasPendingAmendment: boolean
   pendingTermination: 'none' | 'proposed_by_me' | 'proposed_by_other'
+  /** Server-resolved isMockScenarioSelectionAllowed() (RTB payments share
+   * the same src/lib/payments provider/registry as checkout) -- a normal
+   * payment action never claims an outcome; test_scenario is only ever
+   * sent when this is true, and then only via the explicit picker below,
+   * never a hidden default. The 3 payment routes independently re-check
+   * the same condition server-side regardless of what this prop says. */
+  testModeAvailable: boolean
 }
 
 async function callAction(path: string, body: Record<string, unknown> = {}) {
@@ -29,6 +38,7 @@ async function callAction(path: string, body: Record<string, unknown> = {}) {
 export function RentToBuyAgreementActions({
   agreementId, isMerchant, isCustomer, status, possessionStatus, ownershipStatus,
   earlyPayoffAllowed, securityDepositAmount, nextUnpaidSequence, handedOverAt, hasPendingAmendment, pendingTermination,
+  testModeAvailable,
 }: Props) {
   const router = useRouter()
   const t = useTranslations('rtb')
@@ -36,6 +46,8 @@ export function RentToBuyAgreementActions({
   const [error, setError] = useState<string | null>(null)
   const [defaultReason, setDefaultReason] = useState('')
   const [showDefaultConfirm, setShowDefaultConfirm] = useState(false)
+  const [testScenario, setTestScenario] = useState<RtbTestScenario>('success')
+  const scenarioBody = testModeAvailable ? { test_scenario: testScenario } : {}
 
   const run = async (key: string, path: string, body: Record<string, unknown> = {}) => {
     setBusy(key)
@@ -59,6 +71,30 @@ export function RentToBuyAgreementActions({
   return (
     <div className="space-y-3">
       {error && <p className="text-sm text-[#8B1A1A]">{error}</p>}
+      {testModeAvailable && isCustomer && (
+        <div className="bg-white rounded-xl border border-dashed border-amber-400/60 p-4">
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-amber-600">{t('testMode.heading')}</p>
+            <span className="text-[10px] font-mono text-[#9B8B85]">{t('testMode.provider')}</span>
+          </div>
+          <div className="flex gap-4">
+            {(['success', 'declined'] as const).map((scenario) => (
+              <label key={scenario} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                <input
+                  type="radio"
+                  name="rtb_test_scenario"
+                  value={scenario}
+                  checked={testScenario === scenario}
+                  onChange={() => setTestScenario(scenario)}
+                  disabled={busy !== null}
+                  className="accent-[#8B1A1A]"
+                />
+                <span className="text-[#1A0A0A]">{t(`testMode.${scenario}`)}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap gap-3">
         {isMerchant && status === 'pending_merchant_acceptance' && (
           <>
@@ -70,10 +106,10 @@ export function RentToBuyAgreementActions({
           <button className={secondary} disabled={busy !== null} onClick={() => run('cancel', `${base}/cancel`)}>{t('actions.cancel')}</button>
         )}
         {isCustomer && securityDepositAmount && (
-          <button className={secondary} disabled={busy !== null} onClick={() => run('deposit', `${base}/pay-deposit`, { test_scenario: 'success' })}>{t('actions.payDeposit')}</button>
+          <button className={secondary} disabled={busy !== null} onClick={() => run('deposit', `${base}/pay-deposit`, scenarioBody)}>{t('actions.payDeposit')}</button>
         )}
         {isCustomer && (status === 'awaiting_first_payment' || status === 'active') && nextUnpaidSequence && (
-          <button className={primary} disabled={busy !== null} onClick={() => run('installment', `${base}/pay-installment`, { sequence: nextUnpaidSequence, test_scenario: 'success' })}>
+          <button className={primary} disabled={busy !== null} onClick={() => run('installment', `${base}/pay-installment`, { sequence: nextUnpaidSequence, ...scenarioBody })}>
             {t('actions.payInstallment', { sequence: nextUnpaidSequence })}
           </button>
         )}
@@ -84,7 +120,7 @@ export function RentToBuyAgreementActions({
           <button className={primary} disabled={busy !== null} onClick={() => run('possession', `${base}/confirm-possession`)}>{t('actions.confirmPossession')}</button>
         )}
         {isCustomer && earlyPayoffAllowed && status === 'active' && (
-          <button className={secondary} disabled={busy !== null} onClick={() => run('payoff', `${base}/payoff`, { test_scenario: 'success' })}>{t('actions.payOff')}</button>
+          <button className={secondary} disabled={busy !== null} onClick={() => run('payoff', `${base}/payoff`, scenarioBody)}>{t('actions.payOff')}</button>
         )}
         {(isMerchant || isCustomer) && (possessionStatus === 'customer_in_possession' || possessionStatus === 'return_required') && (
           <button className={secondary} disabled={busy !== null} onClick={() => run('return', `${base}/request-return`)}>{t('actions.requestReturn')}</button>

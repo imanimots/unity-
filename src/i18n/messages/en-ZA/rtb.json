@@ -75,6 +75,12 @@
     "tooLarge": "File is too large — maximum {mb}MB.",
     "couldNotUpload": "Could not upload this file — please try again"
   },
+  "testMode": {
+    "heading": "Test mode — simulate payment outcome",
+    "provider": "mock provider",
+    "success": "Successful payment",
+    "declined": "Payment declined"
+  },
   "handoverEvidence": "Handover evidence",
   "preHandoverEvidence": "Pre-handover condition evidence",
   "receiptEvidence": "Receipt / condition evidence",

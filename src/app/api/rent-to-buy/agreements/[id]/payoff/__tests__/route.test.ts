@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { fakeServiceRoleClient } from '@/app/api/__tests__/fake-service-role-client'
 
@@ -195,5 +195,55 @@ describe('POST /api/rent-to-buy/agreements/[id]/payoff -- P5D-B.2 snapshot + req
 
     expect(res.status).toBe(403)
     expect(chargeRental).not.toHaveBeenCalled()
+  })
+})
+
+// E49 Phase U -- second defense layer: a client-supplied test_scenario
+// must be rejected outright in production, matching
+// src/app/api/advertising/campaigns/[id]/fund/route.ts's pattern. Found
+// live during this phase: the UI component previously hardcoded
+// test_scenario: 'success' on every real "Pay off" click with zero
+// gating -- fixed separately; this covers the route's own independent
+// rejection regardless of what any client sends.
+describe('POST /api/rent-to-buy/agreements/[id]/payoff -- test_scenario production safety', () => {
+  // process.env.NODE_ENV is typed read-only by @types/node -- same cast
+  // used by src/lib/advertising/__tests__/registry.test.ts.
+  const mutableEnv = process.env as Record<string, string | undefined>
+  const ORIGINAL_NODE_ENV = process.env.NODE_ENV
+
+  afterEach(() => {
+    mutableEnv.NODE_ENV = ORIGINAL_NODE_ENV
+  })
+
+  it('rejects a client-supplied test_scenario in production before any charge is attempted', async () => {
+    mutableEnv.NODE_ENV = 'production'
+    nextAdmin = makeAdmin()
+
+    const res = await call({ test_scenario: 'success' })
+
+    expect(res.status).toBe(400)
+    expect(chargeRental).not.toHaveBeenCalled()
+  })
+
+  it('a normal production request with no test_scenario proceeds normally', async () => {
+    mutableEnv.NODE_ENV = 'production'
+    chargeRental.mockResolvedValue({ status: 'captured', providerReference: 'ref-1' })
+    nextAdmin = makeAdmin()
+
+    const res = await call({})
+
+    expect(res.status).toBe(200)
+    expect(chargeRental).toHaveBeenCalledWith(expect.objectContaining({ mockScenario: undefined }))
+  })
+
+  it('an explicit test_scenario still works outside production', async () => {
+    mutableEnv.NODE_ENV = 'test'
+    chargeRental.mockResolvedValue({ status: 'captured', providerReference: 'ref-1' })
+    nextAdmin = makeAdmin()
+
+    const res = await call({ test_scenario: 'success' })
+
+    expect(res.status).toBe(200)
+    expect(chargeRental).toHaveBeenCalledWith(expect.objectContaining({ mockScenario: 'success' }))
   })
 })

@@ -75,6 +75,12 @@
     "tooLarge": "Ifayela likhulu kakhulu — okumaksimamu okungu-{mb}MB.",
     "couldNotUpload": "Asikwazanga ukulayisha leli fayela — sicela uzame futhi"
   },
+  "testMode": {
+    "heading": "Imodi yokuhlola — lingisa umphumela wenkokhelo",
+    "provider": "umhlinzeki wokulingisa",
+    "success": "Inkokhelo iphumelele",
+    "declined": "Inkokhelo inqatshelwe"
+  },
   "handoverEvidence": "Ubufakazi bokudluliselwa",
   "preHandoverEvidence": "Ubufakazi besimo ngaphambi kokudluliselwa",
   "receiptEvidence": "Ubufakazi bokutholwa / isimo",

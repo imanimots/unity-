@@ -75,6 +75,12 @@
     "tooLarge": "Lêer is te groot — maksimum {mb}MB.",
     "couldNotUpload": "Kon nie hierdie lêer oplaai nie — probeer asseblief weer"
   },
+  "testMode": {
+    "heading": "Toetsmodus — simuleer betalingsuitkoms",
+    "provider": "nepverskaffer",
+    "success": "Suksesvolle betaling",
+    "declined": "Betaling geweier"
+  },
   "handoverEvidence": "Bewys van oorhandiging",
   "preHandoverEvidence": "Bewys van toestand voor oorhandiging",
   "receiptEvidence": "Bewys van ontvangs / toestand",

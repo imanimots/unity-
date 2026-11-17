@@ -56,6 +56,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const parsed = bodySchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
 
+  // Second, explicit defense layer matching
+  // src/app/api/advertising/campaigns/[id]/fund/route.ts's pattern -- E30
+  // below already refuses the mock provider in production (layer 1), but
+  // a client-supplied test_scenario must still be rejected outright here
+  // too, not silently ignored.
+  if (process.env.NODE_ENV === 'production' && parsed.data.test_scenario) {
+    return NextResponse.json({ error: 'test_scenario is not permitted in this environment' }, { status: 400 })
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !serviceKey) return NextResponse.json({ error: 'Rent-to-buy storage is not configured' }, { status: 503 })

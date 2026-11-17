@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react'
 import { requireAuth } from '@/lib/supabase/require-admin'
 import { getRentToBuyAgreementDetail } from '@/lib/data/rent-to-buy'
 import { RentToBuyAgreementActions } from '@/components/rent-to-buy/agreement-detail-client'
+import { isMockScenarioSelectionAllowed } from '@/lib/checkout/test-scenario'
 import { AmendmentRespondButtons } from '@/components/rent-to-buy/amendment-respond-buttons'
 import { RentToBuyEvidenceUpload } from '@/components/rent-to-buy/evidence-upload'
 import { EvidenceAccessButton } from '@/components/shared/evidence-access-button'
@@ -199,6 +200,7 @@ export default async function RentToBuyAgreementPage({ params }: PageProps) {
         handedOverAt={agreement.handed_over_at}
         hasPendingAmendment={Boolean(pendingAmendment)}
         pendingTermination={pendingTermination}
+        testModeAvailable={isMockScenarioSelectionAllowed()}
       />
     </div>
   )
