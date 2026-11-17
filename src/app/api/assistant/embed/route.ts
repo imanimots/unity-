@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { KNOWLEDGE_BASE_ENTRIES } from '@/lib/assistant/seed-data'
+import { generateEmbedding } from '@/lib/assistant/embedding'
 import { requireAdmin } from '@/lib/supabase/require-admin'
 import { checkRateLimit, getClientKey } from '@/lib/rate-limit'
 
@@ -11,30 +12,6 @@ const bodySchema = z.object({
   title: z.string().max(200).optional(),
   seed: z.boolean().optional(),
 })
-
-// Embeddings require a vector embedding model.
-// Anthropic recommends Voyage AI (https://www.voyageai.com) — set VOYAGE_API_KEY.
-// Without it, content is stored with a null embedding and text search is used instead.
-async function generateEmbedding(text: string): Promise<number[] | null> {
-  const apiKey = process.env.VOYAGE_API_KEY
-  if (!apiKey) return null
-
-  try {
-    const res = await fetch('https://api.voyageai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ input: [text], model: 'voyage-3-lite' }),
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    return data.data?.[0]?.embedding ?? null
-  } catch {
-    return null
-  }
-}
 
 export async function POST(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
