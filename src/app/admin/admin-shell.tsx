@@ -12,36 +12,88 @@ import {
 import { useAuth } from '@/hooks/use-auth'
 import { IS_MOCK_MODE } from '@/lib/mock/data'
 
-const NAV_ITEMS = [
-  { href: '/admin',                     label: 'Overview',            icon: LayoutDashboard, exact: true },
-  { href: '/admin/users',               label: 'Users',                icon: Users            },
-  { href: '/admin/merchants',           label: 'Merchants',            icon: Users            },
-  { href: '/admin/verifications',       label: 'Verifications',        icon: UserCheck        },
-  { href: '/admin/listings',            label: 'Listings',             icon: Package          },
-  { href: '/admin/bookings',            label: 'Bookings',             icon: Calendar         },
-  { href: '/admin/financial-operations',label: 'Financial Operations', icon: Wallet           },
-  { href: '/admin/email-deliveries',    label: 'Email Deliveries',     icon: Inbox            },
-  { href: '/admin/exceptions',          label: 'Exception Queue',      icon: AlertTriangle    },
-  { href: '/admin/audit',               label: 'Audit Log',            icon: ScrollText       },
-  { href: '/admin/disputes',            label: 'Disputes',             icon: AlertTriangle    },
-  { href: '/admin/support',             label: 'Support',              icon: Headset          },
-  { href: '/admin/reviews',             label: 'Review Moderation',    icon: ShieldCheck      },
-  { href: '/admin/barter',              label: 'Barter Trades',        icon: Repeat           },
-  { href: '/admin/orders',              label: 'Orders',               icon: ShoppingBag      },
-  { href: '/admin/affiliates',          label: 'Affiliates',           icon: Link2            },
-  { href: '/admin/affiliate-commissions', label: 'Affiliate Commissions', icon: DollarSign     },
-  { href: '/admin/payouts',             label: 'Merchant Payouts',     icon: Banknote         },
-  { href: '/admin/subscriptions',       label: 'Merchant Subscriptions', icon: CreditCard     },
-  { href: '/admin/commissions',         label: 'Unity Commissions',    icon: Percent          },
-  { href: '/admin/escrow',              label: 'Secure Transactions',  icon: ShieldCheck      },
-  { href: '/admin/marketplace-requests', label: 'Looking For',         icon: ClipboardList    },
-  { href: '/admin/rent-to-buy',         label: 'Rent-to-Buy',          icon: KeyRound         },
-  { href: '/admin/advertising',         label: 'Advertising',          icon: Megaphone        },
-  { href: '/admin/knowledge-base',      label: 'Knowledge Base',       icon: BookOpen         },
-  { href: '/admin/email-previews',      label: 'Email Previews',       icon: Mail             },
-  { href: '/admin/analytics',           label: 'Analytics',            icon: BarChart3        },
-  { href: '/admin/intelligence',        label: 'AI R&D & Intelligence', icon: Lightbulb        },
+const OVERVIEW_ITEM = { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true }
+
+const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: typeof Users; exact?: boolean }[] }[] = [
+  {
+    label: 'Core Operations',
+    items: [
+      { href: '/admin/users',         label: 'Users',         icon: Users     },
+      { href: '/admin/merchants',     label: 'Merchants',     icon: Users     },
+      { href: '/admin/verifications', label: 'Verifications', icon: UserCheck },
+      { href: '/admin/listings',      label: 'Listings',      icon: Package   },
+      { href: '/admin/bookings',      label: 'Bookings',      icon: Calendar  },
+      { href: '/admin/orders',        label: 'Orders',        icon: ShoppingBag },
+    ],
+  },
+  {
+    label: 'Trust & Safety',
+    items: [
+      { href: '/admin/disputes', label: 'Disputes',          icon: AlertTriangle },
+      { href: '/admin/support',  label: 'Support',            icon: Headset       },
+      { href: '/admin/reviews',  label: 'Review Moderation',  icon: ShieldCheck   },
+    ],
+  },
+  {
+    label: 'Marketplace',
+    items: [
+      { href: '/admin/barter',               label: 'Barter Trades', icon: Repeat        },
+      { href: '/admin/marketplace-requests', label: 'Looking For',   icon: ClipboardList },
+      { href: '/admin/rent-to-buy',          label: 'Rent-to-Buy',   icon: KeyRound      },
+      { href: '/admin/advertising',          label: 'Advertising',   icon: Megaphone     },
+    ],
+  },
+  {
+    label: 'Financial Operations',
+    items: [
+      { href: '/admin/financial-operations',  label: 'Financial Operations',   icon: Wallet     },
+      { href: '/admin/escrow',                label: 'Secure Transactions',    icon: ShieldCheck },
+      { href: '/admin/payouts',               label: 'Merchant Payouts',       icon: Banknote    },
+      { href: '/admin/commissions',           label: 'Unity Commissions',      icon: Percent     },
+      { href: '/admin/affiliates',            label: 'Affiliates',             icon: Link2       },
+      { href: '/admin/affiliate-commissions', label: 'Affiliate Commissions',  icon: DollarSign  },
+      { href: '/admin/subscriptions',         label: 'Merchant Subscriptions', icon: CreditCard  },
+    ],
+  },
+  {
+    label: 'Platform Operations',
+    items: [
+      { href: '/admin/email-deliveries', label: 'Email Deliveries', icon: Inbox         },
+      { href: '/admin/exceptions',       label: 'Exception Queue',  icon: AlertTriangle },
+      { href: '/admin/audit',            label: 'Audit Log',        icon: ScrollText    },
+    ],
+  },
+  {
+    label: 'Content & Insights',
+    items: [
+      { href: '/admin/knowledge-base', label: 'Knowledge Base',        icon: BookOpen   },
+      { href: '/admin/email-previews', label: 'Email Previews',        icon: Mail       },
+      { href: '/admin/analytics',      label: 'Analytics',             icon: BarChart3  },
+      { href: '/admin/intelligence',   label: 'AI R&D & Intelligence', icon: Lightbulb  },
+    ],
+  },
 ]
+
+function NavLink({ item, active, onClick }: { item: { href: string; label: string; icon: typeof Users }; active: boolean; onClick: () => void }) {
+  const Icon = item.icon
+  return (
+    <Link
+      href={item.href}
+      onClick={onClick}
+      className={`
+        flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+        ${active
+          ? 'bg-[#8B1A1A] text-white'
+          : 'text-[#9B8B85] hover:text-white hover:bg-[#2A1A1A]'
+        }
+      `}
+    >
+      <Icon size={16} className="shrink-0" />
+      {item.label}
+      {active && <ChevronRight size={14} className="ml-auto opacity-60" />}
+    </Link>
+  )
+}
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -95,28 +147,18 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {NAV_ITEMS.map(({ href, label, icon: Icon, exact }) => {
-            const active = isActive(href, exact)
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setSidebarOpen(false)}
-                className={`
-                  flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                  ${active
-                    ? 'bg-[#8B1A1A] text-white'
-                    : 'text-[#9B8B85] hover:text-white hover:bg-[#2A1A1A]'
-                  }
-                `}
-              >
-                <Icon size={16} className="shrink-0" />
-                {label}
-                {active && <ChevronRight size={14} className="ml-auto opacity-60" />}
-              </Link>
-            )
-          })}
+        <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
+          <NavLink item={OVERVIEW_ITEM} active={isActive(OVERVIEW_ITEM.href, OVERVIEW_ITEM.exact)} onClick={() => setSidebarOpen(false)} />
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label} className="space-y-0.5">
+              <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B5450]">
+                {group.label}
+              </p>
+              {group.items.map((item) => (
+                <NavLink key={item.href} item={item} active={isActive(item.href, item.exact)} onClick={() => setSidebarOpen(false)} />
+              ))}
+            </div>
+          ))}
         </nav>
 
         {/* Bottom */}

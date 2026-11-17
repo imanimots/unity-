@@ -317,7 +317,7 @@ export default function KnowledgeBasePage() {
                   <div className="flex items-center gap-2 min-w-0">
                     <span
                       className={`text-[10px] font-semibold uppercase tracking-[0.08em] px-2 py-0.5 rounded-full flex-shrink-0 ${
-                        CATEGORY_COLORS[entry.category] ?? 'bg-gray-100 text-gray-600'
+                        CATEGORY_COLORS[entry.category] ?? 'bg-[#F2EDE8] text-[#6B5B55]'
                       }`}
                     >
                       {CATEGORY_LABELS[entry.category] ?? entry.category}

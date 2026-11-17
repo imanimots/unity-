@@ -99,48 +99,48 @@ export default function AdminReviewsPage() {
   const reasonFor = (key: string) => reasonDraft[key] ?? ''
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 lg:p-8 space-y-6">
       <AdminPageHeader eyebrow="Trust & Safety" title="Review Moderation" badge={`${reports.filter((r) => r.status === 'open').length} open`} />
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       {loading ? (
-        <p className="text-sm text-neutral-500">Loading…</p>
+        <p className="text-sm text-[#9B8B85]">Loading…</p>
       ) : reports.length === 0 ? (
-        <p className="text-sm text-neutral-500">No reports.</p>
+        <p className="text-sm text-[#9B8B85]">No reports.</p>
       ) : (
         <div className="space-y-4">
           {reports.map((r) => {
             const reviewHistory = history.filter((h) => h.review_id === r.review?.id)
             const key = r.id
             return (
-              <div key={r.id} className="rounded-xl border border-neutral-200 p-4 space-y-3">
+              <div key={r.id} className="rounded-xl border border-[#F2EDE8] bg-white p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold">
-                    Report: {r.target_type} — {r.reason} {r.status !== 'open' && <span className="text-neutral-500">({r.status})</span>}
+                  <div className="text-sm font-semibold text-[#1A0A0A]">
+                    Report: {r.target_type} — {r.reason} {r.status !== 'open' && <span className="text-[#9B8B85]">({r.status})</span>}
                   </div>
-                  <div className="text-xs text-neutral-500">{formatDateTime(r.created_at)}</div>
+                  <div className="text-xs text-[#9B8B85]">{formatDateTime(r.created_at)}</div>
                 </div>
-                {r.description && <p className="text-sm text-neutral-600">{r.description}</p>}
+                {r.description && <p className="text-sm text-[#6B5B55]">{r.description}</p>}
 
                 {r.review && (
-                  <div className="rounded-lg bg-neutral-50 p-3 text-sm space-y-1">
-                    <p className="font-medium">{r.review.header_snapshot?.title ?? 'Transaction'}</p>
-                    <p>Rating: {r.review.rating} / 5</p>
-                    <p>{r.review.text_hidden_at ? <span className="italic text-neutral-500">Text hidden</span> : r.review.comment}</p>
-                    <p className="text-xs text-neutral-500">
+                  <div className="rounded-lg bg-[#FAF8F5] p-3 text-sm space-y-1">
+                    <p className="font-medium text-[#1A0A0A]">{r.review.header_snapshot?.title ?? 'Transaction'}</p>
+                    <p className="text-[#1A0A0A]">Rating: {r.review.rating} / 5</p>
+                    <p className="text-[#1A0A0A]">{r.review.text_hidden_at ? <span className="italic text-[#9B8B85]">Text hidden</span> : r.review.comment}</p>
+                    <p className="text-xs text-[#9B8B85]">
                       invalidated: {r.review.invalidated_at ? 'yes' : 'no'} · published: {r.review.published_at ? 'yes' : 'no'}
                     </p>
                   </div>
                 )}
                 {r.reply && (
-                  <div className="rounded-lg bg-neutral-50 p-3 text-sm space-y-1">
-                    <p className="font-medium">Reply</p>
-                    <p>{r.reply.hidden_at ? <span className="italic text-neutral-500">Reply hidden</span> : r.reply.reply_text}</p>
+                  <div className="rounded-lg bg-[#FAF8F5] p-3 text-sm space-y-1">
+                    <p className="font-medium text-[#1A0A0A]">Reply</p>
+                    <p className="text-[#1A0A0A]">{r.reply.hidden_at ? <span className="italic text-[#9B8B85]">Reply hidden</span> : r.reply.reply_text}</p>
                   </div>
                 )}
 
                 {reviewHistory.length > 0 && (
-                  <details className="text-xs text-neutral-500">
+                  <details className="text-xs text-[#9B8B85]">
                     <summary>Moderation history ({reviewHistory.length})</summary>
                     <ul className="mt-1 space-y-1">
                       {reviewHistory.map((h) => (
@@ -153,13 +153,13 @@ export default function AdminReviewsPage() {
                 )}
 
                 {r.status === 'open' && (
-                  <div className="space-y-2 pt-2 border-t border-neutral-200">
+                  <div className="space-y-2 pt-2 border-t border-[#F2EDE8]">
                     <input
                       type="text"
                       placeholder="Reason (required for any action)"
                       value={reasonFor(key)}
                       onChange={(e) => setReasonDraft((prev) => ({ ...prev, [key]: e.target.value }))}
-                      className="w-full text-sm px-3 py-1.5 rounded-lg border border-neutral-300 bg-white"
+                      className="w-full text-sm px-3 py-1.5 rounded-lg border border-[#F2EDE8] bg-white text-[#1A0A0A] focus:outline-none focus:ring-1 focus:ring-[#8B1A1A]"
                     />
                     <div className="flex flex-wrap gap-2">
                       <button
