@@ -111,7 +111,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       settlementId = existingSettlement.id
     } else {
       const providerKey = process.env.ADVERTISING_BILLING_PROVIDER || 'mock'
-      const provider = getAdvertisingBillingProvider()
+      let provider
+      try {
+        provider = getAdvertisingBillingProvider()
+      } catch (err) {
+        // The registry itself refuses to hand back the mock provider in
+        // production (defense layer 1, see getAdvertisingBillingProvider).
+        // No real provider is wired up yet, so a production request hits
+        // this path and gets an honest "not configured" response instead
+        // of either an uncaught 500 or a fabricated success.
+        console.error('[advertising.campaigns.fund] no usable billing provider', { userId: requester.userId, campaignId, providerKey, err })
+        return NextResponse.json({ error: 'Advertising billing provider is not configured for this environment' }, { status: 503 })
+      }
       const charge = await provider.charge({
         advertiserId: campaign.advertiser_id,
         campaignId,

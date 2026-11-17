@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestProfile } from '@/lib/supabase/require-admin'
 import { getAdminServiceClient, isValidUuid } from '@/lib/admin/route-helpers'
+import { isAdvertisingMockScenarioSelectionAllowed } from '@/lib/advertising/test-scenario'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -31,5 +32,10 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: error.message ?? 'Could not load report' }, { status: 400 })
   }
 
-  return NextResponse.json(data)
+  // testModeAvailable tells the client whether it may show an explicit
+  // scenario picker for the Fund action -- the fund route independently
+  // re-checks the same condition on every request regardless of this
+  // flag, so it can only ever widen what the UI offers, never what the
+  // server accepts.
+  return NextResponse.json({ ...data, testModeAvailable: isAdvertisingMockScenarioSelectionAllowed() })
 }

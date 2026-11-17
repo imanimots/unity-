@@ -6,6 +6,8 @@ import type { Locale } from '@/i18n/locales'
 import { Link } from '@/i18n/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { formatMoney } from '@/lib/i18n/format'
+import { ADVERTISING_TEST_SCENARIOS, ADVERTISING_TEST_SCENARIO_LABELS } from '@/lib/advertising/test-scenario'
+import type { AdvertisingMockScenario } from '@/lib/advertising/provider'
 
 interface AdCampaignReport {
   campaign_id: string
@@ -31,6 +33,7 @@ interface AdCampaignReport {
   discount_cents: number
   subscription_plan_id: string
   pricing_is_live_quote: boolean
+  testModeAvailable: boolean
 }
 
 export default function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -49,6 +52,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
   const [loading, setLoading] = useState(true)
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionBusy, setActionBusy] = useState(false)
+  const [testScenario, setTestScenario] = useState<AdvertisingMockScenario>('success')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -67,10 +71,18 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
     setActionError(null)
     setActionBusy(true)
     try {
+      // A normal merchant funding request never claims an outcome -- the
+      // real/mock provider (chosen server-side) determines the result.
+      // mockScenario is only ever sent when the server has told us (via
+      // report.testModeAvailable) that explicit scenario selection is
+      // currently permitted, and the fund route independently re-checks
+      // this on every request regardless of what's sent here.
+      const body: Record<string, unknown> = { fundingSource: 'provider' }
+      if (report?.testModeAvailable) body.mockScenario = testScenario
       const res = await fetch(`/api/advertising/campaigns/${id}/fund`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fundingSource: 'provider', mockScenario: 'success' }),
+        body: JSON.stringify(body),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -81,7 +93,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
     } finally {
       setActionBusy(false)
     }
-  }, [id, load])
+  }, [id, load, report?.testModeAvailable, testScenario])
 
   const runAction = useCallback(
     async (action: 'pause' | 'resume' | 'cancel') => {
@@ -143,8 +155,39 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
             This is a live preview, not a guaranteed price — it may change if the package price or your subscription plan changes before you fund. The final amount is locked in the moment you click Fund, before any charge happens.
           </p>
           <p className="text-sm text-[#6B5B55] mb-3">
-            Fund this campaign to activate it. This is a development mock charge — no real money moves.
+            {report.testModeAvailable
+              ? 'Fund this campaign to activate it. This is a development mock charge — no real money moves.'
+              : 'Fund this campaign to activate it.'}
           </p>
+
+          {report.testModeAvailable && (
+            <div className="bg-white rounded-xl border border-dashed border-amber-400/60 p-5 mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-amber-600">Test mode — simulate charge outcome</p>
+                <span className="text-[10px] font-mono text-[#9B8B85]">mock provider</span>
+              </div>
+              <div className="space-y-2">
+                {ADVERTISING_TEST_SCENARIOS.map((scenario) => (
+                  <label
+                    key={scenario}
+                    className="flex items-start gap-2.5 text-sm cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-[#FAF8F5]"
+                  >
+                    <input
+                      type="radio"
+                      name="ad_test_scenario"
+                      value={scenario}
+                      checked={testScenario === scenario}
+                      onChange={() => setTestScenario(scenario)}
+                      disabled={actionBusy}
+                      className="mt-0.5 accent-[#8B1A1A]"
+                    />
+                    <span className="text-[#1A0A0A]">{ADVERTISING_TEST_SCENARIO_LABELS[scenario]}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           <button
             onClick={fund}
             disabled={actionBusy}
