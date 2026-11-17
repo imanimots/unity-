@@ -116,7 +116,7 @@ export default function NewAdCampaignPage() {
   }, [advertiserId, packageId, listingId, endAt, router, t])
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-10">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <Link href="/dashboard/merchant/advertising" className="inline-flex items-center gap-1.5 text-sm text-[#6B5B55] hover:text-[#8B1A1A] mb-6">
         <ArrowLeft size={14} /> {t('backToAdvertising')}
       </Link>
