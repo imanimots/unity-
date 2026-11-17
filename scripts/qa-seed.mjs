@@ -82,6 +82,16 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY)
 const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0]
 const cookieName = `sb-${projectRef}-auth-token`
 
+// E48 Risk 4 fix: the barter idempotency keys below used to be fixed
+// strings, which collided (409 "already submitted with different data")
+// against whatever request body a PRIOR run had cached under that same
+// key -- Phase 2 inserts fresh listings (new ids) every run, so the
+// propose/counter/accept/etc. request bodies are never byte-identical
+// across runs even though the key was. Appending a per-run token keeps
+// each key deterministic within a single run (idempotency's actual job)
+// while guaranteeing it never collides with an earlier run's record.
+const RUN_TOKEN = Date.now().toString(36)
+
 function genPassword() {
   return `Qa${randomBytes(18).toString('base64url')}!1`
 }
@@ -109,9 +119,27 @@ async function api(cookie, method, path, body) {
   return { status: res.status, json }
 }
 
+// E48 Risk 4 fix: this used to check only page 1 (200 users) of
+// listUsers(), so once the project's total user count grew past 200
+// (confirmed live: 314 users today), an existing QA account positioned
+// on page 2+ was never found -- createUser() then failed on Supabase's
+// own unique-email constraint instead of updating the existing user's
+// password, which is exactly the failure that made the QA credentials
+// go stale in the first place. Paginates until the account is found or
+// the list is exhausted.
+async function findUserByEmail(email) {
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 })
+    if (error) throw new Error(`listUsers failed on page ${page}: ${error.message}`)
+    const found = data.users.find((u) => u.email === email)
+    if (found) return found
+    if (data.users.length < 200) return null
+  }
+  throw new Error(`listUsers did not terminate within 50 pages while searching for ${email}`)
+}
+
 async function ensureUser(email, password, role) {
-  const { data: existing } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 })
-  const found = existing?.users?.find((u) => u.email === email)
+  const found = await findUserByEmail(email)
   let userId
   if (found) {
     userId = found.id
@@ -611,7 +639,7 @@ async function seedBarterScenarios(accounts) {
   agreementIds.proposed = await proposeBarter(merchantBCookie, {
     anchor_listing_id: l.proposedA,
     ...offerFields(l.proposedA, l.proposedB, { message: 'QA fixture — awaiting response' }),
-    idempotency_key: 'qa-seed-barter-proposed-propose',
+    idempotency_key: `qa-seed-barter-proposed-propose-${RUN_TOKEN}`,
   })
 
   // 2. countered — multi-item on A's side (2 listings) to demonstrate the
@@ -619,7 +647,7 @@ async function seedBarterScenarios(accounts) {
   agreementIds.countered = await proposeBarter(merchantBCookie, {
     anchor_listing_id: l.counteredA1,
     ...offerFields(l.counteredA1, l.counteredB, { message: 'QA fixture — before counter' }),
-    idempotency_key: 'qa-seed-barter-countered-propose',
+    idempotency_key: `qa-seed-barter-countered-propose-${RUN_TOKEN}`,
   })
   await counterBarter(merchantACookie, agreementIds.countered, {
     ...offerFields([l.counteredA1, l.counteredA2], l.counteredB, {
@@ -632,7 +660,7 @@ async function seedBarterScenarios(accounts) {
       deposit_payer: 'both',
       message: 'QA fixture — countered with an extra item plus a cash top-up',
     }),
-    idempotency_key: 'qa-seed-barter-countered-counter',
+    idempotency_key: `qa-seed-barter-countered-counter-${RUN_TOKEN}`,
   })
 
   // 3. accepted — locks both listings permanently (no completion RPC
@@ -641,26 +669,26 @@ async function seedBarterScenarios(accounts) {
   agreementIds.accepted = await proposeBarter(merchantBCookie, {
     anchor_listing_id: l.acceptedA,
     ...offerFields(l.acceptedA, l.acceptedB, { message: 'QA fixture — accepted trade' }),
-    idempotency_key: 'qa-seed-barter-accepted-propose',
+    idempotency_key: `qa-seed-barter-accepted-propose-${RUN_TOKEN}`,
   })
-  await acceptBarter(merchantACookie, agreementIds.accepted, 'qa-seed-barter-accepted-accept')
+  await acceptBarter(merchantACookie, agreementIds.accepted, `qa-seed-barter-accepted-accept-${RUN_TOKEN}`)
 
   // 4. rejected
   agreementIds.rejected = await proposeBarter(merchantBCookie, {
     anchor_listing_id: l.declinedA,
     ...offerFields(l.declinedA, l.declinedB, { message: 'QA fixture — will be declined' }),
-    idempotency_key: 'qa-seed-barter-rejected-propose',
+    idempotency_key: `qa-seed-barter-rejected-propose-${RUN_TOKEN}`,
   })
-  await rejectBarter(merchantACookie, agreementIds.rejected, 'qa-seed-barter-rejected-reject')
+  await rejectBarter(merchantACookie, agreementIds.rejected, `qa-seed-barter-rejected-reject-${RUN_TOKEN}`)
 
   // 5. cancelled before acceptance — same listing pair as #4 is safe to
   // reuse since neither a proposed nor a rejected agreement locks anything.
   agreementIds.cancelledPreAccept = await proposeBarter(merchantBCookie, {
     anchor_listing_id: l.declinedA,
     ...offerFields(l.declinedA, l.declinedB, { message: 'QA fixture — will be cancelled before acceptance' }),
-    idempotency_key: 'qa-seed-barter-cancelled-pre-propose',
+    idempotency_key: `qa-seed-barter-cancelled-pre-propose-${RUN_TOKEN}`,
   })
-  await cancelBarter(merchantBCookie, agreementIds.cancelledPreAccept, 'qa-seed-barter-cancelled-pre-cancel')
+  await cancelBarter(merchantBCookie, agreementIds.cancelledPreAccept, `qa-seed-barter-cancelled-pre-cancel-${RUN_TOKEN}`)
 
   // 6. cancelled after acceptance — locks, then unlocks again via cancel;
   // demonstrates the 'refunded' settlement path (Phase A: descriptive
@@ -668,10 +696,10 @@ async function seedBarterScenarios(accounts) {
   agreementIds.cancelledPostAccept = await proposeBarter(merchantBCookie, {
     anchor_listing_id: l.cancelledPostA,
     ...offerFields(l.cancelledPostA, l.cancelledPostB, { message: 'QA fixture — will be cancelled after acceptance' }),
-    idempotency_key: 'qa-seed-barter-cancelled-post-propose',
+    idempotency_key: `qa-seed-barter-cancelled-post-propose-${RUN_TOKEN}`,
   })
-  await acceptBarter(merchantACookie, agreementIds.cancelledPostAccept, 'qa-seed-barter-cancelled-post-accept')
-  await cancelBarter(merchantACookie, agreementIds.cancelledPostAccept, 'qa-seed-barter-cancelled-post-cancel')
+  await acceptBarter(merchantACookie, agreementIds.cancelledPostAccept, `qa-seed-barter-cancelled-post-accept-${RUN_TOKEN}`)
+  await cancelBarter(merchantACookie, agreementIds.cancelledPostAccept, `qa-seed-barter-cancelled-post-cancel-${RUN_TOKEN}`)
 
   // 7. expired — propose, backdate expires_at (no route exists for "make
   // time pass", same documented exception as the booking phase's
@@ -680,7 +708,7 @@ async function seedBarterScenarios(accounts) {
   agreementIds.expired = await proposeBarter(merchantBCookie, {
     anchor_listing_id: l.expiredA,
     ...offerFields(l.expiredA, l.expiredB, { message: 'QA fixture — will expire unanswered' }),
-    idempotency_key: 'qa-seed-barter-expired-propose',
+    idempotency_key: `qa-seed-barter-expired-propose-${RUN_TOKEN}`,
   })
   await admin.from('barter_agreements').update({ expires_at: new Date(Date.now() - 3600_000).toISOString() }).eq('id', agreementIds.expired)
   await api(merchantACookie, 'GET', '/api/barter')
@@ -790,8 +818,7 @@ async function seedEmailFailureFixtures() {
   const retryableEmail = 'qa-email-fixture+fail-retryable@unitytest.internal'
   const terminalEmail = 'qa-email-fixture+fail-terminal@unitytest.internal'
   for (const email of [retryableEmail, terminalEmail]) {
-    const { data: existing } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 })
-    let userId = existing?.users?.find((u) => u.email === email)?.id
+    let userId = (await findUserByEmail(email))?.id
     if (!userId) {
       const { data, error } = await admin.auth.admin.createUser({ email, password: genPassword(), email_confirm: true })
       if (error) throw new Error(`createUser failed for ${email}: ${error.message}`)
