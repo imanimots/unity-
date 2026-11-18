@@ -41,7 +41,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
-    const result = await getIdentityDocumentSignedUrl(admin, userId, parsed.data.document_id)
+    const result = await getIdentityDocumentSignedUrl(admin, gate.requester.userId, userId, parsed.data.document_id)
     return NextResponse.json(result)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

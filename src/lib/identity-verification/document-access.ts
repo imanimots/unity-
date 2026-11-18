@@ -16,8 +16,17 @@ export interface DocumentSignedUrlResult {
   expiresAt: string
 }
 
-/** Called only from an already-admin-gated route -- does not re-check admin status itself, same trust boundary as getOwnershipEvidenceSignedUrl. */
-export async function getIdentityDocumentSignedUrl(admin: SupabaseClient, userId: string, documentId: string): Promise<DocumentSignedUrlResult> {
+/**
+ * Called only from an already-admin-gated route -- does not re-check
+ * admin status itself, same trust boundary as
+ * getOwnershipEvidenceSignedUrl. Platform improvement programme, Phase
+ * 1 item 5: writes one row to admin_kyc_document_access_log before
+ * returning the signed URL, the same "log the read, not just the
+ * write" pattern src/lib/messaging/admin.ts already established for
+ * admin message access -- this was the one sensitive-read path the
+ * audit found with no equivalent.
+ */
+export async function getIdentityDocumentSignedUrl(admin: SupabaseClient, adminId: string, userId: string, documentId: string): Promise<DocumentSignedUrlResult> {
   const { data: docRow, error } = await admin
     .from('identity_verification_documents')
     .select('id, storage_path')
@@ -34,6 +43,8 @@ export async function getIdentityDocumentSignedUrl(admin: SupabaseClient, userId
   if (signError || !signed) {
     throw new Error('could_not_sign_url')
   }
+
+  await admin.from('admin_kyc_document_access_log').insert({ admin_id: adminId, user_id: userId, document_id: documentId })
 
   return { url: signed.signedUrl, expiresAt: new Date(Date.now() + SIGNED_URL_TTL_SECONDS * 1000).toISOString() }
 }
