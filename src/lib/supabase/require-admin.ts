@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { IS_MOCK_MODE, MOCK_CURRENT_PROFILE } from '@/lib/mock/data'
+import { isAdminMfaEnforced, hasVerifiedAdminMfaSession } from '@/lib/supabase/admin-mfa'
 import type { Profile } from '@/types'
 
 export interface AuthedProfile {
@@ -55,6 +56,14 @@ export async function getRequestProfile(): Promise<AuthedProfile | null> {
  * with no real data at stake. When Supabase IS configured (as it is in this
  * project's .env.local), this performs a real `profiles.role === 'admin'`
  * check.
+ *
+ * E46: MFA enforcement, feature-flagged via ADMIN_MFA_ENFORCED
+ * (src/lib/supabase/admin-mfa.ts). Unset/false — the overwhelming
+ * majority of this flag's life so far — this check is skipped entirely
+ * and behavior is byte-identical to before this addition. Only once
+ * every admin has a confirmed-enrolled factor (see
+ * docs/operations/ADMIN_MFA_ROLLOUT_CHECKLIST.md) should this ever be
+ * flipped to true.
  */
 export async function requireAdmin(): Promise<AuthedProfile | null> {
   if (IS_MOCK_MODE) {
@@ -63,6 +72,12 @@ export async function requireAdmin(): Promise<AuthedProfile | null> {
 
   const result = await getRequestProfile()
   if (!result || result.profile.role !== 'admin') return null
+
+  if (isAdminMfaEnforced()) {
+    const verified = await hasVerifiedAdminMfaSession()
+    if (!verified) return null
+  }
+
   return result
 }
 
