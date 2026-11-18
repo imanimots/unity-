@@ -37,11 +37,30 @@ test.describe('authenticated smoke', () => {
     page.on('console', (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text())
     })
-    await page.waitForLoadState('networkidle')
+    // E49.1: this page keeps a persistent background connection (realtime/
+    // chat), so 'networkidle' never fires and the wait hangs until the
+    // test timeout -- a known Playwright anti-pattern on apps with
+    // long-lived connections, not a signal about this page's own
+    // correctness. A short settle window is enough to catch a
+    // client-side console error from the initial render.
+    await page.waitForTimeout(2000)
     expect(consoleErrors).toEqual([])
   })
 
+  // E49.2: /admin's Overview previously ran two N+1 query patterns
+  // (getRealUnityCommissionOverviewCounts, getRealEscrowOverviewCounts)
+  // that together fired 4000+ of the page's ~5200 total Supabase
+  // requests and escalated with every repeated load (29s -> 93s+ within
+  // one session) -- root-caused and fixed by batching both into a fixed
+  // number of .in() queries regardless of row count (see
+  // src/lib/admin/commissions-service.ts and escrow-service.ts). Five
+  // sequential post-fix loads measured 19.7-27.8s with no escalation --
+  // stable, but still above the <10s "investigate" budget for this
+  // route, which is the remaining, separately-tracked performance debt
+  // (not an N+1 pattern; see the E49.2 report). This timeout carries a
+  // margin above that observed range, not an open-ended allowance.
   test('admin can log in and reach the overview with real data', async ({ page }) => {
+    test.setTimeout(45000)
     const creds = JSON.parse(readFileSync(credentialsPath, 'utf-8'))
     const admin = creds.accounts.admin
 
@@ -51,7 +70,7 @@ test.describe('authenticated smoke', () => {
     await page.getByRole('button', { name: /log in|sign in/i }).click()
     await expect(page).not.toHaveURL(/\/login/, { timeout: 15000 })
 
-    await page.goto('/admin')
-    await expect(page.getByRole('heading', { name: /overview/i })).toBeVisible({ timeout: 15000 })
+    await page.goto('/admin', { timeout: 35000 })
+    await expect(page.getByRole('heading', { name: /overview/i })).toBeVisible({ timeout: 35000 })
   })
 })

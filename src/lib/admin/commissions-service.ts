@@ -13,37 +13,70 @@ const DEFAULT_LIMIT = 100
  * merchant_id/listing_id are the seller/listing side of that same
  * transaction, so checking the transaction directly covers both without
  * duplicating logic.
+ *
+ * E49.2: batched across the whole row set (4 .in() queries total)
+ * instead of the former per-row shape (3 queries for EVERY row) --
+ * that N+1 pattern scaled directly with row count and was measured
+ * firing 4000+ Supabase requests for a single Admin Overview load once
+ * QA seeding had accumulated enough commission rows. Same
+ * classification semantics (classifyEntityWithOwners, 'unknown'
+ * fail-safe).
  */
+async function resolveUnityCommissionRealClassifications(
+  admin: SupabaseClient,
+  commissions: readonly { order_id: string | null; booking_id: string | null }[]
+): Promise<ProfileDataClassification[]> {
+  const orderIds = Array.from(new Set(commissions.filter((c) => c.order_id).map((c) => c.order_id as string)))
+  const bookingIds = Array.from(new Set(commissions.filter((c) => c.booking_id).map((c) => c.booking_id as string)))
+
+  const [{ data: orders }, { data: bookings }] = await Promise.all([
+    orderIds.length ? admin.from('orders').select('id, buyer_id, seller_id, listing_id').in('id', orderIds) : Promise.resolve({ data: [] }),
+    bookingIds.length ? admin.from('bookings').select('id, renter_id, merchant_id, listing_id').in('id', bookingIds) : Promise.resolve({ data: [] }),
+  ])
+  const orderById = new Map((orders ?? []).map((o) => [o.id, o]))
+  const bookingById = new Map((bookings ?? []).map((b) => [b.id, b]))
+
+  const profileIds = Array.from(
+    new Set([...(orders ?? []).flatMap((o) => [o.buyer_id, o.seller_id]), ...(bookings ?? []).flatMap((b) => [b.renter_id, b.merchant_id])])
+  )
+  const listingIds = Array.from(new Set([...(orders ?? []).map((o) => o.listing_id), ...(bookings ?? []).map((b) => b.listing_id)]))
+
+  const [{ data: profiles }, { data: listings }] = await Promise.all([
+    profileIds.length ? admin.from('profiles').select('id, data_classification').in('id', profileIds) : Promise.resolve({ data: [] }),
+    listingIds.length ? admin.from('listings').select('id, is_test').in('id', listingIds) : Promise.resolve({ data: [] }),
+  ])
+  const profileById = new Map((profiles ?? []).map((p) => [p.id, p]))
+  const listingIsTestById = new Map((listings ?? []).map((l) => [l.id, l.is_test]))
+
+  return commissions.map((commission) => {
+    if (commission.order_id) {
+      const order = orderById.get(commission.order_id)
+      if (!order) return 'unknown'
+      const buyer = profileById.get(order.buyer_id) ?? {}
+      const seller = profileById.get(order.seller_id) ?? {}
+      return classifyEntityWithOwners({ is_test: listingIsTestById.get(order.listing_id) === true }, [buyer, seller])
+    }
+    if (commission.booking_id) {
+      const booking = bookingById.get(commission.booking_id)
+      if (!booking) return 'unknown'
+      const renter = profileById.get(booking.renter_id) ?? {}
+      const merchant = profileById.get(booking.merchant_id) ?? {}
+      return classifyEntityWithOwners({ is_test: listingIsTestById.get(booking.listing_id) === true }, [renter, merchant])
+    }
+    // unity_commissions_one_transaction_chk enforces exactly one of
+    // order_id/booking_id -- reaching here should never happen. Fail
+    // safe, never guess real.
+    return 'unknown'
+  })
+}
+
+/** Single-row convenience wrapper over resolveUnityCommissionRealClassifications, for the detail-view call site where N is always 1 and batching has nothing to batch. */
 async function resolveUnityCommissionRealClassification(
   admin: SupabaseClient,
   commission: { order_id: string | null; booking_id: string | null }
 ): Promise<ProfileDataClassification> {
-  if (commission.order_id) {
-    const { data: order } = await admin.from('orders').select('buyer_id, seller_id, listing_id').eq('id', commission.order_id).maybeSingle()
-    if (!order) return 'unknown'
-    const [{ data: profiles }, { data: listing }] = await Promise.all([
-      admin.from('profiles').select('id, data_classification').in('id', [order.buyer_id, order.seller_id]),
-      admin.from('listings').select('is_test').eq('id', order.listing_id).maybeSingle(),
-    ])
-    const buyer = profiles?.find((p) => p.id === order.buyer_id)
-    const seller = profiles?.find((p) => p.id === order.seller_id)
-    return classifyEntityWithOwners({ is_test: listing?.is_test === true }, [buyer ?? {}, seller ?? {}])
-  }
-  if (commission.booking_id) {
-    const { data: booking } = await admin.from('bookings').select('renter_id, merchant_id, listing_id').eq('id', commission.booking_id).maybeSingle()
-    if (!booking) return 'unknown'
-    const [{ data: profiles }, { data: listing }] = await Promise.all([
-      admin.from('profiles').select('id, data_classification').in('id', [booking.renter_id, booking.merchant_id]),
-      admin.from('listings').select('is_test').eq('id', booking.listing_id).maybeSingle(),
-    ])
-    const renter = profiles?.find((p) => p.id === booking.renter_id)
-    const merchant = profiles?.find((p) => p.id === booking.merchant_id)
-    return classifyEntityWithOwners({ is_test: listing?.is_test === true }, [renter ?? {}, merchant ?? {}])
-  }
-  // unity_commissions_one_transaction_chk enforces exactly one of
-  // order_id/booking_id -- reaching here should never happen. Fail
-  // safe, never guess real.
-  return 'unknown'
+  const [result] = await resolveUnityCommissionRealClassifications(admin, [commission])
+  return result
 }
 
 export interface AdminUnityCommissionRow {
@@ -281,7 +314,7 @@ export async function getRealUnityCommissionOverviewCounts(admin: SupabaseClient
   async function countReal(filter: (q: ReturnType<typeof baseQuery>) => typeof q): Promise<number> {
     const { data: rows } = await filter(baseQuery())
     if (!rows || rows.length === 0) return 0
-    const classifications = await Promise.all(rows.map((r) => resolveUnityCommissionRealClassification(admin, r)))
+    const classifications = await resolveUnityCommissionRealClassifications(admin, rows)
     return classifications.filter((c) => c === 'real').length
   }
   function baseQuery() {

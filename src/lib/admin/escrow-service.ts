@@ -23,61 +23,102 @@ const DEFAULT_LIMIT = 100
  * already established in src/lib/admin/rent-to-buy-service.ts) --
  * never an escrow-specific reimplementation.
  */
-async function resolveEscrowRealClassification(
+type EscrowClassificationInput = {
+  order_id: string | null
+  booking_id: string | null
+  barter_agreement_id: string | null
+  rent_to_buy_agreement_id: string | null
+}
+
+/**
+ * E49.2: batched across the whole row set (6 .in() queries total, one
+ * per referenced table) instead of the former per-row shape (up to 3
+ * queries for EVERY row) -- that N+1 pattern scaled directly with row
+ * count and was a secondary contributor (behind the unity_commissions
+ * equivalent) to the 5000+ Supabase requests measured for a single
+ * Admin Overview load once QA seeding had accumulated enough escrow
+ * rows. Same classification semantics (classifyEntityWithOwners,
+ * 'unknown' fail-safe).
+ */
+async function resolveEscrowRealClassifications(
   admin: SupabaseClient,
-  escrow: {
-    order_id: string | null
-    booking_id: string | null
-    barter_agreement_id: string | null
-    rent_to_buy_agreement_id: string | null
-  }
-): Promise<ProfileDataClassification> {
-  if (escrow.order_id) {
-    const { data: order } = await admin.from('orders').select('buyer_id, seller_id, listing_id').eq('id', escrow.order_id).maybeSingle()
-    if (!order) return 'unknown'
-    const [{ data: profiles }, { data: listing }] = await Promise.all([
-      admin.from('profiles').select('id, data_classification').in('id', [order.buyer_id, order.seller_id]),
-      admin.from('listings').select('is_test').eq('id', order.listing_id).maybeSingle(),
+  escrows: readonly EscrowClassificationInput[]
+): Promise<ProfileDataClassification[]> {
+  const orderIds = Array.from(new Set(escrows.filter((e) => e.order_id).map((e) => e.order_id as string)))
+  const bookingIds = Array.from(new Set(escrows.filter((e) => e.booking_id).map((e) => e.booking_id as string)))
+  const barterIds = Array.from(new Set(escrows.filter((e) => e.barter_agreement_id).map((e) => e.barter_agreement_id as string)))
+  const rtbIds = Array.from(new Set(escrows.filter((e) => e.rent_to_buy_agreement_id).map((e) => e.rent_to_buy_agreement_id as string)))
+
+  const [{ data: orders }, { data: bookings }, { data: barterAgreements }, { data: rtbAgreements }] = await Promise.all([
+    orderIds.length ? admin.from('orders').select('id, buyer_id, seller_id, listing_id').in('id', orderIds) : Promise.resolve({ data: [] }),
+    bookingIds.length ? admin.from('bookings').select('id, renter_id, merchant_id, listing_id').in('id', bookingIds) : Promise.resolve({ data: [] }),
+    barterIds.length ? admin.from('barter_agreements').select('id, party_a_id, party_b_id').in('id', barterIds) : Promise.resolve({ data: [] }),
+    rtbIds.length
+      ? admin.from('rent_to_buy_agreements').select('id, is_test, merchant_id, customer_id').in('id', rtbIds)
+      : Promise.resolve({ data: [] }),
+  ])
+  const orderById = new Map((orders ?? []).map((o) => [o.id, o]))
+  const bookingById = new Map((bookings ?? []).map((b) => [b.id, b]))
+  const barterById = new Map((barterAgreements ?? []).map((a) => [a.id, a]))
+  const rtbById = new Map((rtbAgreements ?? []).map((a) => [a.id, a]))
+
+  const profileIds = Array.from(
+    new Set([
+      ...(orders ?? []).flatMap((o) => [o.buyer_id, o.seller_id]),
+      ...(bookings ?? []).flatMap((b) => [b.renter_id, b.merchant_id]),
+      ...(barterAgreements ?? []).flatMap((a) => [a.party_a_id, a.party_b_id]),
+      ...(rtbAgreements ?? []).flatMap((a) => [a.merchant_id, a.customer_id]),
     ])
-    const buyer = profiles?.find((p) => p.id === order.buyer_id)
-    const seller = profiles?.find((p) => p.id === order.seller_id)
-    return classifyEntityWithOwners({ is_test: listing?.is_test === true }, [buyer ?? {}, seller ?? {}])
-  }
-  if (escrow.booking_id) {
-    const { data: booking } = await admin.from('bookings').select('renter_id, merchant_id, listing_id').eq('id', escrow.booking_id).maybeSingle()
-    if (!booking) return 'unknown'
-    const [{ data: profiles }, { data: listing }] = await Promise.all([
-      admin.from('profiles').select('id, data_classification').in('id', [booking.renter_id, booking.merchant_id]),
-      admin.from('listings').select('is_test').eq('id', booking.listing_id).maybeSingle(),
-    ])
-    const renter = profiles?.find((p) => p.id === booking.renter_id)
-    const merchant = profiles?.find((p) => p.id === booking.merchant_id)
-    return classifyEntityWithOwners({ is_test: listing?.is_test === true }, [renter ?? {}, merchant ?? {}])
-  }
-  if (escrow.barter_agreement_id) {
-    const { data: agreement } = await admin.from('barter_agreements').select('party_a_id, party_b_id').eq('id', escrow.barter_agreement_id).maybeSingle()
-    if (!agreement) return 'unknown'
-    const { data: profiles } = await admin.from('profiles').select('id, data_classification').in('id', [agreement.party_a_id, agreement.party_b_id])
-    const partyA = profiles?.find((p) => p.id === agreement.party_a_id)
-    const partyB = profiles?.find((p) => p.id === agreement.party_b_id)
-    return classifyEntityWithOwners({ is_test: false }, [partyA ?? {}, partyB ?? {}])
-  }
-  if (escrow.rent_to_buy_agreement_id) {
-    const { data: agreement } = await admin
-      .from('rent_to_buy_agreements')
-      .select('is_test, merchant_id, customer_id')
-      .eq('id', escrow.rent_to_buy_agreement_id)
-      .maybeSingle()
-    if (!agreement) return 'unknown'
-    const { data: profiles } = await admin.from('profiles').select('id, data_classification').in('id', [agreement.merchant_id, agreement.customer_id])
-    const merchant = profiles?.find((p) => p.id === agreement.merchant_id)
-    const customer = profiles?.find((p) => p.id === agreement.customer_id)
-    return classifyEntityWithOwners({ is_test: agreement.is_test === true }, [merchant ?? {}, customer ?? {}])
-  }
-  // Exactly one of order_id/booking_id/barter_agreement_id/
-  // rent_to_buy_agreement_id should always be set -- reaching here
-  // should never happen. Fail safe, never guess real.
-  return 'unknown'
+  )
+  const listingIds = Array.from(new Set([...(orders ?? []).map((o) => o.listing_id), ...(bookings ?? []).map((b) => b.listing_id)]))
+
+  const [{ data: profiles }, { data: listings }] = await Promise.all([
+    profileIds.length ? admin.from('profiles').select('id, data_classification').in('id', profileIds) : Promise.resolve({ data: [] }),
+    listingIds.length ? admin.from('listings').select('id, is_test').in('id', listingIds) : Promise.resolve({ data: [] }),
+  ])
+  const profileById = new Map((profiles ?? []).map((p) => [p.id, p]))
+  const listingIsTestById = new Map((listings ?? []).map((l) => [l.id, l.is_test]))
+
+  return escrows.map((escrow) => {
+    if (escrow.order_id) {
+      const order = orderById.get(escrow.order_id)
+      if (!order) return 'unknown'
+      const buyer = profileById.get(order.buyer_id) ?? {}
+      const seller = profileById.get(order.seller_id) ?? {}
+      return classifyEntityWithOwners({ is_test: listingIsTestById.get(order.listing_id) === true }, [buyer, seller])
+    }
+    if (escrow.booking_id) {
+      const booking = bookingById.get(escrow.booking_id)
+      if (!booking) return 'unknown'
+      const renter = profileById.get(booking.renter_id) ?? {}
+      const merchant = profileById.get(booking.merchant_id) ?? {}
+      return classifyEntityWithOwners({ is_test: listingIsTestById.get(booking.listing_id) === true }, [renter, merchant])
+    }
+    if (escrow.barter_agreement_id) {
+      const agreement = barterById.get(escrow.barter_agreement_id)
+      if (!agreement) return 'unknown'
+      const partyA = profileById.get(agreement.party_a_id) ?? {}
+      const partyB = profileById.get(agreement.party_b_id) ?? {}
+      return classifyEntityWithOwners({ is_test: false }, [partyA, partyB])
+    }
+    if (escrow.rent_to_buy_agreement_id) {
+      const agreement = rtbById.get(escrow.rent_to_buy_agreement_id)
+      if (!agreement) return 'unknown'
+      const merchant = profileById.get(agreement.merchant_id) ?? {}
+      const customer = profileById.get(agreement.customer_id) ?? {}
+      return classifyEntityWithOwners({ is_test: agreement.is_test === true }, [merchant, customer])
+    }
+    // Exactly one of order_id/booking_id/barter_agreement_id/
+    // rent_to_buy_agreement_id should always be set -- reaching here
+    // should never happen. Fail safe, never guess real.
+    return 'unknown'
+  })
+}
+
+/** Single-row convenience wrapper over resolveEscrowRealClassifications, for the detail-view call site where N is always 1 and batching has nothing to batch. */
+async function resolveEscrowRealClassification(admin: SupabaseClient, escrow: EscrowClassificationInput): Promise<ProfileDataClassification> {
+  const [result] = await resolveEscrowRealClassifications(admin, [escrow])
+  return result
 }
 
 export interface AdminEscrowRow {
@@ -376,7 +417,7 @@ export async function getRealEscrowOverviewCounts(admin: SupabaseClient): Promis
   async function countRealForStatuses(statuses: string[]): Promise<number> {
     const { data: rows } = await admin.from('escrow_transactions').select('order_id, booking_id, barter_agreement_id, rent_to_buy_agreement_id').in('status', statuses)
     if (!rows || rows.length === 0) return 0
-    const classifications = await Promise.all(rows.map((r) => resolveEscrowRealClassification(admin, r)))
+    const classifications = await resolveEscrowRealClassifications(admin, rows)
     return classifications.filter((c) => c === 'real').length
   }
 
