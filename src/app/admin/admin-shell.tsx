@@ -61,6 +61,7 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: t
       { href: '/admin/email-deliveries', label: 'Email Deliveries', icon: Inbox         },
       { href: '/admin/exceptions',       label: 'Exception Queue',  icon: AlertTriangle },
       { href: '/admin/audit',            label: 'Audit Log',        icon: ScrollText    },
+      { href: '/admin/security',         label: 'Security',         icon: Shield        },
     ],
   },
   {

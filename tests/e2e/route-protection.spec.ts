@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-const PROTECTED_PAGES = ['/dashboard/renter', '/dashboard/merchant', '/admin']
+const PROTECTED_PAGES = ['/dashboard/renter', '/dashboard/merchant', '/admin', '/admin/security']
 
 for (const path of PROTECTED_PAGES) {
   test(`unauthenticated visitor is redirected away from ${path}`, async ({ page }) => {
