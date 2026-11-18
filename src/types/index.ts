@@ -948,4 +948,25 @@ export const CATEGORIES = [
   { id: 'baby', label: 'Baby & Kids', icon: '🧸' },
 ] as const
 
+/**
+ * South Africa's 9 provinces. There is no canonical province picker
+ * anywhere in this codebase yet (merchants type province as free text
+ * in the listing wizard, src/app/[locale]/(dashboard)/dashboard/
+ * merchant/listings/new/create-listing-flow.tsx) -- this list exists
+ * for the search-side filter dropdown so a renter picks from a fixed
+ * set rather than retyping free text that would then have to
+ * case-insensitively match whatever a merchant happened to type.
+ */
+export const SA_PROVINCES = [
+  'Eastern Cape',
+  'Free State',
+  'Gauteng',
+  'KwaZulu-Natal',
+  'Limpopo',
+  'Mpumalanga',
+  'North West',
+  'Northern Cape',
+  'Western Cape',
+] as const
+
 export type CategoryId = typeof CATEGORIES[number]['id']

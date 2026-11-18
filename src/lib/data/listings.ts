@@ -13,7 +13,21 @@ export interface ListingFilters {
   query?: string
   minPrice?: number
   maxPrice?: number
-  location?: string
+  /** Whole-value match against listings.province (case-insensitive — province is merchant-entered free text, no canonical enum exists yet). */
+  province?: string
+  /** Partial/substring match against listings.city (case-insensitive — same free-text caveat as province). */
+  city?: string
+  /**
+   * Discovery-time availability filter (YYYY-MM-DD). Excludes listings
+   * with an overlapping merchant-blocked listing_availability range or
+   * an overlapping accepted/active booking — the same checks
+   * create_booking_request itself uses, reused here, not reimplemented.
+   * Non-authoritative: booking creation re-checks availability itself
+   * regardless of what search showed. Both dates must be supplied
+   * together or neither is applied.
+   */
+  startDate?: string
+  endDate?: string
   sort?: 'relevance' | 'price_asc' | 'price_desc' | 'newest' | 'rating'
   /**
    * Maps the browse-page Buy/Rent toggle to listing_type. 'rent' ->
@@ -51,6 +65,10 @@ function listingsSearchContextParams(filters: ListingFilters, resolvedSort: stri
     countryId: filters.countryId ?? null,
     minPrice: filters.minPrice ?? null,
     maxPrice: filters.maxPrice ?? null,
+    province: filters.province ?? null,
+    city: filters.city ?? null,
+    startDate: filters.startDate ?? null,
+    endDate: filters.endDate ?? null,
     sort: resolvedSort,
   }
 }
@@ -199,6 +217,17 @@ export async function getListingsPage(filters: ListingFilters = {}): Promise<Lis
     if (filters.maxPrice !== undefined) {
       results = results.filter((l) => l.daily_rate !== null && l.daily_rate <= filters.maxPrice!)
     }
+    if (filters.province) {
+      const p = filters.province.toLowerCase()
+      results = results.filter((l) => l.province?.toLowerCase() === p)
+    }
+    if (filters.city) {
+      const c = filters.city.toLowerCase()
+      results = results.filter((l) => l.city?.toLowerCase().includes(c))
+    }
+    // Mock mode has no booking/listing_availability fixtures to check
+    // overlap against, so a date range is a no-op here, matching the
+    // legacy rating-sort path's same documented limitation above.
 
     switch (filters.sort) {
       case 'price_asc':
@@ -235,6 +264,14 @@ export async function getListingsPage(filters: ListingFilters = {}): Promise<Lis
     if (filters.query) query = query.ilike('title', `%${filters.query}%`)
     if (filters.minPrice !== undefined) query = query.gte('daily_rate', filters.minPrice)
     if (filters.maxPrice !== undefined) query = query.lte('daily_rate', filters.maxPrice)
+    // Province/city match the RPC path's semantics (case-insensitive
+    // whole-value / partial match). Date-range availability is NOT
+    // applied here -- this legacy rating-sort path predates the RPC and
+    // has no equivalent overlap-check plumbing; 'rating' sort with a
+    // date range simply doesn't filter by availability, which is a
+    // narrower regression than filtering incorrectly.
+    if (filters.province) query = query.ilike('province', filters.province)
+    if (filters.city) query = query.ilike('city', `%${filters.city}%`)
     if (filters.mode === 'rent') query = query.in('listing_type', ['rental', 'both'])
     if (filters.mode === 'buy') query = query.in('listing_type', ['sale', 'both'])
     if (filters.countryId) query = query.eq('country_id', filters.countryId)
@@ -277,6 +314,10 @@ export async function getListingsPage(filters: ListingFilters = {}): Promise<Lis
     p_cursor_created_at: cursor?.createdAt ?? null,
     p_cursor_id: cursor?.id ?? null,
     p_limit: limit,
+    p_province: filters.province ?? null,
+    p_city: filters.city ?? null,
+    p_start_date: filters.startDate ?? null,
+    p_end_date: filters.endDate ?? null,
   })
 
   if (rpcError || !ranked || ranked.length === 0) return { items: [], nextCursor: null }

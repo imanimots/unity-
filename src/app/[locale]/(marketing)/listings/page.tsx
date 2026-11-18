@@ -42,7 +42,12 @@ interface PageProps {
     q?: string
     category?: string
     sort?: string
+    minPrice?: string
     maxPrice?: string
+    province?: string
+    city?: string
+    startDate?: string
+    endDate?: string
     mode?: string
     direction?: string
     kind?: string
@@ -82,7 +87,8 @@ export default async function ListingsPage({ searchParams }: PageProps) {
   // actually makes search/filter/sort/pagination legible. Both states
   // are real; neither replaces the other's functionality.
   const isDefaultView = !isLookingFor && !isSkillTask && !isBarter && mode === 'rent'
-    && !params.q && !params.category && !params.maxPrice && !params.cursor
+    && !params.q && !params.category && !params.minPrice && !params.maxPrice
+    && !params.province && !params.city && !params.startDate && !params.endDate && !params.cursor
 
   const { countryId } = await resolveEffectiveCountry()
 
@@ -90,7 +96,12 @@ export default async function ListingsPage({ searchParams }: PageProps) {
     query: params.q,
     category: params.category,
     sort: params.sort as ListingFilters['sort'],
+    minPrice: params.minPrice ? Number(params.minPrice) : undefined,
     maxPrice: params.maxPrice ? Number(params.maxPrice) : undefined,
+    province: params.province,
+    city: params.city,
+    startDate: params.startDate,
+    endDate: params.endDate,
     // Barter has no listing_type of its own. Rent now deliberately
     // includes ordinary rentals plus listings with enabled Rent-to-Buy
     // terms; the search_listings RPC owns that combined eligibility rule.
@@ -124,7 +135,10 @@ export default async function ListingsPage({ searchParams }: PageProps) {
   void recordSearchDemandEvent({
     mode: isBarter ? 'barter' : mode,
     category: params.category ?? null,
-    province: null,
+    // Was hardcoded null before this phase -- the search page had no
+    // province filter to source a real value from. Now that one
+    // exists (filters.province), demand telemetry reflects it.
+    province: params.province ?? null,
     zeroResult: isZeroResult,
   })
 

@@ -185,4 +185,26 @@ describe('getListings — country filtering is delegated to the search_listings 
     const filtered = await getListings({ countryId: 'NG' })
     expect(filtered).toEqual([])
   })
+
+  it('passes province/city/date-range filters through to search_listings', async () => {
+    const rpcCalls: Array<[string, unknown]> = []
+    vi.mocked(mockedCreateClient).mockResolvedValue(fakeClientCapturingRpcArgs(rpcCalls) as never)
+    await getListings({ province: 'Gauteng', city: 'Sandton', startDate: '2026-12-01', endDate: '2026-12-05' })
+    const args = rpcCalls[0][1] as Record<string, unknown>
+    expect(args.p_province).toBe('Gauteng')
+    expect(args.p_city).toBe('Sandton')
+    expect(args.p_start_date).toBe('2026-12-01')
+    expect(args.p_end_date).toBe('2026-12-05')
+  })
+
+  it('omitting province/city/dates passes null for all four, not undefined (RPC params must be explicit nulls)', async () => {
+    const rpcCalls: Array<[string, unknown]> = []
+    vi.mocked(mockedCreateClient).mockResolvedValue(fakeClientCapturingRpcArgs(rpcCalls) as never)
+    await getListings({})
+    const args = rpcCalls[0][1] as Record<string, unknown>
+    expect(args.p_province).toBeNull()
+    expect(args.p_city).toBeNull()
+    expect(args.p_start_date).toBeNull()
+    expect(args.p_end_date).toBeNull()
+  })
 })
