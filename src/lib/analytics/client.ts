@@ -3,6 +3,7 @@
 import type { AnalyticsEventName, AnalyticsEntityType } from './events'
 import { getOrCreateSessionId } from './session'
 import { sanitizeRoutePath } from './validation'
+import { hasAnalyticsConsent } from '@/lib/consent/preferences'
 
 export interface TrackEventOptions {
   entityType?: AnalyticsEntityType
@@ -27,6 +28,12 @@ function newEventId(): string {
 export function trackEvent(eventName: AnalyticsEventName, options: TrackEventOptions = {}): void {
   try {
     if (typeof window === 'undefined') return
+    // Platform improvement programme, Phase 3: the single gate every
+    // client-originated behavioral event passes through -- no consent
+    // yet, or consent declined, means this is a silent no-op, never a
+    // queued/retried send once consent later arrives (a later opt-in
+    // only affects events from that point forward).
+    if (!hasAnalyticsConsent()) return
 
     const payload = {
       eventId: newEventId(),

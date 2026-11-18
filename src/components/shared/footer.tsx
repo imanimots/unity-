@@ -2,6 +2,7 @@ import { useTranslations } from 'next-intl'
 import { Link } from '@/i18n/navigation'
 import { LanguageSelector } from '@/components/shared/language-selector'
 import { CountrySelector } from '@/components/shared/country-selector'
+import { CookiePreferencesLink } from '@/components/consent/cookie-preferences-link'
 
 export function Footer() {
   const t = useTranslations('navigation')
@@ -58,6 +59,7 @@ export function Footer() {
                 <li><Link href="/cancellations" className="text-sm text-[#6B5B55] hover:text-[#1A0A0A] transition-colors">{t('footer.cancellations')}</Link></li>
                 <li><Link href="/refunds" className="text-sm text-[#6B5B55] hover:text-[#1A0A0A] transition-colors">{t('footer.refunds')}</Link></li>
                 <li><Link href="/delivery-and-handover" className="text-sm text-[#6B5B55] hover:text-[#1A0A0A] transition-colors">{t('footer.deliveryAndHandover')}</Link></li>
+                <li><CookiePreferencesLink className="text-sm text-[#6B5B55] hover:text-[#1A0A0A] transition-colors" /></li>
               </ul>
             </div>
 
