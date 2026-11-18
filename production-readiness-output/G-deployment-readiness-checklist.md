@@ -46,6 +46,24 @@ Steps 4 and 5 are deliberately decoupled from step 1-3's main deployment — nei
 - **Migrations:** this project's standing forward-fix-only convention means a bad migration is fixed with a new, forward migration — never a destructive rollback migration. If a newly-deployed migration proves wrong, the correct response is a follow-up `CREATE OR REPLACE`/`ALTER TABLE` migration undoing the specific effect, reviewed with the same care as any other change.
 - **Config:** `ADMIN_MFA_ENFORCED` and the `vercel.json` cron entries are both trivially reversible (unset the env var; remove the cron lines) with no code redeploy needed.
 
+## Production risk classification
+
+Every planned production action from this and the prior session, classified Low/Medium/High/Critical:
+
+| Action | Risk | Why |
+|---|---|---|
+| Merging the 7 code/migration commits to `main` | **Medium** — reversible application change, but requires deployment review | Additive schema changes + new routes; no data-destructive step; standard review-before-merge applies |
+| The 5 migrations auto-applying via the GitHub deploy integration | **Medium** | Additive only (new tables/columns/indexes/trailing params) — no drop, no rename, no backfill; still a production database change and gets deployment review as a matter of course |
+| Editing `vercel.json` to add 2 cron lines | **Low** | Documentation-adjacent, fully reversible, no customer-facing effect |
+| Setting `ADMIN_MFA_ENFORCED=true` | **High** — authentication-enforcement change | Can lock out an admin if the rollout checklist wasn't followed; explicitly gated behind that checklist, never a same-step action with the code merge |
+| Provisioning a malware-scanning or error-monitoring vendor | **Low** (the signup/config itself) | No production data at risk from the act of provisioning; the *integration* once built would be Medium (touches the upload path) |
+| Running `scripts/search-scale-test.mjs` against the shared project | **Medium** — reversible, but writes real (if synthetic) data at volume to a shared environment, with real time cost | Not executed this session; would need your explicit sign-off first, consistent with its own Medium classification, not treated as routine |
+| Provisioning a genuinely separate production Supabase project | **Critical** — affects existing customer access and the entire data model's integrity going forward | This is the one item on this entire report that is a true architectural decision, not a configuration change; it is also the one no amount of further code work resolves on its own |
+| A real backup/restore test | **Critical**, if performed against anything other than a disposable copy; **Low**, if performed correctly (restore into a new, separate project, never over the live one) | The DR runbook's own §3 procedure exists specifically to keep this in the Low category by construction |
+| Rotating a compromised credential | **Critical** | Affects existing customer access if done without simultaneously updating the deployed environment; the DR runbook's §7 procedure names this explicitly |
+
+**No action in this list was executed at High or Critical risk this session.** Everything actually performed (the 9 committed files, the live read-only Supabase queries, the live E2E test runs) falls at Low or, at most, the Medium tier reserved for a reviewed-but-unmerged code change — consistent with this phase's own instruction not to execute material production changes merely because they passed local testing.
+
 ## Expected customer impact
 
 | Change | Customer-visible impact |
