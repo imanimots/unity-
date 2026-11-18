@@ -41,6 +41,18 @@ export const EVENT_METADATA_SCHEMAS: Record<AnalyticsEventName, z.ZodType> = {
   order_created: z.object({}).strict(),
   kyc_started: z.object({}).strict(),
   kyc_submitted: z.object({}).strict(),
+  // Platform improvement programme, Phase 3 additions. Same
+  // prohibitions as every event above: no PII, no raw free text, no
+  // payment credentials -- just the outcome classification itself.
+  payment_outcome: z.object({
+    status: z.enum(['captured', 'failed', 'requires_action']),
+    transaction_type: z.enum(['booking', 'order']).optional(),
+  }).strict(),
+  handover_confirmed: z.object({ role: z.enum(['renter', 'merchant']).optional() }).strict(),
+  return_confirmed: z.object({ role: z.enum(['renter', 'merchant']).optional() }).strict(),
+  refund_issued: z.object({}).strict(),
+  dispute_opened: z.object({ transaction_type: z.enum(['booking', 'order', 'barter', 'rent_to_buy']).optional() }).strict(),
+  payout_processed: z.object({}).strict(),
 }
 
 /** The top-level request shape the ingestion route accepts. Deliberately has no actorState/dataClassification/occurredAt field -- those are always server-derived, never read from the client even if present in the raw JSON body. */

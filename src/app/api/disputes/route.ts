@@ -5,6 +5,7 @@ import { openDisputeSchema } from '@/lib/disputes/validation'
 import { mapDisputeRpcError } from '@/lib/disputes/rpc-errors'
 import { computeOpenDisputeHash, checkIdempotentReplay } from '@/lib/disputes/idempotency'
 import { sendTemplate, loadDisputeEmailContext } from '@/lib/email'
+import { recordAnalyticsEvent, deriveActorState } from '@/lib/analytics/server'
 
 /**
  * POST /api/disputes -- open a dispute against a booking, order, or
@@ -120,6 +121,16 @@ export async function POST(request: NextRequest) {
     } catch (emailErr) {
       console.error('[disputes.open] email dispatch failed', { userId: requester.userId, emailErr })
     }
+
+    await recordAnalyticsEvent({
+      eventName: 'dispute_opened',
+      actorState: deriveActorState(requester.profile.role),
+      entityType: 'dispute',
+      entityId: data.dispute_id as string,
+      metadata: {
+        transaction_type: parsed.data.booking_id ? 'booking' : parsed.data.order_id ? 'order' : parsed.data.barter_agreement_id ? 'barter' : 'rent_to_buy',
+      },
+    }).catch(() => {})
 
     return NextResponse.json(data, { status: 201 })
   } catch (err) {

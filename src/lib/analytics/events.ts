@@ -34,9 +34,20 @@ export const ANALYTICS_EVENT_NAMES = [
   'order_created',
   'kyc_started',
   'kyc_submitted',
+  // Platform improvement programme, Phase 3: the post-booking/order
+  // fulfillment funnel (payment outcome through to payout) had zero
+  // instrumentation -- these 6 close that gap, following the exact
+  // same allowlist + strict-schema + service-role-only-write pattern
+  // as every event above.
+  'payment_outcome',
+  'handover_confirmed',
+  'return_confirmed',
+  'refund_issued',
+  'dispute_opened',
+  'payout_processed',
 ] as const
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENT_NAMES)[number]
 
-export const ANALYTICS_ENTITY_TYPES = ['listing', 'booking', 'order'] as const
+export const ANALYTICS_ENTITY_TYPES = ['listing', 'booking', 'order', 'dispute', 'payout'] as const
 export type AnalyticsEntityType = (typeof ANALYTICS_ENTITY_TYPES)[number]

@@ -8,6 +8,7 @@ import { sendTemplate, loadBookingEmailContext } from '@/lib/email'
 import { createMerchantPayout } from '@/lib/payments/orchestrator'
 import { notifyMerchantPayoutEvent } from '@/lib/payouts/notify'
 import { releaseEscrowForPayment } from '@/lib/escrow/orchestrator'
+import { recordAnalyticsEvent, deriveActorState } from '@/lib/analytics/server'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -137,6 +138,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     } catch (escrowErr) {
       console.error('[bookings.confirm-return] escrow release failed', { bookingId, escrowErr })
     }
+
+    await recordAnalyticsEvent({
+      eventName: 'return_confirmed',
+      actorState: deriveActorState(requester.profile.role),
+      entityType: 'booking',
+      entityId: bookingId,
+    }).catch(() => {})
 
     return NextResponse.json(data)
   } catch (err) {

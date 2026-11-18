@@ -11,6 +11,7 @@ import { triggerLazyExpirySweep } from '@/lib/bookings/lazy-expiry'
 import { checkAndRecordLateSuccessIfExpired } from '@/lib/bookings/late-payment-reconciliation'
 import { sendTemplate, loadBookingEmailContext } from '@/lib/email'
 import { blockIfCannotTransact } from '@/lib/admin/account-status'
+import { recordAnalyticsEvent, deriveActorState } from '@/lib/analytics/server'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -176,6 +177,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       console.error('[bookings.checkout] financially-ready email dispatch failed', { bookingId, emailErr })
     }
 
+    await recordAnalyticsEvent({
+      eventName: 'payment_outcome',
+      actorState: deriveActorState(requester.profile.role),
+      entityType: 'booking',
+      entityId: bookingId,
+      metadata: { status: 'captured', transaction_type: 'booking' },
+    }).catch(() => {})
+
     return NextResponse.json({
       status: 'success',
       readiness,
@@ -203,6 +212,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           rentalCaptured ? 'deposit.failed' : 'payment.declined',
           rentalCaptured ? 'deposit-failed-renter' : 'payment-declined-renter'
         )
+        await recordAnalyticsEvent({
+          eventName: 'payment_outcome',
+          actorState: deriveActorState(requester.profile.role),
+          entityType: 'booking',
+          entityId: bookingId,
+          metadata: { status: 'failed', transaction_type: 'booking' },
+        }).catch(() => {})
         return NextResponse.json({ status: 'failed_terminal', error: err.message }, { status: 200 })
       }
 

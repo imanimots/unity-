@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminForRoute, getAdminServiceClient, isValidUuid } from '@/lib/admin/route-helpers'
 import { completeDisputeFinancialDispositionSchema } from '@/lib/disputes/validation'
 import { completeDisputeRefundWithProvider, OrchestrationError, isRetryableOrchestrationError } from '@/lib/payments/orchestrator'
+import { recordAnalyticsEvent, deriveActorState } from '@/lib/analytics/server'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -77,6 +78,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       gate.requester.userId,
       parsed.data.idempotency_key
     )
+    if (result.status === 'completed') {
+      await recordAnalyticsEvent({
+        eventName: 'refund_issued',
+        actorState: deriveActorState(gate.requester.profile.role),
+        entityType: 'dispute',
+        entityId: disputeId,
+      }).catch(() => {})
+    }
     return NextResponse.json(result)
   } catch (err) {
     if (err instanceof OrchestrationError) {

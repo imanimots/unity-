@@ -4,6 +4,7 @@ import { adminMarkPaidSchema } from '@/lib/payouts/validation'
 import { mapPayoutRpcError } from '@/lib/payouts/rpc-errors'
 import { computeMarkPaidHash, checkIdempotentReplay } from '@/lib/payouts/idempotency'
 import { notifyMerchantPayoutEvent } from '@/lib/payouts/notify'
+import { recordAnalyticsEvent, deriveActorState } from '@/lib/analytics/server'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -74,6 +75,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   } catch (emailErr) {
     console.error('[admin.payouts.mark-paid] email dispatch failed', { payoutId, emailErr })
   }
+
+  await recordAnalyticsEvent({
+    eventName: 'payout_processed',
+    actorState: deriveActorState(gate.requester.profile.role),
+    entityType: 'payout',
+    entityId: payoutId,
+  }).catch(() => {})
 
   return NextResponse.json(data)
 }

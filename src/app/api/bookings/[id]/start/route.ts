@@ -9,6 +9,7 @@ import { triggerLazyExpirySweep } from '@/lib/bookings/lazy-expiry'
 import { getBookingFinancialEligibility } from '@/lib/checkout/readiness-gate'
 import { sendTemplate, loadBookingEmailContext } from '@/lib/email'
 import { blockIfCannotTransact } from '@/lib/admin/account-status'
+import { recordAnalyticsEvent, deriveActorState } from '@/lib/analytics/server'
 import type { KycStatus } from '@/types'
 
 interface RouteParams {
@@ -132,6 +133,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     } catch (emailErr) {
       console.error('[bookings.start] email dispatch failed', { bookingId, emailErr })
     }
+
+    await recordAnalyticsEvent({
+      eventName: 'handover_confirmed',
+      actorState: deriveActorState(requester.profile.role),
+      entityType: 'booking',
+      entityId: bookingId,
+      metadata: { role: bookingRow?.renter_id === requester.userId ? 'renter' : 'merchant' },
+    }).catch(() => {})
 
     return NextResponse.json(data)
   } catch (err) {

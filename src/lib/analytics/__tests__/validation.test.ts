@@ -95,6 +95,35 @@ describe('validateEventMetadata -- per-event allowlist (category: ADMIN-CONTROL-
       expect(result.ok, `${name} should reject a raw query-text field`).toBe(false)
     }
   })
+
+  // Platform improvement programme, Phase 3: the post-booking/order
+  // lifecycle events added alongside the original 16.
+  it('8. payment_outcome requires a valid status enum and rejects an arbitrary string', () => {
+    expect(validateEventMetadata('payment_outcome', { status: 'captured' }).ok).toBe(true)
+    expect(validateEventMetadata('payment_outcome', { status: 'captured', transaction_type: 'booking' }).ok).toBe(true)
+    expect(validateEventMetadata('payment_outcome', { status: 'success' }).ok).toBe(false)
+    expect(validateEventMetadata('payment_outcome', {}).ok).toBe(false)
+  })
+
+  it('9. handover_confirmed and return_confirmed accept an optional role, reject an unknown one', () => {
+    expect(validateEventMetadata('handover_confirmed', {}).ok).toBe(true)
+    expect(validateEventMetadata('handover_confirmed', { role: 'renter' }).ok).toBe(true)
+    expect(validateEventMetadata('handover_confirmed', { role: 'admin' }).ok).toBe(false)
+    expect(validateEventMetadata('return_confirmed', { role: 'merchant' }).ok).toBe(true)
+  })
+
+  it('10. dispute_opened accepts the 4 real transaction types, rejects an unknown one', () => {
+    for (const t of ['booking', 'order', 'barter', 'rent_to_buy']) {
+      expect(validateEventMetadata('dispute_opened', { transaction_type: t }).ok).toBe(true)
+    }
+    expect(validateEventMetadata('dispute_opened', { transaction_type: 'skill_task' }).ok).toBe(false)
+  })
+
+  it('11. refund_issued and payout_processed carry no metadata fields at all (the entity reference alone is sufficient, no financial figures duplicated into telemetry)', () => {
+    expect(validateEventMetadata('refund_issued', {}).ok).toBe(true)
+    expect(validateEventMetadata('payout_processed', {}).ok).toBe(true)
+    expect(validateEventMetadata('refund_issued', { amount: 100 }).ok).toBe(false)
+  })
 })
 
 describe('sanitizeRoutePath (category: ADMIN-CONTROL-CENTRE-BATCH-D2)', () => {
