@@ -82,14 +82,14 @@ as $$
         when n.q is null then 0
         when e.title_exact = n.q_exact then 3
         when e.search_vector @@ websearch_to_tsquery('english', n.q) then 2
-        when similarity(e.title, n.q) >= 0.3 then 1
+        when extensions.similarity(e.title, n.q) >= 0.3 then 1
         else null
       end as match_tier,
       case
         when n.q is null then 0::numeric(9, 6)
         when e.title_exact = n.q_exact then 1::numeric(9, 6)
         when e.search_vector @@ websearch_to_tsquery('english', n.q) then public._search_tier2_coverage_score(e.title, e.search_vector, n.q_lexemes)
-        else round(similarity(e.title, n.q)::numeric, 6)
+        else round(extensions.similarity(e.title, n.q)::numeric, 6)
       end as match_score
     from eligible e cross join normalized n
   )
@@ -197,14 +197,14 @@ as $$
         when n.q is null then 0
         when e.title_exact = n.q_exact then 3
         when e.search_vector @@ websearch_to_tsquery('english', n.q) then 2
-        when similarity(e.title, n.q) >= 0.3 then 1
+        when extensions.similarity(e.title, n.q) >= 0.3 then 1
         else null
       end as match_tier,
       case
         when n.q is null then 0::numeric(9, 6)
         when e.title_exact = n.q_exact then 1::numeric(9, 6)
         when e.search_vector @@ websearch_to_tsquery('english', n.q) then public._search_tier2_coverage_score(e.title, e.search_vector, n.q_lexemes)
-        else round(similarity(e.title, n.q)::numeric, 6)
+        else round(extensions.similarity(e.title, n.q)::numeric, 6)
       end as match_score
     from eligible e cross join normalized n
   )
