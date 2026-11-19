@@ -1,7 +1,16 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import { validateEnvironmentSeparation } from "./src/lib/env/environment-separation";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+
+// E49 Phase 3 item 11 -- fails the build/dev-server startup loudly if a
+// production deployment and a non-production one are ever pointed at
+// each other's Supabase project. A genuine no-op today (only one
+// project exists, PRODUCTION_SUPABASE_PROJECT_REF is unset) -- see
+// src/lib/env/environment-separation.ts's own doc comment for why this
+// is deliberately inert until a second project is actually provisioned.
+validateEnvironmentSeparation();
 
 const nextConfig: NextConfig = {
   images: {
