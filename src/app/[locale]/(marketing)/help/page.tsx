@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { getTranslations, getMessages } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
 import { HELP_TASKS } from '@/lib/help/task-registry'
+import { LEARN_ARTICLES } from '@/lib/help/learn-registry'
 import { HelpBrowser } from '@/components/help/help-browser'
 import { absoluteUrl, getDefaultRobotsMeta } from '@/lib/seo/config'
 
@@ -46,7 +47,7 @@ export default async function HelpCenterPage() {
 
       <div className="max-w-6xl mx-auto px-6 lg:px-12 py-6 pb-16">
         <NextIntlClientProvider messages={scoped}>
-          <HelpBrowser tasks={HELP_TASKS} />
+          <HelpBrowser tasks={HELP_TASKS} learnArticles={LEARN_ARTICLES} />
         </NextIntlClientProvider>
       </div>
     </div>

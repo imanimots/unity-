@@ -8,11 +8,52 @@ import {
   Home, Calendar, ShoppingBag, Package, Wallet, Repeat, HelpCircle,
   MessageCircle, AlertTriangle, Star, CreditCard, Link2, ShieldCheck, Settings,
 } from 'lucide-react'
-import type { HelpTask, HelpRole, HelpCategory } from '@/lib/help/types'
+import type { HelpTask, HelpRole, HelpCategory, LearnArticle } from '@/lib/help/types'
 import { CATEGORY_LABELS, CATEGORY_DESCRIPTIONS, ROLE_LABELS } from '@/lib/help/types'
 
 interface HelpBrowserProps {
   tasks: HelpTask[]
+  learnArticles: LearnArticle[]
+}
+
+/**
+ * Common shape both HelpTask and LearnArticle normalize into for
+ * search/filter/category-grouping purposes -- this is what lets one
+ * Help Center render both content types through the same component
+ * rather than two disconnected UIs (CORE CONTENT PRINCIPLE: How-To vs
+ * Learn are complementary content types within one Help Center, not
+ * two systems). `kind` is the only thing that changes card chrome
+ * (the How-To/Learn badge) and is never used to hide one type from
+ * the other's search results.
+ */
+interface SearchableItem {
+  id: string
+  slug: string
+  heading: string
+  summary: string
+  category: HelpCategory
+  role: HelpRole[]
+  providerDependency: HelpTask['providerDependency']
+  kind: 'how-to' | 'learn'
+  searchText: string
+}
+
+function toSearchable(task: HelpTask): SearchableItem {
+  return {
+    id: task.id, slug: task.slug, heading: task.iWantTo, summary: task.summary,
+    category: task.category, role: task.role, providerDependency: task.providerDependency,
+    kind: 'how-to',
+    searchText: [task.title, task.iWantTo, task.summary, CATEGORY_LABELS[task.category], ...task.keywords, ...task.role.map((r) => ROLE_LABELS[r])].join(' ').toLowerCase(),
+  }
+}
+
+function learnToSearchable(article: LearnArticle): SearchableItem {
+  return {
+    id: article.id, slug: article.slug, heading: article.title, summary: article.summary,
+    category: article.category, role: article.role, providerDependency: article.providerDependency,
+    kind: 'learn',
+    searchText: [article.title, article.summary, CATEGORY_LABELS[article.category], ...article.keywords, ...article.synonyms, ...article.role.map((r) => ROLE_LABELS[r])].join(' ').toLowerCase(),
+  }
 }
 
 const ROLES: HelpRole[] = ['guest', 'user', 'merchant', 'admin']
@@ -33,31 +74,41 @@ const CATEGORY_ICON: Record<HelpCategory, typeof Home> = {
   affiliate: Link2,
   'account-privacy': ShieldCheck,
   'admin-help': Settings,
+  'search-discovery': Search,
+  safety: ShieldCheck,
+  'payments-fees': CreditCard,
 }
 
-function matchesSearch(task: HelpTask, query: string): boolean {
+function matchesSearch(item: SearchableItem, query: string): boolean {
   if (!query) return true
-  const q = query.toLowerCase()
+  return item.searchText.includes(query.toLowerCase())
+}
+
+function KindBadge({ kind }: { kind: 'how-to' | 'learn' }) {
   return (
-    task.title.toLowerCase().includes(q) ||
-    task.iWantTo.toLowerCase().includes(q) ||
-    task.summary.toLowerCase().includes(q) ||
-    CATEGORY_LABELS[task.category].toLowerCase().includes(q) ||
-    task.keywords.some((k) => k.toLowerCase().includes(q)) ||
-    task.role.some((r) => ROLE_LABELS[r].toLowerCase().includes(q))
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.05em] ${
+        kind === 'learn' ? 'bg-[#8B1A1A]/10 text-[#8B1A1A]' : 'bg-[#F2EDE8] text-[#6B5B55]'
+      }`}
+    >
+      {kind === 'learn' ? 'Learn' : 'How-To'}
+    </span>
   )
 }
 
-function TaskRow({ task }: { task: HelpTask }) {
+function TaskRow({ item }: { item: SearchableItem }) {
   const t = useTranslations('help.helpCenterPage')
   return (
     <Link
-      href={`/help/${task.slug}`}
+      href={`/help/${item.slug}`}
       className="flex items-center justify-between gap-3 py-3 px-1 -mx-1 rounded-lg hover:bg-[#FAF8F5] transition-colors group"
     >
-      <span className="text-sm font-medium text-[#1A0A0A] group-hover:text-[#8B1A1A] transition-colors">{task.iWantTo}</span>
+      <span className="flex items-center gap-2 min-w-0">
+        <KindBadge kind={item.kind} />
+        <span className="text-sm font-medium text-[#1A0A0A] group-hover:text-[#8B1A1A] transition-colors truncate">{item.heading}</span>
+      </span>
       <span className="flex items-center gap-2 shrink-0">
-        {task.providerDependency && (
+        {item.providerDependency && (
           <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
             <Hourglass size={9} /> {t('providerPendingBadge')}
           </span>
@@ -68,18 +119,21 @@ function TaskRow({ task }: { task: HelpTask }) {
   )
 }
 
-function TaskCard({ task }: { task: HelpTask }) {
+function TaskCard({ item }: { item: SearchableItem }) {
   const t = useTranslations('help.helpCenterPage')
   return (
     <Link
-      href={`/help/${task.slug}`}
+      href={`/help/${item.slug}`}
       className="block h-full rounded-2xl border border-[#F2EDE8] bg-white p-5 hover:border-[#8B1A1A]/40 transition-colors"
     >
-      <p className="font-semibold text-sm text-[#1A0A0A]">{task.iWantTo}</p>
-      <p className="text-xs text-[#6B5B55] mt-1.5 leading-relaxed">{task.summary}</p>
+      <div className="flex items-center gap-2 mb-1.5">
+        <KindBadge kind={item.kind} />
+      </div>
+      <p className="font-semibold text-sm text-[#1A0A0A]">{item.heading}</p>
+      <p className="text-xs text-[#6B5B55] mt-1.5 leading-relaxed">{item.summary}</p>
       <div className="flex flex-wrap items-center gap-1.5 mt-3">
-        <span className="text-[10px] font-medium uppercase tracking-[0.05em] text-[#9B8B85]">{CATEGORY_LABELS[task.category]}</span>
-        {task.providerDependency && (
+        <span className="text-[10px] font-medium uppercase tracking-[0.05em] text-[#9B8B85]">{CATEGORY_LABELS[item.category]}</span>
+        {item.providerDependency && (
           <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
             <Hourglass size={9} /> {t('providerPendingBadge')}
           </span>
@@ -123,16 +177,21 @@ function SupportCard() {
  * reverts to a flat results list -- the same real-functionality-first
  * pattern used for Browse's default category rows vs. flat grid.
  */
-export function HelpBrowser({ tasks }: HelpBrowserProps) {
+export function HelpBrowser({ tasks, learnArticles }: HelpBrowserProps) {
   const t = useTranslations('help.helpCenterPage')
   const searchId = useId()
   const [query, setQuery] = useState('')
   const [role, setRole] = useState<HelpRole | 'all'>('all')
   const [category, setCategory] = useState<HelpCategory | 'all'>('all')
 
+  const allItems = useMemo(
+    () => [...tasks.map(toSearchable), ...learnArticles.map(learnToSearchable)],
+    [tasks, learnArticles]
+  )
+
   const roleFiltered = useMemo(
-    () => tasks.filter((task) => (role === 'all' || task.role.includes(role)) && matchesSearch(task, query)),
-    [tasks, query, role]
+    () => allItems.filter((item) => (role === 'all' || item.role.includes(role)) && matchesSearch(item, query)),
+    [allItems, query, role]
   )
 
   const categoriesWithTasks = useMemo(
@@ -259,8 +318,8 @@ export function HelpBrowser({ tasks }: HelpBrowserProps) {
                         </div>
                       </div>
                       <div className="divide-y divide-[#F2EDE8] mt-2">
-                        {categoryTasks.slice(0, 5).map((task) => (
-                          <TaskRow key={task.id} task={task} />
+                        {categoryTasks.slice(0, 5).map((item) => (
+                          <TaskRow key={item.id} item={item} />
                         ))}
                       </div>
                       {categoryTasks.length > 5 && (
@@ -277,8 +336,8 @@ export function HelpBrowser({ tasks }: HelpBrowserProps) {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {filtered.map((task) => (
-                  <TaskCard key={task.id} task={task} />
+                {filtered.map((item) => (
+                  <TaskCard key={item.id} item={item} />
                 ))}
               </div>
             )}

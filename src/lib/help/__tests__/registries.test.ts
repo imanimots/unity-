@@ -3,6 +3,7 @@ import { existsSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { SITEMAP_ENTRIES } from '../sitemap-registry'
 import { HELP_TASKS } from '../task-registry'
+import { LEARN_ARTICLES } from '../learn-registry'
 
 const REPO_ROOT = join(__dirname, '../../../..')
 
@@ -161,12 +162,82 @@ describe('help task registry', () => {
   })
 
   it('every category referenced by a task is a known HelpCategory', () => {
-    const KNOWN = new Set([
-      'getting-started', 'renting', 'buying', 'selling-listing', 'rent-to-buy',
-      'barter', 'looking-for', 'messages', 'problems-disputes', 'reviews',
-      'money-payouts', 'affiliate', 'account-privacy', 'admin-help',
-    ])
-    const unknown = HELP_TASKS.filter((t) => !KNOWN.has(t.category)).map((t) => t.id)
+    const unknown = HELP_TASKS.filter((t) => !KNOWN_CATEGORIES.has(t.category)).map((t) => t.id)
     expect(unknown).toEqual([])
+  })
+
+  it('every relatedLearnIds entry resolves to a real article in the Learn registry', () => {
+    const learnIds = new Set(LEARN_ARTICLES.map((a) => a.id))
+    const dangling = HELP_TASKS.flatMap((t) =>
+      (t.relatedLearnIds ?? []).filter((id) => !learnIds.has(id)).map((id) => `${t.id} -> ${id}`)
+    )
+    expect(dangling).toEqual([])
+  })
+})
+
+const KNOWN_CATEGORIES = new Set([
+  'getting-started', 'renting', 'buying', 'selling-listing', 'rent-to-buy',
+  'barter', 'looking-for', 'messages', 'problems-disputes', 'reviews',
+  'money-payouts', 'affiliate', 'account-privacy', 'admin-help',
+  'search-discovery', 'safety', 'payments-fees',
+])
+
+describe('help learn registry', () => {
+  it('every id and slug is unique within the Learn registry', () => {
+    const ids = LEARN_ARTICLES.map((a) => a.id)
+    const slugs = LEARN_ARTICLES.map((a) => a.slug)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(new Set(slugs).size).toBe(slugs.length)
+  })
+
+  it('no Learn article slug collides with a How-To task slug (they share one /help/[slug] route namespace)', () => {
+    const taskSlugs = new Set(HELP_TASKS.map((t) => t.slug))
+    const collisions = LEARN_ARTICLES.filter((a) => taskSlugs.has(a.slug)).map((a) => a.slug)
+    expect(collisions).toEqual([])
+  })
+
+  it('every relatedTaskIds entry resolves to a real task in the registry', () => {
+    const taskIds = new Set(HELP_TASKS.map((t) => t.id))
+    const dangling = LEARN_ARTICLES.flatMap((a) =>
+      (a.relatedTaskIds ?? []).filter((id) => !taskIds.has(id)).map((id) => `${a.id} -> ${id}`)
+    )
+    expect(dangling).toEqual([])
+  })
+
+  it('every relatedLearnIds entry resolves to a real article in the registry (and never points at itself)', () => {
+    const learnIds = new Set(LEARN_ARTICLES.map((a) => a.id))
+    const dangling: string[] = []
+    for (const a of LEARN_ARTICLES) {
+      for (const id of a.relatedLearnIds ?? []) {
+        if (id === a.id) dangling.push(`${a.id} -> self`)
+        else if (!learnIds.has(id)) dangling.push(`${a.id} -> ${id}`)
+      }
+    }
+    expect(dangling).toEqual([])
+  })
+
+  it('every category referenced by a Learn article is a known HelpCategory', () => {
+    const unknown = LEARN_ARTICLES.filter((a) => !KNOWN_CATEGORIES.has(a.category)).map((a) => a.id)
+    expect(unknown).toEqual([])
+  })
+
+  it('every Learn article has at least one section, or a definitions list (Glossary), but not neither', () => {
+    const empty = LEARN_ARTICLES.filter((a) => a.sections.length === 0 && (!a.definitions || a.definitions.length === 0)).map((a) => a.id)
+    expect(empty).toEqual([])
+  })
+
+  it('Rent-to-Buy is explained as part of Rent, never as a standalone fourth mode', () => {
+    const rtbArticle = LEARN_ARTICLES.find((a) => a.id === 'learn-buy-rent-barter-rtb')
+    expect(rtbArticle).toBeDefined()
+    const text = rtbArticle!.sections.flatMap((s) => s.body).join(' ').toLowerCase()
+    expect(text).toMatch(/feature of rent|part of rent|not a separate|not a fourth/)
+  })
+
+  it('no payments/logistics/KYC article names a specific provider as the live production authority', () => {
+    const bannedClaims = /peach is|payfast is|tradesafe is live|bob go is live|sumsub is/i
+    for (const a of LEARN_ARTICLES) {
+      const text = [a.summary, ...a.sections.flatMap((s) => s.body), ...(a.quickAnswer ?? [])].join(' ')
+      expect(text).not.toMatch(bannedClaims)
+    }
   })
 })
