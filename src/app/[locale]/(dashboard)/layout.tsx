@@ -53,6 +53,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             rentToBuyEnabled={isRentToBuyEnabled()}
             personalizationEnabled={isPersonalizationEnabled()}
             ambassadorUrl={process.env.NEXT_PUBLIC_WARP_AFFILIATE_URL}
+            accountStatus={auth.profile.account_status}
           >
             {children}
           </AccountShell>

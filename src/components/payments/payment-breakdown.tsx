@@ -3,6 +3,8 @@ import type { Locale } from '@/i18n/locales'
 import { PaymentStatusBadge } from './payment-status-badge'
 import type { PaymentStatus } from '@/lib/checkout/financial-readiness'
 import { formatMoneyFromRands, formatDate } from '@/lib/i18n/format'
+import { ContextualHelp } from '@/components/ui/contextual-help'
+import { CONTEXTUAL_COPY } from '@/lib/help/contextual-copy'
 
 interface Props {
   bookingReference: string | null
@@ -72,12 +74,24 @@ export function PaymentBreakdown(props: Props) {
         </div>
         {platformFeeAmount !== null && platformFeeAmount > 0 && (
           <div className="flex items-center justify-between text-sm">
-            <span className="text-[#6B5B55]">{t('platformFee')}</span>
+            <span className="text-[#6B5B55] flex items-center gap-1">
+              {t('platformFee')}
+              <ContextualHelp label={CONTEXTUAL_COPY.platformFee.label} learnMoreHref={CONTEXTUAL_COPY.platformFee.learnMoreHref}>
+                {CONTEXTUAL_COPY.platformFee.text}
+              </ContextualHelp>
+            </span>
             <span className="text-[#1A0A0A] font-medium">{money(platformFeeAmount, currency)}</span>
           </div>
         )}
         <div className="flex items-center justify-between text-sm">
-          <span className="text-[#6B5B55]">{t('depositRefundable')}</span>
+          <span className="text-[#6B5B55] flex items-center gap-1">
+            {t('depositRefundable')}
+            {depositAmount !== null && depositAmount > 0 && (
+              <ContextualHelp label={CONTEXTUAL_COPY.rentalDeposit.label} learnMoreHref={CONTEXTUAL_COPY.rentalDeposit.learnMoreHref}>
+                {CONTEXTUAL_COPY.rentalDeposit.text}
+              </ContextualHelp>
+            )}
+          </span>
           <span className="text-[#1A0A0A] font-medium">{depositAmount && depositAmount > 0 ? money(depositAmount, currency) : t('none')}</span>
         </div>
         <div className="flex items-center justify-between text-base pt-2 border-t border-[#F2EDE8]">

@@ -13,6 +13,8 @@ import type { Locale } from '@/i18n/locales'
 import { ProfileActions } from '@/components/profile/profile-actions'
 import { ProfileTabs } from '@/components/profile/profile-tabs'
 import { EliteBadge } from '@/components/subscriptions/elite-badge'
+import { ContextualHelp } from '@/components/ui/contextual-help'
+import { CONTEXTUAL_COPY } from '@/lib/help/contextual-copy'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -134,6 +136,9 @@ export default async function PublicProfilePage({ params }: Props) {
                 {profile.isVerified && (
                   <span className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.08em] text-green-700 bg-green-50 px-2.5 py-1 rounded-full">
                     <ShieldCheck size={12} aria-hidden="true" /> {t('verified')}
+                    <ContextualHelp label={CONTEXTUAL_COPY.verification.label} learnMoreHref={CONTEXTUAL_COPY.verification.learnMoreHref}>
+                      {CONTEXTUAL_COPY.verification.text}
+                    </ContextualHelp>
                   </span>
                 )}
                 {profile.isMerchant && (

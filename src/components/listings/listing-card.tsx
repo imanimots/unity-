@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useTranslations } from 'next-intl'
 import { Link } from '@/i18n/navigation'
-import { ShieldCheck, Star, MapPin, Heart } from 'lucide-react'
+import { ShieldCheck, Star, MapPin } from 'lucide-react'
 import type { Listing } from '@/types'
 import { CATEGORIES } from '@/types'
 import { deriveListingRatingDisplay } from '@/lib/listings/rating-display'
@@ -104,15 +104,6 @@ export function ListingCard({ listing, priority = false, verifiedLabel }: Listin
             </span>
           )}
         </div>
-
-        {/* Wishlist */}
-        <button
-          onClick={(e) => e.preventDefault()}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/95 backdrop-blur-sm flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
-          aria-label="Save to wishlist"
-        >
-          <Heart size={14} className="text-[#9B8B85] hover:text-red-500 transition-colors" />
-        </button>
       </div>
 
       {/* Info */}

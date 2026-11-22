@@ -7,17 +7,20 @@ import { AlertTriangle } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 
 interface OpenDisputeDialogProps {
-  transactionType: 'booking' | 'order' | 'barter'
+  transactionType: 'booking' | 'order' | 'barter' | 'rent_to_buy'
   transactionId: string
   className?: string
   triggerLabel?: string
 }
 
 /**
- * The one shared "raise a dispute" entry point for all three transaction
- * types -- booking/order/barter actions components each render this
- * with their own transactionType/transactionId rather than three
- * near-duplicate dialogs.
+ * The one shared "raise a dispute" entry point for all four transaction
+ * types -- booking/order/barter/rent_to_buy actions components each
+ * render this with their own transactionType/transactionId rather than
+ * near-duplicate dialogs. /api/disputes already accepts
+ * rent_to_buy_agreement_id (see route.ts) -- rent_to_buy was simply never
+ * wired into this shared trigger before (customer-journey mapping
+ * finding: RTB had full backend dispute support but no UI entry point).
  */
 export function OpenDisputeDialog({ transactionType, transactionId, className, triggerLabel }: OpenDisputeDialogProps) {
   const router = useRouter()
@@ -42,7 +45,8 @@ export function OpenDisputeDialog({ transactionType, transactionId, className, t
       }
       if (transactionType === 'booking') body.booking_id = transactionId
       else if (transactionType === 'order') body.order_id = transactionId
-      else body.barter_agreement_id = transactionId
+      else if (transactionType === 'barter') body.barter_agreement_id = transactionId
+      else body.rent_to_buy_agreement_id = transactionId
 
       const res = await fetch('/api/disputes', {
         method: 'POST',
@@ -104,6 +108,7 @@ export function OpenDisputeDialog({ transactionType, transactionId, className, t
               <label htmlFor="dispute-description" className="block text-sm font-medium text-[#1A0A0A] mb-1.5">
                 {t('descriptionLabel')}
               </label>
+              <p className="text-xs text-[#9B8B85] mb-1.5">Describe what happened and include relevant dates, messages, and transaction details.</p>
               <textarea
                 id="dispute-description"
                 required

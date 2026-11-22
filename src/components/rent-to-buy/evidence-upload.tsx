@@ -5,6 +5,7 @@ import { useRouter } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { validateRentToBuyEvidenceFile, sanitizeRtbEvidenceExtension, ALLOWED_RTB_EVIDENCE_MIME_TYPES, MAX_RTB_EVIDENCE_SIZE_BYTES } from '@/lib/rent-to-buy/evidence-upload'
+import { CONTEXTUAL_COPY } from '@/lib/help/contextual-copy'
 
 interface Props {
   agreementId: string
@@ -84,6 +85,7 @@ export function RentToBuyEvidenceUpload({ agreementId, userId, evidenceType, lab
   return (
     <div className="space-y-1.5">
       <label className="block text-xs font-semibold uppercase tracking-wide text-[#6B5B55]">{label}</label>
+      <p className="text-xs text-[#9B8B85]">{CONTEXTUAL_COPY.disputeEvidence.text}</p>
       <input
         type="file"
         accept={ALLOWED_RTB_EVIDENCE_MIME_TYPES.join(',')}

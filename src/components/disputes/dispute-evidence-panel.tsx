@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { FileText, Image as ImageIcon, Upload } from 'lucide-react'
 import { validateEvidenceFile, uploadDisputeEvidence, MAX_EVIDENCE_SIZE_BYTES } from '@/lib/disputes/evidence'
 import { EvidenceAccessButton } from '@/components/shared/evidence-access-button'
+import { CONTEXTUAL_COPY } from '@/lib/help/contextual-copy'
 import type { DisputeEvidence } from '@/types'
 
 interface DisputeEvidencePanelLabels {
@@ -107,11 +108,14 @@ export function DisputeEvidencePanel({ disputeId, currentUserId, evidence, canUp
       )}
 
       {canUpload && (
-        <label className="flex items-center justify-center gap-2 py-2.5 border border-dashed border-[#E8E0D8] rounded-lg text-sm text-[#6B5B55] cursor-pointer hover:bg-[#FAF8F5] transition-colors">
-          <Upload size={14} />
-          {uploading ? l.uploading : l.uploadEvidence}
-          <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={handleFileSelected} disabled={uploading} />
-        </label>
+        <>
+          <p className="text-xs text-[#9B8B85] mb-2">{CONTEXTUAL_COPY.disputeEvidence.text}</p>
+          <label className="flex items-center justify-center gap-2 py-2.5 border border-dashed border-[#E8E0D8] rounded-lg text-sm text-[#6B5B55] cursor-pointer hover:bg-[#FAF8F5] transition-colors">
+            <Upload size={14} />
+            {uploading ? l.uploading : l.uploadEvidence}
+            <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={handleFileSelected} disabled={uploading} />
+          </label>
+        </>
       )}
       {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
     </div>

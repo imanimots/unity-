@@ -3,6 +3,14 @@
 import { useState } from 'react'
 import { useRouter } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
+import { OpenDisputeDialog } from '@/components/disputes/open-dispute-dialog'
+
+/** A dispute only makes sense once the agreement has actually been
+ * accepted -- mirrors booking/order/barter's own exclusion of pure-
+ * negotiation states. open_dispute()'s own hard rule is simpler (any
+ * status except an already-open dispute), so this UI gate is narrower
+ * than the backend, never the reverse. */
+const RTB_DISPUTABLE_STATUSES = ['awaiting_first_payment', 'active', 'defaulted', 'return_required', 'completed']
 
 type RtbTestScenario = 'success' | 'declined'
 
@@ -136,6 +144,9 @@ export function RentToBuyAgreementActions({
         )}
         {isMerchant && status === 'active' && ownershipStatus === 'merchant_owned' && !showDefaultConfirm && (
           <button className={danger} disabled={busy !== null} onClick={() => setShowDefaultConfirm(true)}>{t('actions.initiateDefault')}</button>
+        )}
+        {(isMerchant || isCustomer) && RTB_DISPUTABLE_STATUSES.includes(status) && (
+          <OpenDisputeDialog transactionType="rent_to_buy" transactionId={agreementId} className={`inline-flex items-center gap-1.5 ${secondary}`} />
         )}
       </div>
 

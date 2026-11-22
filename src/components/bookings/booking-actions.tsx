@@ -3,9 +3,21 @@
 import { useState } from 'react'
 import { useRouter, Link } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
-import { Check, X, Play, PackageCheck, Ban, CreditCard, MessageCircle } from 'lucide-react'
+import { Check, X, Play, PackageCheck, Ban, CreditCard, MessageCircle, Camera } from 'lucide-react'
 import type { BookingLifecycleStatus } from '@/lib/bookings/status-labels'
 import { OpenDisputeDialog } from '@/components/disputes/open-dispute-dialog'
+import { ConfirmActionDialog } from '@/components/ui/confirm-action-dialog'
+
+/** Pre-handover condition evidence is eligible at these statuses --
+ * mirrors src/lib/bookings/evidence-eligibility.ts's PRE_HANDOVER_ELIGIBLE_STATUSES
+ * exactly, so this link only ever appears when the page behind it would
+ * actually let the user upload something. */
+const PRE_HANDOVER_EVIDENCE_STATUSES: BookingLifecycleStatus[] = ['accepted', 'active']
+/** Post-return condition evidence is eligible from return_pending onward
+ * (see evidence-eligibility.ts's POST_RETURN_ELIGIBLE_STATUSES) -- this
+ * component only renders actions through return_pending, so that's the
+ * one status where surfacing the link here actually matters. */
+const POST_RETURN_EVIDENCE_STATUSES: BookingLifecycleStatus[] = ['return_pending']
 
 /** A dispute only makes sense once the transaction has actually progressed past pure negotiation. */
 const DISPUTABLE_STATUSES: BookingLifecycleStatus[] = ['active', 'return_pending', 'returned', 'completed']
@@ -27,10 +39,10 @@ interface Props {
 
 type ActionKind = 'accept' | 'reject' | 'cancel' | 'start' | 'return' | 'confirm-return' | 'checkout'
 
-const ACTION_META: Record<ActionKind, { labelKey: string; icon: typeof Check; classes: string; promptReason?: boolean }> = {
+const ACTION_META: Record<ActionKind, { labelKey: string; icon: typeof Check; classes: string }> = {
   accept: { labelKey: 'accept', icon: Check, classes: 'bg-green-600 hover:bg-green-700 text-white' },
-  reject: { labelKey: 'decline', icon: X, classes: 'border border-[#F2EDE8] text-[#1A0A0A] hover:bg-[#FAF8F5]', promptReason: true },
-  cancel: { labelKey: 'cancelBooking', icon: Ban, classes: 'border border-[#F2EDE8] text-[#1A0A0A] hover:bg-[#FAF8F5]', promptReason: true },
+  reject: { labelKey: 'decline', icon: X, classes: 'border border-[#F2EDE8] text-[#1A0A0A] hover:bg-[#FAF8F5]' },
+  cancel: { labelKey: 'cancelBooking', icon: Ban, classes: 'border border-[#F2EDE8] text-[#1A0A0A] hover:bg-[#FAF8F5]' },
   start: { labelKey: 'startRental', icon: Play, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
   return: { labelKey: 'initiateReturn', icon: PackageCheck, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
   'confirm-return': { labelKey: 'confirmReturn', icon: Check, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
@@ -65,30 +77,35 @@ function availableActions(status: BookingLifecycleStatus, role: 'renter' | 'merc
   return []
 }
 
+/** Actions whose consequences must be disclosed before firing -- see the
+ * customer-journey mapping's systemic "no confirmation dialog anywhere"
+ * finding. "accept"/"start" are deliberately excluded: they're
+ * commitments the actor is actively seeking, not a destructive/
+ * irreversible change to something already agreed. */
+const CONSEQUENTIAL_ACTIONS: ActionKind[] = ['reject', 'cancel', 'confirm-return']
+
 export function BookingActions({ bookingId, status, role, financiallyReady = false }: Props) {
   const router = useRouter()
   const t = useTranslations('rent')
   const tErrors = useTranslations('errors')
   const [pending, setPending] = useState<ActionKind | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState<ActionKind | null>(null)
+  const [reason, setReason] = useState('')
 
   const actions = availableActions(status, role, financiallyReady)
   const showDispute = DISPUTABLE_STATUSES.includes(status)
+  const showPreHandoverEvidence = PRE_HANDOVER_EVIDENCE_STATUSES.includes(status)
+  const showPostReturnEvidence = POST_RETURN_EVIDENCE_STATUSES.includes(status)
+  const mediaBase = role === 'renter' ? '/dashboard/renter/bookings' : '/dashboard/merchant/bookings'
 
-  async function run(action: ActionKind) {
-    const meta = ACTION_META[action]
-    let reason: string | null = null
-    if (meta.promptReason) {
-      reason = window.prompt(action === 'reject' ? t('actions.declineReasonPrompt') : t('actions.cancelReasonPrompt'))
-      if (reason === null) return // user hit cancel on the prompt itself
-    }
-
+  async function run(action: ActionKind, actionReason: string | null) {
     setPending(action)
     setError(null)
     try {
       const body: Record<string, string> = { idempotency_key: crypto.randomUUID() }
-      if (action === 'reject' && reason) body.rejection_reason = reason
-      if (action === 'cancel' && reason) body.cancellation_reason = reason
+      if (action === 'reject' && actionReason) body.rejection_reason = actionReason
+      if (action === 'cancel' && actionReason) body.cancellation_reason = actionReason
 
       const res = await fetch(`/api/bookings/${bookingId}/${action}`, {
         method: 'POST',
@@ -100,12 +117,47 @@ export function BookingActions({ bookingId, status, role, financiallyReady = fal
         setError(data.error ?? tErrors('generic'))
         return
       }
+      setConfirming(null)
+      setReason('')
       router.refresh()
     } catch {
       setError(tErrors('network'))
     } finally {
       setPending(null)
     }
+  }
+
+  function handleClick(action: ActionKind) {
+    if (CONSEQUENTIAL_ACTIONS.includes(action)) {
+      setError(null)
+      setReason('')
+      setConfirming(action)
+      return
+    }
+    run(action, null)
+  }
+
+  /** Real, state-derived consequence text -- never a hardcoded refund
+   * promise. `financiallyReady` already reflects whether payment has
+   * actually been collected on this booking (see the Props doc comment
+   * above), so cancelling before vs. after payment gets genuinely
+   * different, accurate copy instead of one invented sentence. */
+  function consequenceFor(action: ActionKind): string {
+    if (action === 'reject') {
+      return 'This booking has not been paid for yet -- declining it notifies the renter and ends the request. No payment is affected.'
+    }
+    if (action === 'cancel') {
+      return financiallyReady
+        ? 'This booking has already been paid for. Cancelling now follows Unity’s standard cancellation and refund policy for the stage this booking is at.'
+        : 'No payment has been collected on this booking yet, so cancelling now does not involve a refund.'
+    }
+    return 'Confirming triggers deposit release once the item’s condition is reviewed, and finalizes this booking as returned.'
+  }
+
+  const dialogMeta: Record<string, { title: string; confirmLabel: string }> = {
+    reject: { title: 'Decline this booking request?', confirmLabel: 'Decline request' },
+    cancel: { title: 'Cancel this booking?', confirmLabel: 'Cancel booking' },
+    'confirm-return': { title: 'Confirm this item was returned?', confirmLabel: 'Confirm return' },
   }
 
   return (
@@ -131,7 +183,7 @@ export function BookingActions({ bookingId, status, role, financiallyReady = fal
           return (
             <button
               key={action}
-              onClick={() => run(action)}
+              onClick={() => handleClick(action)}
               disabled={pending !== null}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] rounded-lg transition-colors disabled:opacity-50 ${meta.classes}`}
             >
@@ -140,7 +192,19 @@ export function BookingActions({ bookingId, status, role, financiallyReady = fal
           )
         })}
       </div>
-      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+      {error && !confirming && <p className="text-xs text-red-600 mt-2">{error}</p>}
+
+      {(showPreHandoverEvidence || showPostReturnEvidence) && (
+        <div className="mt-3">
+          <Link
+            href={`${mediaBase}/${bookingId}/media`}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#8B1A1A] hover:underline"
+          >
+            <Camera size={13} /> {showPreHandoverEvidence ? 'Document item condition' : 'Add return evidence'}
+          </Link>
+        </div>
+      )}
+
       <div className="mt-3 flex flex-wrap items-center gap-4">
         <Link
           href={`/chat?booking=${bookingId}`}
@@ -157,6 +221,30 @@ export function BookingActions({ bookingId, status, role, financiallyReady = fal
           />
         )}
       </div>
+
+      {confirming && (
+        <ConfirmActionDialog
+          open
+          onOpenChange={(open) => !open && setConfirming(null)}
+          title={dialogMeta[confirming].title}
+          consequence={consequenceFor(confirming)}
+          reason={
+            confirming === 'confirm-return'
+              ? undefined
+              : {
+                  value: reason,
+                  onChange: setReason,
+                  label: 'Reason (optional)',
+                  placeholder: confirming === 'reject' ? 'Let the renter know why' : 'Let the other party know why',
+                }
+          }
+          confirmLabel={dialogMeta[confirming].confirmLabel}
+          destructive={confirming !== 'confirm-return'}
+          submitting={pending === confirming}
+          error={error}
+          onConfirm={() => run(confirming, reason.trim() || null)}
+        />
+      )}
     </div>
   )
 }

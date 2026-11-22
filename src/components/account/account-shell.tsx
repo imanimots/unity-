@@ -1,15 +1,25 @@
 'use client'
 
 import { useState } from 'react'
-import { Menu, X } from 'lucide-react'
+import { Menu, X, ShieldAlert } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { AccountSidebarContent, type AccountSidebarProfile } from './account-sidebar-content'
+import { Link } from '@/i18n/navigation'
+import { ACCOUNT_STATUS_NOTICE } from '@/lib/help/contextual-copy'
 
 interface AccountShellProps {
   profile: AccountSidebarProfile
   rentToBuyEnabled: boolean
   personalizationEnabled: boolean
   ambassadorUrl: string | undefined
+  /** 'active' (or undefined) renders nothing -- see
+   * src/lib/admin/account-status.ts for what each state actually
+   * blocks. The banner is purely informational; the real gate is
+   * server-side (blockIfCannotCreate/blockIfCannotTransact), so it
+   * disappears on its own the next time this layout renders once the
+   * account's status changes back to 'active' -- never a client-side
+   * toggle to maintain. */
+  accountStatus?: 'active' | 'restricted' | 'suspended' | 'erased'
   children: React.ReactNode
 }
 
@@ -21,12 +31,24 @@ interface AccountShellProps {
  * 390px screen). Every (dashboard) page renders through this once, from
  * the shared (dashboard)/layout.tsx.
  */
-export function AccountShell({ profile, rentToBuyEnabled, personalizationEnabled, ambassadorUrl, children }: AccountShellProps) {
+export function AccountShell({ profile, rentToBuyEnabled, personalizationEnabled, ambassadorUrl, accountStatus, children }: AccountShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const { signOut } = useAuth()
+  const statusNotice = accountStatus === 'restricted' || accountStatus === 'suspended' ? ACCOUNT_STATUS_NOTICE[accountStatus] : null
 
   return (
     <div className="max-w-[1400px] mx-auto">
+      {statusNotice && (
+        <div className="mx-4 sm:mx-6 lg:ml-8 mb-4 flex items-start gap-2.5 px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 text-sm text-amber-900">
+          <ShieldAlert size={16} className="shrink-0 mt-0.5 text-amber-600" />
+          <p className="flex-1">
+            {statusNotice.text}{' '}
+            <Link href={statusNotice.learnMoreHref} className="font-semibold underline">
+              Learn more
+            </Link>
+          </p>
+        </div>
+      )}
       {/* Mobile account bar — avatar + name + menu trigger, opens the
           drawer. Margin only (not padding) since <main> deliberately
           carries none here -- every (dashboard) page already applies its

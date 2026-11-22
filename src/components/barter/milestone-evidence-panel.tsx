@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { FileText, Image as ImageIcon, Upload } from 'lucide-react'
 import { validateMilestoneEvidenceFile, uploadMilestoneEvidence } from '@/lib/barter/skill-task-evidence'
 import { EvidenceAccessButton } from '@/components/shared/evidence-access-button'
+import { CONTEXTUAL_COPY } from '@/lib/help/contextual-copy'
 import type { BarterMilestoneEvidence } from '@/types'
 
 export interface MilestoneEvidencePanelLabels {
@@ -109,9 +110,10 @@ export function MilestoneEvidencePanel({ agreementId, milestoneId, currentUserId
 
       {canUpload && (
         <>
-          <p className="text-[11px] text-[#9B8B85] mb-1.5">
+          <p className="text-[11px] text-[#9B8B85] mb-1">
             {labels?.disclaimer ?? "Only upload evidence that's genuinely relevant to this milestone. Evidence is visible to both parties and Unity admins, and cannot be deleted once uploaded."}
           </p>
+          <p className="text-[11px] text-[#9B8B85] mb-1.5">{CONTEXTUAL_COPY.disputeEvidence.text}</p>
           <label className="flex items-center justify-center gap-2 py-2 border border-dashed border-[#E8E0D8] rounded-lg text-xs text-[#6B5B55] cursor-pointer hover:bg-[#FAF8F5] transition-colors">
             <Upload size={13} />
             {uploading ? (labels?.uploading ?? 'Uploading…') : (labels?.uploadEvidence ?? 'Upload evidence (image or PDF)')}

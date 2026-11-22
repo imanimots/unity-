@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl'
 import { Check, X, Repeat, Ban, MessageCircle, CreditCard, PackageCheck, Truck, PartyPopper } from 'lucide-react'
 import type { BarterStatus } from '@/types'
 import { OpenDisputeDialog } from '@/components/disputes/open-dispute-dialog'
+import { ConfirmActionDialog } from '@/components/ui/confirm-action-dialog'
 import { deriveBarterFinancialReadiness, type BarterDepositRequirement, type BarterPaymentStatus } from '@/lib/barter/financial-readiness'
 
 function asPaymentStatus(status: string | undefined): BarterPaymentStatus {
@@ -48,11 +49,11 @@ interface Props {
 type SimpleAction = 'accept' | 'reject' | 'cancel'
 type ActionKind = SimpleAction | 'counter' | 'pay-deposit' | 'pay-cash-adjustment' | 'mark-preparing' | 'mark-in-transit' | 'mark-ready' | 'confirm-completion'
 
-const ACTION_META: Record<ActionKind, { labelKey: string; icon: typeof Check; classes: string; promptReason?: boolean }> = {
+const ACTION_META: Record<ActionKind, { labelKey: string; icon: typeof Check; classes: string }> = {
   accept: { labelKey: 'accept', icon: Check, classes: 'bg-green-600 hover:bg-green-700 text-white' },
   counter: { labelKey: 'counter', icon: Repeat, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
-  reject: { labelKey: 'decline', icon: X, classes: 'border border-[#F2EDE8] text-[#1A0A0A] hover:bg-[#FAF8F5]', promptReason: true },
-  cancel: { labelKey: 'cancelTrade', icon: Ban, classes: 'border border-[#F2EDE8] text-[#1A0A0A] hover:bg-[#FAF8F5]', promptReason: true },
+  reject: { labelKey: 'decline', icon: X, classes: 'border border-[#F2EDE8] text-[#1A0A0A] hover:bg-[#FAF8F5]' },
+  cancel: { labelKey: 'cancelTrade', icon: Ban, classes: 'border border-[#F2EDE8] text-[#1A0A0A] hover:bg-[#FAF8F5]' },
   'pay-deposit': { labelKey: 'payDeposit', icon: CreditCard, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
   'pay-cash-adjustment': { labelKey: 'payCashAdjustment', icon: CreditCard, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
   'mark-preparing': { labelKey: 'startPreparing', icon: PackageCheck, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
@@ -60,6 +61,9 @@ const ACTION_META: Record<ActionKind, { labelKey: string; icon: typeof Check; cl
   'mark-ready': { labelKey: 'readyToExchange', icon: PackageCheck, classes: 'bg-[#8B1A1A] hover:bg-[#7A1616] text-white' },
   'confirm-completion': { labelKey: 'confirmCompletion', icon: PartyPopper, classes: 'bg-green-600 hover:bg-green-700 text-white' },
 }
+
+/** Consequential actions needing disclosure before firing. */
+const CONSEQUENTIAL_ACTIONS: ActionKind[] = ['reject', 'cancel', 'confirm-completion']
 
 const ACTION_ROUTE: Partial<Record<ActionKind, (id: string) => string>> = {
   'pay-deposit': (id) => `/api/barter/${id}/deposit`,
@@ -164,21 +168,16 @@ export function BarterActions({ agreementId, status, isCurrentProposer, onCounte
   const hasConfirmed = confirmations.some((c) => c.party_id === currentUserId)
   const actions = availableActions(status, isCurrentProposer, currentUserId, partyAId, partyBId, acceptedOffer, payments, hasConfirmed)
   const showDispute = DISPUTABLE_STATUSES.includes(status)
+  const [confirming, setConfirming] = useState<Exclude<ActionKind, 'counter'> | null>(null)
+  const [reason, setReason] = useState('')
 
-  async function run(action: Exclude<ActionKind, 'counter'>) {
-    const meta = ACTION_META[action]
-    let reason: string | null = null
-    if (meta.promptReason) {
-      reason = window.prompt(action === 'reject' ? t('declineReasonPrompt') : t('cancelReasonPrompt'))
-      if (reason === null) return
-    }
-
+  async function run(action: Exclude<ActionKind, 'counter'>, actionReason: string | null) {
     setPending(action)
     setError(null)
     try {
       const body: Record<string, unknown> = { idempotency_key: crypto.randomUUID() }
-      if (action === 'reject' && reason) body.rejection_reason = reason
-      if (action === 'cancel' && reason) body.cancellation_reason = reason
+      if (action === 'reject' && actionReason) body.rejection_reason = actionReason
+      if (action === 'cancel' && actionReason) body.cancellation_reason = actionReason
       if (PROGRESS_TARGET[action]) body.target_status = PROGRESS_TARGET[action]
 
       const path = ACTION_ROUTE[action] ? ACTION_ROUTE[action]!(agreementId) : `/api/barter/${agreementId}/${action}`
@@ -192,12 +191,50 @@ export function BarterActions({ agreementId, status, isCurrentProposer, onCounte
         setError(data.error ?? tErrors('generic'))
         return
       }
+      setConfirming(null)
+      setReason('')
       router.refresh()
     } catch {
       setError(tErrors('network'))
     } finally {
       setPending(null)
     }
+  }
+
+  function handleClick(action: Exclude<ActionKind, 'counter'>) {
+    if (CONSEQUENTIAL_ACTIONS.includes(action)) {
+      setError(null)
+      setReason('')
+      setConfirming(action)
+      return
+    }
+    run(action, null)
+  }
+
+  /** Real, state-derived consequence text. A deposit/cash-adjustment
+   * payment existing in `payments` with a non-pending/non-failed status
+   * means money has actually moved -- never assumed from the status
+   * alone. confirm-completion's deposit release is grounded directly in
+   * src/app/api/barter/[id]/confirm-completion/route.ts's own comment:
+   * it only releases deposits once BOTH parties have confirmed, never
+   * on a single confirmation. */
+  function consequenceFor(action: Exclude<ActionKind, 'counter'>): string {
+    if (action === 'reject') {
+      return 'No payment has been made on this trade yet -- declining it notifies the other party and ends the proposal.'
+    }
+    if (action === 'cancel') {
+      const somethingPaid = payments.some((p) => p.status !== 'pending' && p.status !== 'failed')
+      return somethingPaid
+        ? 'A deposit or cash adjustment has already been paid on this trade. Cancelling now follows Unity’s standard cancellation and refund policy for the stage this trade is at.'
+        : 'No payment has been made on this trade yet, so cancelling now does not involve a refund.'
+    }
+    return 'If you’re the first to confirm, nothing finalizes yet -- the trade completes once the other party also confirms. Once both parties have confirmed, any deposit held for this trade is released.'
+  }
+
+  const dialogMeta: Record<string, { title: string; confirmLabel: string; destructive: boolean }> = {
+    reject: { title: 'Decline this trade proposal?', confirmLabel: 'Decline trade', destructive: true },
+    cancel: { title: 'Cancel this trade?', confirmLabel: 'Cancel trade', destructive: true },
+    'confirm-completion': { title: 'Confirm this trade is complete?', confirmLabel: 'Confirm completion', destructive: false },
   }
 
   return (
@@ -221,7 +258,7 @@ export function BarterActions({ agreementId, status, isCurrentProposer, onCounte
           return (
             <button
               key={action}
-              onClick={() => run(action)}
+              onClick={() => handleClick(action)}
               disabled={pending !== null}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] rounded-lg transition-colors disabled:opacity-50 ${meta.classes}`}
             >
@@ -230,7 +267,7 @@ export function BarterActions({ agreementId, status, isCurrentProposer, onCounte
           )
         })}
       </div>
-      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+      {error && !confirming && <p className="text-xs text-red-600 mt-2">{error}</p>}
       <div className="mt-3 flex flex-wrap items-center gap-4">
         <Link
           href={`/chat?barter=${agreementId}`}
@@ -247,6 +284,25 @@ export function BarterActions({ agreementId, status, isCurrentProposer, onCounte
           />
         )}
       </div>
+
+      {confirming && (
+        <ConfirmActionDialog
+          open
+          onOpenChange={(open) => !open && setConfirming(null)}
+          title={dialogMeta[confirming].title}
+          consequence={consequenceFor(confirming)}
+          reason={
+            confirming === 'confirm-completion'
+              ? undefined
+              : { value: reason, onChange: setReason, label: 'Reason (optional)', placeholder: 'Let the other party know why' }
+          }
+          confirmLabel={dialogMeta[confirming].confirmLabel}
+          destructive={dialogMeta[confirming].destructive}
+          submitting={pending === confirming}
+          error={error}
+          onConfirm={() => run(confirming, reason.trim() || null)}
+        />
+      )}
     </div>
   )
 }

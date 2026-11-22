@@ -3402,6 +3402,254 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       },
     },
   },
+  // ── Rent-to-Buy -- 6 templates referenced by real route handlers
+  // (src/app/api/rent-to-buy/agreements/[id]/{mark-handed-over,accept-
+  // termination,propose-termination,amendments}/route.ts and
+  // src/app/api/internal/rent-to-buy/finalize-due-ownership/route.ts)
+  // but missing from this catalogue entirely -- getEmailTemplate()
+  // returning undefined for an unregistered id falls back silently
+  // (templateVersion: '0') rather than failing loudly, so this was a
+  // genuine "no notification ever actually sends" gap, not a provider
+  // issue (customer-journey mapping finding). af-ZA/zu-ZA variants
+  // below reuse vocabulary and phrasing already reviewed in this same
+  // file's other 3 rent-to-buy templates (huur-om-te-koop/ooreenkoms,
+  // ukuqasha-ukuze-uthenge/isivumelwano) rather than translating from
+  // scratch, to minimize new translation risk on a production
+  // financial notification.
+  {
+    id: 'rent-to-buy-handed-over',
+    version: '1',
+    event: 'rent_to_buy.handed_over',
+    requiredVars: ['recipientName', 'listingTitle'],
+    subject: (v) => `"${s(v, 'listingTitle')}" has been marked as handed over`,
+    build: (v) => ({
+      preheader: 'Confirm receipt once you have the item',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [
+        `The merchant has marked "${s(v, 'listingTitle')}" as handed over to you. Once you have the item, confirm receipt in your dashboard -- the merchant remains the owner until the full rent-to-buy amount has been paid and the completion window has passed.`,
+      ],
+      cta: { label: 'View your agreement', path: '/dashboard' },
+    }),
+    localeVariants: {
+      'af-ZA': {
+        subject: (v) => `"${s(v, 'listingTitle')}" is as oorhandig gemerk`,
+        build: (v) => ({
+          preheader: 'Bevestig ontvangs sodra jy die item het',
+          greeting: `Hallo ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Die handelaar het "${s(v, 'listingTitle')}" as aan jou oorhandig gemerk. Sodra jy die item het, bevestig ontvangs in jou paneelbord -- die handelaar bly die eienaar totdat die volle huur-om-te-koop-bedrag betaal is en die voltooiingstydperk verstryk het.`,
+          ],
+          cta: { label: 'Bekyk jou ooreenkoms', path: '/dashboard' },
+        }),
+      },
+      'zu-ZA': {
+        subject: (v) => `"${s(v, 'listingTitle')}" iphawulwe njengokudluliselwe`,
+        build: (v) => ({
+          preheader: 'Qinisekisa ukuthola uma usuthole into',
+          greeting: `Sawubona ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Umthengisi uphawule "${s(v, 'listingTitle')}" njengokudluliselwe kuwe. Uma usuthole into, qinisekisa ukuthola kuphaneli lakho -- umthengisi uhlala engumnikazi kuze kube inani lokuqasha-ukuze-uthenge eliphelele likhokhiwe futhi isikhathi sokuqeda sidlulile.`,
+          ],
+          cta: { label: 'Buka isivumelwano sakho', path: '/dashboard' },
+        }),
+      },
+    },
+  },
+  {
+    id: 'rent-to-buy-completed',
+    version: '1',
+    event: 'rent_to_buy.completed',
+    requiredVars: ['recipientName', 'listingTitle'],
+    subject: (v) => `You now own "${s(v, 'listingTitle')}"`,
+    build: (v) => ({
+      preheader: 'Your rent-to-buy agreement is complete',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [
+        `Your rent-to-buy agreement for "${s(v, 'listingTitle')}" has completed -- the full amount has been paid and the completion window has passed with no unresolved dispute. Ownership has transferred to you.`,
+      ],
+      cta: { label: 'View your agreement', path: '/dashboard' },
+    }),
+    localeVariants: {
+      'af-ZA': {
+        subject: (v) => `Jy is nou die eienaar van "${s(v, 'listingTitle')}"`,
+        build: (v) => ({
+          preheader: 'Jou huur-om-te-koop-ooreenkoms is voltooi',
+          greeting: `Hallo ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Jou huur-om-te-koop-ooreenkoms vir "${s(v, 'listingTitle')}" is voltooi -- die volle bedrag is betaal en die voltooiingstydperk het verstryk sonder enige onopgeloste dispuut. Eiendomsreg is aan jou oorgedra.`,
+          ],
+          cta: { label: 'Bekyk jou ooreenkoms', path: '/dashboard' },
+        }),
+      },
+      'zu-ZA': {
+        subject: (v) => `Manje ungumnikazi we-"${s(v, 'listingTitle')}"`,
+        build: (v) => ({
+          preheader: 'Isivumelwano sakho sokuqasha-ukuze-uthenge siphelele',
+          greeting: `Sawubona ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Isivumelwano sakho sokuqasha-ukuze-uthenge se-"${s(v, 'listingTitle')}" siqediwe -- inani eliphelele likhokhiwe futhi isikhathi sokuqeda sidlulile ngaphandle kwempikiswano engaxazululwe. Ubunikazi budluliselwe kuwe.`,
+          ],
+          cta: { label: 'Buka isivumelwano sakho', path: '/dashboard' },
+        }),
+      },
+    },
+  },
+  {
+    id: 'rent-to-buy-completed-merchant',
+    version: '1',
+    event: 'rent_to_buy.completed',
+    requiredVars: ['recipientName', 'listingTitle'],
+    subject: (v) => `Your rent-to-buy agreement for "${s(v, 'listingTitle')}" is complete`,
+    build: (v) => ({
+      preheader: 'Ownership has transferred to the customer',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [
+        `Your rent-to-buy agreement for "${s(v, 'listingTitle')}" has completed -- the full amount has been paid and the completion window has passed with no unresolved dispute. Ownership has transferred to the customer.`,
+      ],
+      cta: { label: 'View your agreement', path: '/dashboard' },
+    }),
+    localeVariants: {
+      'af-ZA': {
+        subject: (v) => `Jou huur-om-te-koop-ooreenkoms vir "${s(v, 'listingTitle')}" is voltooi`,
+        build: (v) => ({
+          preheader: 'Eiendomsreg is aan die kliënt oorgedra',
+          greeting: `Hallo ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Jou huur-om-te-koop-ooreenkoms vir "${s(v, 'listingTitle')}" is voltooi -- die volle bedrag is betaal en die voltooiingstydperk het verstryk sonder enige onopgeloste dispuut. Eiendomsreg is aan die kliënt oorgedra.`,
+          ],
+          cta: { label: 'Bekyk jou ooreenkoms', path: '/dashboard' },
+        }),
+      },
+      'zu-ZA': {
+        subject: (v) => `Isivumelwano sakho sokuqasha-ukuze-uthenge se-"${s(v, 'listingTitle')}" siphelele`,
+        build: (v) => ({
+          preheader: 'Ubunikazi budluliselwe kumthengi',
+          greeting: `Sawubona ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Isivumelwano sakho sokuqasha-ukuze-uthenge se-"${s(v, 'listingTitle')}" siqediwe -- inani eliphelele likhokhiwe futhi isikhathi sokuqeda sidlulile ngaphandle kwempikiswano engaxazululwe. Ubunikazi budluliselwe kumthengi.`,
+          ],
+          cta: { label: 'Buka isivumelwano sakho', path: '/dashboard' },
+        }),
+      },
+    },
+  },
+  {
+    id: 'rent-to-buy-terminated',
+    version: '1',
+    event: 'rent_to_buy.terminated',
+    requiredVars: ['recipientName', 'listingTitle'],
+    subject: (v) => `Your rent-to-buy agreement for "${s(v, 'listingTitle')}" has ended`,
+    build: (v) => ({
+      preheader: 'Agreement ended by mutual agreement',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [
+        `Your rent-to-buy agreement for "${s(v, 'listingTitle')}" has ended by mutual agreement. Check your dashboard for any remaining item-return or settlement steps.`,
+      ],
+      cta: { label: 'View your agreement', path: '/dashboard' },
+    }),
+    localeVariants: {
+      'af-ZA': {
+        subject: (v) => `Jou huur-om-te-koop-ooreenkoms vir "${s(v, 'listingTitle')}" is beëindig`,
+        build: (v) => ({
+          preheader: 'Ooreenkoms beëindig met onderlinge instemming',
+          greeting: `Hallo ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Jou huur-om-te-koop-ooreenkoms vir "${s(v, 'listingTitle')}" is met onderlinge instemming beëindig. Gaan jou paneelbord na vir enige oorblywende terugbesorgings- of afrekeningstappe.`,
+          ],
+          cta: { label: 'Bekyk jou ooreenkoms', path: '/dashboard' },
+        }),
+      },
+      'zu-ZA': {
+        subject: (v) => `Isivumelwano sakho sokuqasha-ukuze-uthenge se-"${s(v, 'listingTitle')}" siphelile`,
+        build: (v) => ({
+          preheader: 'Isivumelwano siphele ngokuvumelana',
+          greeting: `Sawubona ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Isivumelwano sakho sokuqasha-ukuze-uthenge se-"${s(v, 'listingTitle')}" siphele ngokuvumelana phakathi kwenu. Hlola iphaneli lakho mayelana nanoma yiziphi izinyathelo ezisele zokubuyisa into noma zokulungiselela.`,
+          ],
+          cta: { label: 'Buka isivumelwano sakho', path: '/dashboard' },
+        }),
+      },
+    },
+  },
+  {
+    id: 'rent-to-buy-termination-proposed',
+    version: '1',
+    event: 'rent_to_buy.termination_proposed',
+    requiredVars: ['recipientName', 'listingTitle'],
+    subject: (v) => `A change was proposed for your "${s(v, 'listingTitle')}" agreement`,
+    build: (v) => ({
+      preheader: 'Review and respond to end this agreement early',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [
+        `The other party has proposed ending your rent-to-buy agreement for "${s(v, 'listingTitle')}" early. Review the proposal in your dashboard and accept or decline it.`,
+      ],
+      cta: { label: 'Review the proposal', path: '/dashboard' },
+    }),
+    localeVariants: {
+      'af-ZA': {
+        subject: (v) => `'n Verandering is voorgestel vir jou "${s(v, 'listingTitle')}"-ooreenkoms`,
+        build: (v) => ({
+          preheader: 'Gaan dit na en reageer om hierdie ooreenkoms vroeg te beëindig',
+          greeting: `Hallo ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Die ander party het voorgestel om jou huur-om-te-koop-ooreenkoms vir "${s(v, 'listingTitle')}" vroeg te beëindig. Gaan die voorstel in jou paneelbord na en aanvaar of weier dit.`,
+          ],
+          cta: { label: 'Gaan die voorstel na', path: '/dashboard' },
+        }),
+      },
+      'zu-ZA': {
+        subject: (v) => `Kuphakanyiswe ushintsho kwisivumelwano sakho se-"${s(v, 'listingTitle')}"`,
+        build: (v) => ({
+          preheader: 'Hlola bese uphendula ukuqeda lesi sivumelwano kusenesikhathi',
+          greeting: `Sawubona ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Umuntu omunye uphakamisile ukuqeda isivumelwano sakho sokuqasha-ukuze-uthenge se-"${s(v, 'listingTitle')}" kusenesikhathi. Hlola isiphakamiso kuphaneli lakho futhi usamukele noma usenqabe.`,
+          ],
+          cta: { label: 'Hlola isiphakamiso', path: '/dashboard' },
+        }),
+      },
+    },
+  },
+  {
+    id: 'rent-to-buy-amendment-proposed',
+    version: '1',
+    event: 'rent_to_buy.amendment_proposed',
+    requiredVars: ['recipientName', 'listingTitle'],
+    subject: (v) => `A change was proposed for your "${s(v, 'listingTitle')}" agreement`,
+    build: (v) => ({
+      preheader: 'Review and respond to the proposed change',
+      greeting: `Hi ${s(v, 'recipientName')},`,
+      bodyParagraphs: [
+        `The other party has proposed a change to your rent-to-buy agreement for "${s(v, 'listingTitle')}". Review the proposed amendment in your dashboard and accept or decline it.`,
+      ],
+      cta: { label: 'Review the amendment', path: '/dashboard' },
+    }),
+    localeVariants: {
+      'af-ZA': {
+        subject: (v) => `'n Verandering is voorgestel vir jou "${s(v, 'listingTitle')}"-ooreenkoms`,
+        build: (v) => ({
+          preheader: 'Gaan die voorgestelde verandering na en reageer',
+          greeting: `Hallo ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Die ander party het 'n verandering voorgestel aan jou huur-om-te-koop-ooreenkoms vir "${s(v, 'listingTitle')}". Gaan die voorgestelde wysiging in jou paneelbord na en aanvaar of weier dit.`,
+          ],
+          cta: { label: 'Gaan die wysiging na', path: '/dashboard' },
+        }),
+      },
+      'zu-ZA': {
+        subject: (v) => `Kuphakanyiswe ushintsho kwisivumelwano sakho se-"${s(v, 'listingTitle')}"`,
+        build: (v) => ({
+          preheader: 'Hlola bese uphendula ushintsho oluphakanyisiwe',
+          greeting: `Sawubona ${s(v, 'recipientName')},`,
+          bodyParagraphs: [
+            `Umuntu omunye uphakamisile ushintsho kwisivumelwano sakho sokuqasha-ukuze-uthenge se-"${s(v, 'listingTitle')}". Hlola ushintsho oluphakanyisiwe kuphaneli lakho futhi usamukele noma usenqabe.`,
+          ],
+          cta: { label: 'Hlola ushintsho', path: '/dashboard' },
+        }),
+      },
+    },
+  },
   // ── Reviews V2 ──
   {
     id: 'review-eligible',

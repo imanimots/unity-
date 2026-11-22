@@ -12,6 +12,8 @@ import { formatDate } from '@/lib/i18n/format'
 import { isPersonalizationEnabled } from '@/lib/personalization/config'
 import { PERMANENT_NOINDEX } from '@/lib/seo/config'
 import { EditProfileButton } from './edit-profile-form'
+import { ContextualHelp } from '@/components/ui/contextual-help'
+import { CONTEXTUAL_COPY } from '@/lib/help/contextual-copy'
 
 export const metadata: Metadata = { title: 'My Profile — Unity', robots: PERMANENT_NOINDEX }
 
@@ -82,6 +84,9 @@ export default async function ProfilePage() {
                 {identityVerified && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700">
                     <ShieldCheck size={12} /> {t('identityVerified')}
+                    <ContextualHelp label={CONTEXTUAL_COPY.verification.label} learnMoreHref={CONTEXTUAL_COPY.verification.learnMoreHref}>
+                      {CONTEXTUAL_COPY.verification.text}
+                    </ContextualHelp>
                   </span>
                 )}
               </div>

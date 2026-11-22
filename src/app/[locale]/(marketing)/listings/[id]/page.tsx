@@ -18,6 +18,8 @@ import { ProposeTradeButton } from '@/components/barter/propose-trade-button'
 import { getRequestProfile } from '@/lib/supabase/require-admin'
 import { ProfileLink } from '@/components/shared/profile-link'
 import { isListingBarterLocked, getAllBarterLockedListingIds } from '@/lib/barter/listing-lock'
+import { ContextualHelp } from '@/components/ui/contextual-help'
+import { CONTEXTUAL_COPY } from '@/lib/help/contextual-copy'
 import { ListingViewTracker } from '@/components/analytics/listing-view-tracker'
 import { isListingRentToBuyLocked } from '@/lib/rent-to-buy/listing-lock'
 import { getPublicRentToBuyTerms } from '@/lib/rent-to-buy/public-terms'
@@ -208,6 +210,9 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                 {listing.ownership_verified && (
                   <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2.5 py-1 rounded-full">
                     <ShieldCheck size={11} /> {t('ownershipVerified')}
+                    <ContextualHelp label={CONTEXTUAL_COPY.ownershipVerification.label} learnMoreHref={CONTEXTUAL_COPY.ownershipVerification.learnMoreHref}>
+                      {CONTEXTUAL_COPY.ownershipVerification.text}
+                    </ContextualHelp>
                   </span>
                 )}
                 <span className="flex items-center gap-1.5 text-sm text-[#6B5B55]">
@@ -323,6 +328,9 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                       {listing.merchant.is_verified && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
                           <ShieldCheck size={9} /> {t('kycVerified')}
+                          <ContextualHelp label={CONTEXTUAL_COPY.verification.label} learnMoreHref={CONTEXTUAL_COPY.verification.learnMoreHref}>
+                            {CONTEXTUAL_COPY.verification.text}
+                          </ContextualHelp>
                         </span>
                       )}
                     </div>

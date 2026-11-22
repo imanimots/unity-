@@ -13,6 +13,8 @@ import { calendarDateToSastIso } from '@/lib/bookings/date'
 import { formatDate as formatLocaleDate } from '@/lib/i18n/format'
 import type { Locale } from '@/i18n/locales'
 import Image from 'next/image'
+import { ContextualHelp } from '@/components/ui/contextual-help'
+import { CONTEXTUAL_COPY } from '@/lib/help/contextual-copy'
 import { EliteBadge } from '@/components/subscriptions/elite-badge'
 
 type Step = 'dates' | 'review' | 'confirmed'
@@ -58,7 +60,10 @@ function PriceBreakdownCard({ price, t }: { price: ReturnType<typeof calculateBo
       {price.depositAmount > 0 && (
         <div className="flex justify-between text-[#6B5B55]">
           <span className="flex items-center gap-1">
-            {t('refundableDeposit')} <Info size={12} />
+            {t('refundableDeposit')}
+            <ContextualHelp label={CONTEXTUAL_COPY.rentalDeposit.label} learnMoreHref={CONTEXTUAL_COPY.rentalDeposit.learnMoreHref}>
+              {CONTEXTUAL_COPY.rentalDeposit.text}
+            </ContextualHelp>
           </span>
           <span>R{price.depositAmount}</span>
         </div>

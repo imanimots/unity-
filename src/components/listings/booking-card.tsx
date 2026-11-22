@@ -3,11 +3,13 @@
 import { useState } from 'react'
 import { useTranslations, useLocale } from 'next-intl'
 import { Link } from '@/i18n/navigation'
-import { ShieldCheck, Star, ArrowRight, Info } from 'lucide-react'
+import { ShieldCheck, Star, ArrowRight } from 'lucide-react'
 import { formatMoneyFromRands } from '@/lib/i18n/format'
 import type { Locale } from '@/i18n/locales'
 import type { Listing } from '@/types'
 import { EliteBadge } from '@/components/subscriptions/elite-badge'
+import { ContextualHelp } from '@/components/ui/contextual-help'
+import { CONTEXTUAL_COPY } from '@/lib/help/contextual-copy'
 
 /** Only ever rendered for a listing that has a daily rate (rental or both) — see the caller's guard on the listing detail page. */
 export function BookingCard({ listing }: { listing: Listing & { daily_rate: number } }) {
@@ -86,7 +88,10 @@ export function BookingCard({ listing }: { listing: Listing & { daily_rate: numb
         {listing.deposit_required && (
           <div className="flex justify-between text-[#6B5B55]">
             <span className="flex items-center gap-1">
-              {t('refundableDeposit')} <Info size={12} className="text-[#9B8B85]" />
+              {t('refundableDeposit')}
+              <ContextualHelp label={CONTEXTUAL_COPY.rentalDeposit.label} learnMoreHref={CONTEXTUAL_COPY.rentalDeposit.learnMoreHref}>
+                {CONTEXTUAL_COPY.rentalDeposit.text}
+              </ContextualHelp>
             </span>
             <span>{money(deposit)}</span>
           </div>

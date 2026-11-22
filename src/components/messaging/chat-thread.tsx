@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Send, ShieldAlert, Paperclip, X, FileText, Image as ImageIcon, RotateCw } from 'lucide-react'
+import { Send, ShieldAlert, Paperclip, X, FileText, Image as ImageIcon, RotateCw, ShieldQuestion } from 'lucide-react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { validateAttachmentFile, uploadChatAttachment } from '@/lib/messaging/attachments'
 import { EvidenceAccessButton } from '@/components/shared/evidence-access-button'
+import { Link } from '@/i18n/navigation'
+import { MESSAGING_SAFETY_NOTICE } from '@/lib/help/contextual-copy'
 import type { Message, MessageAttachment } from '@/types'
 
 type ThreadType = 'booking' | 'order' | 'barter'
@@ -128,6 +130,26 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
   const [hasMoreOlder, setHasMoreOlder] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [olderError, setOlderError] = useState<string | null>(null)
+  // Per-viewer, device-local dismiss -- a convenience, never synced or
+  // read back by Unity, so a failed localStorage read/write just means
+  // the banner shows again next time (safe default).
+  const [safetyNoticeDismissed, setSafetyNoticeDismissed] = useState(true)
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSafetyNoticeDismissed(window.localStorage.getItem('unity.chat.safetyNoticeDismissed') === '1')
+    } catch {
+      // localStorage unavailable -- leave dismissed (fails closed to "don't show"), never crash the thread over it.
+    }
+  }, [])
+  function dismissSafetyNotice() {
+    setSafetyNoticeDismissed(true)
+    try {
+      window.localStorage.setItem('unity.chat.safetyNoticeDismissed', '1')
+    } catch {
+      // Best-effort only.
+    }
+  }
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageIdRef = useRef<string | null>(null)
@@ -425,6 +447,25 @@ export function ChatThread({ transactionType, transactionId, currentUserId, canS
 
   return (
     <div className={`flex flex-col ${containerHeight}`}>
+      {variant === 'full' && canSend && !safetyNoticeDismissed && (
+        <div className="flex items-start gap-2 px-4 py-2 bg-[#FAF8F5] border-b border-[#F2EDE8] text-xs text-[#6B5B55]">
+          <ShieldQuestion size={14} className="text-[#9B8B85] shrink-0 mt-0.5" />
+          <p className="flex-1">
+            {MESSAGING_SAFETY_NOTICE.text}{' '}
+            <Link href={MESSAGING_SAFETY_NOTICE.learnMoreHref} className="font-semibold text-[#8B1A1A] hover:underline">
+              Learn more
+            </Link>
+          </p>
+          <button
+            type="button"
+            onClick={dismissSafetyNotice}
+            aria-label="Dismiss safety notice"
+            className="text-[#9B8B85] hover:text-[#1A0A0A] shrink-0"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
       <div ref={scrollContainerRef} className={`flex-1 overflow-y-auto ${variant === 'embedded' ? 'space-y-3 py-2' : 'px-5 py-5 space-y-4 bg-[#FAF8F5]'}`}>
         {loading ? (
           <p className="text-sm text-[#9B8B85] text-center py-8">{labels.loadingMessages}</p>

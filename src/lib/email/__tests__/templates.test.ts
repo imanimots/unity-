@@ -131,6 +131,7 @@ describe('email template catalogue (category: Templates)', () => {
       'escrow_transaction.released',
       'marketplace_request.offer_received', 'marketplace_request.offer_accepted',
       'rent_to_buy.agreement_accepted', 'rent_to_buy.first_payment_settled', 'rent_to_buy.defaulted',
+      'rent_to_buy.handed_over', 'rent_to_buy.completed', 'rent_to_buy.terminated', 'rent_to_buy.termination_proposed', 'rent_to_buy.amendment_proposed',
       'review.eligible', 'review.reminder', 'review.published', 'review.reply_received',
     ])
     for (const t of EMAIL_TEMPLATES) {
