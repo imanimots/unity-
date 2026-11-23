@@ -434,6 +434,30 @@ export const LEARN_ARTICLES: LearnArticle[] = [
         heading: 'Keeping it current',
         body: ['Edit a listing when price, availability, or condition genuinely changes, rather than leaving outdated information live -- an accurate, recently-updated listing is more useful to buyers than a stale one, even if nothing about the photos or title changed.'],
       },
+      {
+        heading: 'Condition',
+        body: [
+          'New -- unused, in original packaging where applicable.',
+          'Like New -- used very lightly, with no visible wear.',
+          'Good -- shows normal wear from regular use, fully functional.',
+          'Fair -- functional but with noticeable wear; always describe the specific wear in your description so there are no surprises at handover.',
+        ],
+      },
+      {
+        heading: 'Replacement value',
+        body: ['This is what the item is worth if it\'s lost or damaged beyond repair -- Unity records it for reference if a dispute needs to establish that. It doesn\'t automatically set your deposit or insurance amount; those are separate fields you set yourself.'],
+      },
+      {
+        heading: 'Permitted and prohibited use',
+        body: [
+          'These optional fields tell a renter what they may and may not do with your item -- for example, permitted: "light DIY, indoor and outdoor use"; prohibited: "commercial filming, off-road use." Specific examples are far more useful to a renter than a vague restriction.',
+          'If an item goes missing or is damaged beyond repair, your "what happens if lost or damaged" notes are what the renter sees before they book -- state plainly what you expect (e.g. "charged the replacement value shown above") rather than leaving it unsaid and disputing it after the fact.',
+        ],
+      },
+      {
+        heading: 'Booking notice and advance booking',
+        body: ['Minimum notice is how little advance warning you\'re willing to accept for a new request (set it low if you can accommodate last-minute bookings). Maximum advance booking is how far into the future someone can book you -- useful if you don\'t want your calendar filled out for months ahead. Both are optional; leaving them blank means no restriction.'],
+      },
     ],
     relatedTaskIds: ['list-an-item', 'edit-listing', 'create-rental-listing', 'create-sale-listing'],
     relatedLearnIds: ['learn-how-search-works', 'learn-listing-statuses', 'learn-getting-better-results-on-unity'],
@@ -548,6 +572,10 @@ export const LEARN_ARTICLES: LearnArticle[] = [
           'Identity verification is about the PERSON -- the same one-time review, for users and merchants alike, that unlocks booking and publishing. You\'ll see this as "Verified," "Identity verified," or "KYC Verified" depending on the page -- these all refer to the same underlying status, not three different checks.',
           'Ownership verification is about a specific LISTING, not a person -- separate proof, submitted per item, that the merchant actually owns what they\'re listing. A merchant can be identity-verified with some listings still awaiting ownership verification, or vice versa -- the two are tracked independently.',
         ],
+      },
+      {
+        heading: 'What counts as ownership proof',
+        body: ['A receipt or invoice, a clear photo showing the item\'s serial number or label, or a short video of you with the item are all accepted as ownership proof for a listing -- any one of these is enough, there\'s no need to submit more than one. Accepted file types are JPG, PNG, PDF, or MP4.'],
       },
     ],
     relatedTaskIds: ['verify-identity', 'verify-merchant-account'],

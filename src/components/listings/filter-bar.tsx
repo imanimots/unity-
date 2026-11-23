@@ -7,6 +7,8 @@ import { SlidersHorizontal, X, MapPin, Calendar } from 'lucide-react'
 import { CATEGORIES, SA_PROVINCES } from '@/types'
 import { trackEvent } from '@/lib/analytics/client'
 import { calendarDateToIsoDate } from '@/lib/search/date-filter'
+import { ContextualHelp } from '@/components/ui/contextual-help'
+import { CONTEXTUAL_COPY } from '@/lib/help/contextual-copy'
 import 'react-day-picker/style.css'
 
 export type FilterBarEntity = 'listings' | 'requests' | 'skill_task'
@@ -151,6 +153,9 @@ function FilterBarInner({ entity, trailingSlot }: { entity: FilterBarEntity; tra
           <div className="flex items-center gap-2">
             <SlidersHorizontal size={14} className="text-[#9B8B85]" />
             <span className="text-sm text-[#6B5B55]">Max price:</span>
+            <ContextualHelp label="How do these filters work?" learnMoreHref="/help/search-filters-explained">
+              Filters narrow your results before ranking happens. Widen or remove one if you&apos;re not finding what you expect.
+            </ContextualHelp>
             <select
               value={maxPrice}
               onChange={(e) => refineAndNavigate(createURL('maxPrice', e.target.value || null), { ...currentFilterState, maxPrice: e.target.value })}
@@ -265,6 +270,11 @@ function FilterBarInner({ entity, trailingSlot }: { entity: FilterBarEntity; tra
         )}
         <div className="flex items-center gap-2">
           <span className="text-sm text-[#6B5B55]">Sort by:</span>
+          {sort === 'relevance' && (
+            <ContextualHelp label={CONTEXTUAL_COPY.sortRelevance.label} learnMoreHref={CONTEXTUAL_COPY.sortRelevance.learnMoreHref}>
+              {CONTEXTUAL_COPY.sortRelevance.text}
+            </ContextualHelp>
+          )}
           <select
             value={sort}
             onChange={(e) => router.push(createURL('sort', e.target.value), { scroll: false })}

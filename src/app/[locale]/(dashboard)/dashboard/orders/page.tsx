@@ -83,7 +83,7 @@ export default async function MyPurchasesPage() {
                 <Link href={`/listings/${order.listing_id}`} className="text-sm font-semibold text-[#1A0A0A] hover:underline">
                   {t('order')} {order.order_reference} — {titleById.get(order.listing_id) ?? 'Listing'}
                 </Link>
-                <OrderStatusBadge status={order.status} />
+                <OrderStatusBadge status={order.status} role="buyer" />
               </div>
               <p className="text-xs text-[#9B8B85] flex items-center gap-1.5">
                 <Clock size={11} /> {t('placed', { date: fmt(order.created_at) })}

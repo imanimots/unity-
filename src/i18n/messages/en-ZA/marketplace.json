@@ -117,6 +117,29 @@
     "buyNow": "Buy Now — {amount}",
     "youMightAlsoLike": "You might also like",
     "similarListings": "Similar Listings",
-    "eliteBadgeLabel": "Elite"
+    "eliteBadgeLabel": "Elite",
+    "report": "Report",
+    "reportDialog": {
+      "title": "Report this listing",
+      "description": "Reports are reviewed by Unity's team and are never shown publicly.",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "Choose a reason",
+      "reasons": {
+        "prohibited_item": "Prohibited item",
+        "misleading_listing": "Misleading listing",
+        "scam_fraud": "Scam or fraud",
+        "counterfeit": "Counterfeit",
+        "inappropriate_content": "Inappropriate content",
+        "other": "Other"
+      },
+      "descriptionLabel": "Additional details (optional)",
+      "submitted": "Thanks — your report has been submitted.",
+      "submit": "Submit report",
+      "submitting": "Submitting…",
+      "errors": {
+        "couldNotSubmit": "Could not submit your report",
+        "couldNotSubmitRetry": "Could not submit your report — please try again"
+      }
+    }
   }
 }

@@ -10,6 +10,7 @@ import { ImageGallery } from '@/components/listings/image-gallery'
 import { BookingCard } from '@/components/listings/booking-card'
 import { SaleSummaryCard } from '@/components/listings/sale-summary-card'
 import { ListingCard } from '@/components/listings/listing-card'
+import { ReportListingDialog } from '@/components/listings/report-listing-dialog'
 import { CATEGORIES } from '@/types'
 import { AffiliateCookieSetter } from '@/components/listings/affiliate-cookie-setter'
 import { AffiliateAttributionRunner } from '@/components/listings/affiliate-attribution-runner'
@@ -136,7 +137,11 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
   // server-side via getTranslations() directly and never touches this
   // provider's payload.
   const messages = await getMessages()
-  const scoped = { rent: { bookingCard: messages.rent.bookingCard }, rtb: messages.rtb }
+  const scoped = {
+    rent: { bookingCard: messages.rent.bookingCard },
+    rtb: messages.rtb,
+    marketplace: { detail: { report: messages.marketplace.detail.report, reportDialog: messages.marketplace.detail.reportDialog } },
+  }
 
   const personalizationMode: PersonalizationMode | null =
     listing.listing_type === 'sale' ? 'buy' : listing.listing_type === 'rental' ? 'rent' : null
@@ -345,6 +350,11 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                     </div>
                   </div>
                 </div>
+                {viewer?.userId !== listing.merchant_id && (
+                  <div className="mt-2">
+                    <ReportListingDialog listingId={listing.id} />
+                  </div>
+                )}
               </div>
             )}
 

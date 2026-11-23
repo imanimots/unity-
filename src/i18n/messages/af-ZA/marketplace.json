@@ -117,6 +117,29 @@
     "buyNow": "Koop Nou — {amount}",
     "youMightAlsoLike": "Jy sal dalk ook hou van",
     "similarListings": "Soortgelyke Noterings",
-    "eliteBadgeLabel": "Elite"
+    "eliteBadgeLabel": "Elite",
+    "report": "Rapporteer",
+    "reportDialog": {
+      "title": "Rapporteer hierdie notering",
+      "description": "Rapporte word deur Unity se span hersien en word nooit publiek gewys nie.",
+      "reasonLabel": "Rede",
+      "reasonPlaceholder": "Kies 'n rede",
+      "reasons": {
+        "prohibited_item": "Verbode item",
+        "misleading_listing": "Misleidende notering",
+        "scam_fraud": "Skelmstreek of bedrog",
+        "counterfeit": "Nagemaakte item",
+        "inappropriate_content": "Onvanpaste inhoud",
+        "other": "Ander"
+      },
+      "descriptionLabel": "Bykomende besonderhede (opsioneel)",
+      "submitted": "Dankie — jou rapport is ingedien.",
+      "submit": "Dien rapport in",
+      "submitting": "Dien tans in…",
+      "errors": {
+        "couldNotSubmit": "Kon nie jou rapport indien nie",
+        "couldNotSubmitRetry": "Kon nie jou rapport indien nie — probeer asseblief weer"
+      }
+    }
   }
 }

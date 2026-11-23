@@ -14,30 +14,34 @@ test('listing card no longer has a non-functional wishlist control', async ({ pa
   await expect(page.getByLabel('Save to wishlist')).toHaveCount(0)
 })
 
-test('a verification badge exposes a real, keyboard-reachable contextual-help popover, not a decorative icon', async ({ page }) => {
+test('a verified listing\'s grid card exposes its own contextual-help trigger directly, without navigating to the detail page', async ({ page }) => {
+  // The badge sits as a sibling of the card's <Link>, not nested inside
+  // it (a focusable trigger can't safely nest inside an <a>) -- so the
+  // trigger must be reachable, and clickable, without leaving /listings.
   await page.goto('/listings')
-  const verifiedCard = page.locator('a:has-text("Verified")').first()
-  const count = await verifiedCard.count()
-  if (count === 0) {
+  await page.waitForLoadState('networkidle')
+
+  const trigger = page.getByRole('button', { name: 'What does ownership verification mean?' }).first()
+  if ((await trigger.count()) === 0) {
     // No currently-verified listing exists in this environment's data --
     // not a failure of this feature, just nothing to exercise it against
     // right now. Skip rather than fail on absent fixture data.
     test.skip(true, 'no ownership-verified listing available to test against')
     return
   }
-  await verifiedCard.click()
-  await page.waitForLoadState('networkidle')
 
-  const trigger = page.getByRole('button', { name: /what does ownership verification mean|what does verification mean/i }).first()
   await expect(trigger).toBeVisible()
   await trigger.click()
-  await expect(page.getByText(/verification confirms identity/i)).toBeVisible()
+  await expect(page.getByText(/this checks the merchant's proof/i)).toBeVisible()
   await expect(page.getByRole('link', { name: 'Learn more' })).toHaveAttribute('href', /\/help\/what-verification-means/)
 
   // Escape dismisses it -- base-ui's Popover default behavior, asserted
   // here so a future change to the primitive can't silently drop it.
   await page.keyboard.press('Escape')
-  await expect(page.getByText(/verification confirms identity/i)).toBeHidden()
+  await expect(page.getByText(/this checks the merchant's proof/i)).toBeHidden()
+
+  // Clicking the trigger must never navigate the card away.
+  await expect(page).toHaveURL(/\/listings$/)
 })
 
 test('the rental deposit contextual-help explains the refund condition, and the amount itself remains visible without interaction', async ({ page }) => {

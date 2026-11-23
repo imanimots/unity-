@@ -21,6 +21,9 @@ import { DECLARATION_CATALOGUE } from '@/lib/listings/declarations'
 import { CATEGORY_FIELD_SETS, getRequiredCategoryFieldKeys, type CategoryFieldDef } from '@/lib/listings/category-fields'
 import type { ListingDraft } from '@/lib/data/listings'
 import type { BlockedDateRange } from '@/lib/listings/validation'
+import { ContextualHelp } from '@/components/ui/contextual-help'
+import { CONTEXTUAL_COPY } from '@/lib/help/contextual-copy'
+import { ConfirmActionDialog } from '@/components/ui/confirm-action-dialog'
 
 type ListingCreationT = ReturnType<typeof UseTranslationsType<'merchant.listingCreation'>>
 
@@ -308,7 +311,19 @@ function BasicsStep({ onNext, defaults }: { onNext: (d: BasicsData) => void; def
   })
   const description = watch('description') ?? ''
   const category = watch('category')
+  const categoryMetadata = watch('category_metadata')
+  const privateCategoryMetadata = watch('private_category_metadata')
   const [categoryError, setCategoryError] = useState('')
+  const [pendingCategory, setPendingCategory] = useState<string | null>(null)
+
+  const hasCategoryDetailsEntered = (obj?: Record<string, string>) =>
+    Object.values(obj ?? {}).some((v) => v?.trim())
+
+  const applyCategoryChange = (next: string) => {
+    setValue('category', next)
+    setValue('category_metadata', {})
+    setValue('private_category_metadata', {})
+  }
 
   const handleValid = (d: BasicsData) => {
     const missing = getRequiredCategoryFieldKeys(category).filter((key) => {
@@ -334,18 +349,32 @@ function BasicsStep({ onNext, defaults }: { onNext: (d: BasicsData) => void; def
       </div>
 
       <div>
-        <Label required>{t('basics.category')}</Label>
-        <select {...register('category')} className={inputCls(!!errors.category)} onChange={(e) => {
-          // Switching category invalidates any previously entered
-          // category-specific values (they belong to the old category's
-          // field set) — clear both metadata objects rather than letting
-          // stale values silently persist. The server independently
-          // strips anything not on the new category's allowlist regardless
-          // (see save_listing_draft's sanitize_category_metadata call).
-          setValue('category', e.target.value)
-          setValue('category_metadata', {})
-          setValue('private_category_metadata', {})
-        }}>
+        <div className="flex items-center gap-1.5">
+          <Label required>{t('basics.category')}</Label>
+          <ContextualHelp label={CONTEXTUAL_COPY.riskTier.label} learnMoreHref={CONTEXTUAL_COPY.riskTier.learnMoreHref}>
+            {CONTEXTUAL_COPY.riskTier.text}
+          </ContextualHelp>
+        </div>
+        <select
+          {...register('category')}
+          value={category ?? ''}
+          className={inputCls(!!errors.category)}
+          onChange={(e) => {
+            const next = e.target.value
+            // Switching category invalidates any previously entered
+            // category-specific values (they belong to the old category's
+            // field set) — clear both metadata objects rather than letting
+            // stale values silently persist. The server independently
+            // strips anything not on the new category's allowlist regardless
+            // (see save_listing_draft's sanitize_category_metadata call).
+            // Warn first if there's actually something to lose.
+            if (category && next !== category && (hasCategoryDetailsEntered(categoryMetadata) || hasCategoryDetailsEntered(privateCategoryMetadata))) {
+              setPendingCategory(next)
+              return
+            }
+            applyCategoryChange(next)
+          }}
+        >
           <option value="">{t('basics.categorySelectPlaceholder')}</option>
           {CATEGORIES.map((c) => (
             <option key={c.id} value={c.id}>{c.icon} {tCategories(c.id)}</option>
@@ -354,11 +383,29 @@ function BasicsStep({ onNext, defaults }: { onNext: (d: BasicsData) => void; def
         <FieldError message={errors.category?.message} />
       </div>
 
+      <ConfirmActionDialog
+        open={pendingCategory !== null}
+        onOpenChange={(open) => { if (!open) setPendingCategory(null) }}
+        title="Switch category?"
+        consequence="Switching category clears the category-specific details you've already filled in below (they only apply to the old category). Your title, description, photos, and pricing won't be affected."
+        confirmLabel="Switch category"
+        destructive
+        onConfirm={() => {
+          if (pendingCategory !== null) applyCategoryChange(pendingCategory)
+          setPendingCategory(null)
+        }}
+      />
+
       {category && <CategoryFieldsSection category={category} register={register} />}
       {categoryError && <p className="flex items-center gap-1 text-xs text-[#E03D2F]"><AlertCircle size={11} />{categoryError}</p>}
 
       <div>
-        <Label required>{t('basics.condition')}</Label>
+        <div className="flex items-center gap-1.5">
+          <Label required>{t('basics.condition')}</Label>
+          <ContextualHelp label={CONTEXTUAL_COPY.conditionGrading.label} learnMoreHref={CONTEXTUAL_COPY.conditionGrading.learnMoreHref}>
+            {CONTEXTUAL_COPY.conditionGrading.text}
+          </ContextualHelp>
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {(['new', 'like_new', 'good', 'fair'] as ItemCondition[]).map((cond) => {
             const labels: Record<string, string> = {
@@ -395,7 +442,12 @@ function BasicsStep({ onNext, defaults }: { onNext: (d: BasicsData) => void; def
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <Label required>{t('basics.replacementValue')}</Label>
+          <div className="flex items-center gap-1.5">
+            <Label required>{t('basics.replacementValue')}</Label>
+            <ContextualHelp label={CONTEXTUAL_COPY.replacementValue.label} learnMoreHref={CONTEXTUAL_COPY.replacementValue.learnMoreHref}>
+              {CONTEXTUAL_COPY.replacementValue.text}
+            </ContextualHelp>
+          </div>
           <input type="number" min={1} {...register('replacement_value', { valueAsNumber: true })} className={inputCls(!!errors.replacement_value)} />
           <FieldError message={errors.replacement_value?.message} />
         </div>
@@ -645,7 +697,12 @@ function OwnershipStep({
       </div>
 
       <div>
-        <Label required>{t('ownership.proofLabel')}</Label>
+        <div className="flex items-center gap-1.5">
+          <Label required>{t('ownership.proofLabel')}</Label>
+          <ContextualHelp label={CONTEXTUAL_COPY.ownershipProofTypes.label} learnMoreHref={CONTEXTUAL_COPY.ownershipProofTypes.learnMoreHref}>
+            {CONTEXTUAL_COPY.ownershipProofTypes.text}
+          </ContextualHelp>
+        </div>
         {ownershipFile ? (
           <div className="flex items-center gap-3 p-4 border border-green-200 bg-green-50 rounded-xl">
             <FileText size={20} className="text-green-500 shrink-0" />
@@ -900,7 +957,12 @@ function PricingStep({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>{t('pricing.minBookingNotice')} <span className="text-[#9B8B85] font-normal text-xs">{t('optional')}</span></Label>
+                <div className="flex items-center gap-1.5">
+                  <Label>{t('pricing.minBookingNotice')} <span className="text-[#9B8B85] font-normal text-xs">{t('optional')}</span></Label>
+                  <ContextualHelp label={CONTEXTUAL_COPY.bookingNoticeAdvance.label} learnMoreHref={CONTEXTUAL_COPY.bookingNoticeAdvance.learnMoreHref}>
+                    {CONTEXTUAL_COPY.bookingNoticeAdvance.text}
+                  </ContextualHelp>
+                </div>
                 <input type="number" min={0} max={90} {...register('min_booking_notice_days', { valueAsNumber: true })} className={inputCls()} />
               </div>
               <div>
@@ -1046,7 +1108,12 @@ function RequirementsStep({
 
       {/* Usage rules */}
       <div className="border border-[#F2EDE8] rounded-2xl p-4 space-y-3">
-        <p className="text-sm font-semibold text-[#1A0A0A]">{t('requirements.usageRulesHeading')}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-semibold text-[#1A0A0A]">{t('requirements.usageRulesHeading')}</p>
+          <ContextualHelp label={CONTEXTUAL_COPY.permittedProhibitedUse.label} learnMoreHref={CONTEXTUAL_COPY.permittedProhibitedUse.learnMoreHref}>
+            {CONTEXTUAL_COPY.permittedProhibitedUse.text}
+          </ContextualHelp>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label>{t('requirements.permittedUse')} <span className="text-[#9B8B85] font-normal text-xs">{t('optional')}</span></Label>
@@ -1100,7 +1167,12 @@ function RequirementsStep({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <Label>{t('requirements.missingAccessoryConsequence')} <span className="text-[#9B8B85] font-normal text-xs">{t('optional')}</span></Label>
+            <div className="flex items-center gap-1.5">
+              <Label>{t('requirements.missingAccessoryConsequence')} <span className="text-[#9B8B85] font-normal text-xs">{t('optional')}</span></Label>
+              <ContextualHelp label={CONTEXTUAL_COPY.lostOrDamagedConsequence.label} learnMoreHref={CONTEXTUAL_COPY.lostOrDamagedConsequence.learnMoreHref}>
+                {CONTEXTUAL_COPY.lostOrDamagedConsequence.text}
+              </ContextualHelp>
+            </div>
             <textarea {...register('missing_accessory_consequence')} rows={2} className={inputCls()} />
           </div>
           <div>

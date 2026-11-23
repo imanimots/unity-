@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, Package, Calendar,
   AlertTriangle, Link2, BookOpen, BarChart3,
   Menu, X, Shield, LogOut, ChevronRight, UserCheck, Mail,
-  Wallet, Inbox, ScrollText, Repeat, ShoppingBag, DollarSign, Banknote, CreditCard, Percent, ShieldCheck, ClipboardList, KeyRound, Megaphone, Headset, Lightbulb,
+  Wallet, Inbox, ScrollText, Repeat, ShoppingBag, DollarSign, Banknote, CreditCard, Percent, ShieldCheck, ClipboardList, KeyRound, Megaphone, Headset, Lightbulb, Flag,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { IS_MOCK_MODE } from '@/lib/mock/data'
@@ -29,9 +29,10 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: t
   {
     label: 'Trust & Safety',
     items: [
-      { href: '/admin/disputes', label: 'Disputes',          icon: AlertTriangle },
-      { href: '/admin/support',  label: 'Support',            icon: Headset       },
-      { href: '/admin/reviews',  label: 'Review Moderation',  icon: ShieldCheck   },
+      { href: '/admin/disputes',        label: 'Disputes',          icon: AlertTriangle },
+      { href: '/admin/support',         label: 'Support',            icon: Headset       },
+      { href: '/admin/reviews',         label: 'Review Moderation',  icon: ShieldCheck   },
+      { href: '/admin/listing-reports', label: 'Listing Reports',    icon: Flag          },
     ],
   },
   {

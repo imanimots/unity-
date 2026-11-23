@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react'
 import { useTranslations } from 'next-intl'
 import { Link } from '@/i18n/navigation'
 import { ArrowLeft } from 'lucide-react'
+import { ContextualHelp } from '@/components/ui/contextual-help'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -131,7 +132,12 @@ export default function MerchantRentToBuyTermsPage({ params }: PageProps) {
             <input className={inputClass} type="number" min="1" value={installmentAmount} onChange={(e) => setInstallmentAmount(e.target.value)} />
           </div>
           <div>
-            <label className={labelClass}>{t('installmentCount')}</label>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <label className={`${labelClass} mb-0`}>{t('installmentCount')}</label>
+              <ContextualHelp label="How do these add up?">
+                They don&apos;t need to multiply out exactly to the total purchase price -- the actual schedule adjusts the final installment so the total always reconciles correctly.
+              </ContextualHelp>
+            </div>
             <input className={inputClass} type="number" min="1" value={installmentCount} onChange={(e) => setInstallmentCount(e.target.value)} />
           </div>
         </div>
@@ -152,7 +158,12 @@ export default function MerchantRentToBuyTermsPage({ params }: PageProps) {
         <div className="pt-2 border-t border-[#E8E0D8]">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[#1A0A0A] mt-4 mb-3">{t('possessionSection')}</h2>
           <div>
-            <label className={labelClass}>{t('possessionTrigger')}</label>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <label className={`${labelClass} mb-0`}>{t('possessionTrigger')}</label>
+              <ContextualHelp label="What do these mean?">
+                First payment: possession transfers once the first installment is paid. Installment count / Percentage: once that many installments, or that share of the total, are paid. Full payment: only once everything is paid. If you also set a security deposit, it must be paid first regardless of the trigger chosen.
+              </ContextualHelp>
+            </div>
             <select className={inputClass} value={possessionTriggerType} onChange={(e) => setPossessionTriggerType(e.target.value as typeof possessionTriggerType)}>
               <option value="first_payment">{t('trigger.firstPayment')}</option>
               <option value="installment_count">{t('trigger.installmentCount')}</option>
@@ -194,11 +205,21 @@ export default function MerchantRentToBuyTermsPage({ params }: PageProps) {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={labelClass}>{t('gracePeriodDays')}</label>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <label className={`${labelClass} mb-0`}>{t('gracePeriodDays')}</label>
+              <ContextualHelp label="What is this for?">
+                How many extra days a customer gets past an installment&apos;s due date before it&apos;s treated as missed/default.
+              </ContextualHelp>
+            </div>
             <input className={inputClass} type="number" min="0" value={gracePeriodDays} onChange={(e) => setGracePeriodDays(e.target.value)} />
           </div>
           <div>
-            <label className={labelClass}>{t('returnWindowDays')}</label>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <label className={`${labelClass} mb-0`}>{t('returnWindowDays')}</label>
+              <ContextualHelp label="What is this for?">
+                How many days a customer has to return the item once the agreement ends in a return (rather than ownership) -- e.g. after an unresolved default.
+              </ContextualHelp>
+            </div>
             <input className={inputClass} type="number" min="0" value={returnWindowDays} onChange={(e) => setReturnWindowDays(e.target.value)} />
           </div>
         </div>

@@ -3,6 +3,8 @@
 import { Suspense, useCallback } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { ContextualHelp } from '@/components/ui/contextual-help'
+import { CONTEXTUAL_COPY } from '@/lib/help/contextual-copy'
 
 export type MarketplaceKind = 'item' | 'skill' | 'task'
 
@@ -33,27 +35,34 @@ function KindToggleInner() {
   )
 
   return (
-    <div role="radiogroup" aria-label="Items, Skills, or Tasks" className="inline-flex rounded-full border border-[#E8E0D8] bg-white p-1">
-      {(['item', 'skill', 'task'] as const).map((id) => {
-        const selected = kind === id
-        return (
-          <button
-            key={id}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            onClick={() => handleChange(id)}
-            className={cn(
-              'px-4 py-2 rounded-full text-sm font-semibold transition-colors',
-              selected
-                ? 'bg-[#8B1A1A] text-white'
-                : 'text-[#6B5B55] hover:bg-[#FAF8F5]'
-            )}
-          >
-            {id === 'item' ? 'Items' : id === 'skill' ? 'Skills' : 'Tasks'}
-          </button>
-        )
-      })}
+    <div className="inline-flex items-center gap-1.5">
+      <div role="radiogroup" aria-label="Items, Skills, or Tasks" className="inline-flex rounded-full border border-[#E8E0D8] bg-white p-1">
+        {(['item', 'skill', 'task'] as const).map((id) => {
+          const selected = kind === id
+          return (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => handleChange(id)}
+              className={cn(
+                'px-4 py-2 rounded-full text-sm font-semibold transition-colors',
+                selected
+                  ? 'bg-[#8B1A1A] text-white'
+                  : 'text-[#6B5B55] hover:bg-[#FAF8F5]'
+              )}
+            >
+              {id === 'item' ? 'Items' : id === 'skill' ? 'Skills' : 'Tasks'}
+            </button>
+          )
+        })}
+      </div>
+      {kind !== 'item' && (
+        <ContextualHelp label={CONTEXTUAL_COPY.skillVsTask.label} learnMoreHref={CONTEXTUAL_COPY.skillVsTask.learnMoreHref}>
+          {CONTEXTUAL_COPY.skillVsTask.text}
+        </ContextualHelp>
+      )}
     </div>
   )
 }

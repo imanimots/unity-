@@ -3,7 +3,8 @@ import { getTranslations, getLocale } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
 import { Clock, Package, ArrowLeft } from 'lucide-react'
 import { requireAuth } from '@/lib/supabase/require-admin'
-import { BOOKING_STATUS_LABELS, type BookingLifecycleStatus } from '@/lib/bookings/status-labels'
+import type { BookingLifecycleStatus } from '@/lib/bookings/status-labels'
+import { BookingStatusBadge } from '@/components/bookings/booking-status-badge'
 import { BookingActions } from '@/components/bookings/booking-actions'
 import { deriveFinancialReadiness, type WorkflowStatus, type PaymentStatus, type FinancialReadinessState } from '@/lib/checkout/financial-readiness'
 import { triggerLazyExpirySweep } from '@/lib/bookings/lazy-expiry'
@@ -132,7 +133,6 @@ export default async function RenterBookingsPage() {
       ) : (
         <div className="space-y-4">
           {bookings.map((b) => {
-            const sc = BOOKING_STATUS_LABELS[b.status]
             const readiness = readinessByBooking.get(b.id)
             return (
               <div key={b.id} className="bg-white rounded-xl border border-[#F2EDE8] p-5">
@@ -140,7 +140,7 @@ export default async function RenterBookingsPage() {
                   <Link href={`/listings/${b.listing_id}`} className="text-sm font-semibold text-[#1A0A0A] hover:underline">
                     {t('booking')} {b.booking_reference}
                   </Link>
-                  <span className={`shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.classes}`}>{t(`status.${b.status}`)}</span>
+                  <BookingStatusBadge status={b.status} role="renter" />
                 </div>
                 <p className="text-xs text-[#9B8B85] flex items-center gap-1.5">
                   <Clock size={11} /> {fmt(b.start_at)} – {fmt(b.end_at)}

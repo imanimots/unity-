@@ -86,6 +86,36 @@ export const CONTEXTUAL_COPY = {
     text: 'An exact title match ranks first, then a keyword match, then a close-but-not-exact match -- see how search works for the full explanation.',
     learnMoreHref: '/help/how-unity-search-works',
   },
+  conditionGrading: {
+    label: 'What do these mean?',
+    text: 'New: unused. Like New: very light use, no visible wear. Good: normal wear, fully functional. Fair: noticeable wear -- describe it in your listing.',
+    learnMoreHref: '/help/how-to-write-a-listing-that-gets-found',
+  },
+  replacementValue: {
+    label: 'What is this used for?',
+    text: 'What the item is worth if it\'s lost or damaged beyond repair. Recorded for dispute reference -- it doesn\'t automatically set your deposit or insurance amount.',
+    learnMoreHref: '/help/how-to-write-a-listing-that-gets-found',
+  },
+  permittedProhibitedUse: {
+    label: 'What should I write here?',
+    text: 'Be specific, e.g. permitted: "light DIY, indoor and outdoor use"; prohibited: "commercial filming, off-road use." Specific examples are more useful to a renter than a vague restriction.',
+    learnMoreHref: '/help/how-to-write-a-listing-that-gets-found',
+  },
+  lostOrDamagedConsequence: {
+    label: 'What should I write here?',
+    text: 'State plainly what you expect if the item goes missing or is damaged beyond repair -- e.g. "charged the replacement value shown above." A renter sees this before they book.',
+    learnMoreHref: '/help/how-to-write-a-listing-that-gets-found',
+  },
+  ownershipProofTypes: {
+    label: 'What counts as proof?',
+    text: 'A receipt or invoice, a clear photo of the serial number/label, or a short video of you with the item -- any one of these is enough. JPG, PNG, PDF, or MP4.',
+    learnMoreHref: '/help/what-verification-means',
+  },
+  bookingNoticeAdvance: {
+    label: 'What do these control?',
+    text: 'Minimum notice is the shortest advance warning you\'ll accept for a new request. Maximum advance booking limits how far ahead someone can book you. Both optional -- blank means no restriction.',
+    learnMoreHref: '/help/how-to-write-a-listing-that-gets-found',
+  },
 } as const satisfies Record<string, ContextualCopyEntry>
 
 export type ContextualCopyKey = keyof typeof CONTEXTUAL_COPY

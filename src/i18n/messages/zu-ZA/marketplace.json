@@ -117,6 +117,29 @@
     "buyNow": "Thenga Manje — {amount}",
     "youMightAlsoLike": "Ungase uthande futhi",
     "similarListings": "Izinto Ezifanayo Ezifakiwe",
-    "eliteBadgeLabel": "Elite"
+    "eliteBadgeLabel": "Elite",
+    "report": "Bika",
+    "reportDialog": {
+      "title": "Bika le nto efakiwe",
+      "description": "Imibiko ibuyekezwa ithimba le-Unity futhi ayisoze yaboniswa emphakathini.",
+      "reasonLabel": "Isizathu",
+      "reasonPlaceholder": "Khetha isizathu",
+      "reasons": {
+        "prohibited_item": "Into engavunyelwe",
+        "misleading_listing": "Into efakiwe ekhohlisayo",
+        "scam_fraud": "Ubuqili noma inkohliso",
+        "counterfeit": "Impahla yokulingisa",
+        "inappropriate_content": "Okuqukethwe okungafanele",
+        "other": "Okunye"
+      },
+      "descriptionLabel": "Imininingwane engeziwe (kungakhethwa)",
+      "submitted": "Siyabonga — umbiko wakho uthunyelwe.",
+      "submit": "Thumela umbiko",
+      "submitting": "Kuyathunyelwa…",
+      "errors": {
+        "couldNotSubmit": "Ayikwazanga ukuthumela umbiko wakho",
+        "couldNotSubmitRetry": "Ayikwazanga ukuthumela umbiko wakho — sicela uzame futhi"
+      }
+    }
   }
 }

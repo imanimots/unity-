@@ -140,6 +140,9 @@ export function ProposeTradeButton({
       >
         <Repeat size={16} /> {anchorSkillTaskPost?.direction === 'looking_for' ? 'I can help' : 'Propose Trade'}
       </button>
+      {!anchorSkillTaskPost && (
+        <p className="text-xs text-[#9B8B85] mt-1.5 text-center">Any available listing can be offered in a trade -- it doesn&apos;t need to be marked for barter.</p>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl">

@@ -3,7 +3,8 @@ import { getTranslations, getLocale } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
 import { Clock, Package } from 'lucide-react'
 import { requireMerchant } from '@/lib/supabase/require-admin'
-import { BOOKING_STATUS_LABELS, type BookingLifecycleStatus } from '@/lib/bookings/status-labels'
+import type { BookingLifecycleStatus } from '@/lib/bookings/status-labels'
+import { BookingStatusBadge } from '@/components/bookings/booking-status-badge'
 import { BookingActions } from '@/components/bookings/booking-actions'
 import { deriveFinancialReadiness, type WorkflowStatus, type PaymentStatus, type FinancialReadinessState } from '@/lib/checkout/financial-readiness'
 import { triggerLazyExpirySweep } from '@/lib/bookings/lazy-expiry'
@@ -144,7 +145,6 @@ export default async function MerchantBookingsPage() {
       ) : (
         <div className="space-y-3">
           {bookings.map((booking) => {
-            const sc = BOOKING_STATUS_LABELS[booking.status]
             const readiness = readinessByBooking.get(booking.id)
             return (
               <div key={booking.id} className="bg-white rounded-xl border border-[#F2EDE8] p-5">
@@ -152,7 +152,7 @@ export default async function MerchantBookingsPage() {
                   <Link href={`/listings/${booking.listing_id}`} className="text-sm font-semibold text-[#1A0A0A] hover:underline">
                     {t('booking')} {booking.booking_reference}
                   </Link>
-                  <span className={`shrink-0 px-2 py-0.5 rounded-full text-[11px] font-medium ${sc.classes}`}>{t(`status.${booking.status}`)}</span>
+                  <BookingStatusBadge status={booking.status} role="merchant" />
                 </div>
                 <p className="text-xs text-[#9B8B85] flex items-center gap-1.5">
                   <Clock size={11} /> {fmt(booking.start_at)} – {fmt(booking.end_at)}
